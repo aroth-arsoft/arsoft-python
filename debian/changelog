@@ -1,3 +1,9 @@
+arsoft-python (1.4) quantal; urgency=low
+
+  * bump version
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 26 May 2012 19:15:56 +0200
+
 arsoft-python (1.3) oneiric; urgency=low
 
   * rename arsoft-netconfig to arsoft-python
