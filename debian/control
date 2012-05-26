@@ -7,20 +7,20 @@ Build-Depends: debhelper (>= 7.0.50~), python-dev (>= 2.7)
 X-Python-Version: >=2.7
 
 Package: arsoft-python
-Architecture: any
+Architecture: all
 Depends: ${python:Depends}, ${misc:Depends}, ${dhcpserver:Depends}
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 
 Package: arsoft-netconfig
-Architecture: any
+Architecture: all
 Depends: arsoft-python, ${python:Depends}, ${misc:Depends}, ${dhcpserver:Depends}
 Description: common files for the AR Soft netconfig framework
  This package includes all files of the AR Soft netconfig
  framework and all binaries.
 
 Package: arsoft-crypto
-Architecture: any
+Architecture: all
 Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
 Description: crypto utility scripts
  Some scripts to help with crypto related tasks.
