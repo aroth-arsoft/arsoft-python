@@ -1,0 +1,477 @@
+#!/usr/bin/python
+
+import os
+import platform
+import shlex, subprocess
+import argparse
+import sys
+import re
+import io
+from datetime import datetime, timedelta, tzinfo
+from OpenSSL import crypto
+
+__all__ = ["parse_date", "ParseError"]
+
+# Adapted from http://delete.me.uk/2005/03/iso8601.html
+ISO8601_REGEX = re.compile(r"(?P<year>[0-9]{4})((?P<month>[0-9]{2})((?P<day>[0-9]{2})"
+    r"((?P<hour>[0-9]{2})(?P<minute>[0-9]{2})((?P<second>[0-9]{2})(\.(?P<fraction>[0-9]+))?)?"
+    r"(?P<timezone>Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?"
+)
+TIMEZONE_REGEX = re.compile("(?P<prefix>[+-])(?P<hours>[0-9]{2}).(?P<minutes>[0-9]{2})")
+
+class ParseError(Exception):
+    """Raised when there is a problem parsing a date string"""
+
+# Yoinked from python docs
+ZERO = timedelta(0)
+class Utc(tzinfo):
+    """UTC
+    
+    """
+    def utcoffset(self, dt):
+        return ZERO
+
+    def tzname(self, dt):
+        return "UTC"
+
+    def dst(self, dt):
+        return ZERO
+UTC = Utc()
+
+class FixedOffset(tzinfo):
+    """Fixed offset in hours and minutes from UTC
+    
+    """
+    def __init__(self, offset_hours, offset_minutes, name):
+        self.__offset = timedelta(hours=offset_hours, minutes=offset_minutes)
+        self.__name = name
+
+    def utcoffset(self, dt):
+        return self.__offset
+
+    def tzname(self, dt):
+        return self.__name
+
+    def dst(self, dt):
+        return ZERO
+    
+    def __repr__(self):
+        return "<FixedOffset %r>" % self.__name
+
+def parse_timezone(tzstring, default_timezone=UTC):
+    """Parses ISO 8601 time zone specs into tzinfo offsets
+    
+    """
+    if tzstring == "Z":
+        return default_timezone
+    # This isn't strictly correct, but it's common to encounter dates without
+    # timezones so I'll assume the default (which defaults to UTC).
+    # Addresses issue 4.
+    if tzstring is None:
+        return default_timezone
+    m = TIMEZONE_REGEX.match(tzstring)
+    prefix, hours, minutes = m.groups()
+    hours, minutes = int(hours), int(minutes)
+    if prefix == "-":
+        hours = -hours
+        minutes = -minutes
+    return FixedOffset(hours, minutes, tzstring)
+
+def parse_date(datestring, default_timezone=UTC):
+    """Parses ISO 8601 dates into datetime objects
+    
+    The timezone is parsed from the date string. However it is quite common to
+    have dates without a timezone (not strictly correct). In this case the
+    default timezone specified in default_timezone is used. This is UTC by
+    default.
+    """
+    if not isinstance(datestring, basestring):
+        raise ParseError("Expecting a string %r" % datestring)
+    m = ISO8601_REGEX.match(datestring)
+    if not m:
+        raise ParseError("Unable to parse date string %r" % datestring)
+    groups = m.groupdict()
+    tz = parse_timezone(groups["timezone"], default_timezone=default_timezone)
+    if groups["fraction"] is None:
+        groups["fraction"] = 0
+    else:
+        groups["fraction"] = int(float("0.%s" % groups["fraction"]) * 1e6)
+    return datetime(int(groups["year"]), int(groups["month"]), int(groups["day"]),
+        int(groups["hour"]), int(groups["minute"]), int(groups["second"]),
+        int(groups["fraction"]), tz)
+
+
+class certinfo:
+	def __init__(self):
+		self.m_begin_or_end_cert_pattern = re.compile('^-----(?P<cmd>BEGIN|END) CERTIFICATE-----$')
+		self.m_verbose = False
+		self.m_certificate_filename = None
+		self.m_certificate_list_filename = None
+		self.m_certificates = []
+		self.m_certificate_list = []
+		
+	def _readCertFile(self, cert_filename):
+		ret = []
+		certbuffer = ''
+		got_begin = False
+		lineno = 0
+		try:
+			f = open(cert_filename, 'r')
+			for line in f:
+				result = self.m_begin_or_end_cert_pattern.match(line)
+				if result is not None:
+					cmd = result.group('cmd')
+					if cmd == "BEGIN":
+						# clear the cert buffer
+						certbuffer = ''
+						certbuffer += line
+						got_begin = True
+					elif cmd == "END":
+						if got_begin:
+							certbuffer += line
+							cert = crypto.load_certificate(crypto.FILETYPE_PEM, certbuffer) 
+							if cert is not None:
+								ret.append( (cert_filename, cert) )
+							# prepare for next cert
+							got_begin = False
+							certbuffer = ''
+				else:
+					if got_begin:
+						certbuffer += line
+				lineno = lineno + 1
+			f.close()
+		except:
+			ret = []
+			pass
+		return ret
+		
+	def _writeCertFile(self, cert_filename, certs):
+		filedata = ''
+		for cert in certs:
+			certbuf = crypto.dump_certificate(crypto.FILETYPE_PEM, cert) 
+			filedata = filedata + certbuf
+		try:
+			f = open(cert_filename, 'w')
+			f.write(filedata)
+			f.close()
+			ret = True
+		except:
+			ret = False
+			pass
+		return ret
+		
+	def _getAllCertFilesInDir(self, dirname):
+		ret = []
+		exclude_dirs = ['.svn', 'CVS', '.git' ]
+		cert_file_exts = ['.pem', '.crt' ]
+		for direntry in os.listdir(dirname):
+			fullname = os.path.join(dirname, direntry)
+			if os.path.isdir(fullname):
+				if not direntry in exclude_dirs:
+					ret.extend( self._getAllCertFilesInDir(fullname) )
+			else:
+				(basename, ext) = os.path.splitext(direntry)
+				if ext in cert_file_exts:
+					ret.append(fullname)
+		return ret
+
+	def _loadCerts(self, cert_filenames):
+		certbuffer = ''
+		got_begin = False
+		lineno = 0
+		newcerts = []
+		for certfile in cert_filenames:
+			if os.path.isdir(certfile):
+				dir_files = self._getAllCertFilesInDir(certfile)
+				
+				for file_in_dir in dir_files:
+					newcerts.extend( self._readCertFile(file_in_dir) )
+			else:
+				newcerts.extend( self._readCertFile(certfile) )
+		if newcerts:
+			self.m_certificates.extend(newcerts)
+			ret = True
+		else:
+			ret = False
+		return ret
+	
+	def _loadCertList(self, list_filename):
+		got_begin = False
+		lineno = 0
+		self.m_certificate_list = []
+		try:
+			f = open(cert_filename, 'r')
+			for line in f:
+				if line[0] == '#':
+					# it's a comment, so skip this line but keep it for later
+					# (comment, certfile, active)
+					line_obj = (True, line[1:].rstrip(), False)
+				elif line[0] == '!':
+					line_obj = (False, line[1:].rstrip(), False)
+				else:
+					line_obj = (False, line.rstrip(), True)
+
+				self.m_certificate_list.append(line_obj)
+				lineno = lineno + 1
+			f.close()
+		except:
+			pass
+		
+	def _saveCertList(self, list_filename):
+		got_begin = False
+		lineno = 0
+		try:
+			f = open(cert_filename, 'w')
+			for (comment, certfile, active) in self.m_certificate_list:
+				if comment:
+					f.write('#' + certfile + '\n')
+				else:
+					if active:
+						f.write(certfile + '\n')
+					else:
+						f.write('!' + certfile + '\n')
+			f.close()
+		except:
+			pass
+
+	def _enableCertInList(self, cert_filename, enable=True):
+		i = 0
+		ret = False
+		while i < len(self.m_certificate_list):
+			(comment, current_cert_filename, active) = self.m_certificate_list[i]
+			if current_cert_filename == cert_filename:
+				self.m_certificate_list[i] = (comment, cert_filename, enable)
+				ret = True
+			i = i + 1
+		return ret
+
+	def _addCertToList(self, cert_filename, enable=True):
+		i = 0
+		ret = False
+		while i < len(self.m_certificate_list):
+			(comment, current_cert_filename, active) = self.m_certificate_list[i]
+			if current_cert_filename == cert_filename:
+				self.m_certificate_list[i] = (comment, cert_filename, enable)
+				ret = True
+			i = i + 1
+		if not ret:
+			cert_tuple = (comment, cert_filename, enable)
+			self.m_certificate_list.append( cert_tuple )
+		return ret
+
+	def _removeCertFromList(self, cert_filename, enable=True):
+		ret = False
+		i = 0
+		while i < len(self.m_certificate_list):
+			(comment, current_cert_filename, active) = self.m_certificate_list[i]
+			if current_cert_filename == cert_filename:
+				self.m_certificate_list.pop(i)
+				ret = True
+			i = i + 1
+		return ret
+
+	def _matchName(self, name, term):
+		ret = False
+		for (key, value) in name.get_components():
+			if value.count(term) != 0:
+				ret = True
+				break
+		return ret
+
+	def _matchCert(self, cert, term):
+		issuer = cert.get_issuer()
+		subject = cert.get_subject()
+		return self._matchName(issuer, term) or self._matchName(subject, term)
+		
+	def _printName(self, prefix, name):
+		text = ''
+		for (key, value) in name.get_components():
+			if len(text) != 0:
+				text += ', '
+			text += key + '=' + value
+		print(prefix + text)
+		
+	def _printNamePretty(self, label, name, indent=0):
+		prefix = ' ' * indent
+		
+		where = ''
+		if name.localityName:
+			where = name.localityName
+		if name.countryName:
+			if len(where) != 0:
+				where += ', '
+			where += name.countryName
+		if name.stateOrProvinceName:
+			if len(where) != 0:
+				where += ', '
+			where += name.stateOrProvinceName
+			
+		org = ''
+		if name.organizationName:
+			org = name.organizationName
+		if name.organizationalUnitName:
+			if len(org) != 0:
+				org += ', '
+			org += name.organizationalUnitName
+		if name.emailAddress:
+			if len(org) != 0:
+				org += ' '
+			org += '(' + name.emailAddress + ')'
+
+		print(prefix + label + str(name.commonName))
+		if len(org):
+			print(prefix + "  " + org)
+		if len(where):
+			print(prefix + "  " + where)
+	
+	def _printCert(self, cert, indent=0, filename=None, short=False):
+		issuer = cert.get_issuer()
+		serial = cert.get_serial_number() 
+		try:
+			signature_algorithm = cert.get_signature_algorithm()
+		except:
+			signature_algorithm = 'Unknown'
+		subject = cert.get_subject()
+		version = cert.get_version()
+		time_format = "%Y%m%d%H%M%S"
+		not_before = parse_date(cert.get_notBefore())
+		not_after = parse_date(cert.get_notAfter())
+		has_expired = cert.has_expired() 
+		num_extension = cert.get_extension_count()
+		# cert.get_extension(index) 
+		
+		prefix = ' ' * indent
+
+		if short:
+			print(filename)
+		else:
+			if filename:
+				print(prefix + "Certificate " + filename + ": ")
+			else:
+				print(prefix + "Certificate: ")
+			print(prefix + "  Version: " + str(version))
+			print(prefix + "  Serial Number: " + str(serial))
+			print(prefix + "  Signature Algorithm: " + str(signature_algorithm))
+			self._printName('  Issuer:  ', issuer)
+			print(prefix + "  Validity")
+			print(prefix + "    Not Before: " + not_before.ctime())
+			print(prefix + "    Not After : " + not_after.ctime())
+			self._printName('  Subject: ', subject)
+
+	def list_certificates(self, expired_only=False, valid_only=False, output_number=True, short=False):
+		if not short:
+			print("Certificates within " + ','.join(self.m_certificate_filename))
+
+		num_certs = 0
+		for (certfile, cert) in self.m_certificates:
+			if expired_only:
+				if cert.has_expired():
+					self._printCert(cert, filename=certfile, short=short)
+					num_certs = num_certs + 1
+			elif valid_only:
+				if not cert.has_expired():
+					self._printCert(cert, filename=certfile, short=short)
+					num_certs = num_certs + 1
+			else:
+				self._printCert(cert, filename=certfile, short=short)
+				num_certs = num_certs + 1
+
+		if output_number and not short:
+			print("Number of certificates: " + str(num_certs))
+
+	def find(self, term, output_number=True):
+		num_certs = 0
+		for (certfile, cert) in self.m_certificates:
+			if self._matchCert(cert, term):
+				self._printCert(cert, filename=certfile)
+				num_certs = num_certs + 1
+
+		if output_number:
+			print("Number of certificates: " + str(num_certs))
+
+	def addcertfile(self, cert_filename, directory=None, enable=True):
+		(tmp, certs) = self._readCertFile(cert_filename)
+		if len(certs) > 0:
+			basename = os.path.basename(cert_filename)
+			if directory is not None:
+				dest_cert_filename = os.path.join('/usr/share/ca-certificates', directory, basename)
+			else:
+				dest_cert_filename = os.path.join('/usr/share/ca-certificates', basename)
+			ret = self._writeCertFile(dest_cert_filename, certs)
+			if ret:
+				if directory is not None:
+					short_cert_filename = os.path.join(directory, basename)
+				else:
+					short_cert_filename = basename
+				self._loadCertList(self.m_certificate_list_filename)
+				self._addCertToList(short_cert_filename, enable)
+				self._saveCertList(self.m_certificate_list_filename)
+		else:
+			ret = False
+		return ret
+
+	def removecertfile(self, cert_filename, directory=None, enable=True):
+		basename = os.path.basename(cert_filename)
+		if directory is not None:
+			dest_cert_filename = os.path.join('/usr/share/ca-certificates', directory, basename)
+		else:
+			dest_cert_filename = os.path.join('/usr/share/ca-certificates', basename)
+		os.unlink(dest_cert_filename)
+		if directory is not None:
+			short_cert_filename = os.path.join(directory, basename)
+		else:
+			short_cert_filename = basename
+		self._loadCertList(self.m_certificate_list_filename)
+		self._removeCertToList(short_cert_filename, enable)
+		self._saveCertList(self.m_certificate_list_filename)
+		return True
+
+	def main(self):
+		#=============================================================================================
+		# process command line
+		#=============================================================================================
+		parser = argparse.ArgumentParser(description='shows information about certificates')
+		parser.add_argument('certfile', help='input certificate file or directory', metavar='certfile', nargs='+')
+		parser.add_argument('--listfile', dest='listfile', help='input certificate list file', metavar='listfile')
+		parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+		parser.add_argument('--find', dest='findbyname', help='find a certificate by name', metavar='term')
+		parser.add_argument('--expired', dest='list_expired', action='store_true', help='lists all expired ceritificates')
+		parser.add_argument('--short', dest='short', action='store_true', help='lists only the certificate file names')
+		parser.add_argument('--valid', dest='list_valid', action='store_true', help='lists only valid ceritificates')
+		parser.add_argument('--add', dest='addcertfile', help='add the given certificate file', metavar='certfile')
+		parser.add_argument('--remove', dest='removecertfile', help='remove the given certificate file', metavar='certfile')
+
+		args = parser.parse_args()
+
+		self.m_verbose = args.verbose
+		
+		if args.certfile is None:
+			self.m_certificate_filename = [ '/etc/ssl/certs/ca-certificates.crt' ]
+		else:
+			self.m_certificate_filename = args.certfile
+			
+		if args.listfile is None:
+			self.m_certificate_list_filename = '/etc/ca-certificates.conf'
+		else:
+			self.m_certificate_list_filename = args.listfile
+		
+		if args.addcertfile:
+			self.addcertificate(args.addcertfile)
+		elif args.removecertfile:
+			self.addcertificate(args.addcertfile)
+		else:
+			self._loadCerts(self.m_certificate_filename)
+
+		if args.findbyname:
+			self.find(args.findbyname, short=args.short)
+		else:
+			if args.list_expired:
+				self.list_certificates(expired_only=True, short=args.short)
+			elif args.list_valid:
+				self.list_certificates(valid_only=True, short=args.short)
+			else:
+				self.list_certificates(short=args.short)
+
+if __name__ == "__main__":
+	app =  certinfo()
+	app.main()

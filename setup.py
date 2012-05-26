@@ -10,7 +10,7 @@ setup(name='netconfig',
 		author_email='aroth@arsoft-online.com',
 		url='http://www.arsoft-online.com/',
 		packages=['arsoft', 'arsoft.netconfig'],
-		scripts=['pxeconfig'],
+		scripts=['pxeconfig', 'certinfo'],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients']),

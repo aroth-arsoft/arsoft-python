@@ -1,0 +1,8 @@
+usr/bin/pxeconfig
+usr/lib/python2.7/dist-packages/arsoft/netconfig
+etc
+etc/ldap
+etc/ldap/schema
+etc/ldap/schema/netconfig.schema
+etc/cron.hourly
+etc/cron.hourly/update-dhcpd-pxeclients
