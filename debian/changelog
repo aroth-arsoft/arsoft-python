@@ -1,3 +1,9 @@
+arsoft-python (1.5) quantal; urgency=low
+
+  * fixed several package depends
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 29 May 2012 07:34:55 +0200
+
 arsoft-python (1.4) quantal; urgency=low
 
   * bump version
