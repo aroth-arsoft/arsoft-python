@@ -3,7 +3,7 @@ Section: admin
 Priority: optional
 Maintainer: Andreas Roth <aroth@arsoft-online.com>
 Standards-Version: 3.9.2
-Build-Depends: debhelper (>= 7.0.50~), python-dev >= 2.7
+Build-Depends: debhelper (>= 7.0.50~), python-dev (>= 2.7)
 X-Python-Version: >=2.7
 
 Package: arsoft-python
