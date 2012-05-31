@@ -1,0 +1,496 @@
+#!/usr/bin/python
+
+import sys
+import argparse
+import os
+import shlex, subprocess
+import ConfigParser
+import time
+import re
+
+from arsoft.backup import *
+
+SCRIPTDIR=os.path.dirname(__file__)
+REMOTEUSER='fast-srv02'
+REMOTEMACHINE='ossrv.arsoft.dyndns.dk'
+REMOTEDIR='/local/nuna/developer/fast-srv02'
+#REMOTEID=SCRIPTDIR + '/id_backup_at_fast-srv01_fastprotect_net'
+REMOTEID='/root/fast-srv02_at_ossrv.arsoft.homeip.net'
+REMOTE_MAX_DAYS='+8'
+
+verbose = False
+quiet = False
+
+class Usage(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+def remote_upload_file(filename, dest=None):
+    target=REMOTEUSER + "@" + REMOTEMACHINE + ":" + REMOTEDIR
+    if dest is not None:
+        target = target + dest
+
+    print "remote_upload " + filename + " to " + target
+    cmdline = ['/usr/bin/scp', '-q', '-i', REMOTEID, filename, target]
+
+    try:
+        print "remote_upload_file cmdline " + str(cmdline)
+        p = subprocess.Popen(cmdline, stdout=subprocess.PIPE)
+    except OSError, e:
+        p = None
+        print >>sys.stderr, "Execution failed:", e
+    if p is not None:
+        p.wait()
+        ret = p.returncode
+    else:
+        ret = -1
+    return ret
+    
+def remote_commandline(cmdline):
+    cmdline = ['/usr/bin/ssh', '-i', REMOTEID, REMOTEUSER + "@" + REMOTEMACHINE, cmdline]
+    
+    try:
+        print "remote_commandline cmdline " + str(cmdline)
+        p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except OSError, e:
+        p = None
+        print >>sys.stderr, "Execution failed:", e
+    if p is not None:
+        p.wait()
+        out = p.stdout.read()
+        err = p.stderr.read()
+        ret = p.returncode
+    else:
+        ret = -1
+        out = None
+        err = None
+    return (ret, out, err)
+    
+def remote_upload_file_and_hash(filename, hashsum, dest=None):
+    remote_upload_file(filename)
+    
+    b = os.path.basename(filename)
+    (path, ext) = os.path.splitext(b)
+    hashfile = path + ".md5"
+    
+    remotecmdline="echo -n \"" + hashsum + "\" > \"" + REMOTEDIR + "/" + hashfile + "\""
+    (ret, out, err) = remote_commandline(remotecmdline)
+    return (ret, out, err)
+
+def remote_remove_file(filename):
+    b = os.path.basename(filename)
+    
+    destfile = REMOTEDIR + "/" + b
+    remotecmdline="rm \"" + destfile + "\""
+    (ret, out, err) = remote_commandline(remotecmdline)
+    return ret
+
+def remote_remove_oldest(backupdir):
+    remotecmdline="find \"" + REMOTEDIR + "\" -name \"" + backupdir + "\" -type f -mtime " + str(REMOTE_MAX_DAYS) + " -exec rm {} \;"
+    (ret, out, err) = remote_commandline(remotecmdline)
+    return ret
+    
+def remote_check_hash_file(filename):
+    b = os.path.basename(filename)
+    (path, ext) = os.path.splitext(b)
+    hashfile = path + ".md5"
+
+    remotecmdline="cat \"" + REMOTEDIR + "/" + hashfile + "\""
+    (ret, out, err) = remote_commandline(remotecmdline)
+    if len(err):
+        return None
+    else:
+        return out
+
+def remote_check_file(filename):
+    b = os.path.basename(filename)
+    
+    destfile = REMOTEDIR + "/" + b
+
+    remotecmdline="ls -1 \"" + destfile + "\""
+    (ret, out, err) = remote_commandline(remotecmdline)
+    if len(err):
+        return False
+    else:
+        #print "destfile=" + destfile + " out=" + out.rstrip()
+        return (out.rstrip() == destfile)
+
+def remove_old(backupdir, max_keep_days=30):
+    cmdline=["/usr/bin/find", backupdir,"-mtime", "+" + str(max_keep_days), "-exec", "rm", "{}\;"]
+    print "cmdline " + str(cmdline)
+    try:
+        p = subprocess.Popen(cmdline, shell=True)
+    except OSError, e:
+        p = None
+        print >>sys.stderr, "Execution failed:", e
+    if p is not None:
+        p.wait()
+        ret = p.returncode
+    else:
+        ret = -1
+    return ret
+    
+def get_backupfile_name(repo, backupdir, minrev=None, maxrev=None, bzip2=True):
+    
+    b = os.path.basename(repo)
+    if len(b) == 0:
+        elems = repo.split('/')
+        while len(b) == 0:
+            b = elems.pop()
+    filename = "svn_" + b
+    if minrev is not None and maxrev is not None:
+        filename = filename + "_rev_" + str(minrev) + "_" + str(maxrev)
+
+    if bzip2:
+        filename = filename + ".bz2"
+        
+    ret = os.path.join(backupdir, filename )
+    return ret
+
+def backup_repo(repo, backupdir, minrev=None, maxrev=None):
+    if minrev is not None and maxrev is not None:
+        if minrev >= maxrev and minrev != 0 and maxrev != 0:
+            return (None, None)
+    
+        if minrev > maxrev:
+            maxrev = minrev
+        revision = str(minrev) + ":" + str(maxrev)
+    
+    backupfile = get_backupfile_name(repo, backupdir, minrev, maxrev)
+
+    print "dump " + repo + " revision " + str(revision) + " to " + backupfile
+
+    hashsum = check_hash_file(backupfile)
+    if hashsum is not None:
+        print backupfile + " already exists (" + hashsum + ")"
+    else:
+        print "create " + backupfile
+        svndump(repo, backupfile, minrev, maxrev)
+        (hashfile, hashsum) = generate_hash_file(backupfile)
+        print "created " + backupfile + " (" + hashsum + ")"
+
+    return (backupfile, hashsum)
+
+    
+    
+def cleanup_backup_files(oldfilelist, newfilelist):
+    for (fold, hashold) in oldfilelist: 
+        found = False
+        for (fnew, hashnew) in newfilelist:
+            if fold == fnew:
+                found = True
+                break
+        if found == False:
+            if os.path.exists(fold):
+                os.remove(fold)
+            (path, ext) = os.path.splitext(fold)
+            hashfile = path + ".md5"
+            if os.path.exists(hashfile):
+                os.remove(hashfile)
+            
+def remote_cleanup_backup_files(oldfilelist, newfilelist):
+    for (fold, hashold) in oldfilelist: 
+        found = False
+        for (fnew, hashnew) in newfilelist:
+            if fold == fnew:
+                found = True
+                break
+        if found == False:
+            if remote_check_file(fold):
+                remote_remove_file(fold)
+            (path, ext) = os.path.splitext(fold)
+            hashfile = path + ".md5"
+            if remote_check_file(hashfile):
+                remote_remove_file(hashfile)
+
+
+def start_backup_repo(repo, backupdir, lastbackupdir, statedir, options):
+
+    time_start = time.time()
+    (last_backup_revision, last_backup_files) = read_state_file(repo, statedir)
+
+    print "repo " + str(repo)
+    print "last_backup_revision " + str(last_backup_revision)
+    print "last_backup_files " + str(last_backup_files)
+
+    current_revision = get_latest_revision(repo)
+
+    if current_revision >= 0:
+        remain = current_revision
+        highest_10000 = int(remain / 10000) * 10000
+        remain = remain % 10000
+        highest_1000 = int(remain / 1000) * 1000
+        remain = remain % 1000
+        highest_100 = highest_1000 + (int(remain / 100) * 100)
+        remain = remain % 100
+        highest_10 = highest_100 + (int(remain / 10) * 10)
+        remain = remain % 10
+        
+        print "current revision " + str(current_revision)
+        print "current highest_10000 " + str(highest_10000)
+        print "current highest_1000 " + str(highest_1000)
+        print "current highest_100 " + str(highest_100)
+        print "current highest_10 " + str(highest_10)
+        
+        newoutfiles = []
+
+        last_revision = -1
+
+        if highest_10000 > 0:
+            for r in range(0, highest_10000 + 1, 10000):
+                if r <= 0:
+                    continue
+                print "10000 backup_repo(" + repo + ", " + backupdir + ", " + str(last_revision + 1) + ", " + str(r) + ")"
+                (bakfile, hashsum) = backup_repo(repo, backupdir, last_revision + 1, r)
+                if bakfile is not None and newoutfiles.count( (bakfile, hashsum) ) == 0:
+                    newoutfiles.append( (bakfile, hashsum) )
+                last_revision = r
+                
+        if highest_1000 > 0:
+            for r in range(0, highest_1000 + 1, 1000):
+                if r <= 0:
+                    continue
+                print "1000 backup_repo(" + repo + ", " + backupdir + ", " + str(last_revision + 1) + ", " + str(r) + ")"
+                (bakfile, hashsum) = backup_repo(repo, backupdir, last_revision + 1, r)
+                if bakfile is not None and newoutfiles.count( (bakfile, hashsum) ) == 0:
+                    newoutfiles.append( (bakfile, hashsum) )
+                last_revision = r
+
+        if highest_100 > 0:
+            for r in range(last_revision, highest_100 + 1, 100):
+                if r <= 0:
+                    continue
+                print "100 backup_repo(" + repo + ", " + backupdir + ", " + str(last_revision + 1) + ", " + str(r) + ")"
+                (bakfile, hashsum) = backup_repo(repo, backupdir, last_revision + 1, r)
+                if bakfile is not None and newoutfiles.count( (bakfile, hashsum) ) == 0:
+                    newoutfiles.append( (bakfile, hashsum) )
+                last_revision = r
+            
+        if highest_10 > 0:
+            for r in range(last_revision, highest_10 + 1, 10):
+                if r <= 0:
+                    continue
+                print "10 backup_repo(" + repo + ", " + backupdir + ", " + str(last_revision + 1) + ", " + str(r) + ")"
+                (bakfile, hashsum) = backup_repo(repo, backupdir, last_revision + 1, r)
+                if bakfile is not None and newoutfiles.count( (bakfile, hashsum) ) == 0:
+                    newoutfiles.append( (bakfile, hashsum) )
+                last_revision = r
+        
+        print "backup_repo(" + repo + ", " + backupdir + ", " + str(last_revision + 1) + ", " + str(current_revision) + ")"
+        (bakfile, hashsum) = backup_repo(repo, backupdir, last_revision + 1, current_revision)
+        if bakfile is not None and newoutfiles.count( (bakfile, hashsum) ) == 0:
+            newoutfiles.append( (bakfile, hashsum) )
+        
+        write_state_file(repo, statedir, current_revision, newoutfiles)
+        cleanup_backup_files(last_backup_files, newoutfiles)
+        if options['noremote'] == False:
+            upload_backup_files(newoutfiles)
+            remote_cleanup_backup_files(last_backup_files, newoutfiles)
+            
+    else:
+        print >>sys.stderr, "failed to get latest revision from " + repo
+    time_end = time.time()
+    print "backup of repo " + repo + " took " + str(time_end - time_start) + " seconds"
+    
+def retrieve_backup_list(backupdir, repo):
+    b = os.path.basename(repo)
+    if len(b) == 0:
+        elems = repo.split('/')
+        while len(b) == 0:
+            b = elems.pop()
+    backup_file_pattern = "svn_" + b + "_rev_([0-9]+)_([0-9]+).bz2"
+
+    ret = []
+    for filename in os.listdir(backupdir):
+        m = re.match(backup_file_pattern, filename)
+        if m is not None:
+            lower_rev = int(m.group(1))
+            upper_rev = int(m.group(2))
+            ret.append( (filename, lower_rev, upper_rev) )
+
+    return ret
+
+def get_latest_revision_from_backup(backupdir, repo):
+    filelist = retrieve_backup_list(backupdir, repo)
+
+    print filelist
+    
+    current_rev = -1
+    while len(filelist) > 0:
+        last_loop_rev = current_rev
+        for item in filelist:
+            (filename, lower_rev, upper_rev) = item
+            if lower_rev == current_rev + 1:
+                print "found revision " + str(lower_rev) + " to " + str(upper_rev)
+                current_rev = upper_rev;
+                filelist.remove(item)
+                break
+        if last_loop_rev == current_rev:
+            print "no more backup items of value"
+            break;
+        else:
+            print "remaining items " + str(len(filelist))
+            print filelist
+    
+    return current_rev
+    
+def build_single_dumpfile(repo, backupdir, dumpfile, options):
+    filelist = retrieve_backup_list(backupdir, repo)
+
+    ordered_filelist = []
+    current_rev = -1
+    while len(filelist) > 0:
+        last_loop_rev = current_rev
+        for item in filelist:
+            (filename, lower_rev, upper_rev) = item
+            if lower_rev == current_rev + 1:
+                ordered_filelist.append(backupdir + '/' + filename)
+                current_rev = upper_rev;
+                filelist.remove(item)
+                break
+        if last_loop_rev == current_rev:
+            print "no more backup items of value"
+            break;
+        else:
+            print "remaining items " + str(len(filelist))
+            print filelist
+    svnrestoredump(ordered_filelist, dumpfile)
+
+def start_restore_repo(repo, backupdir, destdir, options):
+
+    last_backup_revision = get_latest_revision_from_backup(backupdir, repo)
+
+    print "repo " + str(repo)
+    print "last_backup_revision " + str(last_backup_revision)
+    
+    dumpfile = destdir + '/test_svn_out'
+    print "dumpfile " + str(dumpfile)
+    build_single_dumpfile(repo, backupdir, dumpfile, options)
+
+    repodir = destdir + '/test_repo'
+    svncreate(repodir)
+    svnrestore(dumpfile, repodir)
+
+class svnbackup:
+    
+    def __init__(self):
+        self.m_bakdir = None
+        self.m_repo = None
+        self.m_verbose = False
+        self.m_rsync = False
+        self.m_name = None
+
+        self.lastbackupdir = None
+        self.statedir = None
+        self.destdir = None
+        self.keeptime = "30d"
+        self.backup_opts = {}
+        self.backup_opts['noremote'] = False
+        self.restore = False
+
+    def log(self, msg):
+        if self.m_verbose:
+            print(str(msg))
+
+    def start_restore(backupdir=None, destdir=None, options={}):
+        if backupdir is None:
+            backupdir='/local/backup/svn'
+
+        for repo in self.repos:
+            start_restore_repo(repo, backupdir, destdir, options)
+            
+    def main(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+            
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='backup the given subversion repository')
+        parser.add_argument('--backupdir', dest='backupdir', help='backup directory', metavar='backupdir')
+        parser.add_argument('-n', '--name', dest='name', help='sets the name of the repository and/or backups.')
+        parser.add_argument('-d', '--destdir', dest='destdir', help='destination directory for backup or restore (can be remote).')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--restore', dest='restore', action='store_true', help='restore a backup.')
+        parser.add_argument('--cleanup', dest='cleanup', action='store_true', help='clean up a backup and removes obsolete files.')
+        parser.add_argument('--verify', dest='verify', action='store_true', help='verify a backup.')
+        parser.add_argument('--rsync', dest='rsync', action='store_true', help='rsync the backup directory with remote.')
+        parser.add_argument('-i', '--info', dest='info', action='store_true', help='show information only.')
+        parser.add_argument('-r', '--repo', dest='repo', help='specify the repository to backup.')
+        parser.add_argument('-k', '--keyfile', dest='keyfile', help='specifies a SSH key file to access the remote source.')
+
+        args = parser.parse_args()
+
+        self.m_verbose = args.verbose
+        self.m_name = args.name
+        
+        if args.backupdir:
+            self.m_bakdir = BackupDirectory(args.backupdir, name=self.m_name, prefix='svn', verbose=self.m_verbose)
+
+        if args.repo:
+            self.m_repo = SubversionRepository(args.repo, verbose=self.m_verbose)
+
+        if args.rsync:
+            self.m_rsync = True
+        
+        if args.info:
+            if self.m_bakdir:
+                (bak_youngest_filename, bak_youngest_hashfilename, bak_youngest_from, bak_youngest_to) = self.m_bakdir.get_latest_revision()
+                print('latest backup: ' + bak_youngest_filename)
+                print('latest backup rev: ' + str(bak_youngest_from) + ' to ' + str(bak_youngest_to))
+                
+                missing_revs = self.m_bakdir.missingFiles()
+                for (missing_from, missing_to) in missing_revs:
+                    print('missing revision: ' + str(missing_from) + ' to ' + str(missing_to))
+                    
+                best_files = self.m_bakdir.bestFiles()
+                for (best_filename, best_hashfilename, best_from, best_to) in best_files:
+                    print(best_filename + ' ' + str(best_from) + ' to ' + str(best_to))
+
+            if self.m_repo:
+                repo_youngest = self.m_repo.get_latest_revision()
+                print('latest repo rev: ' + str(repo_youngest))
+        elif args.verify:
+            if self.m_bakdir:
+                failed_filelist = self.m_bakdir.verifyFiles()
+                if len(failed_filelist) == 0:
+                    print('all files are correct')
+                else:
+                    print('The following files failed to verify:')
+                    for (failed_filename, failed_hashfilename, failed_from, failed_to) in failed_filelist:
+                        print(failed_filename + ' ' + str(failed_from) + ' to ' + str(failed_to))
+        elif args.cleanup:
+            if self.m_bakdir:
+                self.m_bakdir.removeObsoleteFiles()
+        elif args.restore:
+            print('restore hasn\'t been implemented yet.')
+        else:
+            if self.m_bakdir and self.m_repo:
+                (bak_youngest_filename, bak_youngest_hashfilename, bak_youngest_from, bak_youngest_to) = self.m_bakdir.get_latest_revision()
+                repo_youngest = self.m_repo.get_latest_revision()
+                
+                if repo_youngest > bak_youngest_to:
+                    print('create new backup from ' + str(bak_youngest_to + 1) + ' to ' + str(repo_youngest))
+                    
+                    (backupfile, hashfile) = self.m_bakdir.get_filenameAndHash(minrev=bak_youngest_to + 1, maxrev=repo_youngest)
+                    
+                    print('backup to ' + backupfile)
+                    if self.m_repo.dump(backupfile, minrev=bak_youngest_to + 1, maxrev=repo_youngest) == 0:
+                        self.m_bakdir.hashFilename(backupfile, hashfile)
+                    else:
+                        print('failed to create backup to ' + backupfile)
+                    self.m_rsync = True
+                    
+            if self.m_bakdir and self.m_rsync:
+                print('rsync to ' + args.destdir)
+                (ret, out, err) = self.m_bakdir.sync_remote(remote_key=args.keyfile, remote_site=args.destdir)
+                if ret == 0:
+                    print('rsync to ' + args.destdir + ' successfully')
+                else:
+                    print('rsync to ' + args.destdir + ' failed with status ' + str(ret))
+                    print(err)
+                    print(out)
+        
+if __name__ == "__main__":
+    app =  svnbackup()
+    app.main()
