@@ -317,7 +317,7 @@ class IniFile(object):
     def save(self, filename=None):
         if filename is None:
             filename = self.m_filename
-        f = open(filename  + '.bak', 'w')
+        f = open(filename, 'w')
         for (name,section) in self.m_sections.items():
             s = section.toString()
             f.write(s)

@@ -1,0 +1,35 @@
+#!/usr/bin/python
+
+import sys
+import argparse
+
+from arsoft.config import *
+
+
+class nsswitch_config:
+    def __init__(self):
+        self.m_verbose = False
+        self.m_nsswitch = None
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='manages the configuration file for the System Databases and Name Service Switch')
+        parser.add_argument('configfile', help='alternatice configuration file', metavar='configfile', nargs='?')
+        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+
+        args = parser.parse_args()
+        self.m_verbose = args.verbose
+        
+        self.m_nsswitch = Nsswitch(args.configfile)
+        if not self.m_nsswitch.open():
+            print('Failed to open ' + self.m_nsswitch.filename())
+        
+        print(self.m_nsswitch.getService('hosts'))
+        
+        self.m_nsswitch.save('/tmp/nsswitch.conf.new')
+
+if __name__ == "__main__":
+    app =  nsswitch_config()
+    app.main()

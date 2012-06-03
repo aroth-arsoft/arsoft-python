@@ -432,6 +432,10 @@ class svnbackup:
 
         if args.rsync:
             self.m_rsync = True
+            
+        if self.m_repo is None:
+            print('No repository specified.')
+            return 1
         
         if args.info:
             if self.m_bakdir:
