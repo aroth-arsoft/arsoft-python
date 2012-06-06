@@ -19,12 +19,12 @@ import re
 import socket
 
 from ldapresult import *
-from inifile import *
 from exception import *
-from ifconfig import *
 from menu import *
 from util import *
 from preseed import *
+
+from arsoft import ifconfig, IniFile
 
 class NetconfigProperty(object):
     """A class to hold a net config property

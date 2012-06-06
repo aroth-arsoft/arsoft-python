@@ -6,7 +6,7 @@ from arsoft.netconfig import *
 from logging import debug, info, exception, error, warning, handlers
 import logging
 import os
-import getopt
+import argparse
 
 class PXEConfig(object):
 	m_netconfig = None
@@ -16,7 +16,7 @@ class PXEConfig(object):
 	m_pxeclient_conf = None
 	m_pxedir = None
 	m_graphics_conf = None
-	m_environ = {'confdir':'/etc/dhcp3',
+	m_environ = {'confdir':'/etc/dhcp',
 					'rundir':'/var/run',
 				}
 
@@ -50,7 +50,7 @@ ALLOWOPTIONS 0\n\
 		if tftpdir is None:
 			tftpdir = '/var/lib/tftproot'
 		if dhcpdir is None:
-			dhcpdir = '/etc/dhcp3'
+			dhcpdir = '/etc/dhcp'
 
 		self.m_dhcp_conf_dir = dhcpdir
 		self.m_dhcpd_conf = self.m_dhcp_conf_dir + '/dhcpd.conf'
@@ -125,7 +125,7 @@ ALLOWOPTIONS 0\n\
 
 			p = os.path.dirname(dhcpd_conf)
 			createpath(p)
-		
+
 			f = open(dhcpd_conf,'r')
 			for line in f:
 				if line.endswith(';\n'):
@@ -147,7 +147,6 @@ ALLOWOPTIONS 0\n\
 				createpath(p)
 			
 				f = open(dhcpd_conf,'a')
-				#f.seek(0, os.SEEK_END)
 				f.write('include "' + os.path.abspath(pxeclient_conf) + '";\n')
 				f.close()
 			except IOError, e:
@@ -159,26 +158,32 @@ ALLOWOPTIONS 0\n\
 		if tftpdir is None:
 			tftpdir = self.m_tftpdir
 
-		
 		pxedir = tftpdir + '/pxelinux.cfg'
 		graphics_conf = pxedir + '/graphics.conf'
 
 		p = os.path.dirname(graphics_conf)
 		createpath(p)
 
-		f = open(graphics_conf, 'w')
-		f.write(self.m_graphics_conf_content)
-		f.close()
+		try:
+			f = open(graphics_conf, 'w')
+			f.write(self.m_graphics_conf_content)
+			f.close()
+			ret = True
+		except:
+			ret = False
+			pass
 
-		menus = self.m_netconfig.getBootMenus();
-		if menus is None:
-			warning('no boot menus available')
-		else:
-			debug('create boot menu for default node')
-			self._create_boot_menu(None, menus)
-			for node in self.m_netconfig.getNodes():
-				debug('create boot menu for node ' + node.name)
-				self._create_boot_menu(node, menus)
+		if ret:
+			menus = self.m_netconfig.getBootMenus();
+			if menus is None:
+				debug('no boot menus available')
+			else:
+				debug('create boot menu for default node')
+				self._create_boot_menu(None, menus)
+				for node in self.m_netconfig.getNodes():
+					debug('create boot menu for node ' + node.name)
+					self._create_boot_menu(node, menus)
+		return ret
 
 	def _create_boot_menu(self, node, menuitem, menufile=None):
 		if menufile is None:
@@ -309,77 +314,62 @@ ALLOWOPTIONS 0\n\
 		return 0
 #        print self.m_cfgfile.toString()
 
-def initLog(verbose=False):
-	root = logging.getLogger('')
-	# allow each log channel to decide which msg to keep and which to ignore
-	root.setLevel(logging.DEBUG)
-	console = logging.StreamHandler(sys.stderr)
-	if verbose:
-		level = logging.DEBUG
-	else:
-		level = logging.WARNING
-	console.setLevel(level)
-	console.setFormatter(logging.Formatter(
-		"%(asctime)s\t%(process)d\t%(threadName)s\t%(levelname)s\t%(message)s",
-		datefmt="%Y-%m-%d_%H:%M:%S",
-		)
-	)
-	root.addHandler(console)
 
-	#log:changes every days, 3 files max
-	try:
-		flog=handlers.TimedRotatingFileHandler('/tmp/pxeconfig.log', "d", 1, 3)
-		flog.setLevel(logging.DEBUG)
-		formatter = logging.Formatter(
+class PXEConfigApp(object):
+
+	def _initLog(self, verbose=False):
+		root = logging.getLogger('')
+		# allow each log channel to decide which msg to keep and which to ignore
+		root.setLevel(logging.DEBUG)
+		console = logging.StreamHandler(sys.stderr)
+		if verbose:
+			level = logging.DEBUG
+		else:
+			level = logging.WARNING
+		console.setLevel(level)
+		console.setFormatter(logging.Formatter(
 			"%(asctime)s\t%(process)d\t%(threadName)s\t%(levelname)s\t%(message)s",
 			datefmt="%Y-%m-%d_%H:%M:%S",
+			)
 		)
-		flog.setFormatter(formatter)
-		root.addHandler(flog)
-	except IOError, e:
-		pass
-    
-def usage():
-    print 'pxeconfig [OPTIONS]'
-    print '    -h, --help              displays this help screen'
-    print '    -v, --verbose           enabled verbose output'
-    print '    -t, --test              enabled test mode (config will be written in /tmp)'
-    print '    --dhcp <file>           creates the config file with the host definitions for dhcp'
-    print '    --tftp <dir>            creates the tftp configuration for the hosts'
-	
-if __name__ == '__main__':
-	initLog()
+		root.addHandler(console)
 
-	try:
-		opts, args = getopt.getopt(sys.argv[1:], "hvt", ['help', 'verbose', 'test', 'dhcp=', 'tftp='])
-	except getopt.GetoptError, err:
-		# print help information and exit:
-		print str(err) # will print something like "option -a not recognized"
-		usage()
-		sys.exit(2)
+		#log:changes every days, 3 files max
+		try:
+			flog=handlers.TimedRotatingFileHandler('/tmp/pxeconfig.log', "d", 1, 3)
+			flog.setLevel(logging.DEBUG)
+			formatter = logging.Formatter(
+				"%(asctime)s\t%(process)d\t%(threadName)s\t%(levelname)s\t%(message)s",
+				datefmt="%Y-%m-%d_%H:%M:%S",
+			)
+			flog.setFormatter(formatter)
+			root.addHandler(flog)
+		except IOError, e:
+			pass
 
-	tftp_config_dir = None
-	dhcp_config_dir = None
-	testmode = False
+	def main(self, argv=None):
+		if argv is None:
+			argv = sys.argv
+			
+		#=============================================================================================
+		# process command line
+		#=============================================================================================
+		parser = argparse.ArgumentParser(description='automatically generates the DHCP and TFTP configuration for registered machines in LDAP.')
+		parser.add_argument('--dhcp', dest='dhcpdir', help='set the DHCP config directory', metavar='dhcpdir')
+		parser.add_argument('--tftp', dest='tftpdir', help='set the TFTP root directory', metavar='tftpdir')
+		parser.add_argument('--test', dest='test', action='store_true', help='verify a backup.')
+		parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
 
-	for o, a in opts:
-		if o == '-v' or o == '--verbose':
-			initLog(True)
-		elif o == '-h' or o == "--help":
-			usage()
-			sys.exit(0)
-		elif o == '-t' or o == "--test":
-			testmode = True
-		elif o == "--dhcp":
-			dhcp_config_dir = a
-		elif o == "--tftp":
-			tftp_config_dir = a
+		args = parser.parse_args()
+		self._initLog(args.verbose)
+
+		if args.test is not None and args.test != False:
+			pxe = PXEConfig(tftpdir='/tmp/tftproot', dhcpdir='/tmp/dhcp')
 		else:
-			assert False, "unhandled option"
-		
-	if testmode:
-		pxe = PXEConfig(tftpdir='/tmp/tftproot', dhcpdir='/tmp/dhcp')
-	else:
-		pxe = PXEConfig(tftpdir=tftp_config_dir, dhcpdir=dhcp_config_dir)
-	pxe.update_pxe_clients()
-	pxe.create_boot_menu()
+			pxe = PXEConfig(tftpdir=args.tftpdir, dhcpdir=args.dhcpdir)
+		pxe.update_pxe_clients()
+		pxe.create_boot_menu()
+
+if __name__ == "__main__":
+	app =  PXEConfigApp()
+	app.main()
