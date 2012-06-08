@@ -18,12 +18,10 @@ setup(name='netconfig',
 		scripts=[
             'certinfo',
             'jabber-send',
-            'pxeconfig', 
-            'slapd-config',
-            'svnbackup'
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients']),
+			('/sbin', ['svnbackup', 'slapd-config', 'pxeconfig']),
 			]
 		)

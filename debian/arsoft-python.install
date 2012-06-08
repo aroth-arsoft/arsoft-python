@@ -1,1 +1,6 @@
 usr/lib/python2.7/dist-packages/arsoft/__init__.py
+usr/lib/python2.7/dist-packages/arsoft/inifile.py
+usr/lib/python2.7/dist-packages/arsoft/ifconfig.py
+usr/bin/jabber-send
+usr/sbin/slapd-config
+usr/sbin/svnbackup

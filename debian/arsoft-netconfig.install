@@ -1,4 +1,4 @@
-usr/bin/pxeconfig
+usr/sbin/pxeconfig
 usr/lib/python2.7/dist-packages/arsoft/netconfig
 etc
 etc/ldap
