@@ -22,6 +22,6 @@ setup(name='netconfig',
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients']),
-			('/sbin', ['svnbackup', 'slapd-config', 'pxeconfig']),
+			('/usr/sbin', ['svnbackup', 'slapd-config', 'pxeconfig']),
 			]
 		)

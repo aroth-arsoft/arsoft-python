@@ -14,11 +14,12 @@ class certinfo:
         self.m_certificate_list = None
 
     def _loadCerts(self, cert_filenames):
-        ret = False
+        ret = True
         self.m_certificate_list = CertificateList()
         for certfile in cert_filenames:
-            if self.m_certificate_list.add(certfile):
-                ret = True
+            if not self.m_certificate_list.add(certfile):
+                ret = False
+                print("Failed to add " + str(certfile))
         return ret
 
     def find(self, term, output_number=True):
@@ -175,7 +176,8 @@ class certinfo:
         elif args.removecertfile:
             self._removeCertificate(args.removecertfile)
         else:
-            self._loadCerts(self.m_certificate_filename)
+            if not self._loadCerts(self.m_certificate_filename):
+                return 1
 
         if args.findbyname:
             self.find(args.findbyname, short=args.short)
@@ -190,7 +192,8 @@ class certinfo:
                 self.m_certificate_list.write(sys.stdout, valid_only=True, short=args.short)
             else:
                 self.m_certificate_list.write(sys.stdout, short=args.short)
+        return 0
 
 if __name__ == "__main__":
     app =  certinfo()
-    app.main()
+    sys.exit(app.main())

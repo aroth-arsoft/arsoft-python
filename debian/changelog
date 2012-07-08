@@ -1,3 +1,9 @@
+arsoft-python (1.8) quantal; urgency=low
+
+  * improve certinfo error reporting
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 08 Jul 2012 10:15:56 +0200
+
 arsoft-python (1.7) quantal; urgency=low
 
   * fixed missing files
