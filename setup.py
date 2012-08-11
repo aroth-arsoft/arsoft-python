@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='netconfig',
-		version='1.4',
+		version='1.9',
 		description='AR Soft Network configuration tools',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -17,6 +17,8 @@ setup(name='netconfig',
                     ],
 		scripts=[
             'certinfo',
+            'fritzbox-status',
+            'ini-util',
             'jabber-send',
             ],
 		data_files=[ 

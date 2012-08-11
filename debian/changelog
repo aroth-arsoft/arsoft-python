@@ -1,3 +1,10 @@
+arsoft-python (1.9) precise; urgency=low
+
+  * add ini-util script
+  * add fritzbox-status script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 11 Aug 2012 13:35:30 +0200
+
 arsoft-python (1.8) quantal; urgency=low
 
   * improve certinfo error reporting

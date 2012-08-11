@@ -44,7 +44,7 @@ class IniSection(object):
     values = []
     comment = ''
 
-    def __init__(self, inifile, name, line, comment=''):
+    def __init__(self, inifile, name, line=-1, comment=''):
         self.inifile = inifile
         self.name = name
         self.line = line
@@ -102,6 +102,7 @@ class IniSection(object):
                     else:
                         self.values.insert(last, IniValue(self.inifile, -1, key, value[idx], c, d))
                         last += 1
+            ret = True
         else:
             found = False
             for v in self.values:
@@ -115,6 +116,8 @@ class IniSection(object):
                         del(v)
             if found == False:
                 self.values.append(IniValue(self.inifile, -1, key, value, comment, disabled))
+            ret = True
+        return ret
 
     def _getLast(self, key):
         ret = None
@@ -129,8 +132,10 @@ class IniSection(object):
         found = False
         for v in self.values:
             if v.key == key:
+                found = True
                 del(v)
-        return Found
+                break
+        return found
 
     def __repr__(self):
         return toString()
@@ -153,16 +158,9 @@ class IniFile(object):
     m_sections = {}
     m_commentPrefix = ';'
     m_keyValueSeperator = '='
-    def __init__(self, filename):
-        self.m_filename = filename
-        try:
-            f = open(filename, 'r')
-            self._read(f)
-            f.close()
-        except IOError:
-            self.m_content = []
-            self.m_sections = {}
-
+    def __init__(self, filename=None):
+        if filename is not None:
+            self.open(filename)
     #
     # Regular expressions for parsing section headers and options.
     #
@@ -179,6 +177,20 @@ class IniFile(object):
                                               # by any # space/tab
         r'(?P<value>.*)$'                     # everything up to eol
         )
+        
+    def open(self, filename):
+        try:
+            f = open(filename, 'r')
+            self._read(f)
+            f.close()
+            self.m_filename = filename
+            ret = True
+        except IOError:
+            self.m_content = []
+            self.m_sections = {}
+            self.m_filename = None
+            ret = False
+        return ret
 
     def _read(self, file):
         """Parse a sectioned setup file.
@@ -294,13 +306,19 @@ class IniFile(object):
 
     def set(self, section, key, value, comment=None):
         if section not in self.m_sections:
-            self.m_sections[section] = IniSection(sectname, lineno)
-        self.m_sections[section].set(key, value, comment)
+            self.m_sections[section] = IniSection(self, sectname)
+        return self.m_sections[section].set(key, value, comment)
     
+    def remove(self, section, key, comment=None):
+        if section in self.m_sections:
+            return self.m_sections[section].remove(key, value, comment)
+        else:
+            return True
+
     def append(self, section, key, value, comment=None):
         if section not in self.m_sections:
-            self.m_sections[section] = IniSection(sectname, lineno)
-        self.m_sections[section].append(key, value, comment)
+            self.m_sections[section] = IniSection(self, sectname)
+        return self.m_sections[section].append(key, value, comment)
 
     def has_section(self, section):
         if section in self.m_sections:
@@ -309,6 +327,12 @@ class IniFile(object):
             return False
 
     def __repr__(self):
+        ret = ''
+        for (name,section) in self.m_sections.items():
+            ret += section.toString()
+        return ret
+
+    def __str__(self):
         ret = ''
         for (name,section) in self.m_sections.items():
             ret += section.toString()

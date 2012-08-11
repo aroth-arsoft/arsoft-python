@@ -1,11 +1,41 @@
 import os, stat
 import pwd
 import grp
+import subprocess
+import sys
+
+(python_major, python_minor, python_micro, python_releaselevel, python_serial) = sys.version_info
 
 def isRoot():
     euid = os.geteuid()
     return True if euid == 0 else False
-    
+
+def runcmd(self, exe, args=[], verbose=False):
+    if verbose:
+        print("runcmd " + str(exe) + " args=" + str(args))
+    all_args = [str(exe)]
+    all_args.extend(args)
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, shell=False)
+    if p:
+        (stdoutdata, stderrdata) = p.communicate()
+        if stdoutdata is not None:
+            if int(python_major) < 3: # check for version < 3
+                sys.stdout.write(stdoutdata)
+                sys.stdout.flush()
+            else:
+                sys.stdout.buffer.write(stdoutdata)
+                sys.stdout.buffer.flush()
+        if stderrdata is not None:
+            if int(python_major) < 3: # check for version < 3
+                sys.stderr.write(stderrdata)
+                sys.stderr.flush()
+            else:
+                sys.stderr.buffer.write(stderrdata)
+                sys.stderr.buffer.flush()
+        sts = p.returncode
+    else:
+        sts = -1
+    return sts
 
 def drop_privileges(uid_name='nobody', gid_name='nogroup'):
     if os.getuid() != 0:
@@ -30,35 +60,6 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 def isMountDirectory(path):
     return os.path.ismount(path)
 
-def getMountpoint(filename):
-    ret = None
-    last_dirname = filename
-    try:
-        st = os.stat(filename)
-    except (IOError, OSError) as e:
-        st = None
-        pass
-        
-    if st:
-        last_st = st
-        while True:
-            parent_dir = os.path.dirname(last_dirname)
-            try:
-                st = os.stat(parent_dir)
-            except (IOError, OSError) as e:
-                st = None
-                pass
-            if st.st_dev != last_st.st_dev or st.st_ino == last_st.st_ino:
-                # parent_dir is the mount point.
-                ret = last_dirname
-                break
-            if parent_dir == '/':
-                # stop at root
-                break;
-            last_stat = st
-            last_dirname = parent_dir
-    return ret
-    
 def bytes2human(n):
     symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
     prefix = {}
@@ -80,9 +81,17 @@ class MountEntry(object):
         self._fpassno = int(fpassno) if fpassno is not None else 0
         pass
 
+    def devicename(self):
+        return self._devicename
     def mountpoint(self):
         return self._mountpoint
-        
+    def filesystem(self):
+        return self._filesystem
+    def options(self):
+        return self._options
+    def hasOption(self, optname):
+        return self._options.count(optname) != 0
+
     def __str__(self):
         return  str(self._devicename) + ' ' + \
                 str(self._mountpoint) + ' ' + \
@@ -147,7 +156,67 @@ class MountManager(object):
             ret = False
             pass
         return ret
-    
+
+    @staticmethod
+    def _getMountpoint(filename):
+        ret = None
+        last_dirname = filename
+        try:
+            st = os.stat(filename)
+        except (IOError, OSError) as e:
+            st = None
+            pass
+            
+        if st:
+            last_st = st
+            while True:
+                parent_dir = os.path.dirname(last_dirname)
+                try:
+                    st = os.stat(parent_dir)
+                except (IOError, OSError) as e:
+                    st = None
+                    pass
+                if st.st_dev != last_st.st_dev or st.st_ino == last_st.st_ino:
+                    # parent_dir is the mount point.
+                    ret = last_dirname
+                    break
+                if parent_dir == '/':
+                    # stop at root
+                    break;
+                last_stat = st
+                last_dirname = parent_dir
+        return ret
+
+    @staticmethod
+    def mount(devicename=None, mountpoint=None, options=[]):
+        args = []
+        if devicename:
+            args.append(devicename)
+        if mountpoint:
+            args.append(mountpoint)
+        if len(args) == 0:
+            ret = False
+        else:
+            args.extend(options)
+            exitcode = runcmd('/bin/mount', args)
+            ret = True if exitcode == 0 else False
+        return ret
+
+    @staticmethod
+    def umount(devicename=None, mountpoint=None, options=[]):
+        args = []
+        if devicename:
+            args.append(devicename)
+        if mountpoint:
+            args.append(mountpoint)
+        if len(args) == 0:
+            ret = False
+        else:
+            args.extend(options)
+            exitcode = runcmd('/bin/umount', args)
+            ret = True if exitcode == 0 else False
+        return ret
+
     def reload(self):
         self._active_entries = []
         self._parseFile('/proc/mounts', self._active_entries)
@@ -185,8 +254,20 @@ class MountManager(object):
         return ret
 
     def getEntryForFile(self, filename):
-        mp = getMountpoint(filename)
+        mp = MountManager._getMountpoint(filename)
         return self.getEntry(mp) if mp is not None else None
+        
+    def getDeviceNameForFile(self, filename):
+        mp = MountManager._getMountpoint(filename)
+        if mp:
+            entry = self.getEntry(mp)
+            if entry:
+                ret = entry.devicename()
+            else:
+                ret = None
+        else:
+            ret = None
+        return ret
         
 if __name__ == "__main__":
     mmgr = MountManager()

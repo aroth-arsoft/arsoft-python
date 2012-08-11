@@ -1,0 +1,104 @@
+#!/usr/bin/python
+
+import sys
+import argparse
+from arsoft.inifile import IniFile
+
+class iniutil(object):
+
+    def parse_value(self, line):
+        first_equal = line.rfind('=')
+        if first_equal > 0:
+            raw_key = line[0:first_equal].rstrip()
+            value = line[first_equal + 1:].lstrip()
+        else:
+            raw_key = line.strip()
+
+        last_slash = raw_key.rfind('/')
+        if last_slash > 0:
+            section = raw_key[0:last_slash]
+            key = raw_key[last_slash + 1:]
+        else:
+            section = None
+            key = raw_key
+        return (section, key, value)
+        
+    def format_value(self, section, key, value, only_values=False):
+        if only_values:
+            ret = str(value)
+        else:
+            if section is not None:
+                ret = section + '/' + key + '=' + str(value)
+            else:
+                ret = key + '=' + str(value)
+        return ret
+
+    def main(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+            
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='utility to get or modify values in INI configuration files')
+        parser.add_argument('file', help='configuration file', metavar='inifile')
+        parser.add_argument('--dump', dest='dump', action='store_true', help='read the file and writes the contents to stdout.')
+        parser.add_argument('--value', dest='only_values', action='store_true', help='writes the only the values to stdout.')
+        parser.add_argument('-g', '--get', dest='values_get', metavar='value', nargs='+', help='specifies values to get.')
+        parser.add_argument('-e', '--edit', dest='values_edit', metavar='value', nargs='+', help='specifies values to set.')
+        parser.add_argument('-d', '--delete', dest='values_delete', metavar='value', nargs='+', help='specifies values to delete.')
+        parser.add_argument('-a', '--add', dest='values_add', metavar='value', nargs='+', help='specifies values to add.')
+
+        args = parser.parse_args()
+        
+        self.inifile = IniFile()
+        if not self.inifile.open(args.file):
+            sys.stderr.write('failed to open ' + args.file + '\n')
+            ret = False
+        else:
+            ret = True
+
+        if ret:
+            modified = False
+            if args.values_edit is not None:
+                for line in args.values_edit:
+                    (section, key, value) = self.parse_value(line)
+                    success = self.inifile.set(section, key, value)
+                    if not success:
+                        ret = False
+                    else:
+                        modified = True
+
+            if args.values_delete is not None:
+                for line in args.values_delete:
+                    (section, key, value) = self.parse_value(line)
+                    success = self.inifile.remove(section, key)
+                    if not success:
+                        ret = False
+                    else:
+                        modified = True
+                    
+            if args.values_add is not None:
+                for line in args.values_add:
+                    (section, key, value) = self.parse_value(line)
+                    success = self.inifile.append(section, key, value)
+                    if not success:
+                        ret = False
+                    else:
+                        modified = True
+
+            if args.values_get is not None:
+                for line in args.values_edit:
+                    (section, key, value) = self.parse_value(line)
+                    value = self.inifile.get(section, key)
+                    print(self.format_value(section, key, value, only_values=args.only_values))
+
+            if args.dump:
+                print(self.inifile)
+            if modified:
+                self.inifile.save()
+        return 0 if ret else 1
+        
+if __name__ == "__main__":
+    app =  iniutil()
+    sys.exit(app.main())
