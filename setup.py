@@ -4,13 +4,14 @@
 from distutils.core import setup
 
 setup(name='netconfig',
-		version='1.9',
+		version='1.11',
 		description='AR Soft Network configuration tools',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
 		url='http://www.arsoft-online.com/',
 		packages=['arsoft', 
                     'arsoft.backup',
+                    'arsoft.config',
                     'arsoft.crypto',
                     'arsoft.ldap',
                     'arsoft.netconfig', 

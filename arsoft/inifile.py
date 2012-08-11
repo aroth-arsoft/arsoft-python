@@ -2,57 +2,59 @@
 
 import re
 
-class IniValue(object):
-    inifile = None
-    line = -1
-    key = ''
-    value = ''
-    comment = ''
-    disabled = False
-    def __init__(self, inifile, line, key, value, comment='', disabled=False):
-        self.inifile = inifile
-        self.line = line
-        self.key = key
-        self.value = value
-        self.comment = comment
-        self.disabled = disabled
-
-    def __repr__(self):
-        return toString()
-    def toString(self):
-        if self.disabled == False:
-            ret = ''
-        else:
-            ret = self.inifile.m_commentPrefix
-        if self.key is not None:
-            ret += self.key + self.inifile.m_keyValueSeperator
-            if self.value is not None:
-                ret += self.value
-        if self.comment is not None:
-            if len(ret) > 0:
-                ret += ' ' + self.inifile.m_commentPrefix + self.comment
-            else:
-                ret += self.inifile.m_commentPrefix + self.comment
-        #if len(ret) > 0:
-        ret += '\n'
-        return ret
-
 class IniSection(object):
     inifile = None
     name = None
-    line = -1
+    lineno = -1
+    original = None
     values = []
     comment = ''
 
-    def __init__(self, inifile, name, line=-1, comment=''):
+    def __init__(self, inifile, name, lineno=-1, original=None, comment=''):
         self.inifile = inifile
         self.name = name
-        self.line = line
+        self.lineno = lineno
+        self.original = original
         self.comment = comment
         self.values = []
-        
-    def _append(self, line, key, value, comment, disabled):
-        self.values.append(IniValue(self.inifile, line, key, value, comment, disabled))
+
+    class IniLine(object):
+        inifile = None
+        lineno = -1
+        original = ''
+        key = ''
+        value = ''
+        comment = ''
+        disabled = False
+        def __init__(self, inifile, lineno, original, key, value, comment='', disabled=False):
+            self.inifile = inifile
+            self.lineno = lineno
+            self.original = original
+            self.key = key
+            self.value = value
+            self.comment = comment
+            self.disabled = disabled
+
+        def __str__(self):
+            if self.original is not None:
+                ret = self.original
+            else:
+                if self.disabled == False:
+                    ret = ''
+                else:
+                    ret = self.inifile.m_commentPrefix
+                if self.key is not None:
+                    ret += self.key + self.inifile.m_keyValueSeperator
+                    if self.value is not None:
+                        ret += self.value
+                if self.comment is not None:
+                    if len(ret) > 0:
+                        ret += ' ' + self.inifile.m_commentPrefix + self.comment
+                    else:
+                        ret += self.inifile.m_commentPrefix + self.comment
+                #if len(ret) > 0:
+            ret += '\n'
+            return ret
 
     def get(self, key, default=''):
         for v in self.values:
@@ -97,10 +99,11 @@ class IniSection(object):
                         d = disabled[idx]
                     else:
                         d = disabled
+                    iniline = IniSection.IniLine(self.inifile, -1, None, key, value[idx], c, d)
                     if last < 0:
-                        self.values.append(IniValue(self.inifile, -1, key, value[idx], c, d))
+                        self.values.append(iniline)
                     else:
-                        self.values.insert(last, IniValue(self.inifile, -1, key, value[idx], c, d))
+                        self.values.insert(last, iniline)
                         last += 1
             ret = True
         else:
@@ -108,6 +111,7 @@ class IniSection(object):
             for v in self.values:
                 if v.key == key:
                     if found == False:
+                        v.original = None
                         v.value = value
                         v.comment = comment
                         v.disabled = disabled
@@ -115,7 +119,7 @@ class IniSection(object):
                     else:
                         del(v)
             if found == False:
-                self.values.append(IniValue(self.inifile, -1, key, value, comment, disabled))
+                self.values.append(IniSection.IniLine(self.inifile, -1, None, key, value, comment, disabled))
             ret = True
         return ret
 
@@ -124,9 +128,14 @@ class IniSection(object):
         for v in self.values:
             if v.key == key:
                 ret = v
+                break
+        return ret
 
     def append(self, key, value, comment='', disabled=False):
-        self.values.append(IniValue(self.inifile, -1, key, value, comment, disabled))
+        self.values.append(IniSection.IniLine(self.inifile, -1, None, key, value, comment, disabled))
+
+    def appendRaw(self, lineno, line, key, value, comment, disabled):
+        self.values.append(IniSection.IniLine(self.inifile, lineno, line, key, value, comment, disabled))
 
     def remove(self, key):
         found = False
@@ -137,45 +146,49 @@ class IniSection(object):
                 break
         return found
 
-    def __repr__(self):
-        return toString()
-    def toString(self):
-        if self.name is not None:
-            ret = '[' + self.name + ']';
+    def __str__(self):
+        if self.original is not None:
+            ret = self.original + '\n'
         else:
-            ret = ''
-        if len(self.comment) > 0:
-            ret += ' ' + self.inifile.m_commentPrefix + self.comment + '\n'
-        elif len(ret) > 0:
-            ret += '\n'
+            if self.name is not None:
+                ret = '[' + self.name + ']';
+            else:
+                ret = ''
+            if len(self.comment) > 0:
+                ret += ' ' + self.inifile.m_commentPrefix + self.comment + '\n'
+            elif len(ret) > 0:
+                ret += '\n'
         for v in self.values:
-            ret += v.toString()
+            ret += str(v)
         return ret
 
 class IniFile(object):
     m_filename = ''
     m_content = []
-    m_sections = {}
+    m_sections = []
     m_commentPrefix = ';'
     m_keyValueSeperator = '='
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, commentChars=[';', '#']):
         if filename is not None:
             self.open(filename)
     #
     # Regular expressions for parsing section headers and options.
     #
     SECTCRE = re.compile(
-        r'\['                                 # [
+        r'\s*\['                              # [
         r'(?P<header>[^]]+)'                  # very permissive!
-        r'\]'                                 # ]
+        r'\]\s*'                              # ]
         )
     OPTCRE = re.compile(
-        r'(?P<disabled>[#;]*)(?P<option>[\w]+[^:= \t]*)'          # very permissive!
-        r'(?P<vi>[:= \t])'                 # any number of space/tab,
+        r'\s*(?P<disabled>[#;]*)\s*(?P<option>[\w]+[^:= \t]*)'          # very permissive!
+        r'\s*(?P<vi>[:=])\s*'                 # any number of space/tab,
                                               # followed by separator
                                               # (either : or =), followed
                                               # by any # space/tab
         r'(?P<value>.*)$'                     # everything up to eol
+        )
+    COMMENTRE = re.compile(
+        r'\s*(?P<commentchar>[#;])\s*(?P<comment>.*)'
         )
         
     def open(self, filename):
@@ -187,10 +200,16 @@ class IniFile(object):
             ret = True
         except IOError:
             self.m_content = []
-            self.m_sections = {}
+            self.m_sections = []
             self.m_filename = None
             ret = False
         return ret
+        
+    def _getSection(self, name):
+        for section in self.m_sections:
+            if section.name == name:
+                return section
+        return None
 
     def _read(self, file):
         """Parse a sectioned setup file.
@@ -217,16 +236,17 @@ class IniFile(object):
             if line.strip() == '': # or line[0] in '#;':
                 if cursect is None:
                     cursect = IniSection(self, None, lineno)
-                    self.m_sections['default'] = cursect
-                cursect._append(lineno, None, None, None, False)
+                    self.m_sections.append(cursect)
+                cursect.appendRaw(lineno, line, None, None, None, False)
                 lineno = lineno + 1
+                optname = None
                 continue
             # continuation line?
-            if line[0].isspace() and cursect is not None and optname:
+            if False and line[0].isspace() and cursect is not None and optname:
                 value = line.strip()
                 if value:
                     inival = cursect._getLast(optname)
-                    inival.value = "%s\n%s" % (iniline.value, value)
+                    inival.value = "%s\n%s" % (inival.value, value)
             # a section header or option header?
             else:
                 line = line.rstrip('\n')
@@ -234,23 +254,24 @@ class IniFile(object):
                 mo = self.SECTCRE.match(line)
                 if mo:
                     sectname = mo.group('header')
-                    if sectname in self.m_sections:
-                        cursect = self.m_sections[sectname]
-                    else:
-                        cursect = IniSection(self, sectname, lineno)
-                        self.m_sections[sectname] = cursect
+                    cursect = self._getSection(sectname)
+                    if cursect is None:
+                        cursect = IniSection(self, sectname, lineno, line)
+                        self.m_sections.append(cursect)
                     # So sections can't start with a continuation line
                     optname = None
                 else:
                     if cursect is None:
                         cursect = IniSection(self, None, lineno)
-                        self.m_sections['default'] = cursect
+                        self.m_sections.append(cursect)
                     mo = self.OPTCRE.match(line)
                     if mo:
                         disabled, optname, vi, optval = mo.group('disabled','option', 'vi', 'value')
                         if keyValueSeperator is None:
                             keyValueSeperator = vi
-                        elif vi != keyValueSeperator:
+                        elif vi.strip() != keyValueSeperator:
+                            print('keyValueSeperator changed: ' + keyValueSeperator + ' to ' + vi.strip())
+                            print('line: ' + line)
                             raise UnknownError
 
                         if commentPrefix is None:
@@ -284,65 +305,65 @@ class IniFile(object):
                             disabled = True
                         else:
                             disabled = False
-                        cursect._append(lineno, optname, optval, optcomment, disabled)
+                        cursect.appendRaw(lineno, line, optname, optval, optcomment, disabled)
                     else:
-                        if commentPrefix is None:
-                            if line[0] in ';#':
-                                commentPrefix = line[0]
-                                commentPrefixLen = len(commentPrefix)
-                        if line[0:commentPrefixLen] == commentPrefix:
-                            cursect._append(lineno, None, None, line[commentPrefixLen:], False)
+                        #print('try to match comment for line: ' + line)
+                        mo = self.COMMENTRE.match(line)
+                        if mo:
+                            (commentchar, comment) = mo.group('commentchar', 'comment')
+                            if commentPrefix is None:
+                                commentPrefix = commentchar
+                            #print('found comment line: ' + comment)
+                            cursect.appendRaw(lineno, line, None, None, comment, False)
                         else:
-                            print 'unrecognized line:' + line
+                            cursect.appendRaw(lineno, line, None, None, None, False)
+                            #print 'unrecognized line:' + line
             lineno = lineno + 1
             self.m_commentPrefix = commentPrefix
             self.m_keyValueSeperator = keyValueSeperator
 
     def get(self, section, key, default=''):
         ret = default
-        if section in self.m_sections:
-            ret = self.m_sections[section].get(key, default)
+        section_obj = self._getSection(section)
+        if section_obj is not None:
+            ret = section_obj.get(key, default)
         return ret
 
     def set(self, section, key, value, comment=None):
-        if section not in self.m_sections:
-            self.m_sections[section] = IniSection(self, sectname)
-        return self.m_sections[section].set(key, value, comment)
-    
-    def remove(self, section, key, comment=None):
-        if section in self.m_sections:
-            return self.m_sections[section].remove(key, value, comment)
-        else:
-            return True
+        section_obj = self._getSection(section)
+        if section_obj is None:
+            self.m_sections.append( IniSection(self, sectname) )
+            section_obj = self._getSection(section)
+        return section_obj.set(key, value, comment)
 
     def append(self, section, key, value, comment=None):
-        if section not in self.m_sections:
-            self.m_sections[section] = IniSection(self, sectname)
-        return self.m_sections[section].append(key, value, comment)
+        section_obj = self._getSection(section)
+        if section_obj is None:
+            self.m_sections.append( IniSection(self, sectname) )
+            section_obj = self._getSection(section)
+        return section_obj.append(key, value, comment)
+    
+    def remove(self, section, key, comment=None):
+        section_obj = self._getSection(section)
+        if section_obj is not None:
+            return section_obj.remove(key, value, comment)
+        else:
+            return True
 
     def has_section(self, section):
-        if section in self.m_sections:
-            return True
-        else:
-            return False
-
-    def __repr__(self):
-        ret = ''
-        for (name,section) in self.m_sections.items():
-            ret += section.toString()
-        return ret
+        section_obj = self._getSection(section)
+        return True if section_obj is not None else False
 
     def __str__(self):
         ret = ''
-        for (name,section) in self.m_sections.items():
-            ret += section.toString()
+        for section in self.m_sections:
+            ret += str(section)
         return ret
 
     def save(self, filename=None):
         if filename is None:
             filename = self.m_filename
         f = open(filename, 'w')
-        for (name,section) in self.m_sections.items():
-            s = section.toString()
-            f.write(s)
+        for section in self.m_sections:
+            f.write(str(section))
         f.close()

@@ -1,3 +1,15 @@
+arsoft-python (1.11) precise; urgency=low
+
+  * fixed missing files are scripts
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 11 Aug 2012 14:31:55 +0200
+
+arsoft-python (1.10) precise; urgency=low
+
+  * fixed typo
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 11 Aug 2012 13:49:22 +0200
+
 arsoft-python (1.9) precise; urgency=low
 
   * add ini-util script

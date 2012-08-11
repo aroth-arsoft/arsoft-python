@@ -44,6 +44,7 @@ class iniutil(object):
         parser.add_argument('file', help='configuration file', metavar='inifile')
         parser.add_argument('--dump', dest='dump', action='store_true', help='read the file and writes the contents to stdout.')
         parser.add_argument('--value', dest='only_values', action='store_true', help='writes the only the values to stdout.')
+        parser.add_argument('--dry-run', dest='dry_run', action='store_true', help='try to make changes without storing to disk.')
         parser.add_argument('-g', '--get', dest='values_get', metavar='value', nargs='+', help='specifies values to get.')
         parser.add_argument('-e', '--edit', dest='values_edit', metavar='value', nargs='+', help='specifies values to set.')
         parser.add_argument('-d', '--delete', dest='values_delete', metavar='value', nargs='+', help='specifies values to delete.')
@@ -96,7 +97,10 @@ class iniutil(object):
             if args.dump:
                 print(self.inifile)
             if modified:
-                self.inifile.save()
+                if not args.dry_run:
+                    success = self.inifile.save()
+                    if not success:
+                        ret = False
         return 0 if ret else 1
         
 if __name__ == "__main__":
