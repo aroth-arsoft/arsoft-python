@@ -237,7 +237,7 @@ class IniFile(object):
                 if cursect is None:
                     cursect = IniSection(self, None, lineno)
                     self.m_sections.append(cursect)
-                cursect.appendRaw(lineno, line, None, None, None, False)
+                cursect.appendRaw(lineno, line.rstrip('\n'), None, None, None, False)
                 lineno = lineno + 1
                 optname = None
                 continue
