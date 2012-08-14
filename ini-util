@@ -13,6 +13,7 @@ class iniutil(object):
             value = line[first_equal + 1:].lstrip()
         else:
             raw_key = line.strip()
+            value = None
 
         last_slash = raw_key.rfind('/')
         if last_slash > 0:
@@ -89,9 +90,9 @@ class iniutil(object):
                         modified = True
 
             if args.values_get is not None:
-                for line in args.values_edit:
+                for line in args.values_get:
                     (section, key, value) = self.parse_value(line)
-                    value = self.inifile.get(section, key)
+                    value = self.inifile.get(section, key, default=value)
                     print(self.format_value(section, key, value, only_values=args.only_values))
 
             if args.dump:

@@ -60,7 +60,7 @@ class IniSection(object):
         for v in self.values:
             if v.key == key:
                 return v.value
-        return default
+        return default if default is not None else ''
 
     def set(self, key, value, comment='', disabled=False):
         if type(value) == type([]):

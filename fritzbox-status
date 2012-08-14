@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import os, sys
+import argparse
 
 import pycurl
 import libxml2
@@ -13,6 +14,8 @@ class FritzBox(object):
         self._status = None
         self._wanAddress = None
         self._addonInfo = None
+        self._dslLinkInfo = None
+        self._commonLinkProperties = None
         self._userList = None
         self._callLists = {}
 
@@ -198,6 +201,55 @@ class FritzBox(object):
             ret = False
         return ret
 
+    def _retrieveDSLLinkInfo(self):
+        response = self._sendRequest( FritzBox.Request('/upnp/control/WANDSLLinkC1', 'schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDSLLinkInfo') )
+        if response is not None:
+            self._dslLinkInfo = {}
+            ret = False
+            try:
+                doc = libxml2.parseDoc(response.contents)
+                ctxt = doc.xpathNewContext()
+                ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
+                ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANDSLLinkConfig:1")
+                elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetDSLLinkInfoResponse/NewLinkType')
+                self._dslLinkInfo['linktype'] = elements[0].content
+                elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetDSLLinkInfoResponse/NewLinkStatus')
+                self._dslLinkInfo['status'] = elements[0].content
+                ret = True
+            finally:
+                doc.freeDoc()
+        else:
+            self._dslLinkInfo = None
+            ret = False
+        return ret
+
+    def _retrieveCommonLinkProperties(self):
+        response = self._sendRequest( FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetCommonLinkProperties') )
+        if response is not None:
+            self._commonLinkProperties = {}
+            ret = False
+            try:
+                doc = libxml2.parseDoc(response.contents)
+                ctxt = doc.xpathNewContext()
+                ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
+                ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1")
+                elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewWANAccessType')
+                self._commonLinkProperties['wanaccesstype'] = elements[0].content
+                elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewLayer1UpstreamMaxBitRate')
+                self._commonLinkProperties['upstreammaxbiterate'] = int(elements[0].content)
+                elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewLayer1DownstreamMaxBitRate')
+                self._commonLinkProperties['downstreammaxbitrate'] = int(elements[0].content)
+                elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewPhysicalLinkStatus')
+                self._commonLinkProperties['physicallinkstatus'] = elements[0].content
+                ret = True
+            finally:
+                doc.freeDoc()
+        else:
+            self._commonLinkProperties = None
+            ret = False
+        return ret
+
+
     def connectTime(self):
         if self._status is None:
             self._retrieveStatusInfo()
@@ -220,10 +272,50 @@ class FritzBox(object):
             return self._status['connectionstatus']
         else:
             return None
+            
+    def dslLinkStatus(self):
+        if self._dslLinkInfo is None:
+            self._retrieveDSLLinkInfo()
+        if self._dslLinkInfo is not None:
+            return self._dslLinkInfo['status']
+        else:
+            return None
+
+    def physicalLinkStatus(self):
+        if self._commonLinkProperties is None:
+            self._retrieveCommonLinkProperties()
+        if self._commonLinkProperties is not None:
+            return self._commonLinkProperties['physicallinkstatus']
+        else:
+            return None
+
+    def physicalLinkUpStream(self):
+        if self._commonLinkProperties is None:
+            self._retrieveCommonLinkProperties()
+        if self._commonLinkProperties is not None:
+            return self._commonLinkProperties['upstreammaxbiterate']
+        else:
+            return None
+
+    def physicalLinkDownStream(self):
+        if self._commonLinkProperties is None:
+            self._retrieveCommonLinkProperties()
+        if self._commonLinkProperties is not None:
+            return self._commonLinkProperties['downstreammaxbitrate']
+        else:
+            return None
     
     def isConnected(self):
         cxnstat = self.connectionStatus()
         return True if cxnstat == 'Connected' else False
+        
+    def isDSLConnected(self):
+        cxnstat = self.dslLinkStatus()
+        return True if cxnstat == 'Up' else False
+
+    def isPhysicalConnected(self):
+        cxnstat = self.physicalLinkStatus()
+        return True if cxnstat == 'Up' else False
         
     def wanAddress(self):
         if self._wanAddress is None:
@@ -287,19 +379,115 @@ class FritzBox(object):
                 data = s.recv(1024)
                 print 'Received:', data
         
+        
+class FritxBoxStatusApp(object):
+
+    def __init__(self):
+        self._verbose = False
+
+    def main(self, argv=None):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='backup the given subversion repository')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('address', nargs='?', default='fritz.box', help='specifies the address of the FritxBox.')
+        parser.add_argument('--dsl', dest='status_dsl', action='store_true', help='outputs the DSL link status.')
+        parser.add_argument('--wan', dest='status_wan', action='store_true', help='outputs the WAN status.')
+        parser.add_argument('--dns', dest='status_dns', action='store_true', help='outputs the DNS status.')
+        parser.add_argument('--physical', dest='status_physical', action='store_true', help='outputs the physical link status.')
+        parser.add_argument('--nagios', dest='status_nagios', action='store_true', help='outputs the status suitable for nagios.')
+        
+        parser.add_argument('--minup', dest='minup', nargs='?', type=int, help='outputs the status suitable for nagios.')
+        parser.add_argument('--maxup', dest='maxup', nargs='?', type=int, help='outputs the status suitable for nagios.')
+        parser.add_argument('--mindown', dest='mindown', nargs='?', type=int, help='outputs the status suitable for nagios.')
+        parser.add_argument('--maxdown', dest='maxdown', nargs='?', type=int, help='outputs the status suitable for nagios.')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        
+        status = True
+        critical = False
+
+        fritz = FritzBox(args.address)
+        if args.status_dsl:
+            print(str(fritz.dslLinkStatus()))
+            critical = True if fritz.isDSLConnected() else False
+
+        elif args.status_wan:
+            print(str(fritz.connectionStatus()) + ': ' + str(fritz.connectDuration()) + ', ' + str(fritz.wanAddress()))
+            critical = True if fritz.isConnected() else False
+
+        elif args.status_dns:
+            dnsservers = fritz.dnsServer()
+            if dnsservers is None or len(dnsservers) == 0:
+                print('No DNS servers available')
+                status = False
+            else:
+                print(','.join(dnsservers))
+                status = True
+                
+        elif args.status_physical:
+            print(str(fritz.physicalLinkStatus()) + ': ' + str(fritz.physicalLinkDownStream()) + ', ' + str(fritz.physicalLinkUpStream()))
+            critical = True if fritz.isPhysicalConnected() else False
+            
+        elif args.status_nagios:
+            if fritz.isPhysicalConnected():
+                cxnok = True
+                if args.mindown is not None and args.mindown > fritz.physicalLinkDownStream():
+                    print('Downstream bitrate ' + fritz.physicalLinkDownStream() + ' too low! (min=' + str(args.mindown) + ')')
+                    status = False
+                    cxnok = False
+                if args.maxdown is not None and args.maxdown < fritz.physicalLinkDownStream():
+                    print('Downstream bitrate ' + fritz.physicalLinkDownStream() + ' too high! (max=' + str(args.maxdown) + ')')
+                    status = False
+                    cxnok = False
+                    
+                if args.minup is not None and args.minup > fritz.physicalLinkUpStream():
+                    print('Upstream bitrate ' + fritz.physicalLinkUpStream() + ' too low! (min=' + str(args.minup) + ')')
+                    status = False
+                    cxnok = False
+                if args.maxup is not None and args.maxup < fritz.physicalLinkUpStream():
+                    print('Upstream bitrate ' + fritz.physicalLinkUpStream() + ' too high! (max=' + str(args.maxup) + ')')
+                    status = False
+                    cxnok = False
+
+                if cxnok:
+                    if fritz.isDSLConnected():
+                        if fritz.isConnected():
+                            # everything fine so far
+                            print(str(fritz.connectionStatus()) + ': ' + str(fritz.connectDuration()) + ', ' + str(fritz.wanAddress()))
+                        else:
+                            critical = True 
+                            print('Not connected! (' + str(fritz.connectionStatus()) + ')')
+                    else:
+                        critical = True 
+                        print('DSL link is not up! (' + str(fritz.dslLinkStatus()) + ')')
+            else:
+                critical = True 
+                print('Physical link is not up! (' + str(fritz.physicalLinkStatus()) + ')')
+
+        else:
+            print('Physical link status: ' + str(fritz.physicalLinkStatus()))
+            print('Physical link down: ' + str(fritz.physicalLinkDownStream()) + ' bit/sec')
+            print('Physical link up: ' + str(fritz.physicalLinkUpStream()) + ' bit/sec')
+            print('DSL link status: ' + str(fritz.dslLinkStatus()))
+            print('WAN connection status: ' + str(fritz.connectionStatus()))
+            print('WAN connect time: ' + str(fritz.connectTime()))
+            print('WAN connect duration: ' + str(fritz.connectDuration()))
+            print('WAN address: ' + str(fritz.wanAddress()))
+            print('DNS servers: ' + str(fritz.dnsServer()))
+            #print('userList: ' + str(fritz.userList()))
+
+        if critical == True:
+            ret = 2
+        elif status == False:
+            ret = 1
+        else:
+            ret = 0
+        return ret
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        hostname = sys.argv[1]
-    else:
-        hostname = 'fritz.box'
-    fritz = FritzBox(hostname)
-    if fritz.isConnected():
-        print('Connected')
-    else:
-        print('Not connected')
-    print('connectTime: ' + str(fritz.connectTime()))
-    print('connectDuration: ' + str(fritz.connectDuration()))
-    print('wanAddress: ' + str(fritz.wanAddress()))
-    print('dnsServer: ' + str(fritz.dnsServer()))
-    print('userList: ' + str(fritz.userList()))
+    app = FritxBoxStatusApp()
+    sys.exit(app.main(sys.argv))

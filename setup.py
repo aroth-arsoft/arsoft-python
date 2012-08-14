@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='netconfig',
-		version='1.11',
+		version='1.12',
 		description='AR Soft Network configuration tools',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
