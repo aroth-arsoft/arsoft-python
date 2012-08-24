@@ -12,3 +12,4 @@ usr/bin/ini-util
 usr/bin/jabber-send
 usr/sbin/slapd-config
 usr/sbin/svnbackup
+usr/sbin/efiinfo

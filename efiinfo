@@ -1,0 +1,43 @@
+#!/usr/bin/python
+
+import sys
+import argparse
+
+from arsoft.efi import *
+
+class efiinfo:
+    def __init__(self):
+        self.m_verbose = False
+ 
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='shows information from EFI environment')
+        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--available', dest='available', action='store_true', help='checks if EFI is available on this machine.')
+        parser.add_argument('--vars', dest='vars', action='store_true', help='outputs all EFI variables.')
+
+        args = parser.parse_args()
+
+        self.m_verbose = args.verbose
+        
+        vars = EfiVariables.get_instance()
+        if vars is None:
+            sys.stderr.write('Your system is not supported.\n')
+            ret = 1
+        else:
+            ret = 0
+            if args.vars:
+                for v in vars:
+                    print(v)
+
+            if args.available:
+                ret = 0 if vars.available() else 1
+
+        return ret
+
+if __name__ == "__main__":
+    app =  efiinfo()
+    sys.exit(app.main())
