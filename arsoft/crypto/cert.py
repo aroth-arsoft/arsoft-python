@@ -274,9 +274,10 @@ class CertificateList:
 
     def add(self, filename):
         if os.path.isdir(filename):
-            self.addDirectory(filename)
+            ret = self.addDirectory(filename)
         else:
-            self.addFile(filename)
+            ret = self.addFile(filename)
+        return ret
     
     def addFile(self, filename):
         pemfile = CertificatePEMFile(filename)

@@ -1,3 +1,9 @@
+arsoft-python (1.14) precise; urgency=low
+
+  * install efi package as well
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 25 Aug 2012 10:14:06 +0200
+
 arsoft-python (1.13) precise; urgency=low
 
   * add efiinfo script

@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='netconfig',
-		version='1.13',
+		version='1.14',
 		description='AR Soft Network configuration tools',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -13,6 +13,7 @@ setup(name='netconfig',
                     'arsoft.backup',
                     'arsoft.config',
                     'arsoft.crypto',
+                    'arsoft.efi',
                     'arsoft.ldap',
                     'arsoft.netconfig', 
                     ],
