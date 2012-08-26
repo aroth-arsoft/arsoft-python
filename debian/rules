@@ -1,5 +1,10 @@
 #!/usr/bin/make -f
 
+PYTHON2=$(shell pyversions -vr)
+
+# Don't compress .py files
+DEB_COMPRESS_EXCLUDE := .py
+
 TARGET_DISTRIBUTION := $(shell dpkg-parsechangelog  | awk '/Distribution/ { print $$2}')
 SUBSTVARS=
 
@@ -10,9 +15,6 @@ else
 	SUBSTVARS += -Vdhcpclient:Depends="isc-dhcp-client"
 	SUBSTVARS += -Vdhcpserver:Depends="isc-dhcp-server"
 endif
-
-# Don't compress .py files
-DEB_COMPRESS_EXCLUDE := .py
 
 %:
 	dh $@ --buildsystem=python_distutils --with=python2

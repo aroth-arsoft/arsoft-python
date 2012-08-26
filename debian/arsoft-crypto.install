@@ -1,2 +1,2 @@
 usr/bin/certinfo
-usr/lib/python2.7/dist-packages/arsoft/crypto
+usr/lib/python*/dist-packages/arsoft/crypto
