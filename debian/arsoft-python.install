@@ -7,6 +7,7 @@ usr/lib/python*/dist-packages/arsoft/config/nsswitch.py
 usr/lib/python*/dist-packages/arsoft/backup/__init__.py
 usr/lib/python*/dist-packages/arsoft/backup/BackupDirectory.py
 usr/lib/python*/dist-packages/arsoft/backup/SubversionRepository.py
+usr/lib/python*/dist-packages/arsoft/efi/__init__.py
 usr/bin/fritzbox-status
 usr/bin/ini-util
 usr/bin/jabber-send

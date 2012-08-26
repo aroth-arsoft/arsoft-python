@@ -1,3 +1,9 @@
+arsoft-python (1.16) precise; urgency=low
+
+  * added missing efi module
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 26 Aug 2012 17:45:24 +0200
+
 arsoft-python (1.15) precise; urgency=low
 
   * get packages build on lucid, oneiric and precise
