@@ -436,20 +436,20 @@ class FritxBoxStatusApp(object):
             if fritz.isPhysicalConnected():
                 cxnok = True
                 if args.mindown is not None and args.mindown > fritz.physicalLinkDownStream():
-                    print('Downstream bitrate ' + fritz.physicalLinkDownStream() + ' too low! (min=' + str(args.mindown) + ')')
+                    print('Downstream bitrate ' + str(fritz.physicalLinkDownStream()) + ' too low! (min=' + str(args.mindown) + ')')
                     status = False
                     cxnok = False
                 if args.maxdown is not None and args.maxdown < fritz.physicalLinkDownStream():
-                    print('Downstream bitrate ' + fritz.physicalLinkDownStream() + ' too high! (max=' + str(args.maxdown) + ')')
+                    print('Downstream bitrate ' + str(fritz.physicalLinkDownStream()) + ' too high! (max=' + str(args.maxdown) + ')')
                     status = False
                     cxnok = False
                     
                 if args.minup is not None and args.minup > fritz.physicalLinkUpStream():
-                    print('Upstream bitrate ' + fritz.physicalLinkUpStream() + ' too low! (min=' + str(args.minup) + ')')
+                    print('Upstream bitrate ' + str(fritz.physicalLinkUpStream()) + ' too low! (min=' + str(args.minup) + ')')
                     status = False
                     cxnok = False
                 if args.maxup is not None and args.maxup < fritz.physicalLinkUpStream():
-                    print('Upstream bitrate ' + fritz.physicalLinkUpStream() + ' too high! (max=' + str(args.maxup) + ')')
+                    print('Upstream bitrate ' + str(fritz.physicalLinkUpStream()) + ' too high! (max=' + str(args.maxup) + ')')
                     status = False
                     cxnok = False
 
