@@ -1,0 +1,33 @@
+#!/usr/bin/python
+import os,sys
+
+from arsoft.nagios import *
+from arsoft.fritzbox import NagiosPlugin
+
+## Create the plugin option
+np = NagiosPlugin(must_threshold=False)
+np.add_value('down')
+np.add_value('up')
+
+## This starts the actual plugin activation
+np.activate()
+
+## Use a custom load average file, if specified to
+## This is really only used for debugging purposes, and showing off the
+## 'add_arg' method
+if np['host']:
+    target_host = np['host']
+else:
+    target_host = 'fritz.box'
+
+fritz = FritzBox(target_host)
+
+downStream = fritz.physicalLinkDownStream()
+upStream = fritz.physicalLinkUpStream()
+
+## Add the perdata
+np.add_perfdata("downStream", downStream)
+np.add_perfdata("upStream", upStream)
+
+## Do the check
+np.check_range(downStream) 
