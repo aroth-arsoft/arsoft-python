@@ -1,3 +1,9 @@
+arsoft-python (1.17.1) precise; urgency=low
+
+  * rebuild on lucid
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Sep 2012 19:00:43 +0200
+
 arsoft-python (1.17) precise; urgency=low
 
   * fixed python string concat in fritzbox-status
