@@ -6,8 +6,8 @@ from arsoft.fritzbox import *
 
 ## Create the plugin option
 np = NagiosPlugin(must_threshold=False)
-np.add_value('down', 'defines the range for the down stream speed', warning=True)
-np.add_value('up', 'defines the range for the up stream speed', warning=True)
+np.add_value('down', 'defines the range for the down stream speed', guitext='down stream', units='bit/s', warning=True)
+np.add_value('up', 'defines the range for the up stream speed', guitext='up stream', units='bit/s', warning=True)
 
 ## This starts the actual plugin activation
 np.activate()

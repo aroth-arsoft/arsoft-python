@@ -14,12 +14,12 @@ class NagiosPlugin(pynagPlugin):
         
         self._named_values = {}
 
-    def add_value(self, label, description=None, warning=False, critical=False):
+    def add_value(self, label, description=None, guitext=None, units=None, warning=False, critical=False):
         pynagPlugin.add_perfdata(self, label, value=None)
 
         self.add_arg(label[0], label, description, required=None)
         
-        self._named_values[label] = { 'description':description, 'warning': warning, 'critical': critical }
+        self._named_values[label] = { 'description':description, 'guitext':guitext, 'units':units, 'warning': warning, 'critical': critical }
         return None
 
     def set_value(self, label, value):
@@ -55,14 +55,17 @@ class NagiosPlugin(pynagPlugin):
             i = i + 1
 
     def _check_threshold(self, value_item):
-        print('_check_threshold ' + str(value_item))
+        #print('_check_threshold ' + str(value_item))
         code = pynag_check_threshold(value_item['value'], warning=value_item['warn'], critical=value_item['crit'])
         if code == OK:
             msg = None
-        elif code == WARNING:
-            msg = '%s outside specified range %s' % (value_item['label'], value_item['warn'])
-        elif code == CRITICAL:
-            msg = '%s outside specified range %s' % (value_item['label'], value_item['crit'])
+        elif code == WARNING or code == CRITICAL:
+            named_value_item = self._named_values[value_item['label']]
+            gui_value_name = named_value_item['guitext'] if named_value_item['guitext'] is not None else named_value_item['label']
+            gui_units = ' ' + named_value_item['units'] if named_value_item['units'] is not None else ''
+            gui_range = value_item['warn'] if code == WARNING else value_item['crit']
+            msg = '%s (%s%s) outside specified range %s%s' \
+                % (gui_value_name, str(value_item['value']), gui_units, gui_range, gui_units)
         else:
             msg = None
         return (code, msg)
@@ -76,7 +79,7 @@ class NagiosPlugin(pynagPlugin):
         while i < num_data:
             (ret, msg) = self._check_threshold(self.data['perfdata'][i])
             if ret != OK:
-                print(str(self.data['perfdata'][i]) + ' not ok')
+                #print(str(self.data['perfdata'][i]) + ' not ok')
                 if ret > exit_code:
                     exit_code = ret
                 if exit_message:

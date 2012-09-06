@@ -1,0 +1,2 @@
+usr/lib/python*/dist-packages/arsoft/nagios/__init__.py
+usr/lib/nagios/plugins/check_fritzbox

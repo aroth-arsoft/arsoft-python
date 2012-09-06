@@ -24,3 +24,17 @@ Architecture: all
 Depends: arsoft-python, python-openssl, ${python:Depends}, ${misc:Depends}
 Description: crypto utility scripts
  Some scripts to help with crypto related tasks.
+
+Package: arsoft-python-fritzbox
+Architecture: all
+Depends: arsoft-python, python-pynag, ${python:Depends}, ${misc:Depends}
+Description: python module to access a AVM FritzBox
+ Access the AVM FritzBox using Python and retrieve all kind of information
+ from your box.
+
+Package: arsoft-python-nagios
+Architecture: all
+Depends: arsoft-python, arsoft-python-fritzbox, python-pynag, ${python:Depends}, ${misc:Depends}
+Description: nagios plugin module
+ This module includes a wrapper to create nagios plugins and also
+ includes ready to use plugins for nagios to monitor an AVM FritzBox.

@@ -1,3 +1,15 @@
+arsoft-python (1.19) precise; urgency=low
+
+  * fixed some minor depends issues
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 06 Sep 2012 07:54:48 +0200
+
+arsoft-python (1.18) precise; urgency=low
+
+  * add python module fritzbox and nagios
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 05 Sep 2012 19:51:58 +0200
+
 arsoft-python (1.17.1) precise; urgency=low
 
   * rebuild on lucid
