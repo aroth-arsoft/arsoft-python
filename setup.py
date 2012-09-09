@@ -18,6 +18,7 @@ setup(name='netconfig',
                     'arsoft.ldap',
                     'arsoft.nagios',
                     'arsoft.netconfig', 
+                    'arsoft.openvpn'
                     ],
 		scripts=[
             'certinfo',

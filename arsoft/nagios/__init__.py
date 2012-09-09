@@ -14,13 +14,30 @@ class NagiosPlugin(pynagPlugin):
         
         self._named_values = {}
 
-    def add_value(self, label, description=None, guitext=None, units=None, warning=False, critical=False):
-        pynagPlugin.add_perfdata(self, label, value=None)
+    def add_value(self, label, description=None, guitext=None, value=None, units=None, warning=False, critical=False, has_argument=True):
+        pynagPlugin.add_perfdata(self, label, value=value)
 
-        self.add_arg(label[0], label, description, required=None)
+        if has_argument:
+            self.add_arg(label[0], label, description, required=None)
         
         self._named_values[label] = { 'description':description, 'guitext':guitext, 'units':units, 'warning': warning, 'critical': critical }
         return None
+        
+    def add_flag(self, spec_abbr, spec, help_text, action="store_true", default=False):
+        self.parser.add_option("-%s" % spec_abbr, "--%s" % spec, dest="%s" % spec, help=help_text, metavar="%s" % spec.upper(), action=action, default=default)
+        self.extra_list_optional.append(spec)
+
+    def set_value_range(self, label, warning, critical):
+        # first update the value in the perfdata
+        num_data = len(self.data['perfdata'])
+        i = 0
+        while i < num_data:
+            if self.data['perfdata'][i]['label'] == label:
+                self.data['perfdata'][i]['warn'] = warning
+                self.data['perfdata'][i]['crit'] = critical
+                #print(str(self.data['perfdata'][i]))
+                break
+            i = i + 1
 
     def set_value(self, label, value):
         ret = None
@@ -61,7 +78,7 @@ class NagiosPlugin(pynagPlugin):
             msg = None
         elif code == WARNING or code == CRITICAL:
             named_value_item = self._named_values[value_item['label']]
-            gui_value_name = named_value_item['guitext'] if named_value_item['guitext'] is not None else named_value_item['label']
+            gui_value_name = named_value_item['guitext'] if named_value_item['guitext'] is not None else value_item['label']
             gui_units = ' ' + named_value_item['units'] if named_value_item['units'] is not None else ''
             gui_range = value_item['warn'] if code == WARNING else value_item['crit']
             msg = '%s (%s%s) outside specified range %s%s' \
