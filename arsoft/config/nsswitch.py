@@ -48,8 +48,8 @@ class Nsswitch(object):
             print (e)
             ret = False
             pass
-        
-        print(self.m_items)
+
+        #print(self.m_items)
         return ret
         
     def save(self, filename=None):
@@ -96,12 +96,23 @@ class Nsswitch(object):
         while i < len(self.m_items):
             # skip any unrecognized lines (e.g. comments)
             if not isinstance(self.m_items[i], basestring):
-                (service, values) = self.m_items[i]
+                (service, ignore_values) = self.m_items[i]
                 if service == name:
                     self.m_items[i] = (name, values)
                     found = True
                     break
+            i = i + 1
         if not found:
             self.m_items.append( (name, values) )
+        return True
+
+    @property
+    def services(self):
+        """ Returns a list of all configured services """
+        ret = []
+        for item in self.m_items:
+            if not isinstance(item, basestring):
+                (service, ignore_values) = item
+                ret.append(service)
         return ret
-    
+

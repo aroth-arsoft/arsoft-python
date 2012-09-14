@@ -1,3 +1,9 @@
+arsoft-python (1.21) precise; urgency=low
+
+  * add script to change nsswitch configuration
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 14 Sep 2012 18:28:13 +0200
+
 arsoft-python (1.20) precise; urgency=low
 
   * start with new openvpn module
