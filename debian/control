@@ -32,9 +32,18 @@ Description: python module to access a AVM FritzBox
  Access the AVM FritzBox using Python and retrieve all kind of information
  from your box.
 
+Package: arsoft-python-openvpn
+Architecture: all
+Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
+Description: python module to access the OpenVPN status files
+ Access the OpenVPN status files and analyze the current status of the
+ VPN.
+
 Package: arsoft-python-nagios
 Architecture: all
-Depends: arsoft-python, arsoft-python-fritzbox, python-pynag, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, arsoft-python-fritzbox, python-pynag, arsoft-python-openvpn, 
+ ${python:Depends}, ${misc:Depends}
 Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
- includes ready to use plugins for nagios to monitor an AVM FritzBox.
+ includes ready to use plugins for nagios to monitor an AVM FritzBox
+ and an OpenVPN server or client.

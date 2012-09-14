@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='netconfig',
-		version='1.19',
+		version='1.20',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -29,8 +29,8 @@ setup(name='netconfig',
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients']),
-			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg']),
+			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg', 'nagios/openvpn.cfg']),
 			('/usr/sbin', ['svnbackup', 'slapd-config', 'pxeconfig', 'efiinfo']),
-			('/usr/lib/nagios/plugins', ['check_fritzbox']),
+			('/usr/lib/nagios/plugins', ['check_fritzbox', 'check_openvpn']),
 			]
 		)

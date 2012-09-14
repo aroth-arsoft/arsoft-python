@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import os,sys
+from datetime import datetime, timedelta
 
 from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
 from arsoft.openvpn import OpenVPNStatusParser
@@ -32,21 +33,37 @@ else:
 
 if os.path.exists(status_file):
     parser = OpenVPNStatusParser(status_file)
-
+    
+    now = datetime.now()
     ## set the values
     if np['server'] == True:
         np.set_value('routingtable', parser.routing_table)
         np.set_value('clients', parser.connected_clients)
         np.set_value('numclients', len(parser.connected_clients))
 
-        (exit_code, exit_message) = np.check_values()
-        
+        delta = now - parser.last_update
+        if delta > timedelta(minutes=5):
+            exit_code = WARNING
+            exit_message = 'status has not been since %s' % (str(parser.last_update))
+        else:
+            (exit_code, exit_message) = np.check_values()
+
         if exit_code == OK:
             exit_message = '%i clients' % (len(parser.connected_clients))
     else:
         stats = parser.statistics
         np.set_value('sent', stats['TCP/UDP write bytes'])
         np.set_value('received', stats['TCP/UDP read bytes'])
+
+        delta = now - parser.last_update
+        if delta > timedelta(minutes=5):
+            exit_code = WARNING
+            exit_message = 'status has not been since %s' % (str(parser.last_update))
+        else:
+            (exit_code, exit_message) = np.check_values()
+
+        if exit_code == OK:
+            exit_message = 'Connected'
 
     np.nagios_exit(exit_code, exit_message)
     

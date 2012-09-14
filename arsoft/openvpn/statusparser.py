@@ -58,6 +58,12 @@ class OpenVPNStatusParser:
             row_title = row[0]
 
             if row_title == "END":
+                if read_statistics:
+                    if 'Updated' in self._statistics:
+                        try:
+                            self._details["timestamp"] = datetime.datetime.strptime(self._statistics['Updated'], '%a %b %d %H:%M:%S %Y')
+                        except (IndexError, ValueError):
+                            logging.error("Updated time is invalid: %s" % self._statistics['Updated'])
                 return True
             else:
                 if read_statistics == False:
@@ -120,6 +126,13 @@ class OpenVPNStatusParser:
         if not self._details:
             self._parse_file()
         return self._details
+
+    @property
+    def last_update(self):
+        """ Returns the time of the last update of the status file """
+        if not self._details:
+            self._parse_file()
+        return self._details['timestamp']
 
     @property
     def connected_clients(self):
