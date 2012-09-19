@@ -8,6 +8,7 @@ usr/lib/python*/dist-packages/arsoft/backup/__init__.py
 usr/lib/python*/dist-packages/arsoft/backup/BackupDirectory.py
 usr/lib/python*/dist-packages/arsoft/backup/SubversionRepository.py
 usr/lib/python*/dist-packages/arsoft/efi/__init__.py
+usr/lib/python*/dist-packages/arsoft/cups/__init__.py
 usr/bin/ini-util
 usr/bin/jabber-send
 usr/sbin/slapd-config
@@ -15,3 +16,4 @@ usr/sbin/svnbackup
 usr/sbin/efiinfo
 usr/sbin/nsswitch-config
 usr/sbin/nsswitch-ldap
+usr/sbin/cups-admin

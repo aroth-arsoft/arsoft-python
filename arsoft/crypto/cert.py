@@ -160,7 +160,40 @@ class Certificate(PEMItem):
 
     def get_serial_number(self):
         return self.cert.get_serial_number()
-        
+
+    def get_pubkey(self):
+        return self.cert.get_pubkey()
+
+    def get_pubkey_bits(self):
+        pkey = self.cert.get_pubkey()
+        if pkey is not None:
+            return pkey.bits()
+        else:
+            return None
+
+    def get_pubkey_type(self):
+        pkey = self.cert.get_pubkey()
+        if pkey is not None:
+            return pkey.type()
+        else:
+            return None
+            
+    def get_pubkey_type_str(self):
+        pkey = self.cert.get_pubkey()
+        if pkey is not None:
+            pkeytype = pkey.type()
+            if pkey.type() == crypto.TYPE_RSA:
+                return 'RSA'
+            elif pkey.type() == crypto.TYPE_DSA:
+                return 'DSA'
+            else:
+                return 'Unknown'
+        else:
+            return 'Unknown'
+
+    def digest(self, digest_name='sha1'):
+        return self.cert.digest(digest_name)
+
     def has_expired(self):
         return self.cert.has_expired()
 
@@ -242,8 +275,11 @@ class Certificate(PEMItem):
                     fobj.write(prefix + "Certificate #" + str(certno) + ":\n")
                 else:
                     fobj.write(prefix + "Certificate:\n")
-            fobj.write(prefix + "  Hash: " + str(self.getHash()) + '\n')
             fobj.write(prefix + "  Version: " + str(version) + '\n')
+            fobj.write(prefix + "  Bits: " + self.get_pubkey_type_str() + '/' + str(self.get_pubkey_bits()) + '\n')
+            fobj.write(prefix + "  Hash: " + str(self.getHash()) + '\n')
+            fobj.write(prefix + "  Digest MD5: " + str(self.digest('md5')) + '\n')
+            fobj.write(prefix + "  Digest SHA1: " + str(self.digest('sha1')) + '\n')
             fobj.write(prefix + "  Serial Number: " + str(serial) + '\n')
             fobj.write(prefix + "  Signature Algorithm: " + str(signature_algorithm) + '\n')
             self._writeNamePretty(fobj, '  Issuer:  ', issuer)
@@ -271,6 +307,10 @@ class CertificateList:
                 if ext in cert_file_exts:
                     ret.append(fullname)
         return ret
+    
+    @property
+    def empty(self):
+        return True if len(self.m_certificates) == 0 else False
 
     def add(self, filename):
         if os.path.isdir(filename):

@@ -12,14 +12,21 @@ class certinfo:
         self.m_certificate_filename = None
         self.m_certificate_list_filename = None
         self.m_certificate_list = None
+        self.m_key_list = None
 
-    def _loadCerts(self, cert_filenames):
+    def _loadCerts(self, filenames):
         ret = True
         self.m_certificate_list = CertificateList()
-        for certfile in cert_filenames:
-            if not self.m_certificate_list.add(certfile):
+        self.m_key_list = KeyList()
+        for filename in filenames:
+            filename_result = True
+            if not self.m_key_list.add(filename):
+                filename_result = False
+            if not self.m_certificate_list.add(filename):
+                filename_result = False
+            if not filename_result:
                 ret = False
-                print("Failed to add " + str(certfile))
+                print("Failed to add " + str(filename))
         return ret
 
     def find(self, term, output_number=True):
@@ -186,6 +193,7 @@ class certinfo:
         elif args.update:
             self.update(args.update)
         else:
+            self.m_key_list.write(sys.stdout, short=args.short)
             if args.list_expired:
                 self.m_certificate_list.write(sys.stdout, expired_only=True, short=args.short)
             elif args.list_valid:
