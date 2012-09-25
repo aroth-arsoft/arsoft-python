@@ -16,6 +16,7 @@ class CupsAdminApp(object):
         parser = argparse.ArgumentParser(description='manage CUPS')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debugging of this script.')
+        parser.add_argument('-l', '--localhost', dest='localhost', action='store_true', help='connect to local CUPS server.')
         parser.add_argument('--server', dest='server', type=str, help='specifies the CUPS server to use.')
         parser.add_argument('--add-remote', dest='add_remote_server', type=str, help='adds all printers from the given remote CUPS server.')
         parser.add_argument('--remove-remote', dest='remove_remote_server', type=str, help='removes all printers on the given remote CUPS server.')
@@ -24,7 +25,9 @@ class CupsAdminApp(object):
         args = parser.parse_args()
 
         self._verbose = args.verbose
-        if args.server:
+        if args.localhost:
+            self._conn = CupsConnection('localhost')
+        elif args.server:
             self._conn = CupsConnection(args.server)
         else:
             self._conn = CupsConnection()

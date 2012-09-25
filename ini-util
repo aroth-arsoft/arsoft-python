@@ -50,10 +50,13 @@ class iniutil(object):
         parser.add_argument('-e', '--edit', dest='values_edit', metavar='value', nargs='+', help='specifies values to set.')
         parser.add_argument('-d', '--delete', dest='values_delete', metavar='value', nargs='+', help='specifies values to delete.')
         parser.add_argument('-a', '--add', dest='values_add', metavar='value', nargs='+', help='specifies values to add.')
+        parser.add_argument('-C', '--comment', dest='comment_char', metavar='char', type=str, nargs='?', help='specifies the character used for comments.')
+        parser.add_argument('-K', '--key-value-separator', dest='key_value_char', type=str, nargs='?', help='specifies the character used to separate key and value.')
+        parser.add_argument('--no-disabled', dest='no_disabled', action='store_false', default=True, help='do not use disabled values.')
 
         args = parser.parse_args()
         
-        self.inifile = IniFile()
+        self.inifile = IniFile(commentPrefix=args.comment_char, keyValueSeperator=args.key_value_char, disabled_values=args.no_disabled)
         if not self.inifile.open(args.file):
             sys.stderr.write('failed to open ' + args.file + '\n')
             ret = False
@@ -67,6 +70,7 @@ class iniutil(object):
                     (section, key, value) = self.parse_value(line)
                     success = self.inifile.set(section, key, value)
                     if not success:
+                        sys.stderr.write('failed to edit ' + section + '/' + key + '=' + value + '\n')
                         ret = False
                     else:
                         modified = True
@@ -76,6 +80,7 @@ class iniutil(object):
                     (section, key, value) = self.parse_value(line)
                     success = self.inifile.remove(section, key)
                     if not success:
+                        sys.stderr.write('failed to delete ' + section + '/' + key + '\n')
                         ret = False
                     else:
                         modified = True
@@ -85,6 +90,7 @@ class iniutil(object):
                     (section, key, value) = self.parse_value(line)
                     success = self.inifile.append(section, key, value)
                     if not success:
+                        sys.stderr.write('failed to add ' + section + '/' + key + '=' + value + '\n')
                         ret = False
                     else:
                         modified = True
@@ -96,11 +102,13 @@ class iniutil(object):
                     print(self.format_value(section, key, value, only_values=args.only_values))
 
             if args.dump:
-                print(self.inifile)
+                data = self.inifile.asString(only_data=args.only_values)
+                print(data)
             if modified:
                 if not args.dry_run:
                     success = self.inifile.save()
                     if not success:
+                        sys.stderr.write('failed to save ' + args.file + '\n')
                         ret = False
         return 0 if ret else 1
         

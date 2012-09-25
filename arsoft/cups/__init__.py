@@ -11,7 +11,7 @@ class CupsConnection(object):
         if server is not None:
             i = server.find(':')
             if i > 0:
-                port = server[i+1:]
+                port = int(server[i+1:])
                 server = server[0:i]
             old_server = cups.getServer()
             old_port = cups.getPort()
