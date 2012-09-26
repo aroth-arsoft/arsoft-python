@@ -62,6 +62,9 @@ class IniSection(object):
         def __str__(self):
             return self.asString(only_data=False)
 
+        def __repr__(self):
+            return self.asString(only_data=False)
+
     def get(self, key, default=''):
         for v in self.values:
             if v.key == key:
@@ -151,7 +154,21 @@ class IniSection(object):
                 del(v)
                 break
         return found
-        
+
+    def merge(self, another_section):
+        ret = True
+        for v in another_section.values:
+            if not self.set(v.key, v.value, v.comment, v.disabled):
+                ret = False
+                break
+        return ret
+
+    def clear(self):
+        self.lineno = -1
+        self.original = None
+        self.values = []
+        self.comment = ''
+
     def asString(self, only_data=False):
         if self.original is not None and not only_data:
             ret = self.original + '\n'
@@ -172,8 +189,11 @@ class IniSection(object):
     def __str__(self):
         return self.asString(only_data=False)
 
+    def __repr__(self):
+        return self.asString(only_data=False)
+
 class IniFile(object):
-    m_filename = ''
+    m_filename = None
     m_content = []
     m_sections = []
     m_commentPrefix = None
@@ -181,6 +201,9 @@ class IniFile(object):
     def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True):
         self.m_commentPrefix = commentPrefix
         self.m_keyValueSeperator = keyValueSeperator
+        self.m_content = []
+        self.m_sections = []
+        self.m_filename = None
         #
         # Regular expressions for parsing section headers and options.
         #
@@ -236,9 +259,18 @@ class IniFile(object):
             self.m_content = []
             self.m_sections = []
             self.m_filename = None
+            self.m_commentPrefix = None
+            self.m_keyValueSeperator = None
             ret = False
         return ret
         
+    def close(self):
+        self.m_content = []
+        self.m_sections = []
+        self.m_filename = None
+        self.m_commentPrefix = None
+        self.m_keyValueSeperator = None
+
     def _getSection(self, name):
         for section in self.m_sections:
             if section.name == name:
@@ -308,11 +340,12 @@ class IniFile(object):
 
                         if keyValueSeperator is None:
                             keyValueSeperator = vi
+                            #print('got keyValueSeperator : \'' + keyValueSeperator + '\'')
                             gotValue = True
                         elif vi == keyValueSeperator:
                             gotValue = True
                         else:
-                            #print('keyValueSeperator changed: \'' + keyValueSeperator + '\' to \'' + vi.strip() + '\'')
+                            #print('keyValueSeperator changed: \'' + keyValueSeperator + '\' to \'' + vi + '\'')
                             #print('line: ' + line)
                             gotValue = False
                     else:
@@ -364,8 +397,14 @@ class IniFile(object):
                             cursect.appendRaw(lineno, line, None, None, None, False)
                             #print 'unrecognized line:' + line
             lineno = lineno + 1
-        self.m_commentPrefix = commentPrefix
-        self.m_keyValueSeperator = keyValueSeperator
+        if commentPrefix is not None:
+            self.m_commentPrefix = commentPrefix
+        else:
+            self.m_commentPrefix = ';'
+        if keyValueSeperator is not None:
+            self.m_keyValueSeperator = keyValueSeperator
+        else:
+            self.m_keyValueSeperator = '='
 
     def get(self, section, key, default=''):
         ret = default
@@ -377,23 +416,28 @@ class IniFile(object):
     def set(self, section, key, value, comment=None):
         section_obj = self._getSection(section)
         if section_obj is None:
-            self.m_sections.append( IniSection(self, sectname) )
+            self.m_sections.append( IniSection(self, section) )
             section_obj = self._getSection(section)
         return section_obj.set(key, value, comment)
 
     def append(self, section, key, value, comment=None):
         section_obj = self._getSection(section)
         if section_obj is None:
-            self.m_sections.append( IniSection(self, sectname) )
+            self.m_sections.append( IniSection(self, section) )
             section_obj = self._getSection(section)
         return section_obj.append(key, value, comment)
-    
-    def remove(self, section, key, comment=None):
-        section_obj = self._getSection(section)
-        if section_obj is not None:
-            return section_obj.remove(key, value, comment)
-        else:
-            return True
+
+    def remove(self, section, key):
+        ret = False
+        for section_obj in self.m_sections:
+            if section_obj.name == name:
+                if key == '*':
+                    self.m_sections.remove(section_obj)
+                    ret = True
+                else:
+                    ret = section_obj.remove(key)
+                break
+        return ret
 
     def has_section(self, section):
         section_obj = self._getSection(section)
@@ -419,4 +463,35 @@ class IniFile(object):
             ret = True
         except IOError:
             ret = False
+        return ret
+
+    def merge(self, another_inifile):
+        ret = True
+        #print('merge ' + another_inifile.m_filename + ' into ' + self.m_filename)
+        #print(another_inifile.m_sections)
+        for section_obj in another_inifile.m_sections:
+            my_section_obj = self._getSection(section_obj.name)
+            if my_section_obj is None:
+                #print('create new section ' + section_obj.name)
+                self.m_sections.append( IniSection(self, section_obj.name) )
+                my_section_obj = self._getSection(section_obj.name)
+            ret = my_section_obj.merge(section_obj)
+            if not ret:
+                break
+        return ret
+
+    def replace(self, another_inifile):
+        ret = True
+        for section_obj in another_inifile.m_sections:
+            my_section_obj = self._getSection(section_obj.name)
+            #print('replace section ' + str(section_obj.name))
+            if my_section_obj is not None:
+                my_section_obj.clear()
+            else:
+                # add a new section because it's missing
+                self.m_sections.append( IniSection(self, section_obj.name) )
+                my_section_obj = self._getSection(section_obj.name)
+            ret = my_section_obj.merge(section_obj)
+            if not ret:
+                break
         return ret

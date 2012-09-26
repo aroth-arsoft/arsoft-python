@@ -1,3 +1,10 @@
+arsoft-python (1.25) precise; urgency=low
+
+  * add merge operation to ini-util
+  * enhance ini-util to process commands from a file
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 26 Sep 2012 18:01:40 +0200
+
 arsoft-python (1.24) precise; urgency=low
 
   * improved ini file reading
