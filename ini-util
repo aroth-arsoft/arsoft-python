@@ -8,16 +8,19 @@ import re
 class CmdFile(object):
     CMDLINE_RE = re.compile(
         r'^'
-        r'(?P<action>[a-z]+):' # required action followed by colon
+        r'(?P<action>[a-z_]+)(\((?P<action_param>[^:])\))?:' # required action followed by colon
         r'(?P<section>[^/]+)?/?' # optional section
         r'(?P<key>[^=]*)' # required key
         r'=' # required equal sign
         r'(?P<value>.*)'
         r'$'
         )
-
-    def open(self, filename):
+    def __init__(self):
         self._commands = []
+
+    def open(self, filename, append=False):
+        if append == False:
+            self._commands = []
         try:
             f = open(filename, 'r')
             for line in f:
@@ -28,19 +31,26 @@ class CmdFile(object):
                 mo = self.CMDLINE_RE.match(line)
                 if mo:
                     action = mo.group('action')
+                    action_param = mo.group('action_param')
                     section = mo.group('section')
                     key = mo.group('key')
                     value = mo.group('value')
-                    self._commands.append( (action, section, key, value) )
+                    self._commands.append( (action, action_param, section, key, value) )
                 else:
                     sys.stderr.write('invalid command line: \'' + line + '\'\n')
             f.close()
             ret = True
         except IOError:
-            self._commands = []
+            if append == False:
+                self._commands = []
             ret = False
         return ret
-        
+    def add_command(self, action, section, key, value):
+        self._commands.append( (action, None, section, key, value) )
+
+    def add_command(self, action, action_param, section, key, value):
+        self._commands.append( (action, action_param, section, key, value) )
+
     def close(self):
         self._commands = []
 
@@ -163,49 +173,67 @@ class iniutil(object):
             ret = True
 
         if ret:
+            cmdfile = CmdFile()
+
             modified = False
             if args.values_edit is not None:
                 for line in args.values_edit:
                     (section, key, value) = self.parse_value(line)
+                    cmdfile.add_command('set', section, key, value)
+
+            if args.values_delete is not None:
+                for line in args.values_delete:
+                    (section, key, value) = self.parse_value(line)
+                    cmdfile.add_command('delete', section, key, None)
+
+            if args.values_add is not None:
+                for line in args.values_add:
+                    (section, key, value) = self.parse_value(line)
+                    cmdfile.add_command('add', section, key, value)
+
+            if args.values_get is not None:
+                for line in args.values_get:
+                    (section, key, value) = self.parse_value(line)
+                    cmdfile.add_command('get', section, key, value)
+
+            if args.files_merge is not None:
+                for merge_filename in args.files_merge:
+                    cmdfile.add_command('merge', None, None, merge_filename)
+
+            if args.files_replace is not None:
+                for replace_filename in args.files_replace:
+                    cmdfile.add_command('replace', None, None, replace_filename)
+
+            if args.cmdfile:
+                if not cmdfile.open(args.cmdfile, append=True):
+                    sys.stderr.write('failed to open command file ' + args.cmdfile + '\n')
+                    ret = False
+
+            #print(cmdfile.commands)
+            # now execute all listed commands
+            for (action, action_param, section, key, value) in cmdfile.commands: 
+                if action == 'set':
                     success = self.inifile.set(section, key, value)
                     if not success:
                         sys.stderr.write('failed to edit ' + section + '/' + key + '=' + value + '\n')
                         ret = False
                     else:
                         modified = True
-
-            if args.values_delete is not None:
-                for line in args.values_delete:
-                    (section, key, value) = self.parse_value(line)
+                elif action == 'get':
+                    value = self.inifile.get(section, key, default=value)
+                    print(self.format_value(section, key, value, only_values=args.only_values))
+                elif action == 'delete':
                     success = self.inifile.remove(section, key)
                     if not success:
                         sys.stderr.write('failed to delete ' + section + '/' + key + '\n')
                         ret = False
                     else:
                         modified = True
-                    
-            if args.values_add is not None:
-                for line in args.values_add:
-                    (section, key, value) = self.parse_value(line)
-                    success = self.inifile.append(section, key, value)
-                    if not success:
-                        sys.stderr.write('failed to add ' + section + '/' + key + '=' + value + '\n')
-                        ret = False
-                    else:
-                        modified = True
-
-            if args.values_get is not None:
-                for line in args.values_get:
-                    (section, key, value) = self.parse_value(line)
-                    value = self.inifile.get(section, key, default=value)
-                    print(self.format_value(section, key, value, only_values=args.only_values))
-
-            if args.files_merge is not None:
-                for merge_filename in args.files_merge:
+                elif action == 'merge':
                     merge_inifile = IniFile(commentPrefix=commentPrefix, keyValueSeperator=keyValueSeperator, disabled_values=args.no_disabled)
-                    print('merge in ' + str(merge_inifile))
-                    if not merge_inifile.open(merge_filename):
-                        sys.stderr.write('failed to open ' + merge_filename + '\n')
+                    #print('merge in ' + str(value))
+                    if not merge_inifile.open(value):
+                        sys.stderr.write('failed to open ' + value + '\n')
                         ret = False
                     else:
                         #print('merge in ' + str(merge_inifile.m_filename))
@@ -214,73 +242,73 @@ class iniutil(object):
                         else:
                             modified = True
                         merge_inifile.close()
-
-            if args.files_replace is not None:
-                for replace_filename in args.files_replace:
+                elif action == 'replace':
                     replace_inifile = IniFile(commentPrefix=commentPrefix, keyValueSeperator=keyValueSeperator, disabled_values=args.no_disabled)
-                    print('replace from ' + str(replace_filename))
-                    if not replace_inifile.open(replace_filename):
-                        sys.stderr.write('failed to open ' + replace_filename + '\n')
+                    #print('replace from ' + str(value))
+                    if not replace_inifile.open(value):
+                        sys.stderr.write('failed to open ' + value + '\n')
                         ret = False
                     else:
-                        #print('merge in ' + str(replace_inifile.m_filename))
+                        #print('replace from ' + str(replace_inifile.m_filename))
                         if not self.inifile.replace(replace_inifile):
                             ret = False
                         else:
                             modified = True
                         replace_inifile.close()
-                        
-            if args.cmdfile:
-                cmdfile = CmdFile()
-                if not cmdfile.open(args.cmdfile):
-                    sys.stderr.write('failed to open command file ' + args.cmdfile + '\n')
-                    ret = False
-                else:
-                    #print(cmdfile.commands)
-                    for (action, section, key, value) in cmdfile.commands: 
-                        if action == 'set':
-                            success = self.inifile.set(section, key, value)
-                            if not success:
-                                sys.stderr.write('failed to edit ' + section + '/' + key + '=' + value + '\n')
-                                ret = False
-                            else:
-                                modified = True
-                        elif action == 'delete':
-                            success = self.inifile.remove(section, key)
-                            if not success:
-                                sys.stderr.write('failed to delete ' + section + '/' + key + '\n')
-                                ret = False
-                            else:
-                                modified = True
-                        elif action == 'merge':
-                            merge_inifile = IniFile(commentPrefix=commentPrefix, keyValueSeperator=keyValueSeperator, disabled_values=args.no_disabled)
-                            #print('merge in ' + str(value))
-                            if not merge_inifile.open(value):
-                                sys.stderr.write('failed to open ' + value + '\n')
-                                ret = False
-                            else:
-                                #print('merge in ' + str(merge_inifile.m_filename))
-                                if not self.inifile.merge(merge_inifile):
-                                    ret = False
-                                else:
-                                    modified = True
-                                merge_inifile.close()
-                        elif action == 'replace':
-                            replace_inifile = IniFile(commentPrefix=commentPrefix, keyValueSeperator=keyValueSeperator, disabled_values=args.no_disabled)
-                            #print('replace from ' + str(value))
-                            if not replace_inifile.open(value):
-                                sys.stderr.write('failed to open ' + value + '\n')
-                                ret = False
-                            else:
-                                #print('replace from ' + str(replace_inifile.m_filename))
-                                if not self.inifile.replace(replace_inifile):
-                                    ret = False
-                                else:
-                                    modified = True
-                                replace_inifile.close()
+                elif action == 'list_append':
+                    separator = action_param if action_param is not None else ','
+                    old_value = self.inifile.get(section, key, default=None)
+                    if old_value is not None and len(old_value) != 0:
+                        l = old_value.split(separator)
+                        l.append(value)
+                        new_value = separator.join(l)
+                    else:
+                        new_value = value
+                    success = self.inifile.set(section, key, new_value)
+                    if not success:
+                        sys.stderr.write('failed to edit ' + section + '/' + key + '=' + new_value + '\n')
+                        ret = False
+                    else:
+                        modified = True
+                elif action == 'set_insert':
+                    separator = action_param if action_param is not None else ','
+                    #print('separator=' + str(separator))
+                    old_value = self.inifile.get(section, key, default=None)
+                    if old_value is not None and len(old_value) != 0:
+                        s = set()
+                        sv = old_value.split(separator)
+                        s.update(sv)
+                        s.add(value)
+                        new_value = separator.join(s)
+                    else:
+                        new_value = value
+                    success = self.inifile.set(section, key, new_value)
+                    if not success:
+                        sys.stderr.write('failed to edit ' + section + '/' + key + '=' + new_value + '\n')
+                        ret = False
+                    else:
+                        modified = True
+                elif action == 'set_remove':
+                    separator = action_param if action_param is not None else ','
+                    old_value = self.inifile.get(section, key, default=None)
+                    if old_value is not None and len(old_value) != 0:
+                        s = set()
+                        sv = old_value.split(separator)
+                        s.update(sv)
+                        s.remove(value)
+                        if len(s) != 0:
+                            new_value = separator.join(s)
                         else:
-                            sys.stderr.write('Invalid action ' + action + '\n')
+                            new_value = ''
+                        success = self.inifile.set(section, key, new_value)
+                        if not success:
+                            sys.stderr.write('failed to edit ' + section + '/' + key + '=' + new_value + '\n')
                             ret = False
+                        else:
+                            modified = True
+                else:
+                    sys.stderr.write('Invalid action ' + action + '\n')
+                    ret = False
 
             if args.dump:
                 data = self.inifile.asString(only_data=args.only_values)

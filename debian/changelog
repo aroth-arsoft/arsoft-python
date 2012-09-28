@@ -1,3 +1,9 @@
+arsoft-python (1.27) precise; urgency=low
+
+  * more actions in ini-util
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 28 Sep 2012 18:54:30 +0200
+
 arsoft-python (1.26) precise; urgency=low
 
   * add option to specify the ini style via command line to avoid
