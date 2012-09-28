@@ -182,6 +182,8 @@ class IniSection(object):
                     ret += ' ' + self.inifile.m_commentPrefix + self.comment + '\n'
                 elif len(ret) > 0:
                     ret += '\n'
+            elif len(ret) > 0:
+                ret += '\n'
         for v in self.values:
             ret += v.asString(only_data=only_data)
         return ret
@@ -290,6 +292,8 @@ class IniFile(object):
         commentPrefix = self.m_commentPrefix
         commentPrefixLen = 0 if commentPrefix is None else len(commentPrefix)
         keyValueSeperator = self.m_keyValueSeperator
+        #print('commentPrefix='+str(commentPrefix))
+        #print('keyValueSeperator='+str(keyValueSeperator))
 
         cursect = None                            # None, or a dictionary
         optname = None
@@ -353,6 +357,10 @@ class IniFile(object):
 
                     if gotValue:
                         if commentPrefix is None:
+                            # no comment char has yet been determined or specified,
+                            # so we should try to automatically detect the comment
+                            # char, which can either be a semi-colon or a hash char.
+                            # the comment char must be preceeded by a space char
                             pos = optval.find(';')
                             if pos != -1 and optval[pos-1].isspace():
                                 commentPrefix = ';'
@@ -372,6 +380,7 @@ class IniFile(object):
                                 optcomment=None
                         else:
                             optcomment=None
+                        #print('commentPrefix=' + str(commentPrefix) + ' optcomment=' + str(optcomment))
 
                         optval = optval.strip()
                         # allow empty values

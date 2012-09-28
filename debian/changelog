@@ -1,3 +1,10 @@
+arsoft-python (1.26) precise; urgency=low
+
+  * add option to specify the ini style via command line to avoid
+    trouble with comments
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 28 Sep 2012 09:05:18 +0200
+
 arsoft-python (1.25) precise; urgency=low
 
   * add merge operation to ini-util
