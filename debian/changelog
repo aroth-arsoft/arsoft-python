@@ -1,3 +1,10 @@
+arsoft-python (1.28) UNRELEASED; urgency=low
+
+  * reload nscd when nsswitch is changed
+  * first build for quantal
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 01 Nov 2012 16:08:49 +0100
+
 arsoft-python (1.27) precise; urgency=low
 
   * more actions in ini-util

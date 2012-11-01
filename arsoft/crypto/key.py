@@ -136,10 +136,10 @@ class KeyPEMFile(PEMFile):
         i = 0
         while i < len(self.m_blocks):
             pemitem = self.m_blocks[i]
-            if pemitem.blocktype == 'RSA PRIVATE KEY' or pemitem.blocktype == 'DSA PRIVATE KEY':
+            if pemitem.blocktype == 'RSA PRIVATE KEY' or pemitem.blocktype == 'DSA PRIVATE KEY' or pemitem.blocktype == 'PRIVATE KEY':
                 key = KeyItem(pemitem, private=True)
                 ret.append( key )
-            elif pemitem.blocktype == 'RSA PUBLIC KEY' or pemitem.blocktype == 'DSA PUBLIC KEY':
+            elif pemitem.blocktype == 'RSA PUBLIC KEY' or pemitem.blocktype == 'DSA PUBLIC KEY' or pemitem.blocktype == 'PUBLIC KEY':
                 key = KeyItem(pemitem, private=False)
                 ret.append( key )
             i = i + 1
