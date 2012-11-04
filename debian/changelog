@@ -1,4 +1,10 @@
-arsoft-python (1.28) UNRELEASED; urgency=low
+arsoft-python (1.29) quantal; urgency=low
+
+  * fixed trouble in ini-util
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 04 Nov 2012 16:30:31 +0100
+
+arsoft-python (1.28) quantal; urgency=low
 
   * reload nscd when nsswitch is changed
   * first build for quantal
