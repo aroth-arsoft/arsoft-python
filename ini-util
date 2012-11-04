@@ -48,7 +48,7 @@ class CmdFile(object):
     def add_command(self, action, section, key, value):
         self._commands.append( (action, None, section, key, value) )
 
-    def add_command(self, action, action_param, section, key, value):
+    def add_command_with_param(self, action, action_param, section, key, value):
         self._commands.append( (action, action_param, section, key, value) )
 
     def close(self):

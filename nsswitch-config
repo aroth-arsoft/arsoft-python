@@ -2,6 +2,7 @@
 
 import sys
 import argparse
+import subprocess
 
 from arsoft.config import *
 
@@ -42,9 +43,9 @@ class nsswitch_config:
                 if config_changed:
                     if not switchfile.save():
                         ret = 1
-                    else if args.nscd_reload == True:
+                    elif args.nscd_reload == True:
                         # restart the nscd daemon to drop all chanced entries
-                        subprocess.call(["/sbin/restart", "nscd"])
+                        subprocess.call(["/usr/sbin/service", "nscd", "restart"])
             elif args.get:
                 for s in args.get:
                     service = s.strip()
