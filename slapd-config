@@ -1,15 +1,12 @@
 #!/usr/bin/python
 import sys
-import getopt
+import argparse
 import os
 import ldap
 import ldap.modlist as modlist
 import socket
 import string
 import shlex, subprocess
-
-verbose = False
-quiet = False
 
 # Used attributes from RootDSE
 ROOTDSE_ATTRS = (
@@ -42,275 +39,456 @@ ROOTDSE_ATTRS = (
 'ibm-configurationnamingcontext',
 )
 
-def usage():
-	print "slapd-config [options] <action> <nodename> [args]"
-	print "options:"
-	print "  -h, --help               this help screen"
-	print "  -v, --verbose            enable verbose output"
-	print "  -q, --quiet              disable any output, except errors"
-	print "  --server=hostname        specify the ldap server"
-	print "  --username=user          specify the user to acess the ldap directory"
-	print "  --password=secret        password for the ldap user"
-	print "  --base=basedn            specify the base dn for ldap search operation"
-	print "actions:"
-	print "  modules                  shows the current active modules"
-	print "  schemas                  shows the current active schemas"
-	
-	sys.exit(0)
-	
-def ldapsearch_ext(uri, base, filter, attrs):
-	#cmdline = ['/usr/bin/ldapsearch', '-LLL', '-Q', '-Y', 'EXTERNAL', '-H', uri]
-	cmdline = ['/usr/bin/ldapsearch', '-LLL', '-x', '-H', uri]
+class SlapdConfigApp(object):
 
-	if base is not None:
-		cmdline.append( '-b' )
-		cmdline.append( base )
-	if filter is not None:
-		cmdline.append( filter )
-	if attrs is not None:
-		for a in attrs:
-			cmdline.append( a )
+    def __init__(self):
+        self._verbose = False
+        self._quiet = False
+        self._commands = None
+        self._uri = None
+        self._ldapbase = None
+        self._username = None
+        self._password = None
+        self._saslmech = None
+        self._cxn = None
 
-	try:
-		print "ldapsearch_ext cmdline " + str(cmdline)
-		p = subprocess.Popen(cmdline, stdout=subprocess.PIPE)
-	except OSError, e:
-		p = None
-		print >>sys.stderr, "Execution failed:", e
-	if p is not None:
-		p.wait()
-		curline = ''
-		lines = []
-		for l in p.stdout.readlines():
-			l = l.rstrip('\n')
-			if len(l) > 0 and l[0] == ' ':
-				curline += l
-			else:
-				curline += l
-				lines.append(curline)
-				curline = ''
-				
-		#print "all lines:\n" + str(lines)
+    def ldapsearch_ext(uri, base, filter, attrs):
+        #cmdline = ['/usr/bin/ldapsearch', '-LLL', '-Q', '-Y', 'EXTERNAL', '-H', uri]
+        cmdline = ['/usr/bin/ldapsearch', '-LLL', '-x', '-H', uri]
 
-		entries = {}
-		entry = {}
-		entry_dn = None
-		for l in lines:
-			if len(l) == 0:
-				entries[entry_dn] = entry
-				entry_dn = None
-			else:
-				elems = l.split(':')
-				if len(elems) > 1:
-					(key, value) = (elems[0], elems[1].lstrip(' ') )
-				else:
-					key = elems[0]
-					value = ''
-				if entry_dn is None:
-					entry_dn = value
-				else:
-					entry[key] = value
-		if entry_dn is not None:
-			entries[entry_dn] = entry
+        if base is not None:
+            cmdline.append( '-b' )
+            cmdline.append( base )
+        if filter is not None:
+            cmdline.append( filter )
+        if attrs is not None:
+            for a in attrs:
+                cmdline.append( a )
 
-		ret = entries
-	else:
-		ret = None
-	return ret
+        try:
+            print "ldapsearch_ext cmdline " + str(cmdline)
+            p = subprocess.Popen(cmdline, stdout=subprocess.PIPE)
+        except OSError, e:
+            p = None
+            print >>sys.stderr, "Execution failed:", e
+        if p is not None:
+            p.wait()
+            curline = ''
+            lines = []
+            for l in p.stdout.readlines():
+                l = l.rstrip('\n')
+                if len(l) > 0 and l[0] == ' ':
+                    curline += l
+                else:
+                    curline += l
+                    lines.append(curline)
+                    curline = ''
+                    
+            #print "all lines:\n" + str(lines)
 
-def main(argv=None):
-	if argv is None:
-		argv = sys.argv
-		
-	commands = None
-	ldapuri = None
-	ldapserver = None
-	ldapbase = None
-	ldapusername = None
-	ldappassword = None
-	saslmech = None
+            entries = {}
+            entry = {}
+            entry_dn = None
+            for l in lines:
+                if len(l) == 0:
+                    entries[entry_dn] = entry
+                    entry_dn = None
+                else:
+                    elems = l.split(':')
+                    if len(elems) > 1:
+                        (key, value) = (elems[0], elems[1].lstrip(' ') )
+                    else:
+                        key = elems[0]
+                        value = ''
+                    if entry_dn is None:
+                        entry_dn = value
+                    else:
+                        entry[key] = value
+            if entry_dn is not None:
+                entries[entry_dn] = entry
 
-	try:
-		try:
-			opts, args = getopt.getopt(argv[1:], "hvqY:u:", ["help","verbose","quiet","uri=", "server=", "username=", "password=", "base=", "saslmech="])
-			output = None
-			for o, a in opts:
-				if o in ("-h", "--help"):
-					usage()
-					sys.exit()
-				elif o == ("-v", "--verbose"):
-					verbose = True
-				elif o == ("-q", "--quiet"):
-					quiet = True
-				elif o in ("--uri"):
-					ldapserver  = a
-				elif o in ("--server"):
-					ldapserver  = a
-				elif o in ("-u", "--username"):
-					print "got username " + a
-					ldapusername  = a
-				elif o in ("--password"):
-					ldappassword  = a
-				elif o in ("--base"):
-					ldapbase  = a
-				elif o in ("-Y", "--saslmech"):
-					saslmech  = a
-				else:
-					assert False, "unhandled option"
-			commands = args
-		except getopt.error, msg:
-			 raise Usage(msg)
-		# more code, unchanged
-	except Usage, err:
-		print >>sys.stderr, err.msg
-		print >>sys.stderr, "for help use --help"
-		return 2
+            ret = entries
+        else:
+            ret = None
+        return ret
 
-	if ldapserver is not None:
-		ldapuri = "ldap://" + str(ldapserver)
+    def connect(self):
+        try:
+            print "Connecting to " + self._uri + "..."
+            self._cxn = ldap.initialize(self._uri)
+        except ldap.LDAPError, e:
+            print >>sys.stderr, "Failed to connect to ldap server " + self._uri + ". Error: " + e.desc
+            self._cxn = None
 
-	if ldapuri is None and ldapserver is None:
-		ldapuri = ldap.get_option(ldap.OPT_URI)
-		if ldapuri is None:
-			ldapserver  = ldap.get_option(ldap.OPT_SERVER)
-			if ldapserver is None:
-				ldapserver = "127.0.0.1"
+        if self._cxn is not None:
+            # you should  set this to ldap.VERSION2 if you're using a v2 directory
+            self._cxn.protocol_version = ldap.VERSION3
+            ret = True
+        else:
+            ret = False
+        return ret
 
-	if ldapbase is None or len(ldapbase) == 0:
-		ldapbase = 'ou=nodes,ou=config,o=arsoft'
+    def bind(self):
+        # Pass in a valid username and password to get 
+        # privileged directory access.
+        # If you leave them as empty strings or pass an invalid value
+        # you will still bind to the server but with limited privileges.
+        
+        ldapusername = '' if self._username is None else self._username
+        ldappassword = '' if self._password is None else self._password
+        
+        try:
+            # Any errors will throw an ldap.LDAPError exception 
+            # or related exception so you can ignore the result
+            if self._saslmech == 'simple':
+                if ldapusername != '':
+                    print "simple_bind user:" + ldapusername + " pwd:" + ldappassword
+                else:
+                    print "simple_bind anonymous"
+                self._cxn.simple_bind_s(ldapusername, ldappassword)
+                ret = True
+            else:
+                print 'bind ' + self._saslmech + " user:" + ldapusername + " pwd:" + ldappassword
+                self._cxn.bind_s(ldapusername, ldappassword, self._saslmech)
+                ret = True
+        except ldap.LDAPError, e:
+            print >>sys.stderr, "Failed to bind to ldap server as " + ldapusername + ". Error: " + str(e)
+            ret = False
+        return ret
+        
+    def unbind(self):
+        self._cxn.unbind_s()
+        self._cxn = None
+        
+    def action_status(self, args):
+        searchBase = ''
+        searchFilter = '(objectclass=*)'
+        attrsFilter = ROOTDSE_ATTRS
+        
+        namingContexts = []
+        saslMechs = []
+        configContext = ''
+        ldapversion = None
+        
+        result_set = []
+        rootDSE = None
+        try:
+            ldap_result_id = self._cxn.search(searchBase, ldap.SCOPE_BASE, searchFilter, attrsFilter)
+            while 1:
+                result_type, result_data = self._cxn.result(ldap_result_id, 0)
+                if (result_data == []):
+                    break
+                else:
+                    ## here you don't have to append to a list
+                    ## you could do whatever you want with the individual entry
+                    ## The appending to list is just for illustration. 
+                    if result_type == ldap.RES_SEARCH_ENTRY:
+                        result_set.append(result_data)
+        
+            (dn, rootDSE) = result_set[0][0]
+            if 'namingContexts' in rootDSE:
+                namingContexts = rootDSE['namingContexts']
+            configContext = rootDSE['configContext'][0]
+            ldapversion = rootDSE['supportedLDAPVersion'][0]
+            if 'supportedSASLMechanisms' in rootDSE:
+                saslMechs = rootDSE['supportedSASLMechanisms']
+            
+        except ldap.LDAPError, e:
+            pass
+        
+        print("LDAP uri:        " + str(self._uri))
+        print("LDAP version:    " + str(ldapversion))
+        if len(namingContexts) > 0:
+            print("namingContexts:  " + str(string.join(namingContexts, ', ')))
+        else:
+            print("namingContexts:  <none>")
+        print("configContext:   " + str(configContext))
+        print("SASL mechanisms: " + str(string.join(saslMechs, ', ')))
+        return 0
 
-	if ldapusername is not None and len(ldapusername.split('=')) == 1:
-		ldapusername = 'cn=' + ldapusername + ',cn=config'
-		
-	if commands is None or len(commands) == 0:
-		commands = [ 'status' ]
-		
-	if ldapusername is None:
-		ldapusername = ''
-	if ldappassword is None:
-		ldappassword = ''
+    def action_schemas(self, args):
+        searchBase = 'cn=schema,cn=config'
+        searchFilter = '(&(objectClass=olcSchemaConfig)(cn=*))'
+        attrsFilter = ['cn']
+        
+        print('searchBase ' + searchBase)
+        print('searchFilter ' + searchFilter)
+        print('attrsFilter ' + str(attrsFilter))
+        result_set = []
+        
+        schemas = []
+        try:
+            ldap_result_id = self._cxn.search(searchBase, ldap.SCOPE_ONELEVEL, searchFilter, attrsFilter)
+            while 1:
+                result_type, result_data = self._cxn.result(ldap_result_id, 0)
+                if (result_data == []):
+                    break
+                else:
+                    ## here you don't have to append to a list
+                    ## you could do whatever you want with the individual entry
+                    ## The appending to list is just for illustration. 
+                    if result_type == ldap.RES_SEARCH_ENTRY:
+                        result_set.append(result_data)
+                        
+            for rec in result_set:
+                (dn, values) = rec[0]
+                cn_elems = string.split(values['cn'][0], ',')
+                schemas.append( cn_elems[0].split('}')[1] )
+                
+                #print dn
+        except ldap.LDAPError as e:
+            print 'ldaperror: ' + str(e)
+            pass
 
-	if saslmech is None or len(saslmech) == 0:
-		saslmech = 'simple'
+        if len(schemas) > 0:
+            print("Schemas: " + str(string.join(schemas, '\n         ')))
+        else:
+            print("Schemas: <none>")
+        return 0
 
-	try:
-		print "Connecting to " + ldapuri + "..."
-		cxn = ldap.initialize(ldapuri)
-	except ldap.LDAPError, e:
-		print >>sys.stderr, "Failed to connect to ldap server " + ldapuri + ". Error: " + e.desc
-		sys.exit()
-		
-	# you should  set this to ldap.VERSION2 if you're using a v2 directory
-	cxn.protocol_version = ldap.VERSION3
-	# Pass in a valid username and password to get 
-	# privileged directory access.
-	# If you leave them as empty strings or pass an invalid value
-	# you will still bind to the server but with limited privileges.
-	
-	
-	try:
-		# Any errors will throw an ldap.LDAPError exception 
-		# or related exception so you can ignore the result
-		if saslmech == 'simple':
-			print "simple_bind user:" + ldapusername + " pwd:" + ldappassword
-			cxn.simple_bind_s(ldapusername, ldappassword)
-		else:
-			print 'bind ' + saslmech + " user:" + ldapusername + " pwd:" + ldappassword
-			cxn.bind_s(ldapusername, ldappassword, saslmech)
-	except ldap.LDAPError, e:
-		print >>sys.stderr, "Failed to bind to ldap server " + ldapuri + ". Error: " + str(e)
-		sys.exit()
-		
-	action = commands[0]
-	action_args = commands[1:]
-	print 'action ' + str(action)
-	print 'action_args ' + str(action_args)
-	
+    def action_databases(self, args):
+        searchBase = 'cn=config'
+        searchFilter = '(&(objectClass=olcDatabaseConfig)(olcDatabase=*))'
+        attrsFilter = ['olcDatabase', 'olcDbDirectory', 'olcSuffix', 'olcRootDN', 'olcAccess', 'olcDbConfig', 'olcDbIndex']
+        
+        print('searchBase ' + searchBase)
+        print('searchFilter ' + searchFilter)
+        print('attrsFilter ' + str(attrsFilter))
+        result_set = []
+        
+        databases = []
+        try:
+            ldap_result_id = self._cxn.search(searchBase, ldap.SCOPE_ONELEVEL, searchFilter, attrsFilter)
+            while 1:
+                result_type, result_data = self._cxn.result(ldap_result_id, 0)
+                if (result_data == []):
+                    break
+                else:
+                    ## here you don't have to append to a list
+                    ## you could do whatever you want with the individual entry
+                    ## The appending to list is just for illustration. 
+                    if result_type == ldap.RES_SEARCH_ENTRY:
+                        result_set.append(result_data)
+                        
+            for rec in result_set:
+                (dn, values) = rec[0]
+                cn_elems = string.split(values['olcDatabase'][0], ',')
+                database_type = cn_elems[0].split('}')[1]
+                database = {'type': database_type, 
+                            'suffix': values['olcSuffix'][0] if 'olcSuffix' in values else None,
+                            'rootdn': values['olcRootDN'][0] if 'olcRootDN' in values else None,
+                            'dbdir': values['olcDbDirectory'][0] if 'olcDbDirectory' in values else None,
+                            }
+                databases.append(database)
+                
+                #print dn
+        except ldap.LDAPError as e:
+            print 'ldaperror: ' + str(e)
+            pass
 
-	if action == "status":
-		searchBase = ''
-		searchFilter = '(objectclass=*)'
-		attrsFilter = ROOTDSE_ATTRS
-		
-		namingContexts = []
-		saslMechs = []
-		configContext = ''
-		ldapversion = None
-		
-		result_set = []
-		rootDSE = None
-		try:
-			ldap_result_id = cxn.search(searchBase, ldap.SCOPE_BASE, searchFilter, attrsFilter)
-			while 1:
-				result_type, result_data = cxn.result(ldap_result_id, 0)
-				if (result_data == []):
-					break
-				else:
-					## here you don't have to append to a list
-					## you could do whatever you want with the individual entry
-					## The appending to list is just for illustration. 
-					if result_type == ldap.RES_SEARCH_ENTRY:
-						result_set.append(result_data)
-		
-			(dn, rootDSE) = result_set[0][0]
-			namingContexts = rootDSE['namingContexts']
-			configContext = rootDSE['configContext'][0]
-			ldapversion = rootDSE['supportedLDAPVersion'][0]
-			saslMechs = rootDSE['supportedSASLMechanisms']
-			
-		except ldap.LDAPError, e:
-			pass
-		
-		print "LDAP server:     " + str(ldapuri)
-		print "LDAP version:    " + str(ldapversion)
-		print "namingContexts:  " + str(string.join(namingContexts, ', '))
-		print "configContext:   " + str(configContext)
-		print "SASL mechanisms: " + str(string.join(saslMechs, ', '))
-		
-	elif action == "schemas":
-		searchBase = 'cn=schema,cn=config'
-		searchFilter = '(&(objectClass=olcSchemaConfig)(cn=*))'
-		attrsFilter = ['cn']
-		
-		print 'searchBase ' + searchBase
-		print 'searchFilter ' + searchFilter
-		print 'attrsFilter ' + str(attrsFilter)
-		result_set = []
-		
-		schemas = []
-		try:
-			ldap_result_id = cxn.search(searchBase, ldap.SCOPE_ONELEVEL, searchFilter, attrsFilter)
-			while 1:
-				result_type, result_data = cxn.result(ldap_result_id, 0)
-				if (result_data == []):
-					break
-				else:
-					## here you don't have to append to a list
-					## you could do whatever you want with the individual entry
-					## The appending to list is just for illustration. 
-					if result_type == ldap.RES_SEARCH_ENTRY:
-						result_set.append(result_data)
-						
-			for rec in result_set:
-				(dn, values) = rec[0]
-				cn_elems = string.split(values['cn'][0], ',')
-				schemas.append( cn_elems[0].split('}')[1] )
-				
-				#print dn
-		except ldap.LDAPError, e:
-			pass
+        if len(databases) > 0:
+            for db in databases:
+                print("Database: " + db['type'] + ' ' + str(db['suffix']))
+        else:
+            print("Databases: <none>")
+        return 0
 
-		print "Schemas: " + str(string.join(schemas, '\n         '))
-		
-	elif action == 'test':
-		searchBase = 'cn=replicator,o=arsoft'
-		searchFilter = '(objectclass=*)'
-		attrsFilter = None #ROOTDSE_ATTRS
-		
-		result = ldapsearch_ext(ldapuri, searchBase, searchFilter, attrsFilter)
-		print result
+    def action_modules(self, args):
+        searchBase = 'cn=config'
+        searchFilter = '(&(objectClass=olcModuleList)(cn=*))'
+        attrsFilter = ['cn', 'olcModuleLoad', 'olcModulePath']
+        
+        print('searchBase ' + searchBase)
+        print('searchFilter ' + searchFilter)
+        print('attrsFilter ' + str(attrsFilter))
+        result_set = []
+        
+        modulepath = None
+        modules = []
+        try:
+            ldap_result_id = self._cxn.search(searchBase, ldap.SCOPE_ONELEVEL, searchFilter, attrsFilter)
+            while 1:
+                result_type, result_data = self._cxn.result(ldap_result_id, 0)
+                if (result_data == []):
+                    break
+                else:
+                    ## here you don't have to append to a list
+                    ## you could do whatever you want with the individual entry
+                    ## The appending to list is just for illustration. 
+                    if result_type == ldap.RES_SEARCH_ENTRY:
+                        result_set.append(result_data)
+                        
+            for rec in result_set:
+                (dn, values) = rec[0]
+                cn_elems = string.split(values['cn'][0], ',')
+                
+                modulepath = values['olcModulePath'][0] if 'olcModulePath' in values else None
+                if 'olcModuleLoad' in values:
+                    for modload in values['olcModuleLoad']:
+                        modules.append(modload.split('}')[1])
+                
+                #print dn
+        except ldap.LDAPError as e:
+            print 'ldaperror: ' + str(e)
+            pass
 
-		
-		
+        print("Modulepath: " + (modulepath if modulepath is not None else '<default>'))
+        if len(modules) > 0:
+            print("Modules: " + str(string.join(modules, '\n         ')))
+        else:
+            print("Modules: <none>")
+        return 0
+
+    def action_certs(self, args):
+        searchBase = 'cn=config'
+        searchFilter = '(cn=config)'
+        attrsFilter = ['olcTLSCACertificateFile', 'olcTLSCACertificatePath', 'olcTLSCRLFile', 'olcTLSCertificateFile', 'olcTLSCertificateKeyFile',
+                        'olcTLSCRLCheck', 'olcTLSCipherSuite', 'olcTLSDHParamFile', 'olcTLSRandFile', 'olcTLSVerifyClient']
+        
+        print('searchBase ' + searchBase)
+        print('searchFilter ' + searchFilter)
+        print('attrsFilter ' + str(attrsFilter))
+        result_set = []
+        
+        databases = []
+        tls_cipher_suite = None
+        tls_cacert_file = None
+        tls_cacert_path = None
+        tls_crl_file = None
+        tls_crl_check = None
+        tls_cert_file = None
+        tls_key_file = None
+        tls_dhparam_file = None
+        tls_rand_file = None
+        tls_verify_client = None
+        try:
+            ldap_result_id = self._cxn.search(searchBase, ldap.SCOPE_BASE, searchFilter, attrsFilter)
+            while 1:
+                result_type, result_data = self._cxn.result(ldap_result_id, 0)
+                if (result_data == []):
+                    break
+                else:
+                    ## here you don't have to append to a list
+                    ## you could do whatever you want with the individual entry
+                    ## The appending to list is just for illustration. 
+                    if result_type == ldap.RES_SEARCH_ENTRY:
+                        result_set.append(result_data)
+                        
+            for rec in result_set:
+                (dn, values) = rec[0]
+                tls_cipher_suite = values['olcTLSCipherSuite'][0] if 'olcTLSCipherSuite' in values else None
+                tls_cacert_file = values['olcTLSCACertificateFile'][0] if 'olcTLSCACertificateFile' in values else None
+                tls_cacert_path = values['olcTLSCACertificatePath'][0] if 'olcTLSCACertificatePath' in values else None
+                tls_crl_file = values['olcTLSCRLFile'][0] if 'olcTLSCRLFile' in values else None
+                tls_crl_check = values['olcTLSCRLCheck'][0] if 'olcTLSCRLCheck' in values else None
+                tls_cert_file = values['olcTLSCertificateFile'][0] if 'olcTLSCertificateFile' in values else None
+                tls_key_file = values['olcTLSCertificateKeyFile'][0] if 'olcTLSCertificateKeyFile' in values else None
+                tls_dhparam_file = values['olcTLSDHParamFile'][0] if 'olcTLSDHParamFile' in values else None
+                tls_rand_file = values['olcTLSRandFile'][0] if 'olcTLSRandFile' in values else None
+                tls_verify_client = values['olcTLSVerifyClient'][0] if 'olcTLSVerifyClient' in values else None
+                
+                #print dn
+        except ldap.LDAPError as e:
+            print 'ldaperror: ' + str(e)
+            pass
+
+        print("TLS cipher suite:        " + (tls_cipher_suite if tls_cipher_suite is not None else '<none>'))
+        print("TLS CA certificate file: " + (tls_cacert_file if tls_cacert_file is not None else '<none>'))
+        print("TLS CA certificate path: " + (tls_cacert_path if tls_cacert_path is not None else '<none>'))
+        print("TLS CRL file:            " + (tls_crl_file if tls_crl_file is not None else '<none>'))
+        print("TLS CRL check:           " + (tls_crl_check if tls_crl_check is not None else '<none>'))
+        print("TLS certificate file:    " + (tls_cert_file if tls_cert_file is not None else '<none>'))
+        print("TLS key file:            " + (tls_key_file if tls_key_file is not None else '<none>'))
+        print("TLS DH param file:       " + (tls_dhparam_file if tls_dhparam_file is not None else '<none>'))
+        print("TLS rand file:           " + (tls_rand_file if tls_rand_file is not None else '<none>'))
+        print("TLS verify client:       " + (tls_verify_client if tls_verify_client is not None else '<none>'))
+        return 0
+
+    def main(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='configures and manages an OpenLDAP server.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-q', '--quiet', dest='quiet', action='store_true', help='disable any output, except errors.')
+        parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debugging of this script.')
+        parser.add_argument('-l', '--localhost', dest='localhost', action='store_true', help='connect to local OpenLDAP server.')
+        parser.add_argument('--uri', dest='uri', type=str, help='specify the address of the ldap server.')
+        parser.add_argument('--username', dest='username', type=str, help='specify the user to access the ldap directory.')
+        parser.add_argument('--password', dest='password', type=str, help='password for the ldap user.')
+        parser.add_argument('--base', dest='base', type=str, help='specify the base dn for ldap search operation.')
+        parser.add_argument('-Y', '--saslmech', dest='saslmech', type=str, default='simple', help='specify mechanism used to SASL authentication.')
+        parser.add_argument('action', type=str, nargs='*', default=['status'], help='specifies the action to perform.')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        self._quiet = args.quiet
+        self._saslmech = args.saslmech
+
+        if args.uri is not None:
+            if args.uri.startswith('ldap://') or \
+                args.uri.startswith('ldaps://') or \
+                args.uri.startswith('ldapi://'):
+                self._uri = args.uri
+            else:
+                if args.uri[0] == '/':
+                    self._uri = "ldapi://" + str(args.uri)
+                else:
+                    self._uri = "ldap://" + str(args.uri)
+        else:
+            self._uri = ldap.get_option(ldap.OPT_URI)
+            if self._uri is None:
+                ldapserver  = ldap.get_option(ldap.OPT_SERVER)
+                if ldapserver is None:
+                    self._uri = "ldap://localhost"
+                else:
+                    self._uri = "ldap://" + str(ldapserver)
+
+        if args.base is None or len(args.base) == 0:
+            self._base = ldap.get_option(ldap.OPT_DEFBASE)
+        else:
+            self._base = args.base
+
+        if args.username is not None:
+            if '=' in args.username:
+                # got a full bind dn
+                self._username = args.username
+            else:
+                self._username = 'cn=' + args.username
+                if self._base is not None:
+                    self._username = self._username + ',' + self._base
+
+        self._password = args.password
+        
+        action_name = args.action[0]
+        action_args = args.action[1:]
+
+        if self.connect():
+            if self.bind():
+                if action_name == 'status':
+                    ret = self.action_status(action_args)
+                elif action_name == 'schemas':
+                    ret = self.action_schemas(action_args)
+                elif action_name == 'databases':
+                    ret = self.action_databases(action_args)
+                elif action_name == 'modules':
+                    ret = self.action_modules(action_args)
+                elif action_name == 'certs':
+                    ret = self.action_certs(action_args)
+                else:
+                    ret = 3
+                self.unbind()
+            else:
+                ret = 2
+        else:
+            ret = 1
+            
+        return ret
+
 if __name__ == "__main__":
-    main()
+    app = SlapdConfigApp()
+    sys.exit(app.main(sys.argv))
