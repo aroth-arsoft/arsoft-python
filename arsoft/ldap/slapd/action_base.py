@@ -101,6 +101,17 @@ class action_base(object):
             ret = False
         return ret
 
+    def _modify_direct(self, dn, mod_attrs):
+        self._verbose('dn ' + dn)
+        self._verbose('mod_attrs ' + str(mod_attrs))
+        try:
+            self._cxn.modify_s(dn, mod_attrs)
+            ret = True
+        except ldap.LDAPError as e:
+            self._error('ldaperror: ' + str(e))
+            ret = False
+        return ret
+
     def _add(self, dn, values):
         add_attrs = ldap.modlist.addModlist(values)
         try:
