@@ -43,8 +43,20 @@ class action_module(action_base):
                     for modload in values['olcModuleLoad']:
                         (modidx, modulename) = action_base._indexvalue(modload)
                         self._modules[modidx] = modulename
+            ret = True if self._selected_modulelist_dn is not None else False
+        else:
+            ret = self._add_modulelist()
 
-        ret = True if self._selected_modulelist_dn is not None else False
+        return ret
+
+    def _add_modulelist(self):
+        dn = 'cn=module, cn=config'
+        values = { 'objectClass': 'olcModuleList', 'cn':'module'}
+
+        if self._add_entry(dn, values):
+            ret = self._select_modulelist()
+        else:
+            ret = False
         return ret
 
     def run(self):

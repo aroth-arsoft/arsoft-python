@@ -50,6 +50,43 @@ class action_schema(action_base):
                     (schemaidx, schemaname) = action_base._indexvalue(values['cn'][0])
                     self._schemas[schemaidx] = schemaname
         return ret
+        
+    def _add_ldif_schema(self, filename):
+        recordlist = action_base._read_ldif_file(filename)
+        if recordlist is not None:
+            ret = True
+            for (dn, record) in recordlist:
+                if not self._add_entry(dn, record):
+                    ret = False
+                    break;
+        else:
+            ret = False
+        return ret
+        
+    def _find_schema_dn(self, schemaname):
+        searchBase = self._selected_schemaconfig_dn
+        searchFilter = '(&(objectClass=olcSchemaConfig)(cn=*' + schemaname + '))'
+        attrsFilter = ['cn']
+        
+        ret = None
+        result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
+        if result_set is not None:
+            for rec in result_set:
+                (dn, values) = rec[0]
+                ret = dn
+                break
+        return ret
+
+    def _remove_schema(self, schemaname):
+        schema_dn = self._find_schema_dn(schemaname)
+        if schema_dn is not None:
+            ret = self._delete_entry(schema_dn)
+            if not ret:
+                self._error('Failed to delete schema ' + schema_dn)
+        else:
+            self._error('Cannot find schema ' + schemaname)
+            ret = False
+        return ret
 
     def run(self):
         self._select_schemaconfig()
@@ -57,24 +94,18 @@ class action_schema(action_base):
         if self._add is None and self._remove is None:
             ret = self._list()
         else:
-            mod_attrs = []
             if self._add is not None:
-                for mod in self._add:
-                    if mod not in self._modules.values():
-                        mod_attrs.append( (ldap.MOD_ADD, 'olcModuleLoad', mod) )
-            if self._remove is not None:
-                for mod in self._remove:
-                    found = False
-                    for (modidx, modname) in self._modules.items():
-                        if modname == mod:
-                            found = True
-                            mod_attrs.append( (ldap.MOD_DELETE, 'olcModuleLoad', '{' + str(modidx) + '}' + mod) )
-                            break
-
-            if self._modify_direct(self._selected_modulelist_dn, mod_attrs):
                 ret = 0
-            else:
-                ret = 1
+                for schemafile in self._add:
+                    if not self._add_ldif_schema(schemafile):
+                        self._error('Failed to add schema from file ' + schemafile)
+                        ret = 1
+            if self._remove is not None:
+                ret = 0
+                for schemaname in self._remove:
+                    if not self._remove_schema(schemaname):
+                        ret = 1
+
         return ret
 
     def _list(self):

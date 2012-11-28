@@ -4,6 +4,7 @@
 
 import ldap
 import ldap.modlist as modlist
+import ldif
 
 # Used attributes from RootDSE
 ROOTDSE_ATTRS = (
@@ -63,6 +64,20 @@ class action_base(object):
             else:
                 return (None, val)
 
+    @staticmethod
+    def _read_ldif_file(filename):
+        ret = None
+        try:
+            f = open(filename, 'rb')
+            recordlist = ldif.LDIFRecordList(f)
+            recordlist.parse()
+            f.close()
+            ret = recordlist.all_records
+        except ldap.LDAPError as e:
+            self._error('ldaperror: ' + str(e))
+            ret = None
+        return ret
+
     def _search( self, searchBase, searchFilter, attrsFilter, scope=ldap.SCOPE_ONELEVEL):
         
         self._verbose('searchBase ' + searchBase)
@@ -112,7 +127,7 @@ class action_base(object):
             ret = False
         return ret
 
-    def _add(self, dn, values):
+    def _add_entry(self, dn, values):
         add_attrs = ldap.modlist.addModlist(values)
         try:
             self._cxn.add_s(dn, add_attrs)
@@ -122,7 +137,7 @@ class action_base(object):
             ret = False
         return ret
 
-    def _delete(self, dn):
+    def _delete_entry(self, dn):
         try:
             self._cxn.delete_s(dn)
             ret = True
