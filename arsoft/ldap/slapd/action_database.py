@@ -14,9 +14,10 @@ class action_database(action_base):
         action_base.__init__(self, app, args)
 
         parser = argparse.ArgumentParser(description='configure a LDAP database')
-        parser.add_argument('-r', '--readonly', dest='readonly', type=str, choices=['yes', 'no'], help='marks the database as read-only.')
+        parser.add_argument('--readonly', dest='readonly', type=str, choices=['yes', 'no'], help='marks the database as read-only.')
+        parser.add_argument('--mirror', dest='mirror', type=str, choices=['yes', 'no'], help='enables/disables the mirror mode of the database.')
         parser.add_argument('--all', dest='show_all', action='store_true', help='shows all databases (internal as well).')
-        parser.add_argument('suffix', type=str, nargs='?', help='selects the database by the suffix.')
+        parser.add_argument('dbname', type=str, nargs='?', help='selects the database by the suffix or database name.')
 
         pargs = parser.parse_args(args)
 
@@ -24,18 +25,24 @@ class action_database(action_base):
             self._readonly = None
         else:
             self._readonly = True if pargs.readonly == 'yes' else False
-        self._suffix = pargs.suffix
+        self._dbname = pargs.dbname
         self._selected_database_dn = None
         self._show_internal = True if pargs.show_all else False
         
     def run(self):
-        if not self._select_database():
+        if not self._get_databases():
             return 4
         
+        if not self._select_database():
+            return 5
+
         show_db = True
         if self._readonly is not None:
             show_db = False
             ret = self._set_readonly()
+        if self._mirror is not None:
+            show_db = False
+            ret = self._set_mirror()
 
         if show_db:
             ret = self._show()
@@ -43,17 +50,14 @@ class action_database(action_base):
 
     def _select_database(self):
         self._selected_database_dn = None
-        if self._suffix is not None:
-            searchBase = 'cn=config'
-            searchFilter = '(&(objectClass=olcDatabaseConfig)(olcDatabase=*)(olcSuffix=' + self._suffix + '))'
-            attrsFilter = []
-
-            result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
-            if result_set is not None:
-                for rec in result_set:
-                    (dn, values) = rec[0]
-                    self._selected_database_dn = dn
-            ret = True if self._selected_database_dn is not None else False
+        if self._dbname is not None:
+            db = self._get_database_by_name(self._dbname)
+            if db is not None:
+                self._selected_database_dn = db['dn']
+                ret = True
+            else:
+                self._selected_database_dn = None
+                ret = False
         else:
             ret = True
         return ret
@@ -69,73 +73,54 @@ class action_database(action_base):
             ret = 1
         return ret
 
-    def _show(self):
-        if self._selected_database_dn is None:
-            searchBase = 'cn=config'
+    def _set_mirror(self):
+        if self._mirror == True:
+            target_value = {'olcMirrorMode':'TRUE'}
         else:
-            searchBase = self._selected_database_dn
-        searchFilter = '(&(objectClass=olcDatabaseConfig)(olcDatabase=*))'
-        attrsFilter = ['olcDatabase', 'olcDbDirectory', 'olcSuffix', 'olcReadOnly', 'olcRootDN', 'olcAccess', 'olcDbConfig', 'olcDbIndex']
-        
-        result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
-        databases = []
-        if result_set is not None:
-            for rec in result_set:
-                (dn, values) = rec[0]
-                cn_elems = string.split(values['olcDatabase'][0], ',')
-                (dbno, dbtype) = action_base._indexvalue(cn_elems[0])
+            target_value = {'olcMirrorMode':'FALSE'}
+        if self._update(self._selected_database_dn, target_value):
+            ret = 0
+        else:
+            ret = 1
+        return ret
 
-                index = []
-                access = []
-                config = []
-                if 'olcDbIndex' in values:
-                    for v in values['olcDbIndex']:
-                        (indexno, indexline) = action_base._indexvalue(v)
-                        index.append(indexline)
-                if 'olcAccess' in values:
-                    for v in values['olcAccess']:
-                        (accessno, accessline) = action_base._indexvalue(v)
-                        access.append(accessline)
-                if 'olcDbConfig' in values:
-                    for v in values['olcDbConfig']:
-                        (configno, configline) = action_base._indexvalue(v)
-                        config.append(configline)
-                database = {'type': dbtype, 
-                            'suffix': values['olcSuffix'][0] if 'olcSuffix' in values else None,
-                            'internal': True if dbtype == 'frontend' or dbtype == 'config' else False,
-                            'rootdn': values['olcRootDN'][0] if 'olcRootDN' in values else None,
-                            'readonly': (True if values['olcReadOnly'][0] == 'true' else False ) if 'olcReadOnly' in values else None,
-                            'dbdir': values['olcDbDirectory'][0] if 'olcDbDirectory' in values else None,
-                            'index': index,
-                            'access': access,
-                            'config': config
-                            }
-                databases.append(database)
-
-        if len(databases) > 0:
-            for db in databases:
-                if db['internal']:
+    def _show(self):
+        if len(self._databases) > 0:
+            self._get_database_overlays()
+            for db in self._databases:
+                if self._selected_database_dn is not None:
+                    show_db = True if self._selected_database_dn == db['dn'] else False
+                elif db['internal']:
                     show_db = True if self._show_internal else False
                 else:
                     show_db = True
                 if show_db:
                     print('Database: ' + str(db['suffix']) + ' (' + db['type'] + ')')
+                    print('  dn:        ' + str(db['dn']))
                     print('  root dn:   ' + str(db['rootdn']))
                     if db['readonly'] is not None:
                         print('  read-only: ' + ('yes' if db['readonly'] == True else 'no'))
 
                     if len(db['index']) != 0:
                         print('  index:')
-                        for idx in db['index']:
+                        for idx in db['index'].values():
                             print('    ' + str(idx))
                     if len(db['access']) != 0:
                         print('  access:')
-                        for idx in db['access']:
+                        for idx in db['access'].values():
                             print('    ' + str(idx))
                     if len(db['config']) != 0:
                         print('  config:')
-                        for idx in db['config']:
+                        for idx in db['config'].values():
                             print('    ' + str(idx))
+                    if len(db['overlay']) != 0:
+                        print('  overlay:')
+                        for overlay in db['overlay'].values():
+                            print('    ' + overlay['name'] + '(' + str(overlay['type']) + ')')
+                    if len(db['replication']) != 0:
+                        print('  replication:')
+                        for repl in db['replication']:
+                            print('    ' + str(repl))
         else:
             print("Databases: <none>")
         return 0 

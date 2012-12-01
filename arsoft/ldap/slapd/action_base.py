@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+import string
 import ldap
 import ldap.modlist as modlist
 import ldif
@@ -119,12 +120,15 @@ class action_base(object):
     def _modify_direct(self, dn, mod_attrs):
         self._verbose('dn ' + dn)
         self._verbose('mod_attrs ' + str(mod_attrs))
-        try:
-            self._cxn.modify_s(dn, mod_attrs)
+        if len(mod_attrs) == 0:
             ret = True
-        except ldap.LDAPError as e:
-            self._error('ldaperror: ' + str(e))
-            ret = False
+        else:
+            try:
+                self._cxn.modify_s(dn, mod_attrs)
+                ret = True
+            except ldap.LDAPError as e:
+                self._error('ldaperror: ' + str(e))
+                ret = False
         return ret
 
     def _add_entry(self, dn, values):
@@ -171,3 +175,147 @@ class action_base(object):
             if key not in mod_new_values:
                 mod_new_values[key] = new_value
         self._modify(dn, mod_old_values, mod_new_values)
+
+    def _select_modulelist(self, add_modulelist_if_not_available=False):
+        self._selected_modulelist_dn = None
+        self._modulepath = None
+        self._modules = {}
+
+        searchBase = 'cn=config'
+        searchFilter = '(&(objectClass=olcModuleList)(cn=*))'
+        attrsFilter = ['cn', 'olcModuleLoad', 'olcModulePath']
+        
+        result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
+        
+        if result_set is not None:
+            for rec in result_set:
+                (dn, values) = rec[0]
+                self._selected_modulelist_dn = dn
+                
+                self._modulepath = values['olcModulePath'][0] if 'olcModulePath' in values else None
+                if 'olcModuleLoad' in values:
+                    for modload in values['olcModuleLoad']:
+                        (modidx, modulename) = action_base._indexvalue(modload)
+                        self._modules[modidx] = modulename
+            ret = True if self._selected_modulelist_dn is not None else False
+        else:
+            if add_modulelist_if_not_available:
+                ret = self._add_modulelist()
+            else:
+                ret = False
+
+        return ret
+
+    def _add_modulelist(self):
+        dn = 'cn=module, cn=config'
+        values = { 'objectClass': 'olcModuleList', 'cn':'module'}
+
+        if self._add_entry(dn, values):
+            ret = self._select_modulelist()
+        else:
+            ret = False
+        return ret
+
+    def _get_databases(self):
+        searchBase = 'cn=config'
+        searchFilter = '(&(objectClass=olcDatabaseConfig)(olcDatabase=*))'
+        attrsFilter = ['objectClass', 'olcDatabase', 'olcDbDirectory', 'olcSuffix', 'olcReadOnly', 'olcRootDN', 'olcAccess', 'olcDbConfig', 'olcDbIndex', 'olcSyncrepl', 'olcMirrorMode']
+        
+        result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
+        self._databases = []
+        if result_set is not None:
+            for rec in result_set:
+                (dn, values) = rec[0]
+                cn_elems = string.split(values['olcDatabase'][0], ',')
+                (dbno, dbtype) = action_base._indexvalue(cn_elems[0])
+
+                index = {}
+                access = {}
+                config = {}
+                repl = {}
+                if 'olcDbIndex' in values:
+                    for v in values['olcDbIndex']:
+                        (indexno, indexline) = action_base._indexvalue(v)
+                        index[indexno] = indexline
+                if 'olcAccess' in values:
+                    for v in values['olcAccess']:
+                        (accessno, accessline) = action_base._indexvalue(v)
+                        access[accessno] = accessline
+                if 'olcDbConfig' in values:
+                    for v in values['olcDbConfig']:
+                        (configno, configline) = action_base._indexvalue(v)
+                        config[configno] = configline
+                if 'olcSyncrepl' in values:
+                    for v in values['olcSyncrepl']:
+                        (replno, replline) = action_base._indexvalue(v)
+                        repl[replno] = syncrepl(replline)
+                database = {'dn': dn,
+                            'objectclass': values['objectClass'],
+                            'type': dbtype, 
+                            'suffix': values['olcSuffix'][0] if 'olcSuffix' in values else None,
+                            'internal': True if dbtype == 'frontend' or dbtype == 'config' else False,
+                            'rootdn': values['olcRootDN'][0] if 'olcRootDN' in values else None,
+                            'readonly': (True if values['olcReadOnly'][0] == 'true' else False ) if 'olcReadOnly' in values else None,
+                            'mirrormode': (True if values['olcMirrorMode'][0] == 'true' else False ) if 'olcMirrorMode' in values else None,
+                            'dbdir': values['olcDbDirectory'][0] if 'olcDbDirectory' in values else None,
+                            'index': index,
+                            'access': access,
+                            'config': config,
+                            'replication': repl,
+                            'overlay': {}
+                            }
+                self._databases.append(database)
+            ret = True
+        else:
+            ret = False
+        return ret
+
+    def _get_database_by_name(self, dbname):
+        for db in self._databases:
+            if db['suffix'] == dbname:
+                return db
+            elif db['internal'] == True and db['type'] == dbname:
+                return db
+        return None
+        
+    def _get_database_overlays(self):
+        i = 0
+        while i < len(self._databases):
+            db_overlays = self._get_overlays_for_database(self._databases[i]['dn'])
+            if db_overlays is not None:
+                self._databases[i]['overlay'] = db_overlays
+            i = i + 1
+        return True
+
+    def _get_overlays_for_database(self, database_dn):
+        searchBase = database_dn
+        searchFilter = '(objectClass=olcOverlayConfig)'
+        attrsFilter = ['objectClass', 'olcOverlay']
+        
+        result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
+        overlays = {}
+        if result_set is not None:
+            for rec in result_set:
+                (dn, values) = rec[0]
+
+                (overlayno, overlayname) = action_base._indexvalue(values['olcOverlay'][0])
+                if 'olcSyncProvConfig' in values['objectClass']:
+                    overlaytype = 'syncprov'
+                else:
+                    overlaytype = None
+                overlay = { 'name': overlayname,
+                            'type': overlaytype 
+                            }
+                overlays[overlayno] = overlay
+            ret = True
+        else:
+            ret = False
+
+        return overlays if ret else None
+
+    def _set_database_mirrormode(self, database_dn, enable):
+        if enable == True:
+            target_value = {'olcMirrorMode':'TRUE'}
+        else:
+            target_value = {'olcMirrorMode':'FALSE'}
+        return self._update(self._selected_database_dn, target_value)

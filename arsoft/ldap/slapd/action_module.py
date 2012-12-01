@@ -22,49 +22,12 @@ class action_module(action_base):
         self._remove = pargs.remove
         self._selected_modulelist_dn = None
 
-    def _select_modulelist(self):
-        self._selected_modulelist_dn = None
-        self._modulepath = None
-        self._modules = {}
-
-        searchBase = 'cn=config'
-        searchFilter = '(&(objectClass=olcModuleList)(cn=*))'
-        attrsFilter = ['cn', 'olcModuleLoad', 'olcModulePath']
-        
-        result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
-        
-        if result_set is not None:
-            for rec in result_set:
-                (dn, values) = rec[0]
-                self._selected_modulelist_dn = dn
-                
-                self._modulepath = values['olcModulePath'][0] if 'olcModulePath' in values else None
-                if 'olcModuleLoad' in values:
-                    for modload in values['olcModuleLoad']:
-                        (modidx, modulename) = action_base._indexvalue(modload)
-                        self._modules[modidx] = modulename
-            ret = True if self._selected_modulelist_dn is not None else False
-        else:
-            ret = self._add_modulelist()
-
-        return ret
-
-    def _add_modulelist(self):
-        dn = 'cn=module, cn=config'
-        values = { 'objectClass': 'olcModuleList', 'cn':'module'}
-
-        if self._add_entry(dn, values):
-            ret = self._select_modulelist()
-        else:
-            ret = False
-        return ret
-
     def run(self):
-        self._select_modulelist()
-        
         if self._add is None and self._remove is None:
+            self._select_modulelist(add_modulelist_if_not_available=False)
             ret = self._list()
         else:
+            self._select_modulelist(add_modulelist_if_not_available=True)
             mod_attrs = []
             if self._add is not None:
                 for mod in self._add:

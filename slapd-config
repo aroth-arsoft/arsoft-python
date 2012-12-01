@@ -228,6 +228,9 @@ class SlapdConfigApp(object):
                 elif action_name == 'cert':
                     action_obj = action_cert(self, action_args)
                     ret = action_obj.run()
+                elif action_name == 'replication' or action_name == 'repl':
+                    action_obj = action_replication(self, action_args)
+                    ret = action_obj.run()
                 else:
                     ret = 3
                 self.unbind()
