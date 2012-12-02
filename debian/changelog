@@ -1,3 +1,9 @@
+arsoft-python (1.30) quantal; urgency=low
+
+  * add check_kernel_modules plugin for nagios
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Dec 2012 12:20:07 +0100
+
 arsoft-python (1.29) quantal; urgency=low
 
   * fixed trouble in ini-util

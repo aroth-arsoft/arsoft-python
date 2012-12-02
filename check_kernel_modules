@@ -1,0 +1,35 @@
+#!/usr/bin/python
+import os,sys
+from datetime import datetime, timedelta
+
+from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
+
+from arsoft.kernel_module import kernel_module
+
+## Create the plugin option
+np = NagiosPlugin(must_threshold=False)
+np.add_value('modules')
+np.add_arg('w', 'warning', 'list of the modules to issue a warning status when not loaded.', required=0)
+np.add_arg('c', 'critical', 'list of the modules to issue a critical status when not loaded.', required=0)
+
+## This starts the actual plugin activation
+np.activate()
+
+exit_code = OK
+exit_message = 'OK'
+
+modlist = kernel_module.get_module_list().keys()
+np.set_value('modules', modlist)
+
+
+if np['warning']:
+    if not kernel_module.is_module_loaded(np['warning']):
+        exit_code = WARNING
+        exit_message = 'Module %s not loaded' % np['warning']
+
+if np['critical']:
+    if not kernel_module.is_module_loaded(np['critical']):
+        exit_code = CRITICAL
+        exit_message = 'Module %s not loaded' % np['critical']
+
+np.nagios_exit(exit_code, exit_message)
