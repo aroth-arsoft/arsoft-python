@@ -3,10 +3,11 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 class syncrepl(object):
-    def __init__(self, line):
+    def __init__(self, line=None):
         self._data = {}
+        self._org_line = None
         self.parse(line)
-        
+
     @staticmethod
     def _parse_key_value_line(line):
         ret = {}
@@ -57,10 +58,18 @@ class syncrepl(object):
 
     @staticmethod
     def _need_quotes(value):
-        return syncrepl._contains_any(value, ' ,=')
+        if isinstance(value, str):
+            return syncrepl._contains_any(value, ' ,=')
+        else:
+            return False
 
     def parse(self, line):
-        key_value_dict = syncrepl._parse_key_value_line(line)
+        if line is not None:
+            key_value_dict = syncrepl._parse_key_value_line(line)
+            self._org_line = line
+        else:
+            key_value_dict = {}
+            self._org_line = None
 
         syncrepl._copy_value(self._data, key_value_dict, 'rid')
         syncrepl._copy_value(self._data, key_value_dict, 'provider')
@@ -86,9 +95,25 @@ class syncrepl(object):
                     key_value_pair = key + '=' + str(value)
                 elems.append(key_value_pair)
         return ' '.join(elems)
+    
+    def original_string(self):
+        return self._org_line
 
     def __str__(self):
         return self.to_string()
+
+    def __getattr__(self, attr):
+        if attr == '_data':
+            self.__dict__['_data']
+        else:
+            return self.__dict__['_data'][attr]
+
+    def __setattr__(self, attr, value):
+        if attr == '_data':
+            self.__dict__['_data'] = value
+        else:
+            print(self.__dict__['_data'])
+            self.__dict__['_data'][attr] = value
 
 
 if __name__ == "__main__":

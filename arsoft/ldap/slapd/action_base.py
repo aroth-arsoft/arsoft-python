@@ -6,6 +6,7 @@ import string
 import ldap
 import ldap.modlist as modlist
 import ldif
+from syncrepl import *
 
 # Used attributes from RootDSE
 ROOTDSE_ATTRS = (
@@ -219,8 +220,8 @@ class action_base(object):
     def _get_databases(self):
         searchBase = 'cn=config'
         searchFilter = '(&(objectClass=olcDatabaseConfig)(olcDatabase=*))'
-        attrsFilter = ['objectClass', 'olcDatabase', 'olcDbDirectory', 'olcSuffix', 'olcReadOnly', 'olcRootDN', 'olcAccess', 'olcDbConfig', 'olcDbIndex', 'olcSyncrepl', 'olcMirrorMode']
-        
+        attrsFilter = ['objectClass', 'olcDatabase', 'olcDbDirectory', 'olcSuffix', 'olcReadOnly', 'olcRootDN', 'olcRootPW', 'olcAccess', 'olcDbConfig', 'olcDbIndex', 'olcSyncrepl', 'olcMirrorMode']
+
         result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
         self._databases = []
         if result_set is not None:
@@ -228,6 +229,7 @@ class action_base(object):
                 (dn, values) = rec[0]
                 cn_elems = string.split(values['olcDatabase'][0], ',')
                 (dbno, dbtype) = action_base._indexvalue(cn_elems[0])
+                dbtype = dbtype.lower()
 
                 index = {}
                 access = {}
@@ -249,14 +251,22 @@ class action_base(object):
                     for v in values['olcSyncrepl']:
                         (replno, replline) = action_base._indexvalue(v)
                         repl[replno] = syncrepl(replline)
+                if dbtype == 'frontend':
+                    searchbase = None
+                elif dbtype == 'config':
+                    searchbase = 'cn=config'
+                else:
+                    searchbase = values['olcSuffix'][0] if 'olcSuffix' in values else None
                 database = {'dn': dn,
                             'objectclass': values['objectClass'],
                             'type': dbtype, 
                             'suffix': values['olcSuffix'][0] if 'olcSuffix' in values else None,
+                            'defaultsearchbase': searchbase,
                             'internal': True if dbtype == 'frontend' or dbtype == 'config' else False,
                             'rootdn': values['olcRootDN'][0] if 'olcRootDN' in values else None,
-                            'readonly': (True if values['olcReadOnly'][0] == 'true' else False ) if 'olcReadOnly' in values else None,
-                            'mirrormode': (True if values['olcMirrorMode'][0] == 'true' else False ) if 'olcMirrorMode' in values else None,
+                            'rootpw': values['olcRootPW'][0] if 'olcRootPW' in values else None,
+                            'readonly': (True if values['olcReadOnly'][0].lower() == 'true' else False ) if 'olcReadOnly' in values else None,
+                            'mirrormode': (True if values['olcMirrorMode'][0].lower() == 'true' else False ) if 'olcMirrorMode' in values else None,
                             'dbdir': values['olcDbDirectory'][0] if 'olcDbDirectory' in values else None,
                             'index': index,
                             'access': access,

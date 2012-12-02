@@ -1,3 +1,10 @@
+arsoft-python (1.31) quantal; urgency=low
+
+  * fixed build errors
+  * check_kernel_modules now correctly handle multiple modules
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Dec 2012 15:18:09 +0100
+
 arsoft-python (1.30) quantal; urgency=low
 
   * add check_kernel_modules plugin for nagios

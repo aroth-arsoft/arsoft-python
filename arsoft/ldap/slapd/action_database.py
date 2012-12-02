@@ -100,6 +100,8 @@ class action_database(action_base):
                     print('  root dn:   ' + str(db['rootdn']))
                     if db['readonly'] is not None:
                         print('  read-only: ' + ('yes' if db['readonly'] == True else 'no'))
+                    if db['mirrormode'] is not None:
+                        print('  mirror mode: ' + ('yes' if db['mirrormode'] == True else 'no'))
 
                     if len(db['index']) != 0:
                         print('  index:')

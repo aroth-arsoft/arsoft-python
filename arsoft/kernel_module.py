@@ -1,8 +1,5 @@
 #!/usr/bin/python
 
-import re
-import sys
-
 class kernel_module(object):
     _instance = None
 

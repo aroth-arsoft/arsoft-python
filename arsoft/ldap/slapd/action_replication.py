@@ -7,6 +7,7 @@ import string
 import ldap
 import ldap.modlist as modlist
 from action_base import *
+from syncrepl import *
 
 class action_replication(action_base):
 
@@ -16,13 +17,11 @@ class action_replication(action_base):
         parser = argparse.ArgumentParser(description='configure the replication')
         parser.add_argument('-a', '--add', dest='add', type=str, nargs='+', help='adds the specified server.')
         parser.add_argument('-r', '--remove', dest='remove', type=str, nargs='+', help='removes the specified server.')
-        parser.add_argument('-d', '--database', dest='database', type=str, nargs='+', help='enable replication on the specified database.')
         
         pargs = parser.parse_args(args)
 
         self._add = pargs.add
         self._remove = pargs.remove
-        self._database = pargs.database
         self._server_list = {}
 
     @staticmethod
@@ -58,6 +57,7 @@ class action_replication(action_base):
             for rec in result_set:
                 (dn, values) = rec[0]
 
+                print(values)
                 if 'olcServerID' in values:
                     for val in values['olcServerID']:
                         (serverid, serveruri) = action_replication._parse_serverid(val)
@@ -68,7 +68,7 @@ class action_replication(action_base):
         else:
             ret = False
         return ret
-    
+
     def _get_next_serverid(self):
         ret = 1
         used_serverids = self._server_list.keys()
@@ -84,6 +84,19 @@ class action_replication(action_base):
         for (serverid, serveruri) in self._server_list.items():
             if serveruri == uri:
                 ret = serverid
+                break
+        return ret
+
+    def _get_next_rid(self):
+        ret = 1
+        used_rids = []
+        for db in self._databases:
+            for repl in db['replication'].values():
+                used_rids.append(repl.rid)
+        while ret < 4096:
+            if ret in used_rids:
+                ret = ret + 1
+            else:
                 break
         return ret
     
@@ -117,30 +130,120 @@ class action_replication(action_base):
         return ret
 
     def _add_syncrepl_to_database(self, database):
+        print('_add_syncrepl_to_database ' + str(database))
+        print('_add_syncrepl_to_database ' + str(self._server_list))
 
-        ret = True
+        mod_attrs = []
+        for (serverid, serveruri) in self._server_list.items():
+            print('_add_syncrepl_to_database check for server ' + str(serveruri))
+            server_has_syncrepl = False
+            for repl in database['replication'].values():
+                if repl.provider == serveruri:
+                    server_has_syncrepl = True
+                    break
+            if server_has_syncrepl == False:
+                db_repl = syncrepl()
+                db_repl.rid = self._get_next_rid()
+                db_repl.searchbase = database['defaultsearchbase']
+                db_repl.provider = serveruri
+                db_repl.binddn = database['rootdn']
+                db_repl.credentials = database['rootpw']
+                db_repl.bindmethod = 'simple'
+
+                mod_attrs.append( (ldap.MOD_ADD, 'olcSyncRepl', str(db_repl) ) )
+
+        if database['mirrormode'] is None:
+            mod_attrs.append( (ldap.MOD_ADD, 'olcMirrorMode', 'TRUE' ) )
+        elif database['mirrormode'] == False:
+            mod_attrs.append( (ldap.MOD_REPLACE, 'olcMirrorMode', 'TRUE' ) )
+
+        ret = self._modify_direct(database['dn'], mod_attrs)
+        return ret
+    
+    def _add_server(self, serverid, serveruri):
+        self._ensure_syncprov_module()
+        
+        mod_attrs = []
+        server_already_exists = False
+        if serverid is None:
+            serverid = self._find_server_by_uri(serveruri)
+            if serverid is None:
+                serverid = self._get_next_serverid()
+                # add server
+                mod_attrs.append( (ldap.MOD_ADD, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
+            else:
+                server_already_exists = True
+        else:
+            current_serveruri = self._server_list[serverid]
+            if current_serveruri == serveruri:
+                server_already_exists = True
+            else:
+                # need to modify a specific server (e.g. server uri has changed)
+                # keep serverid, but modify the URI
+                mod_attrs.append( (ldap.MOD_REPLACE, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
+        ret = self._modify_direct('cn=config', mod_attrs)
         if ret:
-            ret = self._set_database_mirrormode(database_dn, true)
+            self._get_databases()
+            self._get_database_overlays()
+            # now ensure the list of servers is up-to-date in each database
+            for db in self._databases:
+                if db['type'] == 'frontend':
+                    continue
+                if not self._add_syncprov_to_database(db):
+                    ret = False
+                    break
+                elif not self._add_syncrepl_to_database(db):
+                    ret = False
+                    break
+
+        return ret
+
+    def _remove_syncrepl_from_database(self, database, serveruri):
+        print('_remove_syncrepl_from_database ' + str(database))
+        print('_remove_syncrepl_from_database ' + str(self._server_list))
+        server_has_syncrepl = False
+        mod_attrs = []
+        for (replno, repl) in database['replication'].items():
+            if repl.provider == serveruri:
+                server_has_syncrepl = True
+                mod_attrs.append( (ldap.MOD_DELETE, 'olcSyncRepl', '{' + str(replno) + '}' + repl.original_string() ) )
+                break
+        ret = self._modify_direct(database['dn'], mod_attrs)
+        return ret
+
+    def _remove_server(self, serverid):
+        serveruri = self._server_list[serverid]
+
+        self._get_databases()
+        ret = True
+        # remove the syncrepl line for this server from all databases
+        for db in self._databases:
+            if db['type'] == 'frontend':
+                continue
+            if not self._remove_syncrepl_from_database(db, serveruri):
+                ret = False
+
+        if ret:
+            # finally remove the server from the global config
+            mod_attrs = []
+            mod_attrs.append( (ldap.MOD_DELETE, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
+            ret = self._modify_direct('cn=config', mod_attrs)
         return ret
 
     def run(self):
         self._get_server_list()
-        
-        if self._add is None and self._remove is None and self._database is None:
+
+        if self._add is None and self._remove is None:
             ret = self._status()
         else:
-            mod_attrs = []
+            ret = 0
             if self._add is not None:
                 self._ensure_syncprov_module()
                 for server in self._add:
                     (serverid, serveruri) = action_replication._parse_serverid(server)
-                    if serverid is None:
-                        serverid = self._find_server_by_uri(serveruri)
-                        if serverid is None:
-                            serverid = self._get_next_serverid()
-                            mod_attrs.append( (ldap.MOD_ADD, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
-                    else:
-                        mod_attrs.append( (ldap.MOD_ADD, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
+                    if not self._add_server(serverid, serveruri):
+                        self._error('Failed to add server with serverid ' + str(serverid) + ' and URI ' + str(serveruri))
+                        ret = 1
 
             if self._remove is not None:
                 for server in self._remove:
@@ -149,25 +252,14 @@ class action_replication(action_base):
                     if serverid is None:
                         serverid = self._find_server_by_uri(serveruri)
                         
-                    if serverid in self._server_list.keys():
-                        found = True
-                    else:
-                        found = False
-                        
-                    if found:
-                        mod_attrs.append( (ldap.MOD_DELETE, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
+                    if serverid not in self._server_list.keys():
+                        self._error('Server with serverid ' + str(serverid) + ' and URI ' + str(serveruri) + ' not found.')
+                        ret = 1
+                        break
+                    if not self._remove_server(serverid):
+                        self._error('Failed to remove server with serverid ' + str(serverid) + ' and URI ' + str(serveruri))
+                        ret = 1
 
-            if self._modify_direct('cn=config', mod_attrs):
-                if self._database is not None:
-                    self._get_databases()
-                    self._get_database_overlays()
-                    for database in self._database:
-                        db = self._get_database_by_name(database)
-                        if db is not None:
-                            self._add_syncprov_to_database(db)
-                ret = 0
-            else:
-                ret = 1
         return ret
 
     def _status(self):
