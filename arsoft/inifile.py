@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import re
 
@@ -338,6 +340,10 @@ class IniFile(object):
                     if mo:
                         try:
                             disabled = mo.group('disabled')
+                            if len(disabled) > 0:
+                                disabled = True
+                            else:
+                                disabled = False
                         except IndexError:
                             disabled = False
                         optname, vi, optval = mo.group('option', 'vi', 'value')
@@ -388,10 +394,6 @@ class IniFile(object):
                             optval = ''
                         optname = optname.rstrip()
 
-                        if len(disabled) > 0:
-                            disabled = True
-                        else:
-                            disabled = False
                         cursect.appendRaw(lineno, line, optname, optval, optcomment, disabled)
                     else:
                         #print('try to match comment for line: ' + line)

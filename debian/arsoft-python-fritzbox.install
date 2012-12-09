@@ -1,2 +1,2 @@
-usr/lib/python*/dist-packages/arsoft/fritzbox/__init__.py
+usr/lib/python*/dist-packages/arsoft/fritzbox/*.py
 usr/bin/fritzbox-status

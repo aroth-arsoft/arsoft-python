@@ -6,7 +6,12 @@ import string
 import ldap
 import ldap.modlist as modlist
 import ldif
+import socket
+from urlparse import urlparse
 from syncrepl import *
+from slapd_defaults import *
+import arsoft.utils
+from arsoft.ldap.cxn import LdapConnection
 
 # Used attributes from RootDSE
 ROOTDSE_ATTRS = (
@@ -39,18 +44,65 @@ ROOTDSE_ATTRS = (
 'ibm-configurationnamingcontext',
 )
 
+class database_list(list):
+    def get_config(self):
+        for db in self:
+            if db['type'] == 'config':
+                return db
+        return None
+        
+    def exclude_internal(self):
+        ret = []
+        for db in self:
+            if db['internal'] == True:
+                continue
+            ret.append(db)
+        return ret
+
 class action_base(object):
 
     def __init__(self, app, args):
         self._app = app
         self._cxn = app._cxn
+        self._second_cxn = None
+        self._uri = app._uri
         self._args = args
+        self._local_defaults = None
+        self._ldap_hostname = None
+        self._ldap_hostaddr = None
+
+        o = urlparse(self._uri)
+        if o.scheme == 'ldap' or o.scheme == 'ldaps':
+            self._ldap_hostname = o.hostname
+        elif o.scheme == 'ldapi':
+            self._ldap_hostname = 'localhost'
+        else:
+            self._error('Invalid or unsupported URI scheme ' + o.scheme)
+            
+        if arsoft.utils.is_localhost(self._ldap_hostname):
+            self._ldap_hostname = socket.getfqdn()
+            self._ldap_hostaddr = socket.gethostbyname(self._ldap_hostname)
+            self._local_defaults = slapd_defaults()
+        else:
+            # keep the value in self._ldap_hostname
+            self._ldap_hostaddr = socket.gethostbyname(self._ldap_hostname)
+            self._local_defaults = None
 
     def _verbose(self, msg):
         self._app.verbose(msg)
 
     def _error(self, msg):
         self._app.error(msg)
+
+    def _warn(self, msg):
+        self._app.warn(msg)
+        
+    def connect(self, uri, username, password, saslmech):
+        self._cxn = LdapConnection(uri, username, password, saslmech)
+        return self._cxn.connect()
+
+    def close(self):
+        self._cxn.close()
         
     @staticmethod
     def _indexvalue(val):
@@ -79,103 +131,94 @@ class action_base(object):
             self._error('ldaperror: ' + str(e))
             ret = None
         return ret
+    
+    @staticmethod
+    def _ldap_error_message(e):
+        if type(e.message) == dict:
+            msg = ''
+            for (k, v) in e.message.iteritems():
+                msg = msg + "%s: %s" % (k, v)
+        else:
+            msg = str(e)
+        return msg
 
-    def _search( self, searchBase, searchFilter, attrsFilter, scope=ldap.SCOPE_ONELEVEL):
-        
-        self._verbose('searchBase ' + searchBase)
-        self._verbose('searchFilter ' + searchFilter)
-        self._verbose('attrsFilter ' + str(attrsFilter))
-        result_set = []
+    def _connect_second(self, uri):
+
+        uri = action_base.get_full_ldap_uri(uri)
+
         try:
-            ldap_result_id = self._cxn.search(searchBase, scope, searchFilter, attrsFilter)
-            while 1:
-                result_type, result_data = self._cxn.result(ldap_result_id, 0)
-                if (result_data == []):
-                    break
-                else:
-                    ## here you don't have to append to a list
-                    ## you could do whatever you want with the individual entry
-                    ## The appending to list is just for illustration. 
-                    if result_type == ldap.RES_SEARCH_ENTRY:
-                        result_set.append(result_data)
+            self._verbose("Connecting to " + uri + "...")
+            self._second_cxn = ldap.initialize(uri)
         except ldap.LDAPError as e:
-            self._error('ldaperror: ' + str(e))
-            result_set = None
-            pass
-        return result_set
+            msg = action_base._ldap_error_message(e)
+            self._error("Failed to connect to ldap server " + uri + ". " + msg)
+            self._second_cxn = None
 
-    def _modify(self, dn, old_values, new_values):
-        self._verbose('dn ' + dn)
-        self._verbose('old_values ' + str(old_values))
-        self._verbose('new_values ' + str(new_values))
-        mod_attrs = ldap.modlist.modifyModlist(old_values, new_values)
-        self._verbose('mod_attrs ' + str(mod_attrs))
-        try:
-            self._cxn.modify_s(dn, mod_attrs)
-            ret = True
-        except ldap.LDAPError as e:
-            self._error('ldaperror: ' + str(e))
-            ret = False
-        return ret
-
-    def _modify_direct(self, dn, mod_attrs):
-        self._verbose('dn ' + dn)
-        self._verbose('mod_attrs ' + str(mod_attrs))
-        if len(mod_attrs) == 0:
+        if self._second_cxn is not None:
+            # you should  set this to ldap.VERSION2 if you're using a v2 directory
+            self._second_cxn.protocol_version = ldap.VERSION3
             ret = True
         else:
-            try:
-                self._cxn.modify_s(dn, mod_attrs)
-                ret = True
-            except ldap.LDAPError as e:
-                self._error('ldaperror: ' + str(e))
-                ret = False
+            ret = False
         return ret
+
+    def _bind_second(self, username=None, password=None, saslmech=None):
+        # Pass in a valid username and password to get 
+        # privileged directory access.
+        # If you leave them as empty strings or pass an invalid value
+        # you will still bind to the server but with limited privileges.
+        
+        if username is None:
+            username = self._app._username
+        if password is None:
+            password = self._app._password
+        if saslmech is None:
+            saslmech = self._app._saslmech
+
+        ldapusername = '' if username is None else username
+        ldappassword = '' if password is None else password
+        
+        try:
+            # Any errors will throw an ldap.LDAPError exception 
+            # or related exception so you can ignore the result
+            if saslmech == 'simple':
+                if ldapusername != '':
+                    self._verbose("simple_bind user:" + ldapusername + " pwd:" + ldappassword)
+                else:
+                    self.verbose("simple_bind anonymous")
+                self._second_cxn.simple_bind_s(ldapusername, ldappassword)
+                ret = True
+            else:
+                self._verbose('bind ' + saslmech + " user:" + ldapusername + " pwd:" + ldappassword)
+                self._second_cxn.bind_s(ldapusername, ldappassword, saslmech)
+                ret = True
+        except ldap.LDAPError as e:
+            msg = action_base._ldap_error_message(e)
+            self._error("Failed to bind to ldap server as " + ldapusername + ". " + msg)
+            ret = False
+        return ret
+        
+    def _unbind_second(self):
+        self._second_cxn.unbind_s()
+        self._second_cxn = None
+
+    def _search( self, searchBase, searchFilter, attrsFilter, scope=ldap.SCOPE_ONELEVEL):
+        return self._cxn.search(searchBase, searchFilter, attrsFilter, scope)
+
+    def _modify(self, dn, old_values, new_values):
+        return self._cxn.modify(dn, old_values, new_values)
+
+    def _modify_direct(self, dn, mod_attrs):
+        return self._cxn.modify_direct(dn, mod_attrs)
 
     def _add_entry(self, dn, values):
-        add_attrs = ldap.modlist.addModlist(values)
-        try:
-            self._cxn.add_s(dn, add_attrs)
-            ret = True
-        except ldap.LDAPError as e:
-            self._error('ldaperror: ' + str(e))
-            ret = False
-        return ret
+        return self._cxn.add_entry(dn, values)
 
     def _delete_entry(self, dn):
-        try:
-            self._cxn.delete_s(dn)
-            ret = True
-        except ldap.LDAPError as e:
-            self._error('ldaperror: ' + str(e))
-            ret = False
-        return ret
+        return self._cxn.delete_entry(dn)
     
     def _update(self, dn, values):
-        searchBase = dn
-        searchFilter = '(objectClass=*)'
-        attrsFilter = values.keys()
-        
-        mod_old_values = {}
-        mod_new_values = {}
-        result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_BASE)
-        if result_set is not None:
-            for rec in result_set:
-                (dn, current_values) = rec[0]
-                
-                for (key, current_value) in current_values.items():
-                    if values[key] == current_value:
-                        # value already up-to-date
-                        continue
-                    else:
-                        # add the old and new value to the dict for
-                        # the modify op
-                        mod_old_values[key] = current_value
-                        mod_new_values[key] = values[key]
-        for (key, new_value) in values.items():
-            if key not in mod_new_values:
-                mod_new_values[key] = new_value
-        self._modify(dn, mod_old_values, mod_new_values)
+        return self._cxn.update(dn, values)
 
     def _select_modulelist(self, add_modulelist_if_not_available=False):
         self._selected_modulelist_dn = None
@@ -206,6 +249,18 @@ class action_base(object):
                 ret = False
 
         return ret
+    
+    def _has_config_access(self):
+        searchBase = 'cn=config'
+        searchFilter = '(objectClass=olcGlobal)'
+        attrsFilter = ['cn']
+        
+        results = self._cxn.search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_BASE)
+        if results is None:
+            ret = False
+        else:
+            ret = True
+        return ret
 
     def _add_modulelist(self):
         dn = 'cn=module, cn=config'
@@ -223,7 +278,7 @@ class action_base(object):
         attrsFilter = ['objectClass', 'olcDatabase', 'olcDbDirectory', 'olcSuffix', 'olcReadOnly', 'olcRootDN', 'olcRootPW', 'olcAccess', 'olcDbConfig', 'olcDbIndex', 'olcSyncrepl', 'olcMirrorMode']
 
         result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_ONELEVEL)
-        self._databases = []
+        self._databases = database_list()
         if result_set is not None:
             for rec in result_set:
                 (dn, values) = rec[0]
@@ -253,11 +308,15 @@ class action_base(object):
                         repl[replno] = syncrepl(replline)
                 if dbtype == 'frontend':
                     searchbase = None
+                    name = 'frontend'
                 elif dbtype == 'config':
                     searchbase = 'cn=config'
+                    name = 'cn=config'
                 else:
                     searchbase = values['olcSuffix'][0] if 'olcSuffix' in values else None
+                    name = searchbase
                 database = {'dn': dn,
+                            'name': name,
                             'objectclass': values['objectClass'],
                             'type': dbtype, 
                             'suffix': values['olcSuffix'][0] if 'olcSuffix' in values else None,

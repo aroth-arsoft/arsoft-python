@@ -40,4 +40,12 @@ class action_status(action_base):
             print("namingContexts:  <none>")
         print("configContext:   " + str(configContext))
         print("SASL mechanisms: " + str(string.join(saslMechs, ', ')))
+        
+        if self._local_defaults is not None:
+            if self._local_defaults.has_ldapi_service():
+                print("LDAPI socket:    enabled")
+            else:
+                print("LDAPI socket:    disabled")
+            print("Public services: " + str(string.join(self._local_defaults.public_services, ', ')))
+
         return 0

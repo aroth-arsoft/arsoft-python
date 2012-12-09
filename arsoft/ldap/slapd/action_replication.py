@@ -6,8 +6,11 @@ import argparse
 import string
 import ldap
 import ldap.modlist as modlist
+from urlparse import urlparse
 from action_base import *
 from syncrepl import *
+import arsoft.utils
+import arsoft.ldap.utils
 
 class action_replication(action_base):
 
@@ -15,6 +18,7 @@ class action_replication(action_base):
         action_base.__init__(self, app, args)
 
         parser = argparse.ArgumentParser(description='configure the replication')
+        parser.add_argument('-c', '--connect', dest='connect', type=str, nargs='+', help='connects the server to the specified server.')
         parser.add_argument('-a', '--add', dest='add', type=str, nargs='+', help='adds the specified server.')
         parser.add_argument('-r', '--remove', dest='remove', type=str, nargs='+', help='removes the specified server.')
         
@@ -22,6 +26,7 @@ class action_replication(action_base):
 
         self._add = pargs.add
         self._remove = pargs.remove
+        self._connect = pargs.connect
         self._server_list = {}
 
     @staticmethod
@@ -53,17 +58,22 @@ class action_replication(action_base):
         result_set = self._search(searchBase, searchFilter, attrsFilter, ldap.SCOPE_BASE)
         
         self._server_list = {}
+        self._own_serverid = None
         if result_set is not None:
             for rec in result_set:
                 (dn, values) = rec[0]
-
-                print(values)
                 if 'olcServerID' in values:
                     for val in values['olcServerID']:
                         (serverid, serveruri) = action_replication._parse_serverid(val)
                         if serverid is not None:
                             self._server_list[serverid] = serveruri
-
+                            if self._local_defaults is not None:
+                                self._local_defaults.has_service(serveruri)
+                                self._own_serverid = serverid
+                            else:
+                                o = urlparse(serveruri)
+                                if o.hostname == self._ldap_hostname or o.hostname == self._ldap_hostaddr:
+                                    self._own_serverid = serverid
             ret = True
         else:
             ret = False
@@ -149,8 +159,11 @@ class action_replication(action_base):
                 db_repl.binddn = database['rootdn']
                 db_repl.credentials = database['rootpw']
                 db_repl.bindmethod = 'simple'
-
-                mod_attrs.append( (ldap.MOD_ADD, 'olcSyncRepl', str(db_repl) ) )
+                
+                if db_repl.has_credentials():
+                    mod_attrs.append( (ldap.MOD_ADD, 'olcSyncRepl', str(db_repl) ) )
+                else:
+                    self._warn('Database ' + database['name'] + 'does not have any usable credentials specified.')
 
         if database['mirrormode'] is None:
             mod_attrs.append( (ldap.MOD_ADD, 'olcMirrorMode', 'TRUE' ) )
@@ -160,7 +173,31 @@ class action_replication(action_base):
         ret = self._modify_direct(database['dn'], mod_attrs)
         return ret
     
+    def _set_mirrormode_to_database(self, database):
+        print('_set_mirrormode_to_database ' + str(database))
+        mod_attrs = []
+        if database['mirrormode'] is None:
+            mod_attrs.append( (ldap.MOD_ADD, 'olcMirrorMode', 'TRUE' ) )
+        elif database['mirrormode'] == False:
+            mod_attrs.append( (ldap.MOD_REPLACE, 'olcMirrorMode', 'TRUE' ) )
+
+        ret = self._modify_direct(database['dn'], mod_attrs)
+        return ret
+    
     def _add_server(self, serverid, serveruri):
+        o = urlparse(serveruri)
+        if arsoft.utils.is_localhost(o.hostname) or arsoft.utils.is_localhost(serveruri):
+            if self._local_defaults is None:
+                self._error('Cannot add server with URI to localhost.')
+                return False
+            else:
+                if len(self._local_defaults.public_services) == 1:
+                    self._verbose('use server uri ' + self._local_defaults.public_services[0] + ' instead of ' + serveruri)
+                    serveruri = self._local_defaults.public_services[0]
+                else:
+                    self._error('Cannot add server with URI to localhost and cannot determine valid URI from public services.')
+                    return False
+
         self._ensure_syncprov_module()
         
         mod_attrs = []
@@ -183,18 +220,39 @@ class action_replication(action_base):
                 mod_attrs.append( (ldap.MOD_REPLACE, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
         ret = self._modify_direct('cn=config', mod_attrs)
         if ret:
-            self._get_databases()
-            self._get_database_overlays()
-            # now ensure the list of servers is up-to-date in each database
-            for db in self._databases:
-                if db['type'] == 'frontend':
-                    continue
-                if not self._add_syncprov_to_database(db):
-                    ret = False
-                    break
-                elif not self._add_syncrepl_to_database(db):
-                    ret = False
-                    break
+            # refresh the server list and determine again if the connected server
+            # has a valid id
+            self._get_server_list()
+            if self._own_serverid is None or self._own_serverid < 0:
+                self._error('Unable to determine the server id for the connected LDAP server. Refuse to add database replication to avoid further trouble.')
+            else:
+                self._get_databases()
+                self._get_database_overlays()
+                # now ensure the list of servers is up-to-date in each database
+                for db in self._databases.exclude_internal():
+                    if not self._add_syncprov_to_database(db):
+                        ret = False
+                        break
+                    elif not self._add_syncrepl_to_database(db):
+                        ret = False
+                        break
+                    elif not self._set_mirrormode_to_database(db):
+                        ret = False
+                        break
+
+                if ret:
+                    # done with all regular databases and now configure
+                    # the config database as well
+                    db = self._databases.get_config()
+                    if db is not None:
+                        if not self._add_syncprov_to_database(db):
+                            ret = False
+                        elif not self._add_syncrepl_to_database(db):
+                            ret = False
+                        elif not self._set_mirrormode_to_database(db):
+                            ret = False
+                    else:
+                        ret = False
 
         return ret
 
@@ -229,12 +287,61 @@ class action_replication(action_base):
             mod_attrs.append( (ldap.MOD_DELETE, 'olcServerID', action_replication._format_serverid( (serverid, serveruri) ) ) )
             ret = self._modify_direct('cn=config', mod_attrs)
         return ret
+    
+    def _connect_server(self, remote_server, options):
+        # only configure the cn=config database to sync to remote_server
+        full_uri = arsoft.ldap.get_full_ldap_uri(remote_server)
+        if full_uri == self._uri:
+            self._error('Cannot connect this server to itself.')
+            ret = False
+        else:
+            if self._connect_second(remote_server):
+                if self._bind_second():
+                    self._verbose('Connected to ' + remote_server)
+                    ret = True
+                    self._unbind_second()
+                else:
+                    self._error('Unable to bind to remote server ' + remote_server)
+                    ret = False
+            else:
+                self._error('Unable to connect to remote server ' + remote_server)
+                ret = False
+        return ret
+
+    def _status(self):
+        if len(self._server_list) > 0:
+            print("Replication servers:")
+            for serverid in sorted(self._server_list.keys()):
+                serveruri = self._server_list[serverid]
+                if self._own_serverid == serverid:
+                    print('  ' + str(serverid) + ': ' + serveruri + ' (current server)')
+                else:
+                    print('  ' + str(serverid) + ': ' + serveruri)
+            if self._own_serverid is not None and self._own_serverid < 0:
+                print('  No server id for the LDAP server ' + self._ldap_hostname + ' or ' + self._ldap_hostaddr + ' configured.')
+        else:
+            print("No replication configured.")
+        return 0
 
     def run(self):
+        if not self._has_config_access():
+            self._error('No access to online configuration of the LDAP server. Please use proper username and password to access the LDAP server.')
+            return 1
         self._get_server_list()
 
-        if self._add is None and self._remove is None:
+        if self._add is None and self._remove is None and self._connect is None:
             ret = self._status()
+        elif self._connect is not None:
+            remote_server = self._connect[0]
+            if len(self._connect) > 1:
+                options = self._connect[1:]
+            else:
+                options = []
+            # connect cannot be compined with add and/or remove
+            if not self._connect_server(remote_server, options):
+                ret = 1
+            else:
+                ret = 0
         else:
             ret = 0
             if self._add is not None:
@@ -261,13 +368,3 @@ class action_replication(action_base):
                         ret = 1
 
         return ret
-
-    def _status(self):
-        if len(self._server_list) > 0:
-            print("Servers:")
-            for serverid in sorted(self._server_list.keys()):
-                serveruri = self._server_list[serverid]
-                print('  ' + str(serverid) + ': ' + serveruri)
-        else:
-            print("Servers: <none>")
-        return 0

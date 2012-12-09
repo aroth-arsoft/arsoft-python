@@ -18,6 +18,7 @@ setup(name='netconfig',
                     'arsoft.fritzbox', 
                     'arsoft.ldap',
                     'arsoft.ldap.slapd',
+                    'arsoft.mount',
                     'arsoft.nagios',
                     'arsoft.netconfig', 
                     'arsoft.openvpn'

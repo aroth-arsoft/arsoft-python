@@ -62,6 +62,20 @@ class syncrepl(object):
             return syncrepl._contains_any(value, ' ,=')
         else:
             return False
+            
+    def has_credentials(self):
+        if self._data['binddn'] is not None:
+            if self._data['bindmethod'] is None or self._data['bindmethod'] == 'simple':
+                ret = True if self._data['credentials'] is not None else False
+            elif self._data['bindmethod'] == 'gssapi':
+                # assume that the keys are already available (krb5 ccache)
+                ret = True
+            else:
+                # TODO add additional checks for more bind methods
+                ret = False
+        else:
+            ret = False
+        return ret
 
     def parse(self, line):
         if line is not None:
@@ -112,7 +126,7 @@ class syncrepl(object):
         if attr == '_data':
             self.__dict__['_data'] = value
         else:
-            print(self.__dict__['_data'])
+            #print(self.__dict__['_data'])
             self.__dict__['_data'][attr] = value
 
 

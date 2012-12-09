@@ -32,6 +32,8 @@ class SlapdConfigApp(object):
             print(msg)
     def error(self, msg):
         print(msg, file=sys.stderr)
+    def warn(self, msg):
+        print(msg, file=sys.stderr)
 
     def ldapsearch_ext(uri, base, filter, attrs):
         #cmdline = ['/usr/bin/ldapsearch', '-LLL', '-Q', '-Y', 'EXTERNAL', '-H', uri]
@@ -92,54 +94,6 @@ class SlapdConfigApp(object):
         else:
             ret = None
         return ret
-
-    def connect(self):
-        try:
-            self.verbose("Connecting to " + self._uri + "...")
-            self._cxn = ldap.initialize(self._uri)
-        except ldap.LDAPError, e:
-            self.error("Failed to connect to ldap server " + self._uri + ". Error: " + e.desc)
-            self._cxn = None
-
-        if self._cxn is not None:
-            # you should  set this to ldap.VERSION2 if you're using a v2 directory
-            self._cxn.protocol_version = ldap.VERSION3
-            ret = True
-        else:
-            ret = False
-        return ret
-
-    def bind(self):
-        # Pass in a valid username and password to get 
-        # privileged directory access.
-        # If you leave them as empty strings or pass an invalid value
-        # you will still bind to the server but with limited privileges.
-        
-        ldapusername = '' if self._username is None else self._username
-        ldappassword = '' if self._password is None else self._password
-        
-        try:
-            # Any errors will throw an ldap.LDAPError exception 
-            # or related exception so you can ignore the result
-            if self._saslmech == 'simple':
-                if ldapusername != '':
-                    self.verbose("simple_bind user:" + ldapusername + " pwd:" + ldappassword)
-                else:
-                    self.verbose("simple_bind anonymous")
-                self._cxn.simple_bind_s(ldapusername, ldappassword)
-                ret = True
-            else:
-                self.verbose('bind ' + self._saslmech + " user:" + ldapusername + " pwd:" + ldappassword)
-                self._cxn.bind_s(ldapusername, ldappassword, self._saslmech)
-                ret = True
-        except ldap.LDAPError, e:
-            self.error("Failed to bind to ldap server as " + ldapusername + ". Error: " + str(e))
-            ret = False
-        return ret
-        
-    def unbind(self):
-        self._cxn.unbind_s()
-        self._cxn = None
 
     def main(self, argv=None):
         if argv is None:
@@ -211,34 +165,29 @@ class SlapdConfigApp(object):
             action_name = args.action[0]
             action_args = args.action[1:]
 
-        if self.connect():
-            if self.bind():
-                if action_name == 'status':
-                    action_obj = action_status(self, action_args)
-                    ret = action_obj.run()
-                elif action_name == 'schema':
-                    action_obj = action_schema(self, action_args)
-                    ret = action_obj.run()
-                elif action_name == 'database':
-                    action_obj = action_database(self, action_args)
-                    ret = action_obj.run()
-                elif action_name == 'module':
-                    action_obj = action_module(self, action_args)
-                    ret = action_obj.run()
-                elif action_name == 'cert':
-                    action_obj = action_cert(self, action_args)
-                    ret = action_obj.run()
-                elif action_name == 'replication' or action_name == 'repl':
-                    action_obj = action_replication(self, action_args)
-                    ret = action_obj.run()
-                else:
-                    ret = 3
-                self.unbind()
+        action_obj = None
+        if action_name == 'status':
+            action_obj = action_status(self, action_args)
+        elif action_name == 'schema':
+            action_obj = action_schema(self, action_args)
+        elif action_name == 'database':
+            action_obj = action_database(self, action_args)
+        elif action_name == 'module':
+            action_obj = action_module(self, action_args)
+        elif action_name == 'cert':
+            action_obj = action_cert(self, action_args)
+        elif action_name == 'replication' or action_name == 'repl':
+            action_obj = action_replication(self, action_args)
+            
+        if action_obj is not None:
+            if action_obj.connect(self._uri, self._username, self._password, self._saslmech):
+                ret = action_obj.run()
+                action_obj.close()
             else:
-                ret = 2
+                ret = 1
         else:
             ret = 1
-            
+
         return ret
 
 if __name__ == "__main__":
