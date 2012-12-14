@@ -6,7 +6,7 @@ import os
 
 class Config(object):
 
-    def __init__(self, configdir='/etc/openvpn', extension='conf'):
+    def __init__(self, configdir='/etc/openvpn', extension='.conf'):
         self._config_directory = configdir
         self._config_extension = extension
         self._refresh_names()

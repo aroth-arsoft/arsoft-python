@@ -3,6 +3,7 @@
 """
 
 from arsoft.inifile import *
+import sys
 
 class ConfigFile:
     def __init__(self, filename):
@@ -51,4 +52,4 @@ if __name__ == '__main__':
     files = sys.argv[1:]
 
     for file in files:
-        f = ConfigFile(f)
+        f = ConfigFile(file)
