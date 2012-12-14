@@ -39,21 +39,29 @@ import logging
 import sys
 
 class OpenVPNStatusParser:
-    def __init__(self, filename):
+    def __init__(self, filename, version=2):
         self.filename = filename
         self._connected_clients = None
         self._routing_table = None
         self._details = None
         self._statistics = None
+        self._version = version
 
     def _parse_file(self):
         self._details = {}
         self._connected_clients = {}
         self._routing_table = {}
+        
+        if self._version == 2:
+            delimiter = ','
+        elif self._version == 3:
+            delimiter = '\t'
+        else:
+            delimiter = ','
 
         read_statistics = False
         topics_for = {}
-        csvreader = csv.reader(open(self.filename), delimiter=',')
+        csvreader = csv.reader(open(self.filename), delimiter=delimiter)
         for row in csvreader:
             row_title = row[0]
 

@@ -7,7 +7,7 @@ from arsoft.openvpn import OpenVPNStatusParser
 
 ## Create the plugin option
 np = NagiosPlugin(must_threshold=True)
-np.add_arg('-s', 'status-file', 'name of the status file')
+np.add_arg('s', 'status-file', 'name of the status file')
 np.add_flag('S', 'server', 'check status of a OpenVPN server instance')
 np.add_flag('C', 'client', 'check status of a OpenVPN client instance')
 
