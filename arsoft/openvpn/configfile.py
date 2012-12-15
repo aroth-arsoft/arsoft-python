@@ -25,7 +25,6 @@ class ConfigFile:
 
     def _parse_file(self):
         self._conf  = IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
-        print('check ' + self.filename)
         if not self._conf .open(self.filename):
             self._conf = None
             ret = False
