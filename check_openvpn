@@ -3,69 +3,68 @@ import os,sys
 from datetime import datetime, timedelta
 
 from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
-from arsoft.openvpn import OpenVPNStatusParser
+from arsoft.openvpn import StatusFile, ConfigFile, Config
 
 ## Create the plugin option
-np = NagiosPlugin(must_threshold=True)
-np.add_arg('s', 'status-file', 'name of the status file')
-np.add_flag('S', 'server', 'check status of a OpenVPN server instance')
-np.add_flag('C', 'client', 'check status of a OpenVPN client instance')
+np = NagiosPlugin(must_threshold=False)
+np.add_arg('n', 'name', 'name of the VPN configuration')
+np.add_arg('c', 'clients', 'number of clients required (server only).', default=0, required=0)
 
 ## This starts the actual plugin activation
 np.activate()
 
-if np['server'] == True:
-    np.add_value('numclients', has_argument=False)
-    np.set_value_range('numclients', warning=np['warning'], critical=np['critical'])
-    np.add_value('clients', has_argument=False)
-    np.add_value('routingtable', has_argument=False)
+config = Config()
+if not config.get_config_file(np['name']):
+    exit_code = CRITICAL
+    exit_message = 'VPN %s is not configured.' % (str(np['name']))
+elif not config.is_running(np['name']):
+    exit_code = CRITICAL
+    exit_message = 'VPN %s is not running.' % (str(np['name']))
 else:
-    np.add_value('sent', has_argument=False)
-    np.add_value('received', has_argument=False)
-
-## Use a custom load average file, if specified to
-## This is really only used for debugging purposes, and showing off the
-## 'add_arg' method
-if np['status-file']:
-    status_file = np['status-file']
-else:
-    status_file = None
-
-if os.path.exists(status_file):
-    parser = OpenVPNStatusParser(status_file)
-    
     now = datetime.now()
-    ## set the values
-    if np['server'] == True:
-        np.set_value('routingtable', parser.routing_table)
-        np.set_value('clients', parser.connected_clients)
-        np.set_value('numclients', len(parser.connected_clients))
-
-        delta = now - parser.last_update
-        if delta > timedelta(minutes=5):
-            exit_code = WARNING
-            exit_message = 'status has not been since %s' % (str(parser.last_update))
-        else:
-            (exit_code, exit_message) = np.check_values()
-
-        if exit_code == OK:
-            exit_message = '%i clients' % (len(parser.connected_clients))
-    else:
-        stats = parser.statistics
+    
+    config_file = ConfigFile(config_name=np['name'])
+    status_file = StatusFile(config_file=config_file)
+    if config_file.client:
+        np.add_value('sent', has_argument=False)
+        np.add_value('received', has_argument=False)
+        
+        stats = status_file.statistics
         np.set_value('sent', stats['TCP/UDP write bytes'])
         np.set_value('received', stats['TCP/UDP read bytes'])
 
-        delta = now - parser.last_update
+        delta = now - status_file.last_update
         if delta > timedelta(minutes=5):
             exit_code = WARNING
-            exit_message = 'status has not been since %s' % (str(parser.last_update))
+            exit_message = 'status has not been since %s' % (str(status_file.last_update))
         else:
             (exit_code, exit_message) = np.check_values()
 
         if exit_code == OK:
             exit_message = 'Connected'
+    elif config_file.server:
+        np.add_value('numclients', has_argument=False)
+        
+        if np['clients'] is not None:
+            np.set_value_range('numclients', warning=(np['clients']), critical=None)
+        np.add_value('clients', has_argument=False)
+        np.add_value('routingtable', has_argument=False)
 
-    np.nagios_exit(exit_code, exit_message)
-    
-else:
-    np.nagios_exit("CRITICAL", 'Status file %s is missing' % str(status_file))
+        np.set_value('routingtable', status_file.routing_table)
+        np.set_value('clients', status_file.connected_clients)
+        np.set_value('numclients', len(status_file.connected_clients))
+
+        delta = now - status_file.last_update
+        if delta > timedelta(minutes=5):
+            exit_code = WARNING
+            exit_message = 'status has not been since %s' % (str(status_file.last_update))
+        else:
+            (exit_code, exit_message) = np.check_values()
+
+        if exit_code == OK:
+            exit_message = '%i clients' % (len(status_file.connected_clients))
+    else:
+        exit_code = CRITICAL
+        exit_message = 'VPN %s configuration is neither client nor server.' % (str(np['name']))
+
+np.nagios_exit(exit_code, exit_message)

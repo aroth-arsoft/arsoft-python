@@ -1,3 +1,7 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
 """ This is a parser for openvpn config files, version 3.
 
 """
@@ -10,7 +14,7 @@ import config
 class ConfigFile:
     def __init__(self, filename=None, config_name=None):
         self._conf = None
-        
+
         if filename is None and config_name is not None:
             cfg = config.Config()
             self.filename = cfg.get_config_file(config_name)
@@ -26,9 +30,18 @@ class ConfigFile:
             self._conf = None
             ret = False
         else:
-            self._conf.get(section=None, key='server', default=None)
             ret = True
         return ret
+        
+    @property
+    def client(self):
+        remote = self._conf.get(section=None, key='remote', default=None)
+        return True if remote is not None else False
+
+    @property
+    def server(self):
+        server = self._conf.get(section=None, key='server', default=None)
+        return True if server is not None else False
 
     @property
     def status_version(self):
@@ -65,7 +78,10 @@ class ConfigFile:
         ret = "config file " + str(self.filename) + "\r\n" +\
             "status file: " + str(self.status_file) + "\r\n" +\
             "status version: " + str(self.status_version) + "\r\n" +\
-            "status interval: " + str(self.status_interval) + "\r\n"
+            "status interval: " + str(self.status_interval) + "\r\n" +\
+            "client: " + str(self.client) + "\r\n" +\
+            "server: " + str(self.server) + "\r\n" +\
+            ""
         return ret
 
 if __name__ == '__main__':

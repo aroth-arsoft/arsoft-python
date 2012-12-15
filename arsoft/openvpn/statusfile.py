@@ -1,3 +1,7 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
 """ This is a parser for openvpn status files, version 3.
 
 How to use:
@@ -37,15 +41,33 @@ import csv
 import datetime
 import logging
 import sys
+import os
+import configfile
 
-class OpenVPNStatusParser:
-    def __init__(self, filename, version=2):
+class StatusFile(object):
+    def __init__(self, filename=None, version=2, config_name=None, config_file=None):
         self.filename = filename
         self._connected_clients = None
         self._routing_table = None
         self._details = None
         self._statistics = None
-        self._version = version
+
+        if filename is None:
+            if config_name is not None:
+                cfgfile = configfile.ConfigFile(config_name=config_name)
+                self.filename = cfgfile.status_file
+                self._version = cfgfile.status_version
+            elif config_file is not None:
+                self.filename = config_file.status_file
+                self._version = config_file.status_version
+            else:
+                self.filename = None
+                self._version = version
+        else:
+            self.filename = filename
+            self._version = version
+
+        self._parse_file()
 
     def _parse_file(self):
         self._details = {}
@@ -168,7 +190,10 @@ if __name__ == '__main__':
     files = sys.argv[1:]
 
     for file in files:
-        parser = OpenVPNStatusParser(file)
+        if os.path.isfile(file):
+            parser = OpenVPNStatusParser(filename=file)
+        else:
+            parser = OpenVPNStatusParser(config_name=file)
         print "="*79
         print file
         print "-"*79

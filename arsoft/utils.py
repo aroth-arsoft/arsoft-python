@@ -41,6 +41,35 @@ def runcmd(self, exe, args=[], verbose=False):
         sts = -1
     return sts
 
+def isProcessRunning(pid, use_kill=False):
+    '''Check For the existence of a unix pid.
+    '''
+    if use_kill:
+        try:
+            os.kill(pid, 0)
+        except OSError as e:
+            return False
+        return True
+    else:
+        return os.path.isdir('/proc/' + str(pid))
+
+def isProcessRunningByPIDFile(pidfile):
+    if os.path.isfile(pidfile):
+        try:
+            f = open(pidfile, 'r')
+            pid = int(f.readline())
+            f.close()
+        except IOError:
+            pid = None
+        if pid is not None:
+            ret = isProcessRunning(pid)
+        else:
+            ret = False
+    else:
+        ret = False
+    return ret
+        
+
 def drop_privileges(uid_name='nobody', gid_name='nogroup'):
     if os.getuid() != 0:
         # We're not root so, like, whatever dude

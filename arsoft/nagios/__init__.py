@@ -22,7 +22,20 @@ class NagiosPlugin(pynagPlugin):
         
         self._named_values[label] = { 'description':description, 'guitext':guitext, 'units':units, 'warning': warning, 'critical': critical }
         return None
+
+    def add_arg(self, spec_abbr, spec, help_text, required=1, action="store", default=None):
+        """
+        Add an argument to be handled by the option parser.  By default, the arg is not required.
         
+        required = optional parameter
+        action = [store, append, store_true]
+        """
+        self.parser.add_option("-%s" % spec_abbr, "--%s" % spec, dest="%s" % spec, help=help_text, metavar="%s" % spec.upper(), action=action, default=default)
+        if required:
+            self.extra_list_required.append(spec)
+        else:
+            self.extra_list_optional.append(spec)
+
     def add_flag(self, spec_abbr, spec, help_text, action="store_true", default=False):
         self.parser.add_option("-%s" % spec_abbr, "--%s" % spec, dest="%s" % spec, help=help_text, metavar="%s" % spec.upper(), action=action, default=default)
         self.extra_list_optional.append(spec)
