@@ -4,18 +4,31 @@
 
 from arsoft.inifile import *
 import sys
+import os
+import config
 
 class ConfigFile:
-    def __init__(self, filename):
-        self.filename = filename
+    def __init__(self, filename=None, config_name=None):
         self._conf = None
+        
+        if filename is None and config_name is not None:
+            cfg = config.Config()
+            self.filename = cfg.get_config_file(config_name)
+        else:
+            self.filename = filename
+            
+        self._parse_file()
 
     def _parse_file(self):
         self._conf  = IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
+        print('check ' + self.filename)
         if not self._conf .open(self.filename):
             self._conf = None
+            ret = False
         else:
             self._conf.get(section=None, key='server', default=None)
+            ret = True
+        return ret
 
     @property
     def status_version(self):
@@ -48,8 +61,19 @@ class ConfigFile:
             ret = None
         return ret
 
+    def __str__(self):
+        ret = "config file " + str(self.filename) + "\r\n" +\
+            "status file: " + str(self.status_file) + "\r\n" +\
+            "status version: " + str(self.status_version) + "\r\n" +\
+            "status interval: " + str(self.status_interval) + "\r\n"
+        return ret
+
 if __name__ == '__main__':
     files = sys.argv[1:]
 
     for file in files:
-        f = ConfigFile(file)
+        if os.path.isfile(file):
+            f = ConfigFile(filename=file)
+        else:
+            f = ConfigFile(config_name=file)
+        print(f)

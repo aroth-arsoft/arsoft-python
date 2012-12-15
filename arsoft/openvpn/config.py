@@ -12,20 +12,27 @@ class Config(object):
         self._refresh_names()
         
     def _refresh_names(self):
-        self._names = []
+        self._names = {}
         if os.path.isdir(self._config_directory):
             for filename in os.listdir(self._config_directory):
                 (basename, ext) = os.path.splitext(filename)
                 if ext == self._config_extension:
-                    self._names.append(basename)
+                    self._names[basename] = os.path.join(self._config_directory, filename)
+                    
+    def get_config_file(self, config_name):
+        if config_name in self._names:
+            ret = self._names[config_name]
+        else:
+            ret = None
+        return ret
 
     def __str__(self):
         ret = "config directory: " + str(self._config_directory) + "\r\n" +\
             "config extension: " + str(self._config_extension) + "\r\n"
         if len(self._names) > 0:
             ret = ret + "configs:\r\n"
-            for name in self._names:
-                ret = ret + "  " + name + "\r\n"
+            for (name, configfile) in self._names.items():
+                ret = ret + "  " + name + ": " + configfile + "\r\n"
         else:
             ret = ret + "configs: <none>\r\n"
         return ret
