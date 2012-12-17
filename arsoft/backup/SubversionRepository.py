@@ -1,10 +1,13 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import sys
 import getopt
 import os
 import subprocess
-        
+import arsoft.utils
+
 class SubversionRepository:
     
     def __init__(self, path, verbose=False):
@@ -16,32 +19,10 @@ class SubversionRepository:
             print(str(msg))
 
     def create(self):
-        cmdline=["/usr/bin/svnadmin","create", self.m_repopath]
-        self.log("cmdline " + str(cmdline))
-        try:
-            output = subprocess.Popen(cmdline, stdout=subprocess.PIPE).communicate()[0]
-        except OSError, e:
-            output = None
-            print >>sys.stderr, "Execution failed:", e
-        if output is not None:
-            ret = True
-        else:
-            ret = False
-        return ret
+        return arsoft.utils.runcmd('/usr/bin/svnadmin', ["create", self.m_repopath], verbose=self.m_verbose)
         
     def hotcopy(self, backupdir):
-        cmdline = ["/usr/bin/svnadmin", "hotcopy", self.m_repopath, backupdir, "--clean-logs"]
-        self.log("cmdline " + str(cmdline))
-        try:
-            output = subprocess.Popen(cmdline, stdout=subprocess.PIPE).communicate()[0]
-        except OSError, e:
-            output = None
-            print >>sys.stderr, "Execution failed:", e
-        if output is not None:
-            ret = True
-        else:
-            ret = False
-        return ret
+        return arsoft.utils.runcmd('/usr/bin/svnadmin', ["hotcopy", self.m_repopath, backupdir, '--clean-logs'], verbose=self.m_verbose)
         
     def dump(self, bakfile, minrev=None, maxrev=None):
 
@@ -146,14 +127,8 @@ class SubversionRepository:
         return ret
 
     def get_latest_revision(self):
-        cmdline=["/usr/bin/svnlook","youngest", self.m_repopath]
-        self.log("cmdline " + str(cmdline))
-        try:
-            output = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
-        except OSError, e:
-            output = None
-            print >>sys.stderr, "Execution failed:", e
-        if output is not None and len(output):
+        (ret, stdout, stderr) = arsoft.utils.runcmdAndGetData('/usr/bin/svnlook', ["youngest", self.m_repopath], verbose=self.m_verbose)
+        if ret == 0 and output is not None and len(output):
             ret = int(output, 10)
         else:
             ret = -1

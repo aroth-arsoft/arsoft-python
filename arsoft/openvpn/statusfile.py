@@ -83,72 +83,80 @@ class StatusFile(object):
 
         read_statistics = False
         topics_for = {}
-        csvreader = csv.reader(open(self.filename), delimiter=delimiter)
-        for row in csvreader:
-            row_title = row[0]
+        try:
+            file = open(self.filename)
+        except IOError:
+            file = None
+            
+        if file is not None:
+            csvreader = csv.reader(file, delimiter=delimiter)
+            for row in csvreader:
+                row_title = row[0]
 
-            if row_title == "END":
-                if read_statistics:
-                    if 'Updated' in self._statistics:
-                        try:
-                            self._details["timestamp"] = datetime.datetime.strptime(self._statistics['Updated'], '%a %b %d %H:%M:%S %Y')
-                        except (IndexError, ValueError):
-                            logging.error("Updated time is invalid: %s" % self._statistics['Updated'])
-                return True
-            else:
-                if read_statistics == False:
-                    if row_title == "TITLE":
-                        try:
-                            self._details["title"] = row[1]
-                        except IndexError:
-                            logging.error("TITLE row is invalid: %s" % row)
-
-                    elif row_title == "TIME":
-                        try:
-                            self._details["timestamp"] = datetime.datetime.fromtimestamp(int(row[2]))
-                        except (IndexError, ValueError):
-                            logging.error("TIME row is invalid: %s" % row)
-
-                    elif row_title == "HEADER":
-                        try:
-                            topics_for[row[1]] = row[2:]
-                        except IndexError:
-                            logging.error("HEADER row is invalid: %s" % row)
-
-                    elif row_title == "CLIENT_LIST":
-                        try:
-                            self._connected_clients[row[1]] = dict(zip(topics_for["CLIENT_LIST"], row[1:]))
-                            self._connected_clients[row[1]]["connected_since"] = datetime.datetime.fromtimestamp(int(row[-1]))
-                        except IndexError:
-                            logging.error("CLIENT_LIST row is invalid: %s" % row)
-
-                    elif row_title == "ROUTING_TABLE":
-                        try:
-                            self._routing_table[row[2]] = dict(zip(topics_for["ROUTING_TABLE"], row[1:]))
-                            self._routing_table[row[2]]["last_ref"] = datetime.datetime.fromtimestamp(int(row[-1]))
-                        except IndexError:
-                            logging.error("ROUTING_TABLE row is invalid: %s" % row)
-
-                    elif row_title == "GLOBAL_STATS":
-                        try:
-                            self._details[row[1]] = row[2]
-                        except IndexError:
-                            logging.error("GLOBAL_STATS row is invalid: %s" % row)
-
-                    elif row_title == "OpenVPN STATISTICS":
-                        read_statistics = True
-                        self._statistics = {}
-
-                    else:
-                        logging.warning("Line was not parsed. Keyword %s not recognized. %s" % (row_title, row))
+                if row_title == "END":
+                    if read_statistics:
+                        if 'Updated' in self._statistics:
+                            try:
+                                self._details["timestamp"] = datetime.datetime.strptime(self._statistics['Updated'], '%a %b %d %H:%M:%S %Y')
+                            except (IndexError, ValueError):
+                                logging.error("Updated time is invalid: %s" % self._statistics['Updated'])
+                    return True
                 else:
-                    try:
-                        self._statistics[row[0]] = row[1]
-                    except IndexError:
-                        logging.error("statistics row is invalid: %s" % row)
+                    if read_statistics == False:
+                        if row_title == "TITLE":
+                            try:
+                                self._details["title"] = row[1]
+                            except IndexError:
+                                logging.error("TITLE row is invalid: %s" % row)
 
-        logging.error("File was incomplete. END line was missing.")
-        return False
+                        elif row_title == "TIME":
+                            try:
+                                self._details["timestamp"] = datetime.datetime.fromtimestamp(int(row[2]))
+                            except (IndexError, ValueError):
+                                logging.error("TIME row is invalid: %s" % row)
+
+                        elif row_title == "HEADER":
+                            try:
+                                topics_for[row[1]] = row[2:]
+                            except IndexError:
+                                logging.error("HEADER row is invalid: %s" % row)
+
+                        elif row_title == "CLIENT_LIST":
+                            try:
+                                self._connected_clients[row[1]] = dict(zip(topics_for["CLIENT_LIST"], row[1:]))
+                                self._connected_clients[row[1]]["connected_since"] = datetime.datetime.fromtimestamp(int(row[-1]))
+                            except IndexError:
+                                logging.error("CLIENT_LIST row is invalid: %s" % row)
+
+                        elif row_title == "ROUTING_TABLE":
+                            try:
+                                self._routing_table[row[2]] = dict(zip(topics_for["ROUTING_TABLE"], row[1:]))
+                                self._routing_table[row[2]]["last_ref"] = datetime.datetime.fromtimestamp(int(row[-1]))
+                            except IndexError:
+                                logging.error("ROUTING_TABLE row is invalid: %s" % row)
+
+                        elif row_title == "GLOBAL_STATS":
+                            try:
+                                self._details[row[1]] = row[2]
+                            except IndexError:
+                                logging.error("GLOBAL_STATS row is invalid: %s" % row)
+
+                        elif row_title == "OpenVPN STATISTICS":
+                            read_statistics = True
+                            self._statistics = {}
+
+                        else:
+                            logging.warning("Line was not parsed. Keyword %s not recognized. %s" % (row_title, row))
+                    else:
+                        try:
+                            self._statistics[row[0]] = row[1]
+                        except IndexError:
+                            logging.error("statistics row is invalid: %s" % row)
+
+            logging.error("File was incomplete. END line was missing.")
+            return False
+        else:
+            return False
 
     @property
     def details(self):

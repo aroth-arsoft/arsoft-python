@@ -14,12 +14,12 @@ def isRoot():
     euid = os.geteuid()
     return True if euid == 0 else False
 
-def runcmd(self, exe, args=[], verbose=False):
-    if verbose:
-        print("runcmd " + str(exe) + " args=" + str(args))
+def runcmd(exe, args=[], verbose=False):
     all_args = [str(exe)]
     all_args.extend(args)
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, shell=False)
+    if verbose:
+        print("runcmd " + ' '.join(all_args))
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
     if p:
         (stdoutdata, stderrdata) = p.communicate()
         if stdoutdata is not None:
@@ -40,6 +40,35 @@ def runcmd(self, exe, args=[], verbose=False):
     else:
         sts = -1
     return sts
+
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False):
+    all_args = [str(exe)]
+    all_args.extend(args)
+    if verbose:
+        print("runcmd " + ' '.join(all_args))
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+    if p:
+        (stdoutdata, stderrdata) = p.communicate()
+        if stdoutdata is not None and outputStdOut:
+            if int(python_major) < 3: # check for version < 3
+                sys.stdout.write(stdoutdata)
+                sys.stdout.flush()
+            else:
+                sys.stdout.buffer.write(stdoutdata)
+                sys.stdout.buffer.flush()
+        if stderrdata is not None and outputStdErr:
+            if int(python_major) < 3: # check for version < 3
+                sys.stderr.write(stderrdata)
+                sys.stderr.flush()
+            else:
+                sys.stderr.buffer.write(stderrdata)
+                sys.stderr.buffer.flush()
+        sts = p.returncode
+    else:
+        sts = -1
+        stdoutdata = None
+        stderrdata = None
+    return (sts, stdoutdata, stderrdata)
 
 def isProcessRunning(pid, use_kill=False):
     '''Check For the existence of a unix pid.

@@ -1,10 +1,12 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import sys
 import re
 import os
-import subprocess
 import hashlib
+import arsoft.utils
 
 class BackupDirectory:
     hash_buffer_size = 256 * 1024
@@ -269,21 +271,7 @@ class BackupDirectory:
         if destdir[remote_site_len - 1] != '/':
             destdir = destdir + '/'
             
-        cmdline = ['/usr/bin/rsync', '-z', '-r', '-a', '--delete', '-e', rsync_rsh, srcdir, destdir]
+        args = ['-z', '-r', '-a', '--delete', '-e', rsync_rsh, srcdir, destdir]
         
-        try:
-            self.log("sync_remote cmdline " + str(cmdline))
-            p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if p:
-                (stdoutdata, stderrdata) = p.communicate()
-                ret = p.returncode
-            else:
-                ret = -1
-                stdoutdata = None
-                stderrdata = None
-        except OSError, e:
-            print >>sys.stderr, "Execution failed:", e
-            ret = -1
-            stdoutdata = None
-            stderrdata = None
+        (ret, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData('/usr/bin/rsync', args)
         return (ret, stdoutdata, stderrdata)

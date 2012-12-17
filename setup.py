@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='netconfig',
-		version='1.33',
+		version='1.34',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -21,6 +21,7 @@ setup(name='netconfig',
                     'arsoft.mount',
                     'arsoft.nagios',
                     'arsoft.netconfig', 
+                    'arsoft.nfs', 
                     'arsoft.openvpn'
                     ],
 		scripts=[

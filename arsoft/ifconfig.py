@@ -1,6 +1,7 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-# -*- coding: iso-8859-1 -*-
 """from http://twistedmatrix.com/wiki/python/IfConfig
 """
 
