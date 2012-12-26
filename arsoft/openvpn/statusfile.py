@@ -43,33 +43,16 @@ import logging
 import sys
 import os
 import configfile
+import management
 
-class StatusFile(object):
-    def __init__(self, filename=None, version=2, config_name=None, config_file=None):
-        self.filename = filename
+class StatusBase(object):
+    def __init__(self, version=2):
         self._connected_clients = None
         self._routing_table = None
         self._details = None
         self._statistics = None
-
-        if filename is None:
-            if config_name is not None:
-                cfgfile = configfile.ConfigFile(config_name=config_name)
-                self.filename = cfgfile.status_file
-                self._version = cfgfile.status_version
-            elif config_file is not None:
-                self.filename = config_file.status_file
-                self._version = config_file.status_version
-            else:
-                self.filename = None
-                self._version = version
-        else:
-            self.filename = filename
-            self._version = version
-
-        self._parse_file()
-
-    def _parse_file(self):
+        
+    def _parse_lines(self, lines):
         self._details = {}
         self._connected_clients = {}
         self._routing_table = {}
@@ -83,15 +66,9 @@ class StatusFile(object):
 
         read_statistics = False
         topics_for = {}
-        try:
-            file = open(self.filename)
-        except IOError:
-            file = None
-            
-        if file is not None:
-            csvreader = csv.reader(file, delimiter=delimiter)
-            for row in csvreader:
-                row_title = row[0]
+        csvreader = csv.reader(lines, delimiter=delimiter)
+        for row in csvreader:
+            row_title = row[0]
 
                 if row_title == "END":
                     if read_statistics:
@@ -193,15 +170,69 @@ class StatusFile(object):
             self._parse_file()
         return self._statistics
 
+class StatusFile(StatusBase):
+    def __init__(self, filename=None, version=2, config_name=None, config_file=None):
+        StatusBase.__init__(self, version=version)
+        self.filename = filename
+        self._is_socket = False
+
+        if filename is None:
+            if config_name is not None:
+                cfgfile = configfile.ConfigFile(config_name=config_name)
+                self.filename = cfgfile.management_socket
+                if self.filename is None:
+                    self.filename = cfgfile.status_file
+                    self._version = cfgfile.status_version
+                else:
+                    self._is_socket = True
+                    self._version = 3
+            elif config_file is not None:
+                self.filename = config_file.management_socket
+                if self.filename is None:
+                    self.filename = config_file.status_file
+                    self._version = config_file.status_version
+                else:
+                    self._is_socket = True
+                    self._version = 3
+            else:
+                self.filename = None
+        else:
+            self.filename = filename
+
+        self._parse_file()
+
+    def _parse_file(self):
+        ret = False
+        if self._is_socket:
+            miface = management.ManagementInterface(self.filename)
+            if miface.open():
+                lines = miface.status()
+                ret = self._parse_lines(lines)
+                miface.close()
+            else:
+                ret = False
+        else:
+            try:
+                file = open(self.filename)
+            except IOError:
+                file = None
+
+            if file is not None:
+                lines = file.readlines()
+                file.close()
+                ret = self._parse_lines(lines)
+            else:
+                ret = False
+        return ret
 
 if __name__ == '__main__':
     files = sys.argv[1:]
 
     for file in files:
         if os.path.isfile(file):
-            parser = OpenVPNStatusParser(filename=file)
+            parser = StatusFile(filename=file)
         else:
-            parser = OpenVPNStatusParser(config_name=file)
+            parser = StatusFile(config_name=file)
         print "="*79
         print file
         print "-"*79
