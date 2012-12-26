@@ -23,17 +23,19 @@ critical_modules = []
 
 if np['warning']:
     for mod in np['warning']:
-        if not kernel_module.is_module_loaded(mod):
-            warning_modules.append(mod)
-        else:
-            ok_modules.append(mod)
+        if len(mod) > 0:
+            if not kernel_module.is_module_loaded(mod):
+                warning_modules.append(mod)
+            else:
+                ok_modules.append(mod)
 
 if np['critical']:
     for mod in np['critical']:
-        if not kernel_module.is_module_loaded(mod):
-            critical_modules.append(mod)
-        else:
-            ok_modules.append(mod)
+        if len(mod) > 0:
+            if not kernel_module.is_module_loaded(mod):
+                critical_modules.append(mod)
+            else:
+                ok_modules.append(mod)
 
 if len(critical_modules) > 0:
     exit_code = CRITICAL
