@@ -125,10 +125,29 @@ class Disks(object):
                 if add:
                     ret.append(d)
         return ret
+    
+    @property
+    def system_drive(self):
+        ret = self.root_partition
+        for d in self._list:
+            if d.is_mounted and '/' in d.mountpath:
+                ret = d
+        return ret
+    
+    @property
+    def root_partition(self):
+        ret = None
+        for d in self._list:
+            if d.is_mounted and '/' in d.mountpath:
+                ret = d
+        return ret
 
 if __name__ == '__main__':
     
     e = Disks()
+    print('drives:')
     for drive in e.drives:
         print(drive)
 
+    print('system drive:')
+    print(e.system_drive)
