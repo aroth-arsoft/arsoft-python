@@ -51,6 +51,7 @@ class StatusBase(object):
         self._routing_table = None
         self._details = None
         self._statistics = None
+        self._reading_done = False
 
     def _parse_lines(self, lines):
         self._details = {}
@@ -64,6 +65,7 @@ class StatusBase(object):
         else:
             delimiter = ','
 
+        self._reading_done = True
         read_statistics = False
         topics_for = {}
         csvreader = csv.reader(lines, delimiter=delimiter)
@@ -135,35 +137,38 @@ class StatusBase(object):
     @property
     def details(self):
         """ Returns miscellaneous details from status file """
-        if not self._details:
+        if not self._reading_done:
             self._parse_file()
         return self._details
 
     @property
     def last_update(self):
         """ Returns the time of the last update of the status file """
-        if not self._details:
+        if not self._reading_done:
             self._parse_file()
-        return self._details['timestamp']
+        if 'timestamp' in self._details:
+            return self._details['timestamp']
+        else:
+            return None
 
     @property
     def connected_clients(self):
         """ Returns dictionary of connected clients with details."""
-        if not self._connected_clients:
+        if not self._reading_done:
             self._parse_file()
         return self._connected_clients
 
     @property
     def routing_table(self):
         """ Returns dictionary of routing_table used by OpenVPN """
-        if not self._routing_table:
+        if not self._reading_done:
             self._parse_file()
         return self._routing_table
 
     @property
     def statistics(self):
         """ Returns dictionary of statistics used by OpenVPN """
-        if not self._statistics:
+        if not self._reading_done:
             self._parse_file()
         return self._statistics
 
@@ -182,7 +187,7 @@ class StatusFile(StatusBase):
                     self._version = cfgfile.status_version
                 else:
                     self._is_socket = True
-                    self._version = 3
+                    self._version = 2
             elif config_file is not None:
                 self.filename = config_file.management_socket
                 if self.filename is None:
@@ -190,7 +195,7 @@ class StatusFile(StatusBase):
                     self._version = config_file.status_version
                 else:
                     self._is_socket = True
-                    self._version = 3
+                    self._version = 2
             else:
                 self.filename = None
         else:
@@ -203,7 +208,7 @@ class StatusFile(StatusBase):
         if self._is_socket:
             miface = management.ManagementInterface(self.filename)
             if miface.open():
-                lines = miface.status()
+                lines = miface.status(version=self._version)
                 ret = self._parse_lines(lines)
                 miface.close()
             else:
@@ -230,14 +235,19 @@ if __name__ == '__main__':
             parser = StatusFile(filename=file)
         else:
             parser = StatusFile(config_name=file)
-        print "="*79
-        print file
-        print "-"*79
-        print "Connected clients"
+        print("="*79)
+        print(file)
+        print("="*79)
+        print("Last updated")
+        pprint.pprint(parser.last_update)
+        print("Connected clients")
         pprint.pprint(parser.connected_clients)
-        print "-"*79
-        print "Routing table"
+        print("-"*79)
+        print("Routing table")
         pprint.pprint(parser.routing_table)
-        print "-"*79
-        print "Additional details"
+        print("-"*79)
+        print("Additional details")
         pprint.pprint(parser.details)
+        print("-"*79)
+        print("Statistics")
+        pprint.pprint(parser.statistics)
