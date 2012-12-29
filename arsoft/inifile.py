@@ -72,6 +72,12 @@ class IniSection(object):
             if v.key == key:
                 return v.value
         return default
+    
+    def get_all(self):
+        ret = []
+        for v in self.values:
+            ret.append( (v.key, v.value) )
+        return ret
 
     def set(self, key, value, comment='', disabled=False):
         if type(value) == type([]):
@@ -453,6 +459,9 @@ class IniFile(object):
     def has_section(self, section):
         section_obj = self._getSection(section)
         return True if section_obj is not None else False
+
+    def section(self, section):
+        return self._getSection(section)
 
     def __str__(self):
         return self.asString(only_data=False)

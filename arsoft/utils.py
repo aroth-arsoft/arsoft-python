@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-import os, stat
+import os, stat, shutil
 import pwd
 import grp
 import subprocess
@@ -14,12 +14,12 @@ def isRoot():
     euid = os.geteuid()
     return True if euid == 0 else False
 
-def runcmd(exe, args=[], verbose=False):
+def runcmd(exe, args=[], verbose=False, stdin=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
-        print("runcmd " + ' '.join(all_args))
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+        print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, shell=False)
     if p:
         (stdoutdata, stderrdata) = p.communicate()
         if stdoutdata is not None:
@@ -41,12 +41,13 @@ def runcmd(exe, args=[], verbose=False):
         sts = -1
     return sts
 
-def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False):
+
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
-        print("runcmd " + ' '.join(all_args))
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+        print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, shell=False)
     if p:
         (stdoutdata, stderrdata) = p.communicate()
         if stdoutdata is not None and outputStdOut:
@@ -69,6 +70,17 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
         stdoutdata = None
         stderrdata = None
     return (sts, stdoutdata, stderrdata)
+
+def rmtree(directory):
+    def remove_readonly(fn, path, excinfo):
+        if fn is os.rmdir:
+            os.chmod(path, stat.S_IWRITE)
+            os.rmdir(path)
+        elif fn is os.remove:
+            os.chmod(path, stat.S_IWRITE)
+            os.remove(path)
+
+    shutil.rmtree(directory, onerror=remove_readonly)
 
 def isProcessRunning(pid, use_kill=False):
     '''Check For the existence of a unix pid.

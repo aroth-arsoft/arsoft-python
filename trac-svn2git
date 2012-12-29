@@ -1,0 +1,304 @@
+#!/usr/bin/python
+
+from __future__ import unicode_literals
+import sys
+import os
+import argparse
+import re
+import sqlite3
+
+class trac_svn2git(object):
+
+    svn_revno_pattern = r'\[([0-9]+)\]'
+    
+    def __init__(self):
+        self._db = None
+        self._gitrepo = None
+        self._svn2git = {}
+        self._git2svn = {}
+
+    def _load_lookup_table(self, filename):
+        try:
+            f = open(filename, 'r')
+            for line in f:
+                (svnrevno, gitcommithash) = line.split('\t')
+                svnrevno = int(svnrevno)
+                self._svn2git[svnrevno] = gitcommithash
+                self._git2svn[gitcommithash] = svnrevno
+            f.close()
+            ret = True
+        except IOError as e:
+            ret = False
+            pass
+        return ret
+        
+    def _convertSVNIDToGitID(self, text, nrHashCharacters=40):
+        if text is None:
+            return (0, None)
+        num_matches = 0
+        for match in re.finditer(self.svn_revno_pattern, text):
+            svnrevno = int(match.group(1))
+            if svnrevno in self._svn2git:
+                gitid = self._svn2git[svnrevno]
+                gitidstr = gitid[0:nrHashCharacters]
+                org_text = match.group(0)
+                new_text = '[' + gitidstr + '] (SVN r' + str(svnrevno) + ')'
+                text = text.replace(org_text, new_text)
+                num_matches = num_matches + 1
+                print('replace ' + str(org_text) + ' with '+str(new_text))
+        return (num_matches, text)
+
+    def _convert_ticket_change(self):
+        cur = self._db.cursor()
+        update_cur = self._db.cursor()
+        # Convert table 'ticket_change'
+        cur.execute('SELECT ticket,time,field,oldvalue,newvalue FROM ticket_change')
+        while True:
+            row = cur.fetchone()
+            if row == None:
+                break
+            #print (row)
+            (ticket,time,field,oldvalue,newvalue) = row
+            
+            (oldvalue_changes, oldvalue) = self._convertSVNIDToGitID(oldvalue)
+            (newvalue_changes, newvalue) = self._convertSVNIDToGitID(newvalue)
+            
+            if oldvalue_changes != 0 or newvalue_changes != 0:
+                #print('field=' + str(field) + ' oldvalue='+str(oldvalue))
+                #print('field=' + str(field) + ' newvalue='+str(newvalue))
+                stmt = "UPDATE ticket_change SET oldvalue='" + str(oldvalue) + "', newvalue='" + str(newvalue) +\
+                    "' WHERE ticket = '" + str(ticket) + "' AND time = '" + str(time) + "' AND field='" + str(field) + "'"
+                print(stmt)
+                update_cur.execute(stmt)
+                pass
+        self._db.commit()
+
+    def _convert_ticket(self):
+        cur = self._db.cursor()
+        update_cur = self._db.cursor()
+        # Convert table 'ticket_change'
+        cur.execute('SELECT id,description FROM ticket')
+        while True:
+            row = cur.fetchone()
+            if row == None:
+                break
+            #print (row)
+            (ticket_id,description) = row
+            
+            (description_changes, description) = self._convertSVNIDToGitID(description)
+            
+            if description_changes != 0:
+                #print('field=' + str(field) + ' newvalue='+str(newvalue))
+                stmt = "UPDATE ticket SET description='" + str(description) +\
+                    "' WHERE id = '" + str(ticket_id) + "'"
+                print(stmt)
+                update_cur.execute(stmt)
+                pass
+        self._db.commit()
+
+    def _convert_milestone(self):
+        cur = self._db.cursor()
+        update_cur = self._db.cursor()
+        # Convert table 'milestone'
+        cur.execute('SELECT name,description FROM milestone')
+        while True:
+            row = cur.fetchone()
+            if row == None:
+                break
+            #print (row)
+            (milestone_name,description) = row
+            
+            (milestone_changes, description) = self._convertSVNIDToGitID(description)
+            
+            if milestone_changes != 0:
+                stmt = "UPDATE milestone SET description='" + str(description) +\
+                    "' WHERE name = '" + str(milestone_name) + "'"
+                print(stmt)
+                update_cur.execute(stmt)
+                pass
+        self._db.commit()
+
+    def _convert_wiki(self):
+        cur = self._db.cursor()
+        update_cur = self._db.cursor()
+        # Convert table 'wiki'
+        cur.execute('SELECT name,version,text FROM wiki')
+        while True:
+            row = cur.fetchone()
+            if row == None:
+                break
+            #print (row)
+            (wiki_name,wiki_version,text) = row
+            
+            (wiki_changes, text) = self._convertSVNIDToGitID(text)
+            
+            if wiki_changes != 0:
+                stmt = "UPDATE wikie SET text='" + str(text) +\
+                    "' WHERE name = '" + str(wiki_name) + "' AND version = '" + str(wiki_version) + "'"
+                print(stmt)
+                update_cur.execute(stmt)
+                pass
+        self._db.commit()
+
+    def main(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+            
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='converts SVN reference with trac to GIT commits')
+        parser.add_argument('dbfile', help='trac database file', metavar='dbfile')
+        parser.add_argument('gitrepo', help='GIT repository', metavar='gitrepo')
+
+        args = parser.parse_args()
+        self._gitrepo = args.gitrepo
+
+        ret = True
+        try:
+            self._db = sqlite3.connect(args.dbfile)
+        except sqlite3.Error as e:
+            self._db = None
+            ret = False
+
+        if not self._load_lookup_table(os.path.join(args.gitrepo, 'svn2git_lookup')):
+            sys.stderr.write('Failed to load lookup table')
+            ret = False
+            
+        self._convert_ticket_change()
+        self._convert_ticket()
+        self._convert_milestone()
+        self._convert_wiki()
+        
+        if self._db is not None:
+            self._db.close()
+
+        return 0 if ret else 1
+        
+if __name__ == "__main__":
+    app =  trac_svn2git()
+    sys.exit(app.main())
+
+"""
+<?php
+
+/**
+ * This script converts the commit references from SVN IDs to GIT IDs, i.e. changing in all tickets
+ * [1234] to [a42v2e3] or whatever the corresponding GIT hash is
+ *
+ * It needs a SVN ID -> GIT ID lookup table file called lookupTable.txt to match IDs.
+ *
+ * Execute it with php.exe convertTracTickets.php
+ *
+ * Needs the sqlite3 extension enabled to access the TRAC database.
+ **/
+error_reporting(E_ALL);
+
+/* CONFIGURATION */
+
+// Path to trac DB
+$pathDB = "/var/www/trac-git/tracenv/db/trac.db";
+
+// Path to lookup table (SVN revision number to GIT revion hash)
+$pathLookupTable = "lookupTable.txt";
+
+// Number of characters for the changeset hash. This has to be 4 <= nr <= 40
+$nrHashCharacters = 40;
+
+/* END CONFIGURATION */
+
+/**
+ * Converts a text with references to an SVN revision [1234] into the corresponding GIT revision
+ *
+ * @param text Text to convert
+ * @param lookupTable Conversion table from SVN ID to Git ID
+ * @returns True if conversions have been made
+ */
+function convertSVNIDToGitID(&$text, $lookupTable, $nrHashCharacters)
+{       
+    // Extract references to SVN revisions [####]
+    $pattern = '/\[([0-9]+)\]/';
+    
+    if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER) > 0)
+    {       
+        foreach($matches as $match)
+        {       
+            $svnID = $match[1];
+            if (!isSet($lookupTable[$svnID]))
+            {
+                echo "Warning: unknown GIT hash for SVN revision $svnID\n";
+                continue;
+            }
+            $gitID = substr($lookupTable[$svnID], 0, $nrHashCharacters);
+            
+            $text = str_replace('[' . $svnID . ']', '[' . $gitID . '] (SVN r' . $svnID . ')', $text);
+        }
+        
+        return true;
+    }
+    
+    return false;
+}
+
+echo "Creating SVN -> GIT conversion table table...\n";
+
+// Create the lookup table
+$lines = file($pathLookupTable);
+foreach ($lines as $line)
+{   
+    if (empty($line)) continue; 
+    list ($svnID, $gitID) = explode("\t", trim($line)); 
+    $lookupTable[$svnID] = $gitID;
+}
+
+// Connect to the TRAC database
+$db = new SQLite3($pathDB);
+
+echo "Converting table 'ticket_change'...\n";
+
+// Convert table 'ticket_change'
+$result = $db->query('SELECT * FROM ticket_change'); 
+
+$i = 1;
+while ($row = $result->fetchArray())
+{           
+    $i++;
+    $oldValue = $db->escapeString($row['oldvalue']);
+    $newValue = $db->escapeString($row['newvalue']);
+    
+    // Only update when there is something to be changed, since SQLite isn't the fastest beast around
+    if (convertSVNIDToGitID($oldValue, $lookupTable, $nrHashCharacters) || convertSVNIDToGitID($newValue, $lookupTable, $nrHashCharacters))
+    {   
+        $query = "UPDATE ticket_change SET oldvalue='$oldValue', newvalue='$newValue' WHERE ticket = '${row['ticket']}' AND time = '${row['time']}' AND author='${row['author']}' AND field='${row['field']}'";
+        if (!$db->exec($query))
+        {
+            echo "Query failed: " . $query . "\n";
+        }       
+        
+        echo "Updated ticket_change $i\n";
+    }
+}
+
+echo "Converting table 'ticket'...\n";
+
+// Convert table 'ticket'
+
+$i = 1;
+
+$result = $db->query('SELECT * FROM ticket');
+while ($row = $result->fetchArray())
+{
+    $description = $db->escapeString($row['description']);
+    if (convertSVNIDToGitID($description, $lookupTable, $nrHashCharacters))
+    {   
+        $query = "UPDATE ticket SET description='$description' WHERE id = " . $row['id'];
+        $db->exec($query);
+        
+        echo "Updated ticket $i\n";
+    }
+}
+
+// Done :)
+echo "Done!\n";
+?> 
+"""

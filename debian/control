@@ -47,3 +47,11 @@ Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
  includes ready to use plugins for nagios to monitor an AVM FritzBox
  and an OpenVPN server or client.
+
+Package: arsoft-python-trac
+Architecture: all
+Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
+Description: utilities for trac administration
+ Several adminstration helper scripts for trac:
+ - convert repository from SVN to GIT
+ - convert trac database from SQLite to MySQL

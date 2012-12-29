@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='netconfig',
-		version='1.34',
+		version='1.36',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -23,13 +23,16 @@ setup(name='netconfig',
                     'arsoft.nagios',
                     'arsoft.netconfig', 
                     'arsoft.nfs', 
-                    'arsoft.openvpn'
+                    'arsoft.openvpn',
+                    'arsoft.trac'
                     ],
 		scripts=[
             'certinfo',
             'fritzbox-status',
             'ini-util',
             'jabber-send',
+            'trac-sqlite2mysql',
+            'trac-svn2git'
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
