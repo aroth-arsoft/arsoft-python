@@ -123,17 +123,23 @@ class TracAdmin(object):
     @property
     def database_type(self):
         db = self.database
-        return db.split(':')[0]
+        if db:
+            return db.split(':')[0]
+        else:
+            return None
 
     @property
     def database_file(self):
         db = self.database
-        elem = db.split(':')
-        if elem[0] == 'sqlite':
-            return os.path.join(self._tracenv, elem[1])
+        if db:
+            elem = db.split(':')
+            if elem[0] == 'sqlite':
+                return os.path.join(self._tracenv, elem[1])
+            else:
+                return None
         else:
             return None
-            
+
     def set_logging(self, logfile='trac.log', level='DEBUG', logtype='file'):
         self._init_env()
         self._env.config.set('logging', 'log_file', logfile)

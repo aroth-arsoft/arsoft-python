@@ -14,6 +14,7 @@ from arsoft.trac.admin import TracAdmin
 class trac_sqlite2mysql(object):
     
     def __init__(self):
+        self._verbose = False
         self._db = None
         self._db_dump = ''
         self._db_struct = ''
@@ -36,7 +37,7 @@ class trac_sqlite2mysql(object):
         return sql_sqlite
 
     def _run_mysql_query(self, query):
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysql', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '-e', query ], verbose=True)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysql', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '-e', query ], verbose=self._verbose)
         if sts == 0:
             return True
         else:
@@ -46,7 +47,7 @@ class trac_sqlite2mysql(object):
     def _run_trac_admin(self, trac_directory, args):
         cmd_args = [trac_directory]
         cmd_args.extend(args)
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('trac-admin', cmd_args, verbose=True)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData('trac-admin', cmd_args, verbose=self._verbose)
         if sts == 0:
             return True
         else:
@@ -64,7 +65,7 @@ class trac_sqlite2mysql(object):
             query = "GRANT ALL ON " + dbname + ".* TO '" + dbuser + "'@'%' IDENTIFIED BY '" + dbpassword + "';"
             if self._run_mysql_query(query):
                 tmp_trac_database = 'mysql://' + dbuser + ':' + dbpassword + '@' + self._mysql_server + '/' + dbname
-                trac = TracAdmin(tmp_trac_dir, verbose=True)
+                trac = TracAdmin(tmp_trac_dir, verbose=self._verbose)
                 if trac.initenv(dbname, tmp_trac_database, repository_path=repository_path, repository_type=repository_type):
                     trac.set_logging('trac.log')
                     if self._trac_plugins is not None:
@@ -72,6 +73,9 @@ class trac_sqlite2mysql(object):
                             print('trac enable plugin ' + plugin)
                             trac.enable_plugin(plugin)
                     if self._trac_components is not None:
+                        if self._verbose:
+                            for (c, v) in self._trac_components:
+                                print('activate trac component ' + c)
                         trac.set_configured_components(self._trac_components)
                     if trac.save_config():
                         print('trac configuration saved.')
@@ -79,7 +83,7 @@ class trac_sqlite2mysql(object):
                         print('failed to save trac configuration. error ' + trac.last_error)
                     if trac.upgrade():
                         print('trac database upgrade.')
-                        (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysqldump', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '--no-data', dbname ], verbose=True)
+                        (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysqldump', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '--no-data', dbname ], verbose=self._verbose)
                         if sts == 0:
                             print('dump successful.')
                             self._db_struct = stdoutdata
@@ -101,7 +105,7 @@ class trac_sqlite2mysql(object):
         self._db_data = ''
     
         cmd_args = [dbfile, '.dump']
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('sqlite3', cmd_args, verbose=True)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData('sqlite3', cmd_args, verbose=self._verbose)
         if sts == 0:
             stdoutdata = stdoutdata.decode('utf-8')
             if cleanup_sql:
@@ -136,7 +140,7 @@ class trac_sqlite2mysql(object):
                 print(e)
                 sqlfile = None
             if sqlfile:
-                (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysql', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, database_name ], stdin=sqlfile, verbose=True)
+                (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysql', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, database_name ], stdin=sqlfile, verbose=self._verbose)
                 if sts == 0:
                     ret = True
                 else:
@@ -170,6 +174,7 @@ class trac_sqlite2mysql(object):
         parser.add_argument('tracenv', help='trac environment', metavar='tracenv')
         parser.add_argument('outfile', help='output SQL file', nargs='?', metavar='sqlfile')
         parser.add_argument('dbfile', help='trac database file', nargs='?', metavar='dbfile')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-S', dest='mysql_server', default='localhost', help='name of the MySQL server.')
         parser.add_argument('-u', dest='mysql_user', default='root', help='username to access the MySQL server.')
         parser.add_argument('-p', dest='mysql_password', default='', help='password to access the MySQL server.')
@@ -179,12 +184,12 @@ class trac_sqlite2mysql(object):
 
         args = parser.parse_args()
         
+        self._verbose = args.verbose
         self._mysql_server = args.mysql_server
         self._mysql_user = args.mysql_user
         self._mysql_password = args.mysql_password
         self._dbfile = args.dbfile
 
-        
         if args.trac_plugins:
             plugins = []
             for p in args.trac_plugins:
@@ -208,7 +213,9 @@ class trac_sqlite2mysql(object):
                 self._write_sql_file(output_sqlfile)
 
                 if args.mysql_database:
-                    self._import_sql_file_to_database(output_sqlfile, args.mysql_database)
+                    ret = self._import_sql_file_to_database(output_sqlfile, args.mysql_database)
+                    if ret:
+                        print('import converted database to mysql successful.')
         
                 if not args.outfile:
                     # remove temp sql file
