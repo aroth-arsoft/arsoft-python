@@ -6,6 +6,8 @@ import os
 import argparse
 import re
 from urlparse import urlparse
+from arsoft.utils import rmtree, runcmdAndGetData
+from arsoft.trac.admin import TracAdmin
 
 class trac_svn2git(object):
 
@@ -66,12 +68,17 @@ class trac_svn2git(object):
             if oldvalue_changes != 0 or newvalue_changes != 0:
                 #print('field=' + str(field) + ' oldvalue='+str(oldvalue))
                 #print('field=' + str(field) + ' newvalue='+str(newvalue))
-                stmt = "UPDATE ticket_change SET oldvalue='" + str(oldvalue) + "', newvalue='" + str(newvalue) +\
-                    "' WHERE ticket = '" + str(ticket) + "' AND time = '" + str(time) + "' AND field='" + str(field) + "'"
-                print(stmt)
-                update_cur.execute(stmt)
-                pass
+                if self._dbtype == 'sqlite':
+                    stmt = "UPDATE ticket_change SET oldvalue='%(oldvalue)s', newvalue='%(newvalue)s' WHERE ticket = '%(ticket)s' AND time = '%(time)s' AND field='%(field)s'"
+                    params = [oldvalue, newvalue, ticket, time, field]
+                elif self._dbtype == 'mysql':
+                    stmt = "UPDATE ticket_change SET oldvalue='%(oldvalue)s', newvalue='%(newvalue)s' WHERE ticket = '%(ticket)s' AND time = '%(time)s' AND field='%(field)s'"
+                    params = {'oldvalue':oldvalue, 'newvalue':newvalue, 'ticket': ticket, 'time':time, 'field':field}
+                print(stmt, params)
+                update_cur.execute(stmt, params)
+
         self._db.commit()
+        return True
 
     def _convert_ticket(self):
         cur = self._db.cursor()
@@ -89,12 +96,17 @@ class trac_svn2git(object):
             
             if description_changes != 0:
                 #print('field=' + str(field) + ' newvalue='+str(newvalue))
-                stmt = "UPDATE ticket SET description='" + str(description) +\
-                    "' WHERE id = '" + str(ticket_id) + "'"
-                print(stmt)
-                update_cur.execute(stmt)
-                pass
+                if self._dbtype == 'sqlite':
+                    stmt = "UPDATE ticket SET description=? WHERE id=?"
+                    params = [description, ticket_id]
+                elif self._dbtype == 'mysql':
+                    stmt = "UPDATE ticket SET description='%(description)s' WHERE id='%(id)s'"
+                    params = {'description': description, 'id':ticket_id}
+                print(stmt, params)
+                update_cur.execute(stmt, params)
+                
         self._db.commit()
+        return True
 
     def _convert_milestone(self):
         cur = self._db.cursor()
@@ -111,17 +123,23 @@ class trac_svn2git(object):
             (milestone_changes, description) = self._convertSVNIDToGitID(description)
             
             if milestone_changes != 0:
-                stmt = "UPDATE milestone SET description='" + str(description) +\
-                    "' WHERE name = '" + str(milestone_name) + "'"
-                print(stmt)
-                update_cur.execute(stmt)
-                pass
+                if self._dbtype == 'sqlite':
+                    stmt = "UPDATE milestone SET description=? WHERE name=?"
+                    params = [description, milestone_name]
+                elif self._dbtype == 'mysql':
+                    stmt = "UPDATE milestone SET description='%(description)s' WHERE name = '%(name)s'"
+                    params = {'description': description, 'name':milestone_name}
+                print(stmt, params)
+                update_cur.execute(stmt, params)
+
         self._db.commit()
+        return True
 
     def _convert_wiki(self):
         cur = self._db.cursor()
         update_cur = self._db.cursor()
         # Convert table 'wiki'
+        ret = True
         cur.execute('SELECT name,version,text FROM wiki')
         while True:
             row = cur.fetchone()
@@ -133,12 +151,16 @@ class trac_svn2git(object):
             (wiki_changes, text) = self._convertSVNIDToGitID(text)
             
             if wiki_changes != 0:
-                stmt = "UPDATE wikie SET text='" + str(text) +\
-                    "' WHERE name = '" + str(wiki_name) + "' AND version = '" + str(wiki_version) + "'"
-                print(stmt)
-                update_cur.execute(stmt)
-                pass
+                if self._dbtype == 'sqlite':
+                    stmt = "UPDATE wiki SET text=? WHERE name=? AND version=?"
+                    params = [text, wiki_name, wiki_version]
+                elif self._dbtype == 'mysql':
+                    stmt = "UPDATE wiki SET text='%(text)s' WHERE name='%(name)s' AND version = '%(version)s'"
+                    params = {'text':text, 'name': wiki_name, 'version':wiki_version}
+                print(stmt, params)
+                update_cur.execute(stmt, params)
         self._db.commit()
+        return True
 
     def _load_tracenv(self, tracenv):
         trac = TracAdmin(tracenv)
@@ -169,8 +191,8 @@ class trac_svn2git(object):
                 ret = False
             if ret:
                 try:
-                    self._db = sqlite3.connect(args.dbfile)
-                    ret = True if db is not None else False
+                    self._db = sqlite3.connect(self._dbfile)
+                    ret = True if self._db is not None else False
                 except sqlite3.Error as e:
                     self._db = None
                     ret = False
@@ -184,7 +206,7 @@ class trac_svn2git(object):
             if ret:
                 try:
                     self._db = MySQLdb.connect(host=self._dbserver, user=self._dbuser, passwd=self._dbpassword, db=self._dbname)
-                    ret = True if db is not None else False
+                    ret = True if self._db is not None else False
                 except sqlite3.Error as e:
                     self._db = None
                     ret = False
@@ -221,13 +243,24 @@ class trac_svn2git(object):
             ret = False
         else:
             if self._open_db():
-                self._convert_ticket_change()
-                self._convert_ticket()
-                self._convert_milestone()
-                self._convert_wiki()
+                ret = True
+                if not self._convert_ticket_change():
+                    sys.stderr.write('Failed to convert ticket changes\n')
+                    ret = False
+                if not self._convert_ticket():
+                    sys.stderr.write('Failed to convert tickets\n')
+                    ret = False
+                if not self._convert_milestone():
+                    sys.stderr.write('Failed to convert milestones\n')
+                    ret = False
+                if not self._convert_wiki():
+                    sys.stderr.write('Failed to convert wiki\n')
+                    ret = False
         
                 self._close_db()
+                
             else:
+                ret = False
                 sys.stderr.write('Failed to open database\n')
 
         return 0 if ret else 1
