@@ -5,7 +5,7 @@ import sys
 import os
 import argparse
 import re
-import sqlite3
+from urlparse import urlparse
 
 class trac_svn2git(object):
 
@@ -140,6 +140,63 @@ class trac_svn2git(object):
                 pass
         self._db.commit()
 
+    def _load_tracenv(self, tracenv):
+        trac = TracAdmin(tracenv)
+        if trac.database_type == 'sqlite':
+            self._dbtype = trac.database_type
+            self._dbfile = trac.database_file
+            ret = True
+        elif trac.database_type == 'mysql':
+            self._dbtype = trac.database_type
+            o = urlparse(trac.database)
+            self._dbserver = o.hostname
+            self._dbuser = o.username
+            self._dbpassword = o.password
+            self._dbname = o.path
+            ret = True
+        else:
+            print('This script only supports SQLite3 and MySQL databases. Your database ' + trac.database_type + ' is not supported.')
+            ret = False
+        return ret
+        
+    def _open_db(self):
+        if self._dbtype == 'sqlite':
+            try:
+                import sqlite3
+                ret = True
+            except ImportError as e:
+                print('unable to load sqlite3 extension for python.')
+                ret = False
+            if ret:
+                try:
+                    self._db = sqlite3.connect(args.dbfile)
+                    ret = True if db is not None else False
+                except sqlite3.Error as e:
+                    self._db = None
+                    ret = False
+        elif self._dbtype == 'mysql':
+            try:
+                import MySQLdb
+                ret = True
+            except ImportError as e:
+                print('unable to load MySQLdb extension for python.')
+                ret = False
+            if ret:
+                try:
+                    self._db = MySQLdb.connect(host=self._dbserver, user=self._dbuser, passwd=self._dbpassword, db=self._dbname)
+                    ret = True if db is not None else False
+                except sqlite3.Error as e:
+                    self._db = None
+                    ret = False
+        else:
+            ret = False
+        return ret
+        
+    def _close_db(self):
+        if self._db is not None:
+            self._db.close()
+            self._db = None
+
     def main(self, argv=None):
         if argv is None:
             argv = sys.argv
@@ -148,30 +205,29 @@ class trac_svn2git(object):
         # process command line
         #=============================================================================================
         parser = argparse.ArgumentParser(description='converts SVN reference with trac to GIT commits')
-        parser.add_argument('dbfile', help='trac database file', metavar='dbfile')
+        parser.add_argument('tracenv', help='trac environment', metavar='tracenv')
         parser.add_argument('gitrepo', help='GIT repository', metavar='gitrepo')
 
         args = parser.parse_args()
+        self._verbose = args.verbose
         self._gitrepo = args.gitrepo
 
-        ret = True
-        try:
-            self._db = sqlite3.connect(args.dbfile)
-        except sqlite3.Error as e:
-            self._db = None
-            ret = False
-
-        if not self._load_lookup_table(os.path.join(args.gitrepo, 'svn2git_lookup')):
-            sys.stderr.write('Failed to load lookup table')
-            ret = False
+        if not self._load_tracenv(args.tracenv):
+            return 1
             
-        self._convert_ticket_change()
-        self._convert_ticket()
-        self._convert_milestone()
-        self._convert_wiki()
+        if not self._load_lookup_table(os.path.join(args.gitrepo, 'svn2git_lookup')):
+            sys.stderr.write('Failed to load lookup table\n')
+            ret = False
+        else:
+            if self._open_db():
+                self._convert_ticket_change()
+                self._convert_ticket()
+                self._convert_milestone()
+                self._convert_wiki()
         
-        if self._db is not None:
-            self._db.close()
+                self._close_db()
+            else:
+                sys.stderr.write('Failed to open database\n')
 
         return 0 if ret else 1
         

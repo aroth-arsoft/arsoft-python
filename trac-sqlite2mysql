@@ -173,7 +173,6 @@ class trac_sqlite2mysql(object):
         parser = argparse.ArgumentParser(description='converts the trac database from SQLite3 to MySQL')
         parser.add_argument('tracenv', help='trac environment', metavar='tracenv')
         parser.add_argument('outfile', help='output SQL file', nargs='?', metavar='sqlfile')
-        parser.add_argument('dbfile', help='trac database file', nargs='?', metavar='dbfile')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-S', dest='mysql_server', default='localhost', help='name of the MySQL server.')
         parser.add_argument('-u', dest='mysql_user', default='root', help='username to access the MySQL server.')
