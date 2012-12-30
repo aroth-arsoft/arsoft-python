@@ -207,6 +207,7 @@ class trac_svn2git(object):
         parser = argparse.ArgumentParser(description='converts SVN reference with trac to GIT commits')
         parser.add_argument('tracenv', help='trac environment', metavar='tracenv')
         parser.add_argument('gitrepo', help='GIT repository', metavar='gitrepo')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
 
         args = parser.parse_args()
         self._verbose = args.verbose
