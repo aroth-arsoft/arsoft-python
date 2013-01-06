@@ -14,14 +14,14 @@ def isRoot():
     euid = os.geteuid()
     return True if euid == 0 else False
 
-def runcmd(exe, args=[], verbose=False, stdin=None):
+def runcmd(exe, args=[], verbose=False, stdin=None, input=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
         print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
     p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, shell=False)
     if p:
-        (stdoutdata, stderrdata) = p.communicate()
+        (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None:
             if int(python_major) < 3: # check for version < 3
                 sys.stdout.write(stdoutdata)
@@ -42,14 +42,14 @@ def runcmd(exe, args=[], verbose=False, stdin=None):
     return sts
 
 
-def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None):
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, input=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
         print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
     p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, shell=False)
     if p:
-        (stdoutdata, stderrdata) = p.communicate()
+        (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None and outputStdOut:
             if int(python_major) < 3: # check for version < 3
                 sys.stdout.write(stdoutdata)
