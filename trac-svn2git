@@ -11,13 +11,13 @@ from arsoft.trac.admin import TracAdmin
 
 class trac_svn2git(object):
 
-    svn_revno_pattern = r'\[([0-9]+)\]'
-    
     def __init__(self):
         self._db = None
+        self._last_error = None
         self._gitrepo = None
         self._svn2git = {}
         self._git2svn = {}
+        trac_svn2git.svn_revno_pattern = r'\[([0-9]+)\]'.encode('utf-8')
 
     def _load_lookup_table(self, filename):
         try:
@@ -25,6 +25,7 @@ class trac_svn2git(object):
             for line in f:
                 (svnrevno, gitcommithash) = line.split('\t')
                 svnrevno = int(svnrevno)
+                gitcommithash = gitcommithash.encode('utf-8')
                 self._svn2git[svnrevno] = gitcommithash
                 self._git2svn[gitcommithash] = svnrevno
             f.close()
@@ -44,7 +45,7 @@ class trac_svn2git(object):
                 gitid = self._svn2git[svnrevno]
                 gitidstr = gitid[0:nrHashCharacters]
                 org_text = match.group(0)
-                new_text = '[' + gitidstr + '] (SVN r' + str(svnrevno) + ')'
+                new_text = u'[' + gitidstr + u'] (SVN r' + str(svnrevno) + u')'
                 text = text.replace(org_text, new_text)
                 num_matches = num_matches + 1
                 print('replace ' + str(org_text) + ' with '+str(new_text))
@@ -62,6 +63,10 @@ class trac_svn2git(object):
             #print (row)
             (ticket,time,field,oldvalue,newvalue) = row
             
+            if oldvalue:
+                oldvalue = oldvalue.decode('utf-8')
+            if newvalue:
+                newvalue = newvalue.decode('utf-8')
             (oldvalue_changes, oldvalue) = self._convertSVNIDToGitID(oldvalue)
             (newvalue_changes, newvalue) = self._convertSVNIDToGitID(newvalue)
             
@@ -69,10 +74,10 @@ class trac_svn2git(object):
                 #print('field=' + str(field) + ' oldvalue='+str(oldvalue))
                 #print('field=' + str(field) + ' newvalue='+str(newvalue))
                 if self._dbtype == 'sqlite':
-                    stmt = "UPDATE ticket_change SET oldvalue='%(oldvalue)s', newvalue='%(newvalue)s' WHERE ticket = '%(ticket)s' AND time = '%(time)s' AND field='%(field)s'"
+                    stmt = "UPDATE ticket_change SET oldvalue=?, newvalue=? WHERE ticket=? AND time=? AND field=?"
                     params = [oldvalue, newvalue, ticket, time, field]
                 elif self._dbtype == 'mysql':
-                    stmt = "UPDATE ticket_change SET oldvalue='%(oldvalue)s', newvalue='%(newvalue)s' WHERE ticket = '%(ticket)s' AND time = '%(time)s' AND field='%(field)s'"
+                    stmt = "UPDATE ticket_change SET oldvalue=%(oldvalue)s, newvalue=%(newvalue)s WHERE ticket=%(ticket)s AND time=%(time)s AND field=%(field)s"
                     params = {'oldvalue':oldvalue, 'newvalue':newvalue, 'ticket': ticket, 'time':time, 'field':field}
                 print(stmt, params)
                 update_cur.execute(stmt, params)
@@ -92,6 +97,8 @@ class trac_svn2git(object):
             #print (row)
             (ticket_id,description) = row
             
+            if description:
+                description = description.decode('utf-8')
             (description_changes, description) = self._convertSVNIDToGitID(description)
             
             if description_changes != 0:
@@ -100,7 +107,7 @@ class trac_svn2git(object):
                     stmt = "UPDATE ticket SET description=? WHERE id=?"
                     params = [description, ticket_id]
                 elif self._dbtype == 'mysql':
-                    stmt = "UPDATE ticket SET description='%(description)s' WHERE id='%(id)s'"
+                    stmt = "UPDATE ticket SET description=%(description)s WHERE id=%(id)i"
                     params = {'description': description, 'id':ticket_id}
                 print(stmt, params)
                 update_cur.execute(stmt, params)
@@ -120,6 +127,8 @@ class trac_svn2git(object):
             #print (row)
             (milestone_name,description) = row
             
+            if description:
+                description = description.decode('utf-8')
             (milestone_changes, description) = self._convertSVNIDToGitID(description)
             
             if milestone_changes != 0:
@@ -127,7 +136,7 @@ class trac_svn2git(object):
                     stmt = "UPDATE milestone SET description=? WHERE name=?"
                     params = [description, milestone_name]
                 elif self._dbtype == 'mysql':
-                    stmt = "UPDATE milestone SET description='%(description)s' WHERE name = '%(name)s'"
+                    stmt = "UPDATE milestone SET description=%(description)s WHERE name=%(name)s"
                     params = {'description': description, 'name':milestone_name}
                 print(stmt, params)
                 update_cur.execute(stmt, params)
@@ -148,6 +157,8 @@ class trac_svn2git(object):
             #print (row)
             (wiki_name,wiki_version,text) = row
             
+            if text:
+                text = text.decode('utf-8')
             (wiki_changes, text) = self._convertSVNIDToGitID(text)
             
             if wiki_changes != 0:
@@ -155,7 +166,7 @@ class trac_svn2git(object):
                     stmt = "UPDATE wiki SET text=? WHERE name=? AND version=?"
                     params = [text, wiki_name, wiki_version]
                 elif self._dbtype == 'mysql':
-                    stmt = "UPDATE wiki SET text='%(text)s' WHERE name='%(name)s' AND version = '%(version)s'"
+                    stmt = "UPDATE wiki SET text=%(text)s WHERE name=%(name)s AND version=%(version)s"
                     params = {'text':text, 'name': wiki_name, 'version':wiki_version}
                 print(stmt, params)
                 update_cur.execute(stmt, params)
@@ -174,10 +185,13 @@ class trac_svn2git(object):
             self._dbserver = o.hostname
             self._dbuser = o.username
             self._dbpassword = o.password
-            self._dbname = o.path
+            if o.path[0] == '/':
+                self._dbname = o.path[1:]
+            else:
+                self._dbname = o.path
             ret = True
         else:
-            print('This script only supports SQLite3 and MySQL databases. Your database ' + trac.database_type + ' is not supported.')
+            self._last_error = 'This script only supports SQLite3 and MySQL databases. Your database ' + str(trac.database_type) + ' is not supported.'
             ret = False
         return ret
         
@@ -187,7 +201,7 @@ class trac_svn2git(object):
                 import sqlite3
                 ret = True
             except ImportError as e:
-                print('unable to load sqlite3 extension for python.')
+                self._last_error = 'unable to load sqlite3 extension for python.'
                 ret = False
             if ret:
                 try:
@@ -195,20 +209,23 @@ class trac_svn2git(object):
                     ret = True if self._db is not None else False
                 except sqlite3.Error as e:
                     self._db = None
+                    self._last_error = str(e)
                     ret = False
         elif self._dbtype == 'mysql':
             try:
                 import MySQLdb
                 ret = True
             except ImportError as e:
-                print('unable to load MySQLdb extension for python.')
+                self._last_error = 'unable to load MySQLdb extension for python.'
                 ret = False
             if ret:
                 try:
-                    self._db = MySQLdb.connect(host=self._dbserver, user=self._dbuser, passwd=self._dbpassword, db=self._dbname)
+                    self._db = MySQLdb.connect(host=self._dbserver, user=self._dbuser, passwd=self._dbpassword, db=self._dbname, 
+                                                charset='utf8', init_command='SET NAMES UTF8', use_unicode=True)
                     ret = True if self._db is not None else False
-                except sqlite3.Error as e:
+                except MySQLdb.Error as e:
                     self._db = None
+                    self._last_error = str(e)
                     ret = False
         else:
             ret = False
@@ -236,32 +253,33 @@ class trac_svn2git(object):
         self._gitrepo = args.gitrepo
 
         if not self._load_tracenv(args.tracenv):
+            sys.stderr.write('Failed to load trac environment ' + args.tracenv + ', error ' + str(self._last_error) + '\n')
             return 1
             
         if not self._load_lookup_table(os.path.join(args.gitrepo, 'svn2git_lookup')):
-            sys.stderr.write('Failed to load lookup table\n')
+            sys.stderr.write('Failed to load lookup table, error ' + str(self._last_error) + '\n')
             ret = False
         else:
             if self._open_db():
                 ret = True
                 if not self._convert_ticket_change():
-                    sys.stderr.write('Failed to convert ticket changes\n')
+                    sys.stderr.write('Failed to convert ticket changes, error ' + str(self._last_error) + '\n')
                     ret = False
                 if not self._convert_ticket():
-                    sys.stderr.write('Failed to convert tickets\n')
+                    sys.stderr.write('Failed to convert tickets, error ' + str(self._last_error) + '\n')
                     ret = False
                 if not self._convert_milestone():
-                    sys.stderr.write('Failed to convert milestones\n')
+                    sys.stderr.write('Failed to convert milestones, error ' + str(self._last_error) + '\n')
                     ret = False
                 if not self._convert_wiki():
-                    sys.stderr.write('Failed to convert wiki\n')
+                    sys.stderr.write('Failed to convert wiki, error ' + str(self._last_error) + '\n')
                     ret = False
         
                 self._close_db()
                 
             else:
                 ret = False
-                sys.stderr.write('Failed to open database\n')
+                sys.stderr.write('Failed to open database, error ' + str(self._last_error) + '\n')
 
         return 0 if ret else 1
         

@@ -13,6 +13,7 @@ class TracAdmin(object):
         self._verbose = verbose
         self._trac_config = None
         self._plugin_info = None
+        self._repository_manager = None
         self._env = None
 
     @property
@@ -61,6 +62,15 @@ class TracAdmin(object):
                 self._plugin_info = get_plugin_info(self._env)
             except:
                 self._plugin_info = []
+                
+    def _retrieve_repository_manager(self):
+        if self._repository_manager is None:
+            self._init_env()
+            try:
+                from trac.versioncontrol import RepositoryManager
+                self._repository_manager = RepositoryManager(self._env)
+            except:
+                self._repository_manager = []
 
     @property
     def plugins(self):
@@ -140,6 +150,23 @@ class TracAdmin(object):
         else:
             return None
 
+    @property
+    def repositories(self):
+        self._retrieve_repository_manager()
+        ret = []
+        if self._repository_manager:
+            tmp = self._repository_manager.get_real_repositories()
+            for tmp_repo in tmp:
+                ret.append(tmp_repo)
+        return ret
+
+    def get_repository(self, reponame):
+        self._retrieve_repository_manager()
+        if self._repository_manager:
+            return self._repository_manager.get_repository(reponame)
+        else:
+            return None
+
     def set_logging(self, logfile='trac.log', level='DEBUG', logtype='file'):
         self._init_env()
         self._env.config.set('logging', 'log_file', logfile)
@@ -186,4 +213,9 @@ if __name__ == '__main__':
     print(t.plugins)
     print(t.get_plugin_info('AdvancedTicketWorkflowPlugin'))
     print(t.get_plugin_components('AdvancedTicketWorkflowPlugin'))
+    for repo in t.repositories:
+        repo_dir = repo.params['dir']
+        repo_type = repo.params['type'] if 'type' in repo.params else 'svn'
+        repo_name = '(default)' if not repo.name else repo.name
+        print(repo_type + ': ' + repo_name + ' ' + repo_dir)
  
