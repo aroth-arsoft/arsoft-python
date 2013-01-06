@@ -19,7 +19,11 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None):
     all_args.extend(args)
     if verbose:
         print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, shell=False)
+    if stdin is not None:
+        stdin_param = stdin
+    else:
+        stdin_param = subprocess.PIPE
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None:
@@ -47,7 +51,11 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
     all_args.extend(args)
     if verbose:
         print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, shell=False)
+    if stdin is not None:
+        stdin_param = stdin
+    else:
+        stdin_param = subprocess.PIPE
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None and outputStdOut:
