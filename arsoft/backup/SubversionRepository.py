@@ -2,31 +2,54 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-import sys
-import getopt
-import os
-import subprocess
-import arsoft.utils
+from BaseRepository import *
+import re
 
-class SubversionRepository:
+class SubversionRepository(BaseRepository):
     
     def __init__(self, path, verbose=False):
-        self.m_repopath = path
-        self.m_verbose = verbose
+        BaseRepository.__init__(self, path, verbose)
+        self._is_working_directory = None
+        
+    def _determine_directory_type(self):
+        if self._is_working_directory is None:
+            if SubversionRepository.is_working_directory(self._path):
+                self._is_working_directory = True
+            else:
+                self._is_working_directory = False
 
-    def log(self, msg):
-        if self.m_verbose:
-            print(str(msg))
+    @staticmethod
+    def is_working_directory(path):
+        return True if os.path.isdir(os.path.join(path, '.svn')) else False
 
-    def create(self):
-        return arsoft.utils.runcmd('/usr/bin/svnadmin', ["create", self.m_repopath], verbose=self.m_verbose)
+    @staticmethod
+    def is_repository(path):
+        return True if os.path.isfile(os.path.join(path,'format')) else False
+
+    @staticmethod
+    def is_valid(path):
+        while True:
+            if SubversionRepository.is_working_directory(path):
+                return True
+            elif SubversionRepository.is_repository(path):
+                return True
+            else:
+                (head, tail) = os.path.split(path)
+                if head != path:
+                    path = head
+                else:
+                    break
+        return False
+
+    def create(self, **kwargs):
+        return arsoft.utils.runcmd('/usr/bin/svnadmin', ["create", self._path], verbose=self._verbose)
         
     def hotcopy(self, backupdir):
-        return arsoft.utils.runcmd('/usr/bin/svnadmin', ["hotcopy", self.m_repopath, backupdir, '--clean-logs'], verbose=self.m_verbose)
+        return arsoft.utils.runcmd('/usr/bin/svnadmin', ["hotcopy", self._path, backupdir, '--clean-logs'], verbose=self._verbose)
         
     def dump(self, bakfile, minrev=None, maxrev=None):
 
-        cmdline_dump = ["/usr/bin/svnadmin", "dump", "-q", self.m_repopath]
+        cmdline_dump = ["/usr/bin/svnadmin", "dump", "-q", self._path]
         if minrev is not None and maxrev is not None:
             cmdline_dump.append("--incremental")
             cmdline_dump.append("--revision")
@@ -125,11 +148,32 @@ class SubversionRepository:
             print >>sys.stderr, "Failed to open " + dumpfile, e
 
         return ret
-
-    def get_latest_revision(self):
-        (ret, stdout, stderr) = arsoft.utils.runcmdAndGetData('/usr/bin/svnlook', ["youngest", self.m_repopath], verbose=self.m_verbose)
-        if ret == 0 and output is not None and len(output):
-            ret = int(output, 10)
+    
+    def _get_current_revision_from_repository(self):
+        (ret, stdout, stderr) = arsoft.utils.runcmdAndGetData('/usr/bin/svnlook', ['youngest', self._path], verbose=self._verbose)
+        if ret == 0 and stdout is not None and len(stdout):
+            ret = int(stdout, 10)
         else:
-            ret = -1
+            ret = None
         return ret
+
+    def _get_current_revision_from_working_directory(self):
+        (ret, stdout, stderr) = arsoft.utils.runcmdAndGetData('/usr/bin/svn', ['info', self._path], verbose=self._verbose)
+        if ret == 0 and stdout is not None and len(stdout):
+            ret = stdout.find('Revision:')
+            r = re.compile(r'Revision:\s+(?P<rev>[0-9]+)')
+            mo = r.search(stdout)
+            if mo:
+                ret = int(mo.group('rev'))
+            else:
+                ret = None
+        else:
+            ret = None
+        return ret
+
+    def get_current_revision(self):
+        self._determine_directory_type()
+        if self._is_working_directory:
+            return self._get_current_revision_from_working_directory()
+        else:
+            return self._get_current_revision_from_repository()

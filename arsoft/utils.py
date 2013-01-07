@@ -158,3 +158,6 @@ def is_localhost(hostname):
         return True
     else:
         return False
+
+def enum(**enums):
+    return type('Enum', (), enums)
