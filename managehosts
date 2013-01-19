@@ -1,0 +1,153 @@
+#!/usr/bin/python
+import sys
+import getopt
+import os
+import string
+
+hosts_file = '/etc/hosts'
+hosts = []
+verbose = False
+quiet = False
+
+def load_hosts():
+	if verbose:
+		print 'hosts_file=' + str(hosts_file)
+	with open(hosts_file, 'r') as f:
+		for line in f:
+			line_stripped = line.strip()
+			split_line = [s.strip() for s in line_stripped.split()]
+			ip = None
+			comments = []
+			hostnames = []
+			i = 0
+			while i < len(split_line):
+				if split_line[i][0] == '#':
+					comments.extend(split_line[i:])
+					break
+				elif ip is None:
+					ip = split_line[i]
+				else:
+					hostnames.append(split_line[i])
+				i+=1
+
+			hosts.append( (ip, hostnames, comments) )
+			if verbose:
+				print {'ip': ip, 'hostnames': hostnames, 'comments': comments}
+
+def save_hosts():
+	if verbose:
+		print 'hosts_file=' + str(hosts_file)
+	with open(hosts_file, 'w') as f:
+		for line in hosts:
+			ip, hostnames, comments = line
+			if ip is None:
+				if len(comments):
+					f.write( string.join(comments,' ') + '\n')
+			else:
+				if len(hostnames):
+					if len(comments):
+						f.write( str(ip) + "\t" + string.join(hostnames,'\t') + "\t" + string.join(comments,' ') + '\n')
+					else:
+						f.write( str(ip) + "\t" + string.join(hostnames,'\t') + '\n')
+		f.close()
+
+def list_hosts():
+	for line in hosts:
+		ip, hostnames, comments = line
+		if ip is None:
+			if len(comments):
+				print string.join(comments,' ')
+		else:
+			if len(hostnames):
+				if len(comments):
+					print str(ip) + "\t" + string.join(hostnames,'\t') + "\t" + string.join(comments,' ')
+				else:
+					print str(ip) + "\t" + string.join(hostnames,'\t')
+
+def usage():
+	print "managehosts [action] [args]"
+	print "options:"
+	print "  -h, --help               this help screen"
+	print "  -v, --verbose            enable verbose output"
+	print "  -q, --quiet              disable any output, except errors"
+	print "actions:"
+	print "  list                     lists all host entries (default action)"
+	print "  update                   updates the specified entry"
+	sys.exit(0)
+	
+class Usage:
+	def __init__(msg):
+		print msg
+		usage()
+	
+def main(argv=None):
+	if argv is None:
+		argv = sys.argv
+
+	commands = None
+	global hosts_file
+	global verbose
+	global quiet
+
+	try:
+		try:
+			opts, args = getopt.getopt(argv[1:], "hvqf:", ["help","verbose","quiet", "file="])
+			output = None
+			for o, a in opts:
+				if o in ("-h", "--help"):
+					usage()
+					sys.exit()
+				elif o in ("-v", "--verbose"):
+					verbose = True
+				elif o in ("-q", "--quiet"):
+					quiet = True
+				elif o in ("-f", "--file"):
+					hosts_file = a
+				else:
+					assert False, "unhandled option " + str(o)
+			commands = args
+		except getopt.error, msg:
+			 raise Usage(msg)
+		# more code, unchanged
+	except Usage, err:
+		print >>sys.stderr, err.msg
+		print >>sys.stderr, "for help use --help"
+		return 2
+
+	if len(commands) == 0:
+		action = 'list'
+		action_args = []
+	else:
+		action = commands[0]
+		action_args = commands[1:]
+	#print 'action ' + str(action)
+	#print 'action_args ' + str(action_args)
+
+	if action == 'list':
+		load_hosts()
+		list_hosts()
+	elif action == 'update':
+		if len(action_args) == 0:
+			print 'No update address specified.'
+		else:
+			update_ip = action_args[0]
+			update_hostnames = action_args[1:]
+			load_hosts()
+			idx = 0
+			found = False
+			while idx < len(hosts):
+				ip, hostnames, comments = hosts[idx]
+				if len(hostnames) == 0:
+					idx+=1
+					continue
+				if ip == update_ip:
+					hosts[idx] = (ip, update_hostnames, comments)
+					found = True
+					break
+				idx+=1
+			if not found:
+				hosts.append( (update_ip, update_hostnames, []) )
+			save_hosts()
+
+if __name__ == "__main__":
+    main()
