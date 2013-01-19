@@ -16,3 +16,5 @@ usr/sbin/efiinfo
 usr/sbin/nsswitch-config
 usr/sbin/nsswitch-ldap
 usr/sbin/cups-admin
+usr/sbin/managehosts
+usr/sbin/autofs-ldap-auth
