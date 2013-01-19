@@ -1,3 +1,9 @@
+arsoft-python (1.37) UNRELEASED; urgency=low
+
+  * take over python scripts from arsoft-base
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 19 Jan 2013 10:31:15 +0100
+
 arsoft-python (1.36) quantal; urgency=low
 
   * add scripts for trac administration
