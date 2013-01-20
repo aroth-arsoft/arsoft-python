@@ -1,0 +1,10 @@
+/*.debhelper
+/*.substvars
+/arsoft-crypto/
+/arsoft-netconfig/
+/arsoft-python/
+/arsoft-python-fritzbox/
+/arsoft-python-kerberos/
+/arsoft-python-nagios/
+/arsoft-python-openvpn/
+/arsoft-python-trac/
