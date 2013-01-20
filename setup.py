@@ -3,8 +3,8 @@
 
 from distutils.core import setup
 
-setup(name='netconfig',
-		version='1.36',
+setup(name='arsoft-python',
+		version='1.38',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -17,6 +17,7 @@ setup(name='netconfig',
                     'arsoft.disks',
                     'arsoft.efi',
                     'arsoft.fritzbox', 
+                    'arsoft.kerberos',
                     'arsoft.ldap',
                     'arsoft.ldap.slapd',
                     'arsoft.mount',
