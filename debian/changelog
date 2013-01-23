@@ -1,10 +1,16 @@
-arsoft-python (1.38) UNRELEASED; urgency=low
+arsoft-python (1.39) quantal; urgency=low
+
+  * fixed trouble with certificates from windows
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 23 Jan 2013 16:23:18 +0100
+
+arsoft-python (1.38) quantal; urgency=low
 
   * add kerberos module with kpasswd function
 
  -- Andreas Roth <aroth@arsoft-online.com>  Sun, 20 Jan 2013 14:51:44 +0100
 
-arsoft-python (1.37) UNRELEASED; urgency=low
+arsoft-python (1.37) quantal; urgency=low
 
   * take over python scripts from arsoft-base
 
