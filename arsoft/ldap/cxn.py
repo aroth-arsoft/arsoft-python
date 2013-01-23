@@ -69,7 +69,7 @@ class LdapConnection(object):
                     if ldapusername != '':
                         self._verbose("simple_bind user:" + ldapusername + " pwd:" + ldappassword)
                     else:
-                        self.verbose("simple_bind anonymous")
+                        self._verbose("simple_bind anonymous")
                     self._cxn.simple_bind_s(ldapusername, ldappassword)
                     ret = True
                 else:

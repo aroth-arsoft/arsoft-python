@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 class kernel_module(object):
     _instance = None
