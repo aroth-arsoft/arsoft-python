@@ -357,9 +357,6 @@ class CertificateList:
         return ret
         
     def write(self, fobj, expired_only=False, valid_only=False, output_number=True, short=False):
-#        if not short:
- #           print("Certificates within " + ','.join(self.m_certificate_filename))
-
         num_certs = 0
         for (certfile, cert) in self.m_certificates:
             if expired_only:

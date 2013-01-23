@@ -155,7 +155,7 @@ class certinfo:
         parser = argparse.ArgumentParser(description='shows information about certificates')
         parser.add_argument('certfile', help='input certificate file or directory', metavar='certfile', nargs='+')
         parser.add_argument('--listfile', dest='listfile', help='input certificate list file', metavar='listfile')
-        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('--find', dest='findbyname', help='find a certificate by name', metavar='term')
         parser.add_argument('--expired', dest='list_expired', action='store_true', help='lists all expired ceritificates')
         parser.add_argument('--short', dest='short', action='store_true', help='lists only the certificate file names')

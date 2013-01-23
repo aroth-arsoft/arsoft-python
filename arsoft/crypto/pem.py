@@ -37,7 +37,8 @@ class PEMFile:
         blocktype = None
         lineno = 0
         try:
-            f = open(filename, 'r')
+            ret = True
+            f = open(filename, 'rU')
             for line in f:
                 result = self.s_begin_or_end_pattern.match(line)
                 if result is not None:
@@ -45,9 +46,11 @@ class PEMFile:
                     blocktype = result.group('type')
                     if cmd == "BEGIN":
                         # clear the cert buffer
+                        #print('got blockstart ' + blocktype)
                         blockdata = ''
                         blockdata += line
                     elif cmd == "END":
+                        #print('got blockend ' + blocktype)
                         if blocktype:
                             blockdata += line
                             blockindex = len(self.m_blocks)
@@ -55,12 +58,15 @@ class PEMFile:
                         # prepare for next cert
                         blocktype = None
                         blockdata = ''
+                    else:
+                        #print('unexpected block')
+                        ret = False
+                        break
                 else:
                     if blocktype:
                         blockdata += line
                 lineno = lineno + 1
             f.close()
-            ret = True
         except:
             ret = False
             pass
