@@ -1,3 +1,9 @@
+arsoft-python (1.40) quantal; urgency=low
+
+  * ship heimdal-password-expire script 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 24 Jan 2013 08:27:09 +0100
+
 arsoft-python (1.39) quantal; urgency=low
 
   * fixed trouble with certificates from windows
