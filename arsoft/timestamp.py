@@ -5,6 +5,7 @@
 from datetime import datetime, timedelta, tzinfo
 import time
 import re
+import math
 
 # Adapted from http://delete.me.uk/2005/03/iso8601.html
 ISO8601_REGEX = re.compile(r"(?P<year>[0-9]{4})((?P<month>[0-9]{2})((?P<day>[0-9]{2})"
@@ -112,8 +113,8 @@ def parse_timedelta(time_str):
     return timedelta(**time_params)
 
 def format_timedelta(delta):
-    secs = delta.total_seconds()
-    
+    secs = abs(delta.total_seconds())
+
     if secs >= SECONDS_ONE_WEEK:
         days = int(secs / SECONDS_ONE_DAY)
         ret = '%i days' % (days)
