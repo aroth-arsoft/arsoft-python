@@ -1,3 +1,9 @@
+arsoft-python (1.41) quantal; urgency=low
+
+  * create arsoft-python-web as base package for django web apps 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 28 Jan 2013 10:18:33 +0100
+
 arsoft-python (1.40) quantal; urgency=low
 
   * ship heimdal-password-expire script 

@@ -10,3 +10,5 @@
 /arsoft-python-trac/
 /tmp/
 /files
+/*.debhelper.log
+/arsoft-python-web/
