@@ -4,7 +4,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.41',
+		version='1.42',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -27,7 +27,8 @@ setup(name='arsoft-python',
                     'arsoft.nfs', 
                     'arsoft.openvpn',
                     'arsoft.trac',
-                    'arsoft.web'
+                    'arsoft.web',
+                    'arsoft.web.templatetags'
                     ],
 		scripts=[
             'certinfo',
