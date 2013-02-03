@@ -1,10 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.42',
+		version='1.43',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -27,6 +28,7 @@ setup(name='arsoft-python',
                     'arsoft.nfs', 
                     'arsoft.openvpn',
                     'arsoft.trac',
+                    'arsoft.trac.plugins',
                     'arsoft.web',
                     'arsoft.web.templatetags'
                     ],
