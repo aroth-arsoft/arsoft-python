@@ -1,0 +1,81 @@
+#!/usr/bin/python
+import getpass, imaplib
+import sys
+import argparse
+        
+class IMAPCheckApp(object):
+
+    def __init__(self):
+        self._verbose = False
+        
+    def _connect(self):
+        try:
+            self._cxn = imaplib.IMAP4(self._server, self._port)
+            self._cxn.login(self._username, getpass.getpass())
+            self._cxn.select()
+            ret = True
+        except socket.error as e:
+            ret = False
+        return ret
+
+    def _disconnect(self):
+        if self._cxn:
+            self._cxn.close()
+            self._cxn.logout()
+        self._cxn = None
+        
+    def _list(self, mailbox=None):
+        if mailbox:
+            self._cxn.select(mailbox)
+        else:
+            self._cxn.select()
+        typ, data = self._cxn.search(None, 'ALL')
+        for num in data[0].split():
+            typ, data = self._cxn.fetch(num, '(RFC822)')
+            print 'Message %s\n%s\n' % (num, data[0][1])
+            
+    def _annotate(self, mailbox, entry, attribute):
+        try:
+            print self._cxn.getannotation(mailbox, entry, attribute)
+        except Exception as e:
+            print(str(e))
+        self._cxn.setannotation(mailbox, entry, attribute)
+
+    def main(self, argv=None):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='check the IMAP server.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--server', dest='server', help='specifies the IMAP server.')
+        parser.add_argument('--mailbox', dest='mailbox', help='specifies the mailbox on the server (default INBOX).')
+        parser.add_argument('--port', dest='port', default=143, type=int, help='specifies the port of the IMAP server.')
+        parser.add_argument('--username', dest='username', default=getpass.getuser(), help='specifies the username to access the server.')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        self._server = args.server
+        self._username = args.username
+        self._port = args.port
+        self._mailbox = args.mailbox
+        
+        if not self._connect():
+            print('Failed to connect to server.')
+            ret = 1
+        else:
+            #self._list(self._mailbox)
+            try:
+                print self._cxn.getannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv")')
+            except Exception as e:
+                print(str(e))
+            print self._cxn.setannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv" "42")')
+            ret = 0
+        self._disconnect()
+        
+        return ret
+
+
+if __name__ == "__main__":
+    app = IMAPCheckApp()
+    sys.exit(app.main(sys.argv))
