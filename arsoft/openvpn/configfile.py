@@ -64,11 +64,14 @@ class ConfigFile:
     def management(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='management', default=None)
-            fe = f.split(' ')
-            if len(fe) == 2:
-                ret = (fe[0], fe[1], None)
-            elif len(fe) > 2:
-                ret = (fe[0], fe[1], fe[2])
+            if f:
+                fe = f.split(' ')
+                if len(fe) == 2:
+                    ret = (fe[0], fe[1], None)
+                elif len(fe) > 2:
+                    ret = (fe[0], fe[1], fe[2])
+                else:
+                    ret = (None, None, None)
             else:
                 ret = (None, None, None)
         else:
