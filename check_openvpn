@@ -51,15 +51,23 @@ else:
         np.add_value('routingtable', has_argument=False)
 
         np.set_value('routingtable', status_file.routing_table)
-        np.set_value('clients', status_file.connected_clients)
-        np.set_value('numclients', len(status_file.connected_clients))
-
-        delta = now - status_file.last_update
-        if delta > timedelta(minutes=5):
-            exit_code = WARNING
-            exit_message = 'status has not been since %s' % (str(status_file.last_update))
+        if status_file.connected_clients is None:
+            np.set_value('clients', [])
+            np.set_value('numclients', 0)
         else:
-            (exit_code, exit_message) = np.check_values()
+            np.set_value('clients', status_file.connected_clients)
+            np.set_value('numclients', len(status_file.connected_clients))
+
+        if status_file.last_update is None:
+            exit_code = CRITICAL
+            exit_message = 'failed to read status file of VPN %s.' % (str(np['name']))
+        else:
+            delta = now - status_file.last_update
+            if delta > timedelta(minutes=5):
+                exit_code = WARNING
+                exit_message = 'status has not been since %s' % (str(status_file.last_update))
+            else:
+                (exit_code, exit_message) = np.check_values()
 
         if exit_code == OK:
             exit_message = '%i clients' % (len(status_file.connected_clients))

@@ -146,7 +146,7 @@ class StatusBase(object):
         """ Returns the time of the last update of the status file """
         if not self._reading_done:
             self._parse_file()
-        if 'timestamp' in self._details:
+        if self._details is not None and 'timestamp' in self._details:
             return self._details['timestamp']
         else:
             return None
