@@ -75,6 +75,26 @@ class Disk(object):
     def is_removable(self):
         return self._dbus_get_property("DeviceIsRemovable")
 
+    def match(self, pattern):
+        # check for valid pattern
+        if ':' in pattern:
+            key, value = pattern.split(':')
+        else:
+            # no valid pattern, so treat it like a serial number
+            key = 'serial'
+            value = pattern
+        if key == 'serial':
+            ret = True if self.serial == value else False
+        elif key == 'vendor':
+            ret = True if self.vendor == value else False
+        elif key == 'model':
+            ret = True if self.model == value else False
+        elif key == 'devicefile':
+            ret = True if self.devicefile == value else False
+        else:
+            ret = False
+        return ret
+
     def __str__(self):
         ret = 'vendor=' + str(self.vendor) + ' model=' + str(self.model) +\
             ' serial=' + str(self.serial) +\
