@@ -5,6 +5,22 @@
 import re
 import os
 
+class ScsiDevice(object):
+    def __init__(self, host=0, channel=0, target=0, lun=0,
+                    vendor=None, model=None, rev=None, 
+                    devtype=None, devtype_str=None, scsi_rev=None):
+        self.host = host
+        self.channel = channel
+        self.target = target
+        self.lun = lun
+        self.addr = (host, channel, target, lun)
+        self.vendor = vendor
+        self.model = model
+        self.rev = rev
+        self.devtype = devtype
+        self.devtype_str = devtype_str 
+        self.scsi_rev = scsi_rev
+
 class Scsi(object):
 
     SCSI_HOST_ADDR_RE = re.compile(
@@ -94,13 +110,12 @@ class Scsi(object):
                         devtype_str = Scsi.SCSI_DEVICE_TYPES[devtype]
                         scsi_rev = 0
 
-                        device_addr = (host, channel, target, lun)
-                        device = {'host':host, 'channel':channel, 'target':target, 'lun':lun, 
-                                    'addr': device_addr,
-                                    'vendor':vendor, 'model':model, 'rev':rev, 
-                                    'type':devtype, 'type_str':devtype_str, 'scsi_rev':scsi_rev }
+                        device = ScsiDevice(host, channel, target, lun, 
+                                                vendor=vendor, model=model, rev=rev,
+                                                scsi_rev=scsi_rev, 
+                                                devtype=devtype, devtype_str=devtype_str)
                         self._devices.append( device )
-                        self._hosts[host]['devices'].append(device_addr)
+                        self._hosts[host]['devices'].append(device.addr)
 
                     ret = True
             except IOError as e:
@@ -149,7 +164,7 @@ class Scsi(object):
 
     def rescan_hosts(self, only_empty=False):
         ret = True
-        for (hostno, hostinfo) in e.hosts.items():
+        for (hostno, hostinfo) in self.hosts.items():
             if only_empty == False:
                 do_rescan = True
             else:
@@ -207,6 +222,10 @@ class Scsi(object):
                 # it's neither a regular block device (aka disk) nor is it a devmapper device
                 pass
         return ret
+
+    @property
+    def last_error(self):
+        return self._last_error
 
     @property
     def hosts(self):
