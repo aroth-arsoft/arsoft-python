@@ -40,6 +40,22 @@ class Disk(object):
         return self._dbus_get_property("DeviceFile")
 
     @property
+    def devicefile_presentation(self):
+        return self._dbus_get_property("DeviceFilePresentation")
+
+    @property
+    def devicefile_by_path(self):
+        return self._dbus_get_property("DeviceFileByPath")
+
+    @property
+    def devicefile_by_id(self):
+        return self._dbus_get_property("DeviceFileById")
+
+    @property
+    def nativepath(self):
+        return self._dbus_get_property("NativePath")
+    
+    @property
     def mountpath(self):
         return self._dbus_get_property("DeviceMountPaths")
 
