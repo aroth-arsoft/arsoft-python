@@ -46,11 +46,13 @@ class export(object):
             return None
     
 class exports(object):
-    
     def __init__(self):
-        self._entries = []
-        self._refresh()
-        
+        self._entries = None
+        self._last_error = None
+
+    def _dirty(self):
+        self._entries = None
+
     def _refresh(self):
         self._entries = []
         try:
@@ -60,10 +62,11 @@ class exports(object):
                 if entry is not None:
                     self._entries.append(entry)
                 else:
-                    print('invalid line: ' + line)
+                    self._last_error = 'etab parser error: invalid line: ' + line
             fetab.close()
             ret = True
-        except IOError:
+        except IOError as e:
+            self._last_error = str(e)
             ret = False
         return ret
     
@@ -73,16 +76,26 @@ class exports(object):
             if entry.directory == directory:
                 ret.append(entry)
         return ret
+
+    def export(self, directory, clients=None):
+        ret = exports._export(directory, clients)
+        if ret:
+            self._dirty()
+        return ret
     
-    def unexport(self, directory, client=None):
+    def unexport(self, directory, clients=None):
         ret = True
-        if client is None:
+        if clients is None:
             for entry in self._entries:
                 if entry.directory == directory:
-                    if not exports._unexport(entry.client, entry.directory):
+                    if not exports._unexport(entry.directory, entry.client):
                         ret = False
+                    else:
+                        self._dirty()
         else:
-            ret = exports._unexport(client, directory)
+            ret = exports._unexport(directory, clients)
+            if ret:
+                self._dirty()
         return ret
 
     def reexport(self):
@@ -95,19 +108,39 @@ class exports(object):
             ret = ret + str(entry) + "\n"
         return ret
 
+    @property
+    def entries(self):
+        if self._entries is None:
+            self._refresh()
+        return self._entries
+
+    @property
+    def last_error(self):
+        return self._last_error
+
     @staticmethod
-    def _export(client, directory, options=[]):
+    def _export(directory, clients=None, options=[]):
         args = []
         if len(options) > 0:
             args.append('-o')
             args.append(','.join(options))
-        args.append(client + ':' + directory)
+        if clients is None:
+            args.append('*:' + directory)
+        else:
+            for client in clients:
+                args.append(client + ':' + directory)
         (exitcode, output, error) = exports._exportfs(args)
         return True if exitcode == 0 and len(error) == 0 else False
 
     @staticmethod
-    def _unexport(client, directory):
-        (exitcode, output, error) = exports._exportfs(['-u', client + ':' + directory])
+    def _unexport(directory, clients=None):
+        args = ['-u']
+        if clients is None:
+            args.append('*:' + directory)
+        else:
+            for client in clients:
+                args.append(client + ':' + directory)
+        (exitcode, output, error) = exports._exportfs(args)
         return True if exitcode == 0 and len(error) == 0 else False
 
     @staticmethod
@@ -116,8 +149,12 @@ class exports(object):
 
 if __name__ == '__main__':
     
-    e = exports()
-    print (e)
+    mgr = exports()
+    for e in mgr.entries:
+        print (e)
     
-    if not e.unexport('/export'):
+    if not mgr.unexport('/export'):
         print('unexport failed')
+
+    for e in mgr.entries:
+        print (e)

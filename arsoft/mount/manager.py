@@ -3,6 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import os
+import os.path
 
 class MountEntry(object):
     def __init__(self, devicename=None, mountpoint=None, filesystem=None, options=None, freq=0, fpassno=0):
@@ -14,14 +15,25 @@ class MountEntry(object):
         self._fpassno = int(fpassno) if fpassno is not None else 0
         pass
 
+    @property
     def devicename(self):
         return self._devicename
+    @property
     def mountpoint(self):
         return self._mountpoint
+    @property
     def filesystem(self):
         return self._filesystem
+    @property
     def options(self):
         return self._options
+    @property
+    def freq(self):
+        return self._freq
+    @property
+    def fpassno(self):
+        return self._fpassno
+
     def hasOption(self, optname):
         return self._options.count(optname) != 0
 
@@ -32,9 +44,11 @@ class MountEntry(object):
                 str(self._options) + ' ' + \
                 str(self._freq) + ' ' + \
                 str(self._fpassno)
-    def isReadOnly(self):
+                
+    @property
+    def readonly(self):
         return True if self._options.count('ro') != 0 else False
-    def isReadWrite(self):
+    def readwrite(self):
         return True if self._options.count('rw') != 0 else False
 
     def isRoot(self):
@@ -69,6 +83,25 @@ class MountEntry(object):
             ret = None
             pass
         return ret
+    
+class MountFilesystem(object):
+    def __init__(self, name=None, flags=None):
+        self._name = name
+        if flags is not None:
+            self._flags = flags.split(',')
+        else:
+            self._flags = []
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def nodev(self):
+        return True if 'nodev' in self._flags else False
+
+    def __str__(self):
+        return  str(self._name) + ' (' + ','.join(self._flags) + ')'
 
 class MountManager(object):
     def __init__(self):
@@ -82,6 +115,22 @@ class MountManager(object):
                     continue
                 (devicename, mountpoint, filesystem, options, freq, fpassno) = line.split(' ')
                 entry = MountEntry(devicename, mountpoint, filesystem, options, freq, fpassno)
+                entries.append(entry)
+            mounts.close()
+            ret = True
+        except (IOError, OSError) as e:
+            ret = False
+            pass
+        return ret
+    
+    def _parseFilesystemsFile(self, filename, entries):
+        try:
+            mounts = open(filename, 'r')
+            for line in mounts:
+                if line.startswith('#'):
+                    continue
+                (flags, filesystem) = line.split('\t')
+                entry = MountFilesystem(filesystem.strip(), flags.strip())
                 entries.append(entry)
             mounts.close()
             ret = True
@@ -151,18 +200,29 @@ class MountManager(object):
         return ret
 
     def reload(self):
+        self._last_error = None
         self._active_entries = []
         self._parseFile('/proc/mounts', self._active_entries)
         self._configured_entries = []
         self._parseFile('/etc/fstab', self._configured_entries)
+        self._filesystems = []
+        self._parseFilesystemsFile('/proc/filesystems', self._filesystems)
 
-    def __str__(self):
-        ret = ''
-        for e in self._active_entries:
-            ret += str(e) + '\n'
-        for e in self._configured_entries:
-            ret += str(e) + '\n'
-        return ret
+    @property
+    def last_error(self):
+        return self._last_error
+
+    @property
+    def filesystems(self):
+        return self._filesystems
+
+    @property
+    def active_entries(self):
+        return self._active_entries
+
+    @property
+    def configured_entries(self):
+        return self._configured_entries
 
     def getRootEntry(self):
         ret = None
@@ -176,18 +236,19 @@ class MountManager(object):
         ret = None
         if active:
             for e in self._active_entries:
-                if e.mountpoint() == mountpoint:
+                if e.mountpoint == mountpoint:
                     ret = e
                     break
         else:
             for e in self._configured_entries:
-                if e.mountpoint() == mountpoint:
+                if e.mountpoint == mountpoint:
                     ret = e
                     break
         return ret
 
     def getEntryForFile(self, filename):
         mp = MountManager._getMountpoint(filename)
+        print('getEntryForFile(%s) = %s' % (filename, str(mp)))
         return self.getEntry(mp) if mp is not None else None
         
     def getDeviceNameForFile(self, filename):
@@ -205,9 +266,22 @@ class MountManager(object):
 if __name__ == "__main__":
     mmgr = MountManager()
     print(str(mmgr))
+
+    print('Filesystems:')
+    for e in mmgr.filesystems:
+        print('  ' + str(e))
     
-    print('Root: ' + str(mmgr.getRootEntry()))
+    print('Active entries:')
+    for e in mmgr.active_entries:
+        print('  ' + str(e))
+        
+    print('Configured entries:')
+    for e in mmgr.configured_entries:
+        print('  ' + str(e))
     
+    if not os.path.exists('/tmp/dhclient-script.debug'):
+        f = open('/tmp/dhclient-script.debug', 'w')
+        f.close()
     mp = mmgr.getEntryForFile('/tmp/dhclient-script.debug')
     print('mp=' + str(mp))
  

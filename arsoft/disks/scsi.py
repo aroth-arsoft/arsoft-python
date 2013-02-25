@@ -7,8 +7,9 @@ import os
 
 class ScsiDevice(object):
     def __init__(self, host=0, channel=0, target=0, lun=0,
-                    vendor=None, model=None, rev=None, 
-                    devtype=None, devtype_str=None, scsi_rev=None):
+                    vendor=None, model=None, rev=None, scsi_level=None,
+                    dev_major=0, dev_minor=0,
+                    devtype=None, devtype_str=None):
         self.host = host
         self.channel = channel
         self.target = target
@@ -17,9 +18,19 @@ class ScsiDevice(object):
         self.vendor = vendor
         self.model = model
         self.rev = rev
+        self.scsi_level = scsi_level
         self.devtype = devtype
         self.devtype_str = devtype_str 
-        self.scsi_rev = scsi_rev
+        self.dev_major = dev_major
+        self.dev_minor = dev_minor
+
+    def __str__(self):
+        ret = 'addr=' + str(self.addr) +\
+            ' vendor=' + str(self.vendor) +\
+            ' model=' + str(self.model) +\
+            ' dev=' + str(self.dev_major) + ':' + str(self.dev_minor) +\
+            ''
+        return ret
 
 class Scsi(object):
 
@@ -103,16 +114,31 @@ class Scsi(object):
                         channel = int(mo_hostaddr.group('channel'))
                         target = int(mo_hostaddr.group('target'))
                         lun = int(mo_hostaddr.group('lun'))
-                        model = Scsi._readfile(os.path.join('/sys/bus/scsi/devices', f, 'model'))
-                        vendor = Scsi._readfile(os.path.join('/sys/bus/scsi/devices', f, 'vendor'))
-                        rev = Scsi._readfile(os.path.join('/sys/bus/scsi/devices', f, 'rev'))
-                        devtype = int(Scsi._readfile(os.path.join('/sys/bus/scsi/devices', f, 'type')))
+                        devpath = os.path.join('/sys/bus/scsi/devices', f)
+                        model = Scsi._readfile(os.path.join(devpath, 'model'))
+                        vendor = Scsi._readfile(os.path.join(devpath, 'vendor'))
+                        rev = Scsi._readfile(os.path.join(devpath, 'rev'))
+                        scsi_level = Scsi._readfile(os.path.join(devpath, 'scsi_level'))
+                        devtype = int(Scsi._readfile(os.path.join(devpath, 'type')))
                         devtype_str = Scsi.SCSI_DEVICE_TYPES[devtype]
-                        scsi_rev = 0
+                        
+                        dev_major = 0
+                        dev_minor = 0
+                        devblockpath = os.path.join(devpath, 'block')
+                        if os.path.exists(devblockpath):
+                            files = os.listdir(devblockpath)
+                            for f in files:
+                                block_dev_file = os.path.join(devblockpath, f, 'dev')
+                                print (block_dev_file)
+                                devno_str = Scsi._readfile(block_dev_file)
+                                dev_major, dev_minor = devno_str.split(':')
+
+
 
                         device = ScsiDevice(host, channel, target, lun, 
                                                 vendor=vendor, model=model, rev=rev,
-                                                scsi_rev=scsi_rev, 
+                                                scsi_level=scsi_level, 
+                                                dev_major=dev_major, dev_minor=dev_minor,
                                                 devtype=devtype, devtype_str=devtype_str)
                         self._devices.append( device )
                         self._hosts[host]['devices'].append(device.addr)
@@ -246,7 +272,6 @@ class Scsi(object):
         return ret
 
 if __name__ == '__main__':
-    
     e = Scsi()
     if e.rescan_hosts(only_empty=True):
         print('rescan_hosts successful')
