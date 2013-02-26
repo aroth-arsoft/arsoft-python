@@ -4,11 +4,12 @@
 
 import re
 import os
+import stat
 
 class ScsiDevice(object):
     def __init__(self, host=0, channel=0, target=0, lun=0,
                     vendor=None, model=None, rev=None, scsi_level=None,
-                    dev_major=0, dev_minor=0,
+                    dev_major=0, dev_minor=0, devfile=None,
                     devtype=None, devtype_str=None):
         self.host = host
         self.channel = channel
@@ -23,14 +24,28 @@ class ScsiDevice(object):
         self.devtype_str = devtype_str 
         self.dev_major = dev_major
         self.dev_minor = dev_minor
+        self.devfile = devfile
 
+    def __repr__(self):
+        ret = 'addr=' + str(self.addr) +\
+            ' vendor=' + str(self.vendor) +\
+            ' model=' + str(self.model) +\
+            ' dev=' + str(self.dev_major) + ':' + str(self.dev_minor) +\
+            ' devfile=' + str(self.devfile) +\
+            ''
+        return ret
     def __str__(self):
         ret = 'addr=' + str(self.addr) +\
             ' vendor=' + str(self.vendor) +\
             ' model=' + str(self.model) +\
             ' dev=' + str(self.dev_major) + ':' + str(self.dev_minor) +\
+            ' devfile=' + str(self.devfile) +\
             ''
         return ret
+
+    @property
+    def is_removable(self):
+        return True if self.devtype in [5, 8] else False
 
 class Scsi(object):
 
@@ -39,8 +54,8 @@ class Scsi(object):
         )
         
     SCSI_DEVICE_TYPES = [
-        "Direct-Access",
-        "Sequential-Access",
+        "Direct-Access", # HDD
+        "Sequential-Access", # Tape
         "Printer",
         "Processor",
         "Write-once",
@@ -67,11 +82,29 @@ class Scsi(object):
         ]
     
     def __init__(self, path=None):
+        self._block_devfiles = None
         self._devices = None
         self._hosts = None
         self._last_error = None
         pass
     
+    def _get_all_block_devfiles(self, devdir='/dev'):
+        try:
+            ret = False
+            self._block_devfiles = {}
+            files = os.listdir(devdir)
+            for f in files:
+                fullpath = os.path.join(devdir, f)
+                s = os.stat(fullpath)
+                if stat.S_ISBLK(s.st_mode):
+                    (dev_major, dev_minor) = divmod(s.st_rdev, 256)
+                    self._block_devfiles[(dev_major, dev_minor)] = fullpath
+                    ret = True
+        except IOError as e:
+            self._last_error = str(e)
+            ret = False
+        return ret
+
     @staticmethod
     def _readfile(path, strip=True):
         try:
@@ -89,6 +122,8 @@ class Scsi(object):
     def _retrieve_info(self):
         self._devices = []
         self._hosts = {}
+        if not self._get_all_block_devfiles():
+            return False
         try:
             ret = False
             got_header_line = False
@@ -124,21 +159,24 @@ class Scsi(object):
                         
                         dev_major = 0
                         dev_minor = 0
+                        devfile = None
                         devblockpath = os.path.join(devpath, 'block')
                         if os.path.exists(devblockpath):
                             files = os.listdir(devblockpath)
                             for f in files:
                                 block_dev_file = os.path.join(devblockpath, f, 'dev')
-                                print (block_dev_file)
                                 devno_str = Scsi._readfile(block_dev_file)
-                                dev_major, dev_minor = devno_str.split(':')
-
+                                dev_major_str, dev_minor_str = devno_str.split(':')
+                                dev_major = int(dev_major_str)
+                                dev_minor = int(dev_minor_str)
+                                if (dev_major, dev_minor) in self._block_devfiles:
+                                    devfile  = self._block_devfiles[(dev_major, dev_minor)]
 
 
                         device = ScsiDevice(host, channel, target, lun, 
                                                 vendor=vendor, model=model, rev=rev,
                                                 scsi_level=scsi_level, 
-                                                dev_major=dev_major, dev_minor=dev_minor,
+                                                dev_major=dev_major, dev_minor=dev_minor, devfile=devfile,
                                                 devtype=devtype, devtype_str=devtype_str)
                         self._devices.append( device )
                         self._hosts[host]['devices'].append(device.addr)
@@ -206,7 +244,7 @@ class Scsi(object):
     def _get_device(self, device_addr):
         ret = None
         for dev in self.devices:
-            if dev['addr'] == device_addr:
+            if dev.addr == device_addr:
                 ret = dev
                 break
         return ret

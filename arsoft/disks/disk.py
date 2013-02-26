@@ -3,6 +3,8 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import dbus
+import os.path
+import stat
 
 class Disk(object):
     DEVICE_CLASS = 'org.freedesktop.UDisks.Device'
@@ -111,6 +113,14 @@ class Disk(object):
             ret = False
         return ret
 
+    @property
+    def disk_name(self):
+        return '%s_%s_%s'%(self.vendor,self.model,self.serial)
+
+    @property
+    def match_pattern(self):
+        return 'vendor:%s,model:%s,serial:%s'%(self.vendor,self.model,self.serial)
+
     def __str__(self):
         ret = 'vendor=' + str(self.vendor) + ' model=' + str(self.model) +\
             ' serial=' + str(self.serial) +\
@@ -143,6 +153,29 @@ class Disks(object):
             Disks._udisks_manager = dbus.Interface(Disks._udisks_manager_obj, 'org.freedesktop.UDisks')
         
         return True if Disks._udisks_manager is not None else False
+
+    def find_disk(self, devfile):
+        if not Disks._dbus_connect():
+            return None
+        path = Disks._udisks_manager.FindDeviceByDeviceFile(devfile)
+        if path:
+            print('got path ' + path)
+            ret = Disk(path)
+        else:
+            ret = None
+        return ret
+    
+    def find_disk_from_user_input(self, devname):
+        if os.path.exists(devname):
+            # given argument might be a device file
+            s = os.stat(devname)
+            if stat.S_ISBLK(s.st_mode):
+                ret = self.find_disk(devname)
+            else:
+                ret = None
+        else:
+            ret = None
+        return ret
 
     def __str__(self):
         ret = ''
