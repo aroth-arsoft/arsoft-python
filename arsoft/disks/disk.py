@@ -5,6 +5,7 @@
 import dbus
 import os.path
 import stat
+import re
 
 class Device(object):
     DEVICE_CLASS = 'org.freedesktop.UDisks.Device'
@@ -112,7 +113,8 @@ class Disk(Device):
 
     @property
     def disk_name(self):
-        return '%s_%s_%s'%(self.vendor,self.model,self.serial)
+        s = '%s_%s_%s'%(self.vendor,self.model,self.serial)
+        return re.sub('[^\w\-_\. ]', '_', s)
 
     @property
     def match_pattern(self):
@@ -311,19 +313,19 @@ class Disks(object):
             is_lvm2lv = Disks._get_device_property(device_props, "DeviceIsLinuxLvm2LV")
             is_lvm2pv = Disks._get_device_property(device_props, "DeviceIsLinuxLvm2PV")
             if is_drive:
-                print('create disk %s' % (path))
+                #print('create disk %s' % (path))
                 ret = Disk(mgr, path, device_obj, device_props)
             elif is_lvm2pv:
-                print('create Lvm2PV %s' % (path))
+                #print('create Lvm2PV %s' % (path))
                 ret = Lvm2PV(mgr, path, device_obj, device_props)
             elif is_partition:
-                print('create partition %s' % (path))
+                #print('create partition %s' % (path))
                 ret = Partition(mgr, path, device_obj, device_props)
             elif is_lvm2lv:
-                print('create Lvm2LV %s' % (path))
+                #print('create Lvm2LV %s' % (path))
                 ret = Lvm2LV(mgr, path, device_obj, device_props)
             else:
-                print('create device %s' % (path))
+                #print('create device %s' % (path))
                 ret = Device(mgr, path, device_obj, device_props)
         else:
             ret = None
@@ -375,22 +377,24 @@ class Disks(object):
         else:
             ret = None
         return ret
+    
+    def find_disk_for_device(self, devobj):
+        if isinstance(devobj, Partition):
+            ret = part.slave
+        elif isinstance(devobj, Lvm2LV):
+            ret = []
+            print('got group devices=' + str(devobj.group_devices))
+            for dev in devobj.group_devices:
+                if isinstance(dev, Partition):
+                    ret.append(dev.slave)
+        else:
+            ret = None
+        return ret
 
     def __str__(self):
         ret = ''
         for d in self._list:
             ret = ret + str(d) + "\n"
-        return ret
-    
-    def _get_list(self, include_removal=False):
-        ret = []
-        for d in self._list:
-            if d.is_drive:
-                add = True
-                if include_removal == False and d.is_removable:
-                    add = False
-                if add:
-                    ret.append(d)
         return ret
 
     @property
@@ -398,12 +402,28 @@ class Disks(object):
         return self._list
 
     @property
+    def partitions(self):
+        ret = []
+        for d in self._list:
+            if isinstance(d, Partition) or isinstance(d, Lvm2LV):
+                ret.append(d)
+        return ret
+
+    @property
     def disks(self):
-        return self._get_list(include_removal=True)
+        ret = []
+        for d in self._list:
+            if isinstance(d, Disk):
+                ret.append(d)
+        return ret
 
     @property
     def fixed_disks(self):
-        return self._get_list(include_removal=False)
+        ret = []
+        for d in self._list:
+            if isinstance(d, Disk) and d.is_removable:
+                ret.append(d)
+        return ret
 
     @property
     def root_partition(self):
@@ -417,16 +437,7 @@ class Disks(object):
     def system_disk(self):
         part = self.root_partition
         if part is not None:
-            if isinstance(part, Partition):
-                ret = part.slave
-            elif isinstance(part, Lvm2LV):
-                ret = []
-                print('got group devices=' + str(part.group_devices))
-                for dev in part.group_devices:
-                    if isinstance(dev, Partition):
-                        ret.append(dev.slave)
-            else:
-                ret = None
+            ret = self.find_disk_for_device(part)
         else:
             ret = None
         return ret
@@ -435,11 +446,16 @@ if __name__ == '__main__':
     
     e = Disks()
     print('devices:')
-    for dev in e.devices:
-        print(dev)
+    for obj in e.devices:
+        print('  ' + str(obj))
+
     print('disks:')
-    for disk in e.disks:
-        print(disk)
+    for obj in e.disks:
+        print('  %s %s (%s)'%(str(obj.vendor), str(obj.model), str(obj.serial)))
+
+    print('partitions:')
+    for obj in e.partitions:
+        print('  ' + str(obj))
 
     print('root partition:')
     print(e.root_partition)

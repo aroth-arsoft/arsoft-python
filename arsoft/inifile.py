@@ -159,7 +159,7 @@ class IniSection(object):
         for v in self.values:
             if v.key == key:
                 found = True
-                del(v)
+                self.values.remove(v)
                 break
         return found
 
@@ -176,6 +176,10 @@ class IniSection(object):
         self.original = None
         self.values = []
         self.comment = ''
+
+    @property
+    def empty(self):
+        return True if len(self.values) == 0 else False
 
     def asString(self, only_data=False):
         if self.original is not None and not only_data:
@@ -213,7 +217,7 @@ class IniFile(object):
         self.m_keyValueSeperator = keyValueSeperator
         self.m_content = []
         self.m_sections = []
-        self.m_filename = None
+        self.m_filename = filename
         #
         # Regular expressions for parsing section headers and options.
         #
@@ -256,30 +260,46 @@ class IniFile(object):
         #print('COMMENTRE=' + str(self.COMMENTRE.pattern))
 
         if filename is not None:
-            self.open(filename)
-        
-    def open(self, filename):
+            self._open(filename)
+
+    def _open(self, filename):
         try:
             f = open(filename, 'r')
             self._read(f)
             f.close()
-            self.m_filename = filename
             ret = True
         except IOError:
+            ret = False
+        return ret
+        
+    def open(self, filename):
+        ret = self._open(filename)
+        if not ret:
             self.m_content = []
             self.m_sections = []
             self.m_filename = None
             self.m_commentPrefix = None
             self.m_keyValueSeperator = None
-            ret = False
         return ret
-        
+
     def close(self):
         self.m_content = []
         self.m_sections = []
         self.m_filename = None
         self.m_commentPrefix = None
         self.m_keyValueSeperator = None
+        
+    @property
+    def filename(self):
+        return m_filename
+
+    @property
+    def commentPrefix(self):
+        return m_commentPrefix
+
+    @property
+    def keyValueSeperator(self):
+        return m_keyValueSeperator
 
     def _getSection(self, name):
         for section in self.m_sections:
@@ -447,7 +467,7 @@ class IniFile(object):
     def remove(self, section, key):
         ret = False
         for section_obj in self.m_sections:
-            if section_obj.name == name:
+            if section_obj.name == section:
                 if key == '*':
                     self.m_sections.remove(section_obj)
                     ret = True
@@ -462,6 +482,14 @@ class IniFile(object):
 
     def section(self, section):
         return self._getSection(section)
+
+    @property
+    def empty(self):
+        ret = True
+        for section_obj in self.m_sections:
+            if not section_obj.empty:
+                ret = False
+        return ret
 
     def __str__(self):
         return self.asString(only_data=False)
