@@ -9,11 +9,12 @@ import re
 
 class Device(object):
     DEVICE_CLASS = 'org.freedesktop.UDisks.Device'
-    def __init__(self, mgr, path, device_obj, device_props):
+    def __init__(self, mgr, path, device_obj, device_props, device_if):
         self._mgr = mgr
         self._path = path
         self._device_obj = device_obj
         self._device_props = device_props
+        self._device_if = device_if
 
     @property
     def path(self):
@@ -96,8 +97,8 @@ class Device(object):
         return ret
     
 class Disk(Device):
-    def __init__(self, mgr, path, device_obj, device_props):
-        super(Disk, self).__init__(mgr, path, device_obj, device_props)
+    def __init__(self, mgr, path, device_obj, device_props, device_if):
+        super(Disk, self).__init__(mgr, path, device_obj, device_props, device_if)
 
     @property
     def vendor(self):
@@ -120,14 +121,24 @@ class Disk(Device):
     def match_pattern(self):
         return 'vendor:%s,model:%s,serial:%s'%(self.vendor,self.model,self.serial)
 
-    def match(self, pattern):
+    @property
+    def childs(self):
+        return self._mgr.get_partitions(self)
+
+    def eject(self, options=[]):
+        self._device_if.DriveEject(options)
+
+    def detach(self, options=[]):
+        self._device_if.DriveDetach(options)
+        
+    def _match_pattern_element(self, pattern_element):
         # check for valid pattern
-        if ':' in pattern:
-            key, value = pattern.split(':')
+        if ':' in pattern_element:
+            key, value = pattern_element.split(':')
         else:
             # no valid pattern, so treat it like a serial number
             key = 'serial'
-            value = pattern
+            value = pattern_element
         if key == 'serial':
             ret = True if self.serial == value else False
         elif key == 'vendor':
@@ -140,6 +151,19 @@ class Disk(Device):
             ret = False
         return ret
 
+    def match(self, pattern):
+        elements = pattern.split(',')
+        if len(elements) == 0:
+            ret = False
+        else:
+            ret = True
+            for e in elements:
+                if not self._match_pattern_element(e):
+                    ret = False
+                    break
+        #print('match this=' + str(self) + ' pa=' + pattern + ' ret='+str(ret))
+        return ret
+
     def __str__(self):
         ret = 'vendor=' + str(self.vendor) + ' model=' + str(self.model) +\
             ' serial=' + str(self.serial) +\
@@ -148,8 +172,8 @@ class Disk(Device):
         return ret
 
 class Partition(Device):
-    def __init__(self, mgr, path, device_obj, device_props):
-        super(Partition, self).__init__(mgr, path, device_obj, device_props)
+    def __init__(self, mgr, path, device_obj, device_props, device_if):
+        super(Partition, self).__init__(mgr, path, device_obj, device_props, device_if)
 
     @property
     def size(self):
@@ -172,6 +196,33 @@ class Partition(Device):
             ret = None
         return ret
 
+    def mount(self, filesystem_type, options=[]):
+        try:
+            self._device_if.FilesystemMount(filesystem_type, options)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
+
+    def unmount(self, options=[]):
+        try:
+            self._device_if.FilesystemUnmount(options)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
+
+    def set_label(self, new_label):
+        try:
+            self._device_if.FilesystemSetLabel(new_label)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
+
     def __str__(self):
         ret = 'nativepath=' + str(self.nativepath) +\
             ' uuid=' + str(self.uuid) +\
@@ -180,8 +231,8 @@ class Partition(Device):
         return ret
 
 class Lvm2PV(Partition):
-    def __init__(self, mgr, path, device_obj, device_props):
-        super(Lvm2PV, self).__init__(mgr, path, device_obj, device_props)
+    def __init__(self, mgr, path, device_obj, device_props, device_if):
+        super(Lvm2PV, self).__init__(mgr, path, device_obj, device_props, device_if)
 
     @property
     def group_uuid(self):
@@ -240,8 +291,8 @@ class Lvm2PV(Partition):
         return ret
 
 class Lvm2LV(Device):
-    def __init__(self, mgr, path, device_obj, device_props):
-        super(Lvm2LV, self).__init__(mgr, path, device_obj, device_props)
+    def __init__(self, mgr, path, device_obj, device_props, device_if):
+        super(Lvm2LV, self).__init__(mgr, path, device_obj, device_props, device_if)
 
     @property
     def group_uuid(self):
@@ -262,6 +313,9 @@ class Lvm2LV(Device):
     @property
     def name(self):
         return Disks._get_device_property(self._device_props, "LinuxLvm2LVName")
+
+    def stop(self, options=[]):
+        self._device_if.LinuxLvm2LVStop(options)
 
     def __str__(self):
         ret = 'nativepath=' + str(self.nativepath) +\
@@ -288,9 +342,11 @@ class Disks(object):
         device_obj = Disks._dbus_system_bus.get_object("org.freedesktop.UDisks", path)
         if device_obj is not None:
             device_props = dbus.Interface(device_obj, dbus.PROPERTIES_IFACE)
+            device_if = dbus.Interface(device_obj, Disks.DEVICE_CLASS)
         else:
             device_props = None
-        return (device_obj, device_props)
+            device_if = None
+        return (device_obj, device_props, device_if)
 
     @staticmethod
     def _get_device_property(device_props, property_name):
@@ -306,7 +362,7 @@ class Disks(object):
 
     @staticmethod
     def _create_device(mgr, path):
-        (device_obj, device_props) = Disks._dbus_get_device(path)
+        (device_obj, device_props, device_if) = Disks._dbus_get_device(path)
         if device_obj and device_props:
             is_drive = Disks._get_device_property(device_props, "DeviceIsDrive")
             is_partition = Disks._get_device_property(device_props, "DeviceIsPartition")
@@ -314,19 +370,19 @@ class Disks(object):
             is_lvm2pv = Disks._get_device_property(device_props, "DeviceIsLinuxLvm2PV")
             if is_drive:
                 #print('create disk %s' % (path))
-                ret = Disk(mgr, path, device_obj, device_props)
+                ret = Disk(mgr, path, device_obj, device_props, device_if)
             elif is_lvm2pv:
                 #print('create Lvm2PV %s' % (path))
-                ret = Lvm2PV(mgr, path, device_obj, device_props)
+                ret = Lvm2PV(mgr, path, device_obj, device_props, device_if)
             elif is_partition:
                 #print('create partition %s' % (path))
-                ret = Partition(mgr, path, device_obj, device_props)
+                ret = Partition(mgr, path, device_obj, device_props, device_if)
             elif is_lvm2lv:
                 #print('create Lvm2LV %s' % (path))
-                ret = Lvm2LV(mgr, path, device_obj, device_props)
+                ret = Lvm2LV(mgr, path, device_obj, device_props, device_if)
             else:
                 #print('create device %s' % (path))
-                ret = Device(mgr, path, device_obj, device_props)
+                ret = Device(mgr, path, device_obj, device_props, device_if)
         else:
             ret = None
         return ret
@@ -380,7 +436,7 @@ class Disks(object):
     
     def find_disk_for_device(self, devobj):
         if isinstance(devobj, Partition):
-            ret = part.slave
+            ret = devobj.slave
         elif isinstance(devobj, Lvm2LV):
             ret = []
             print('got group devices=' + str(devobj.group_devices))
@@ -397,17 +453,34 @@ class Disks(object):
             ret = ret + str(d) + "\n"
         return ret
 
+    def get_partitions(self, disk_obj=None):
+        ret = []
+        for devobj in self._list:
+            if isinstance(devobj, Partition):
+                if disk_obj is None:
+                    ret.append(devobj)
+                else:
+                    slave = devobj.slave
+                    if slave and slave.nativepath == disk_obj.nativepath:
+                        ret.append(devobj)
+            elif isinstance(devobj, Lvm2LV):
+                for dev in devobj.group_devices:
+                    if isinstance(dev, Partition):
+                        if disk_obj is None:
+                            ret.append(devobj)
+                        else:
+                            slave = dev.slave
+                            if slave and slave.nativepath == disk_obj.nativepath:
+                                ret.append(devobj)
+        return ret
+
     @property
     def devices(self):
         return self._list
 
     @property
     def partitions(self):
-        ret = []
-        for d in self._list:
-            if isinstance(d, Partition) or isinstance(d, Lvm2LV):
-                ret.append(d)
-        return ret
+        return self.get_partitions(disk_obj=None)
 
     @property
     def disks(self):
@@ -452,6 +525,8 @@ if __name__ == '__main__':
     print('disks:')
     for obj in e.disks:
         print('  %s %s (%s)'%(str(obj.vendor), str(obj.model), str(obj.serial)))
+        for child in obj.childs:
+            print('    %s'%(str(child.nativepath)))
 
     print('partitions:')
     for obj in e.partitions:
