@@ -7,10 +7,11 @@ import os
 import stat
 
 class ScsiDevice(object):
-    def __init__(self, host=0, channel=0, target=0, lun=0,
+    def __init__(self, mgr=None, host=0, channel=0, target=0, lun=0,
                     vendor=None, model=None, rev=None, scsi_level=None,
                     dev_major=0, dev_minor=0, devfile=None,
                     devtype=None, devtype_str=None):
+        self._mgr = mgr
         self.host = host
         self.channel = channel
         self.target = target
@@ -46,6 +47,9 @@ class ScsiDevice(object):
     @property
     def is_removable(self):
         return True if self.devtype in [5, 8] else False
+
+    def delete(self):
+        return self._mgr._delete_device(self.addr)
 
 class Scsi(object):
 
@@ -173,7 +177,7 @@ class Scsi(object):
                                     devfile  = self._block_devfiles[(dev_major, dev_minor)]
 
 
-                        device = ScsiDevice(host, channel, target, lun, 
+                        device = ScsiDevice(self, host, channel, target, lun, 
                                                 vendor=vendor, model=model, rev=rev,
                                                 scsi_level=scsi_level, 
                                                 dev_major=dev_major, dev_minor=dev_minor, devfile=devfile,
