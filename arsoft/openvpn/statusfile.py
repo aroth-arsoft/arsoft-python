@@ -52,6 +52,7 @@ class StatusBase(object):
         self._details = None
         self._statistics = None
         self._reading_done = False
+        self._running = False
 
     def _parse_lines(self, lines):
         self._details = {}
@@ -142,6 +143,12 @@ class StatusBase(object):
         return self._details
 
     @property
+    def running(self):
+        if not self._reading_done:
+            self._parse_file()
+        return self.self._running
+
+    @property
     def last_update(self):
         """ Returns the time of the last update of the status file """
         if not self._reading_done:
@@ -205,11 +212,13 @@ class StatusFile(StatusBase):
 
     def _parse_file(self):
         ret = False
+        self._running = False
         if self._is_socket:
             miface = management.ManagementInterface(self.filename)
             if miface.open():
                 lines = miface.status(version=self._version)
                 ret = self._parse_lines(lines)
+                self._running = True
                 miface.close()
             else:
                 ret = False
@@ -223,6 +232,7 @@ class StatusFile(StatusBase):
                 lines = file.readlines()
                 file.close()
                 ret = self._parse_lines(lines)
+                self._running = True
             else:
                 ret = False
         return ret
