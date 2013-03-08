@@ -272,12 +272,13 @@ class IniFile(object):
             ret = False
         return ret
         
-    def open(self, filename):
+    def open(self, filename=None):
+        if filename is None:
+            filename = self._m_filename
         ret = self._open(filename)
         if not ret:
             self.m_content = []
             self.m_sections = []
-            self.m_filename = None
             self.m_commentPrefix = None
             self.m_keyValueSeperator = None
         return ret
@@ -285,7 +286,6 @@ class IniFile(object):
     def close(self):
         self.m_content = []
         self.m_sections = []
-        self.m_filename = None
         self.m_commentPrefix = None
         self.m_keyValueSeperator = None
         

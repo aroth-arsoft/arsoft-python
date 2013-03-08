@@ -30,7 +30,8 @@ setup(name='arsoft-python',
                     'arsoft.trac',
                     'arsoft.trac.plugins',
                     'arsoft.web',
-                    'arsoft.web.templatetags'
+                    'arsoft.web.templatetags',
+                    'arsoft.xdg'
                     ],
 		scripts=[
             'certinfo',
