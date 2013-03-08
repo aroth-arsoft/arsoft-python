@@ -7,7 +7,7 @@ import argparse
 
 from arsoft.efi import *
 
-class efiinfo:
+class efiinfo(object):
     def __init__(self):
         self.m_verbose = False
  
