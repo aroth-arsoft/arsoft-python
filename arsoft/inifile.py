@@ -207,11 +207,6 @@ class IniSection(object):
         return self.asString(only_data=False)
 
 class IniFile(object):
-    m_filename = None
-    m_content = []
-    m_sections = []
-    m_commentPrefix = None
-    m_keyValueSeperator = None
     def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True):
         self.m_commentPrefix = commentPrefix
         self.m_keyValueSeperator = keyValueSeperator
