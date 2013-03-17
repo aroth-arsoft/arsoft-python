@@ -328,6 +328,20 @@ class xdg_menu_file(xdg_file):
                         include_file = XmlFile.getNodeText(f)
                         self._includes.append(include_file)
             return self._includes
+        @includes.setter
+        def includes(self, value):
+            self._includes = value
+            
+            new_include = self._xmlfile.doc.createElement('Include')
+            for v in value:
+                new_filename = self._xmlfile.doc.createElement('Filename')
+                new_filename.appendChild(self._xmlfile.doc.createTextNode(v))
+                new_include.appendChild(new_filename)
+            include_items = XmlFile.getChildElementsByTagName(self._xmlentity, 'Include')
+            if include_items and len(include_items) > 0:
+                self._xmlentity.replaceChild(include_items[0], new_include)
+            else:
+                self._xmlentity.appendChild(new_include)
         
         @property
         def name(self):
