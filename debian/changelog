@@ -1,3 +1,9 @@
+arsoft-python (1.45) quantal; urgency=low
+
+  * fixed compile error
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 18 Mar 2013 06:53:55 +0100
+
 arsoft-python (1.44) quantal; urgency=low
 
   * bring new arsoft.xdg module

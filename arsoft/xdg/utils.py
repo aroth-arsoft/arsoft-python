@@ -10,7 +10,7 @@ def xdg_open(*args, **kwargs):
         ret = False
     return ret
 
-def xdg_email(utf8=False, subject, body, cc=[], bcc=[], attachments=[], recipiants=[], uri=None):
+def xdg_email(subject, body, cc=[], bcc=[], attachments=[], recipiants=[], utf8=False, uri=None):
     args=[]
     if utf8:
         args.append('--utf8')
