@@ -21,8 +21,12 @@ if not config.get_config_file(np['name']):
     exit_code = CRITICAL
     exit_message = 'VPN %s is not configured.' % (str(np['name']))
 elif not config.is_running(np['name']):
-    exit_code = CRITICAL
-    exit_message = 'VPN %s is not running.' % (str(np['name']))
+    if running == False:
+        exit_code = OK
+        exit_message = 'VPN is stopped.'
+    else:
+        exit_code = CRITICAL
+        exit_message = 'VPN %s is not running.' % (str(np['name']))
 else:
     now = datetime.now()
     
