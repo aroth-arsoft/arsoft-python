@@ -192,7 +192,7 @@ class Certificate(PEMItem):
             fobj.write(prefix + "  Hash: " + str(self.getHash()) + '\n')
             fobj.write(prefix + "  Digest MD5: " + str(self.digest('md5')) + '\n')
             fobj.write(prefix + "  Digest SHA1: " + str(self.digest('sha1')) + '\n')
-            fobj.write(prefix + "  Serial Number: " + str(serial) + '\n')
+            fobj.write(prefix + ("  Serial Number: %i (0x%X)\n" %(serial, serial)))
             fobj.write(prefix + "  Signature Algorithm: " + str(signature_algorithm) + '\n')
             self._writeNamePretty(fobj, '  Issuer:  ', issuer)
             fobj.write(prefix + "  Validity" + '\n')
