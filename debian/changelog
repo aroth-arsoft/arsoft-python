@@ -1,3 +1,10 @@
+arsoft-python (1.46) quantal; urgency=low
+
+  * show certificate serial as hex too
+  * check for not stopped openvpn instance
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 06 Apr 2013 18:06:56 +0200
+
 arsoft-python (1.45) quantal; urgency=low
 
   * fixed compile error
