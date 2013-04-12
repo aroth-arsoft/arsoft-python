@@ -1,79 +1,265 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import os
 import argparse
 import sys
-import xmpp
+import logging
+import time
+
+from pyxmpp.jid import JID
+from pyxmpp.jabber.simple import send_message
+
 
 (python_major, python_minor, python_micro, python_releaselevel, python_serial) = sys.version_info
 if int(python_major) < 3: # check for version < 3
-	from ConfigParser import ConfigParser
+    from ConfigParser import ConfigParser
 else:
-	from configparser import ConfigParser
+    from configparser import ConfigParser
+    
 
 class jabbersend:
-	def __init__(self):
-		self.verbose = False
-		
-	def main(self):
-		#=============================================================================================
-		# process command line
-		#=============================================================================================
-		parser = argparse.ArgumentParser(description='send messages using jabber')
-		parser.add_argument('--configfile', dest='configfile', help='input config file')
-		parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
-		parser.add_argument('-m', '--message', dest='message', help='message text', metavar='MSG')
-		parser.add_argument('-f', '--from', dest='sender', help='sender name')
-		parser.add_argument('-t', '--to', dest='recipient', help='recipient name')
-		parser.add_argument('-p', '--password', dest='password', help='password for sender')
+    def __init__(self):
+        self.verbose = False
+        
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='send messages using jabber')
+        parser.add_argument('--configfile', dest='configfile', help='input config file')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('-m', '--message', dest='message', help='message body text', metavar='MSG')
+        parser.add_argument('-s', '--subject', dest='subject', help='message subject', metavar='SUB')
+        parser.add_argument('-f', '--from', dest='sender', help='sender name')
+        parser.add_argument('-t', '--to', dest='recipient', help='recipient name')
+        parser.add_argument('-p', '--password', dest='password', help='password for sender')
 
-		args = parser.parse_args()
-		
-		sender = None
-		recipient = None
-		password = None
+        args = parser.parse_args()
+        
+        sender = None
+        recipient = None
+        password = None
+        subject = args.subject
+        self.verbose = args.verbose
 
-		if args.configfile:
-			config = ConfigParser.ConfigParser()
-			config.read(args.configfile)
+        if args.configfile:
+            config = ConfigParser.ConfigParser()
+            config.read(args.configfile)
 
-			sender = config.get('General', 'From', '') 
-			recipient = config.get('General', 'To', '') 
-			password = config.get('General', 'Password', '') 
-		
-		if args.sender:
-			sender = args.sender
-		if args.recipient:
-			recipient = args.recipient
-		if args.password:
-			password = args.password
-		if args.message:
-			message = args.message
-		else:
-			message = sys.stdin.read()
-			
-		if not message:
-			sys.stderr.write('No message given.\n') 
-			sys.exit(1)
-		if not sender:
-			sys.stderr.write('No sender specified.\n') 
-			sys.exit(1)
-		if not recipient:
-			sys.stderr.write('No recipient specified.\n') 
-			sys.exit(1)
+            sender = config.get('General', 'From', '') 
+            recipient = config.get('General', 'To', '') 
+            password = config.get('General', 'Password', '') 
+        
+        if args.sender:
+            sender = args.sender
+        if args.recipient:
+            recipient = args.recipient
+        if args.password:
+            password = args.password
 
-		self.send(sender, password, recipient, message)
+        if not sender:
+            sys.stderr.write('No sender specified.\n') 
+            return 1
+        if not recipient:
+            sys.stderr.write('No recipient specified.\n') 
+            return 1
 
-	def send(self, sender, password, recipient, message):
-		jid=xmpp.protocol.JID(sender)
-		cl=xmpp.Client(jid.getDomain(),debug=[])
-		cl.connect()
-		if not cl.auth(jid.getNode(),password):
-			raise IOError('Can not auth with server.')
+        if args.message:
+            message = args.message
+        else:
+            message = sys.stdin.read()
 
-		cl.send( xmpp.Message( recipient, message ) )
-		cl.disconnect()
+        if not message:
+            sys.stderr.write('No message given.\n') 
+            return 1
+
+        if self.verbose:
+            print('Send message \'%s\' from %s to %s' %(message, sender, recipient))
+        self.send(sender, password, recipient, message, subject)
+        ret = 0
+        return ret
+    
+    def send(self, sender, password, recipient, body, subject=None):
+        #self._send_impl_sleekxmpp(sender, password, recipient, body, subject)
+        #self._send_impl_xmpp(sender, password, recipient, body, subject)
+        self._send_impl_pyxmpp(sender, password, recipient, body, subject)
+
+    @staticmethod
+    def _xmpp_do(jid,password,function,server=None,port=None):
+        """Connect as client to a Jabber/XMPP server and call the provided
+        function when stream is ready for IM. The function will be called
+        with one argument -- the XMPP stream. After function returns the stream is
+        closed."""
+        from pyxmpp.jabber.client import JabberClient
+        from pyxmpp.streamtls import TLSSettings
+        class Client(JabberClient):
+            """The simplest client implementation."""
+            def session_started(self):
+                """Call the function provided when the session starts and exit."""
+                function(self.stream)
+                self.disconnect()
+
+            def stream_state_changed(self,state,arg):
+                """This one is called when the state of stream connecting the component
+                to a server changes. This will usually be used to let the user
+                know what is going on."""
+                print "*** State changed: %s %r ***" % (state,arg)
+                
+        tls_settings = TLSSettings(require = True, verify_peer = False)
+        auth_methods = ['sasl:PLAIN']
+
+        c=Client(jid,password,server=server,port=port,
+                 disco_name="PyXMPP example: echo bot", disco_type="bot",
+                 tls_settings=tls_settings, auth_methods=auth_methods)
+        c.connect()
+        try:
+            print('loop')
+            c.loop(1)
+        except KeyboardInterrupt:
+            print u"disconnecting..."
+            c.disconnect()
+
+
+    def _send_impl_pyxmpp(self, sender, password, recipient, body, subject, message_type=None):
+        from pyxmpp.jid import JID
+        from pyxmpp.message import Message
+        msg=Message(to_jid=JID(recipient),body=body,subject=subject,stanza_type='chat')
+        def fun(stream):
+            """Send a mesage `msg` via a stream."""
+            #print('send msg')
+            stream.send(msg)
+            #time.sleep(1)
+        jid=JID(sender)
+        if not jid.resource:
+            jid=JID(jid.node,jid.domain,"send_message")
+        jabbersend._xmpp_do(jid,password,fun)
+
+    def _send_impl_xmpp(self, sender, password, recipient, body, subject):
+        from xmpp.protocol import JID
+        import xmpp
+        jid=JID(sender)
+        print(jid)
+        debug = ['always'] if self.verbose else []
+        cl=xmpp.Client(jid.getDomain(),debug=debug)
+        cl.connect()
+        auth=cl.auth(jid.getNode(),password)
+        if not auth:
+            raise IOError('Can not auth with server.')
+        print 'authenticated using',auth
+        cl.sendInitPresence(requestRoster=0)
+        #cl.sendInitPresence()
+        message = xmpp.protocol.Message(recipient, body)
+        message.setAttr('type', 'chat')
+        print 'mymessage=' + str(message) + ' body=' + str(body)
+        cl.send( message )
+        time.sleep(1)
+        cl.disconnect()
+        
+    def _send_impl_sleekxmpp(self, sender, password, recipient, body, subject):
+        from sleekxmpp import ClientXMPP
+        #from sleekxmpp.exceptions import IqError, IqTimeout        
+        class SendMsgBot(ClientXMPP):
+
+            """
+            A basic SleekXMPP bot that will log in, send a message,
+            and then log out.
+            """
+
+            def __init__(self, jid, password, recipient, message):
+                ClientXMPP.__init__(self, jid, password)
+
+                # The message we wish to send, and the JID that
+                # will receive it.
+                self.recipient = recipient
+                self.msg = message
+
+                # The session_start event will be triggered when
+                # the bot establishes its connection with the server
+                # and the XML streams are ready for use. We want to
+                # listen for this event so that we we can initialize
+                # our roster.
+                self.add_event_handler("session_start", self.start, threaded=True)
+
+            def start(self, event):
+                """
+                Process the session_start event.
+
+                Typical actions for the session_start event are
+                requesting the roster and broadcasting an initial
+                presence stanza.
+
+                Arguments:
+                    event -- An empty dictionary. The session_start
+                            event does not provide any additional
+                            data.
+                """
+                self.send_presence()
+                self.get_roster()
+
+                self.send_message(mto=self.recipient,
+                                mbody=self.msg,
+                                mtype='chat')
+
+                # Using wait=True ensures that the send queue will be
+                # emptied before ending the session.
+                self.disconnect(wait=True)
+
+        class EchoBot(ClientXMPP):
+
+            def __init__(self, jid, password):
+                ClientXMPP.__init__(self, jid, password)
+
+                self.add_event_handler("session_start", self.session_start)
+                self.add_event_handler("message", self.message)
+
+                # If you wanted more functionality, here's how to register plugins:
+                # self.register_plugin('xep_0030') # Service Discovery
+                # self.register_plugin('xep_0199') # XMPP Ping
+
+                # Here's how to access plugins once you've registered them:
+                # self['xep_0030'].add_feature('echo_demo')
+
+                # If you are working with an OpenFire server, you will
+                # need to use a different SSL version:
+                # import ssl
+                # self.ssl_version = ssl.PROTOCOL_SSLv3
+
+            def session_start(self, event):
+                self.send_presence()
+                self.get_roster()
+
+                # Most get_*/set_* methods from plugins use Iq stanzas, which
+                # can generate IqError and IqTimeout exceptions
+                #
+                # try:
+                #     self.get_roster()
+                # except IqError as err:
+                #     logging.error('There was an error getting the roster')
+                #     logging.error(err.iq['error']['condition'])
+                #     self.disconnect()
+                # except IqTimeout:
+                #     logging.error('Server is taking too long to respond')
+                #     self.disconnect()
+
+            def message(self, msg):
+                if msg['type'] in ('chat', 'normal'):
+                    msg.reply("Thanks for sending\n%(body)s" % msg).send()
+        
+        xmpp = SendMsgBot(sender, password, recipient, body)
+        xmpp.register_plugin('xep_0030') # Service Discovery
+        xmpp.register_plugin('xep_0199') # XMPP Ping
+        #xmpp = EchoBot(sender, password)
+        xmpp.connect()
+        xmpp.process(block=True)
 
 if __name__ == "__main__":
-	app =  jabbersend()
-	app.main()
+    # PyXMPP uses `logging` module for its debug output
+    # applications should set it up as needed
+    logger = logging.getLogger()
+    logger.addHandler(logging.StreamHandler())
+    logger.setLevel(logging.DEBUG) # change to DEBUG for higher verbosity
+
+    app =  jabbersend()
+    sys.exit(app.main())
