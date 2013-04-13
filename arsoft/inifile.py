@@ -274,8 +274,6 @@ class IniFile(object):
         if not ret:
             self.m_content = []
             self.m_sections = []
-            self.m_commentPrefix = None
-            self.m_keyValueSeperator = None
         return ret
 
     def close(self):
@@ -445,12 +443,37 @@ class IniFile(object):
             ret = section_obj.get(key, default)
         return ret
 
+    def getAsBoolean(self, section, key, default=None):
+        value = self.get(section, key, default)
+        if value is not None:
+            try:
+                num = int(value)
+                ret = True if num != 0 else False
+            except ValueError:
+                str = value.lower()
+                if str == 'true' or str == 'yes' or str == 'on':
+                    ret = True
+                elif str == 'false' or str == 'no' or str == 'off':
+                    ret = False
+                else:
+                    ret = default
+        else:
+            ret = default
+        return ret
+
     def set(self, section, key, value, comment=None):
         section_obj = self._getSection(section)
         if section_obj is None:
             self.m_sections.append( IniSection(self, section) )
             section_obj = self._getSection(section)
         return section_obj.set(key, value, comment)
+
+    def setAsBoolean(self, section, key, value, comment=None):
+        if value is not None:
+            real_value = 'true' if value else 'false'
+        else:
+            real_value = None
+        return self.set(section, key, real_value, comment)
 
     def append(self, section, key, value, comment=None):
         section_obj = self._getSection(section)
@@ -499,6 +522,7 @@ class IniFile(object):
         if filename is None:
             filename = self.m_filename
         try:
+            print ('m_keyValueSeperator=' + str( self.m_keyValueSeperator))
             f = open(filename, 'w')
             for section in self.m_sections:
                 f.write(str(section))

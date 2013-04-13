@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.45',
+		version='1.46',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -31,7 +31,8 @@ setup(name='arsoft-python',
                     'arsoft.trac.plugins',
                     'arsoft.web',
                     'arsoft.web.templatetags',
-                    'arsoft.xdg'
+                    'arsoft.xdg',
+                    'arsoft.xmpp'
                     ],
 		scripts=[
             'certinfo',
