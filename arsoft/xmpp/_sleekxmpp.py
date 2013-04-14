@@ -57,11 +57,11 @@ def sleekxmpp_send_message(sender, password, recipient, body, html=None, subject
                               mbody=self.message,
                               mhtml=self.html,
                               mtype=self.message_type)
+            self.message_sent = True
 
             # Using wait=True ensures that the send queue will be
             # emptied before ending the session.
             self.disconnect(wait=True)
-            self.message_sent = True
 
     xmpp = SendMsgBot(sender, password, recipient, body, html, subject, message_type, ipv4=ipv4, ipv6=ipv6)
     xmpp.register_plugin('xep_0030') # Service Discovery

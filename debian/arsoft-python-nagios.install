@@ -2,6 +2,7 @@ usr/lib/python*/dist-packages/arsoft/nagios/*.py
 etc/nagios-plugins/config/fritzbox.cfg
 etc/nagios-plugins/config/openvpn.cfg
 etc/nagios-plugins/config/kernel_modules.cfg
+etc/nagios-plugins/config/xmpp_notify.cfg
 usr/lib/nagios/plugins/check_fritzbox
 usr/lib/nagios/plugins/check_openvpn
 usr/lib/nagios/plugins/check_kernel_modules

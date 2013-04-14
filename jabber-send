@@ -3,6 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import os
+import os.path
 import argparse
 import sys
 import logging
@@ -18,12 +19,21 @@ class jabbersend:
     def __init__(self):
         self.verbose = False
         
+    def version(self):
+        print('Version: ' + str(__version__))
+        print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
+        info = arsoft.xmpp.backend_info()
+        print('Backend: ' + str(info.name))
+        print('Backend Version: ' + str(info.version))
+        return 0
+        
     def main(self):
         #=============================================================================================
         # process command line
         #=============================================================================================
         parser = argparse.ArgumentParser(description='send messages using jabber')
         parser.add_argument('--configfile', dest='configfile', help='input config file')
+        parser.add_argument('--noconfig', dest='noconfig', action='store_true', help='do not read the default configuration file.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--version', dest='version', action='store_true', help='enable verbose output.')
         parser.add_argument('--save', dest='save', action='store_true', help='save the command line parameters into the config file.')
@@ -38,12 +48,7 @@ class jabbersend:
         args = parser.parse_args()
         
         if args.version:
-            print('Version: ' + str(__version__))
-            print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
-            info = arsoft.xmpp.backend_info()
-            print('Backend: ' + str(info.name))
-            print('Backend Version: ' + str(info.version))
-            return 0
+            return self.version()
 
         sender = None
         recipient = None
@@ -53,10 +58,17 @@ class jabbersend:
         
         if self.verbose:
             logger.setLevel(logging.DEBUG) # change to DEBUG for higher verbosity
-
+            
         if args.configfile:
+            configfile = args.configfile
+        elif args.noconfig == False:
+            configfile = os.path.expanduser("~/.jabber-send.conf")
+        else:
+            configfile = None
+
+        if configfile:
             inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-            inifile.open(args.configfile)
+            inifile.open(configfile)
 
             sender = inifile.get(None, 'From', '') 
             recipient = inifile.get(None, 'To', '') 
@@ -76,18 +88,18 @@ class jabbersend:
             password = args.password
             
         if args.save:
-            if not args.configfile:
+            if not configfile:
                 sys.stderr.write('No config file specified to save parameters.\n') 
                 return 1
             inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-            inifile.open(args.configfile)
+            inifile.open(configfile)
 
             inifile.set(None, 'From', sender) 
             inifile.set(None, 'To', recipient) 
             inifile.set(None, 'Password', password) 
             inifile.setAsBoolean(None, 'IPv4', ipv4)
             inifile.setAsBoolean(None, 'IPv6', ipv6)
-            inifile.save(args.configfile)
+            inifile.save(configfile)
 
         if not sender:
             sys.stderr.write('No sender specified.\n') 
