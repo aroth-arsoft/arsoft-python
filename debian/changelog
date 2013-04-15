@@ -1,3 +1,9 @@
+arsoft-python (1.47) quantal; urgency=low
+
+  * include nagios tools to send xmpp notifications
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 15 Apr 2013 17:18:21 +0200
+
 arsoft-python (1.46) quantal; urgency=low
 
   * show certificate serial as hex too
