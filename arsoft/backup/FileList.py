@@ -33,17 +33,27 @@ class FileListItem(object):
             ret = False
         return ret
 
-    def save(self, filename=None):
-        if filename is None:
-            filename = self._filename
+    def save(self, filename_or_fileobj=None):
+        if filename_or_fileobj is None:
+            filename_or_fileobj = self._filename
 
-        try:
-            f = open(filename, 'w')
-            for it in self._items:
-                f.write(it + '\n')
-            f.close()
-            ret = True
-        except IOError:
+        if isinstance(filename_or_fileobj, str):
+            try:
+                fobj = open(filename_or_fileobj, 'w')
+            except IOError:
+                fobj = None
+        else:
+            fobj = filename_or_fileobj
+            
+        if fobj:
+            try:
+                for it in self._items:
+                    f.write(it + '\n')
+                f.close()
+                ret = True
+            except IOError:
+                ret = False
+        else:
             ret = False
         return ret
     
@@ -93,11 +103,12 @@ class FileList(object):
                 newitem = FileListItem()
                 if not newitem.open(fullname):
                     ret = False
+                else:
+                    self._items.append(newitem)
         else:
             newitem = FileListItem()
-            if not newitem.open(filename):
-                ret = False
-            else:
+            ret = newitem.open(filename)
+            if ret:
                 self._items.append(newitem)
         return ret
 
@@ -108,10 +119,10 @@ class FileList(object):
                 ret = False
         return ret
     
-    def save(self, filename):
+    def save(self, filename_or_fileobj):
         newitem = FileListItem()
         newitem.items = self.items
-        return newitem.save(filename)
+        return newitem.save(filename_or_fileobj)
 
     @property
     def items(self):
@@ -123,3 +134,10 @@ class FileList(object):
     def __str__(self):
         return str(self.items)
 
+
+if __name__ == "__main__":
+    import sys
+    fl = FileList(sys.argv[1])
+    for it in fl.items:
+        print(str(it))
+    fl.save(sys.argv[2])

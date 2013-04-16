@@ -2,42 +2,153 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+import tempfile
 from FileList import *
 from arsoft.utils import runcmd
+import subprocess
+import sys
 
-class rsync:
+(python_major, python_minor, python_micro, python_releaselevel, python_serial) = sys.version_info
+
+class RsyncDefaults(object):
+    RSYNC_BIN = '/usr/bin/rsync'
+
+class Rsync(object):
+        
     
-    DEFAULT_RSYNC_BIN = '/usr/bin/rsync'
-    
-    def __init__(self, source, dest, include=None, exclude=None, recursive=True, preservePermissions=True, verbose=False, rsync_bin=rsync.DEFAULT_RSYNC_BIN):
+    def __init__(self, source, dest, include=None, exclude=None, 
+                 recursive=True, 
+                 preservePermissions=True, preserveOwner=True, preserveGroup=True, preserveTimes=True, 
+                 preserveDevices=True, preserveSpecials=True, perserveACL=False, preserveXAttrs=False,
+                 verbose=False, compress=True, links=True,
+                 delete=False, deleteExcluded=False, force=False, delayUpdates=False,
+                 rsh=None, bandwidthLimit=None,
+                 rsync_bin=RsyncDefaults.RSYNC_BIN):
         self._rsync_bin = rsync_bin
         self._source = source
         self._dest = dest
         self.verbose = verbose
         self.recursive = recursive
+        self.links = links
+        self.compress = compress
         self.preservePermissions = preservePermissions
+        self.preserveOwner = preserveOwner
+        self.preserveGroup = preserveGroup
+        self.preserveTimes = preserveTimes
+        self.preserveDevices = preserveDevices
+        self.preserveSpecials = preserveSpecials
+        self.perserveACL = perserveACL
+        self.preserveXAttrs = preserveXAttrs
+        self.delete = delete
+        self.deleteExcluded = deleteExcluded
+        self.force = force
+        self.delayUpdates = delayUpdates
+        self.rsh = rsh
+        self.bandwidthLimit = bandwidthLimit
         self._include = include
         self._exclude = exclude
-    """
-                           repeated: --filter='- .rsync-filter'
-     --exclude=PATTERN       exclude files matching PATTERN
-     --exclude-from=FILE     read exclude patterns from FILE
-     --include=PATTERN       don't exclude files matching PATTERN
-     --include-from=FILE     read include patterns from FILE
-     --files-from=FILE       read list of source-file names from FILE
-     """
-     
+
     def execute(self):
-        args = []
+        args = [self._rsync_bin]
         if self.verbose:
-            args.extend('-v')
+            args.append('--verbose')
         if self.recursive:
-            args.extend('-r')
+            args.append('--recursive')
+        if self.links:
+            args.append('--links')
         if self.preservePermissions:
-            args.extend('-p')
-        args.extend(source)
-        args.extend(dest)
-        runcmd(self._rsync_bin, args)
+            args.append('--perms')
+        if self.preserveOwner:
+            args.append('--owner')
+        if self.preserveGroup:
+            args.append('--group')
+        if self.preserveTimes:
+            args.append('--times')
+        if self.preserveDevices:
+            args.append('--devices')
+        if self.preserveSpecials:
+            args.append('--specials')
+        if self.perserveACL:
+            args.append('--acls')
+        if self.preserveXAttrs:
+            args.append('--xattrs')
+        if self.compress:
+            args.append('--compress')
+        if self.delete:
+            args.append('--delete')
+        if self.deleteExcluded:
+            args.append('-delete-excluded')
+        if self.force:
+            args.append('--force')
+        if self.delayUpdates:
+            args.append('--delay-updates')
+        if self.rsh:
+            args.append('--rsh=' + str(self.rsh))
+        if self.bandwidthLimit:
+            args.append('--bwlimit=' + str(self.bandwidthLimit))
+
+        tmp_include = None
+        tmp_exclude = None
+        tmp_source = None
+        if self._include:
+            tmp_include = tempfile.NamedTemporaryFile()
+            if not self._include.save(tmp_include):
+                raise IOError
+            args.append('--include-from=' + tmp_include.name)
+
+        if self._exclude:
+            tmp_exclude = tempfile.NamedTemporaryFile()
+            if not self._exclude.save(tmp_exclude):
+                raise IOError
+            args.append('--exclude-from=' + tmp_exclude.name)
+
+        if isinstance(self._source, FileList):
+            tmp_source = tempfile.NamedTemporaryFile()
+            if not self._source.save(tmp_source):
+                raise IOError
+            args.append('--files-from=' + tmp_source.name)
+        else:
+            args.append(self._source)
+        args.append(self._dest)
+
+        if self.verbose:
+            print("runcmd " + ' '.join(args))
+
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, shell=False)
+        if p:
+            (stdoutdata, stderrdata) = p.communicate()
+            if stdoutdata is not None:
+                if int(python_major) < 3: # check for version < 3
+                    sys.stdout.write(stdoutdata)
+                    sys.stdout.flush()
+                else:
+                    sys.stdout.buffer.write(stdoutdata)
+                    sys.stdout.buffer.flush()
+            if stderrdata is not None:
+                if int(python_major) < 3: # check for version < 3
+                    sys.stderr.write(stderrdata)
+                    sys.stderr.flush()
+                else:
+                    sys.stderr.buffer.write(stderrdata)
+                    sys.stderr.buffer.flush()
+            status_code = p.returncode
+            ret = True if status_code == 0 else False
+        else:
+            status_code = -1
+            ret = False
+
+        if tmp_include:
+            tmp_include.close()
+        if tmp_exclude:
+            tmp_exclude.close()
+        if tmp_source:
+            tmp_source.close()
+        return ret
 
 if __name__ == "__main__":
-    pass 
+    app = Rsync(sys.argv[1], sys.argv[2])
+
+    if app.execute():
+        print('successful')
+    else:
+        print('failed')
