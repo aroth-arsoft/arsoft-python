@@ -515,6 +515,93 @@ class Disks(object):
             ret = None
         return ret
 
+class RegisteredDiskList(object):
+    def __init__(self, path, key='disk'):
+        self.path = path
+        self._config_items = {}
+        self._disks = []
+        self._last_error = None
+        self._dirty = False
+        self._key = key
+
+    @property
+    def disks(self):
+        ret = []
+        for item in self._config_items.itervalues():
+            value = item.get(section, self._key, default=None)
+            if value:
+                ret.append( value )
+        return ret
+
+    @property
+    def dirty(self):
+        return self._dirty
+
+    def load(self):
+        try:
+            self._config_items = {}
+            ret = True
+            files = os.listdir(self.path)
+            for f in files:
+                (basename, ext) = os.path.splitext(f)
+                if ext == '.conf':
+                    fullpath = os.path.join(self.path, f)
+                    item = IniFile(filename=fullpath, commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+                    self._config_items[fullpath] = item
+        except IOError as e:
+            self._last_error = str(e)
+            ret = False
+        except OSError as e:
+            self._last_error = str(e)
+            ret = False
+        return ret
+    
+    def save(self):
+        ret = True
+        if self._dirty:
+            # only save the config when it's marked as dirty
+            for (filename, item) in self._config_items.iteritems():
+                if item.empty:
+                    try:
+                        os.remove(filename)
+                    except OSError as e:
+                        self._last_error = str(e)
+                        ret = False
+                elif not item.save():
+                    ret = False
+        return ret
+
+    def register_disk(self, name, pattern, external=True):
+        # first check if the pattern already exists
+        found_in_file = None
+        for item in self._config_items.itervalues():
+            value = item.get(None, self._key, default=None)
+            if value and value == pattern:
+                found_in_file = item
+        if not found_in_file:
+            # create new config item
+            fullpath = os.path.join(self.path, name + '.conf')
+            item = IniFile(filename=fullpath, commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+            item.set(None, self._key, pattern)
+            self._config_items[fullpath] = item
+            self._dirty = True
+        return True
+        
+    def unregister_disk(self, name, pattern, external=True):
+        print('unregister_disk %s, %s' %(name, pattern))
+        # first check if the pattern already exists
+        ret = False
+        for item in self._config_items.itervalues():
+            value = item.get(None, self._key, default=None)
+            if value and value == pattern:
+                print('remove ' + self._key)
+                ret = item.remove(None, self._key)
+                if ret:
+                    print('ini=' + item.asString())
+                    self._dirty = True
+                break
+        return ret
+
 if __name__ == '__main__':
     
     e = Disks()

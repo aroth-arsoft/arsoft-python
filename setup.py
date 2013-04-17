@@ -40,7 +40,8 @@ setup(name='arsoft-python',
             'ini-util',
             'jabber-send',
             'trac-sqlite2mysql',
-            'trac-svn2git'
+            'trac-svn2git',
+            'arsoft-backup'
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),

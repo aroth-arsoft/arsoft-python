@@ -1,0 +1,117 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+from datetime import datetime
+import os.path
+from arsoft.backup.BackupConfig import BackupConfig
+from arsoft.backup.DiskManager import DiskManager
+from arsoft.backup.rsync import Rsync
+
+class ARSoftBackupApp(object):
+
+    def __init__(self):
+        self._verbose = False
+        self._config = None
+        self._diskmgr = None
+        
+    def _load_config(self, configdir):
+        cfg = BackupConfig(configdir)
+        if not cfg.open():
+            # start with a fresh config
+            cfg.clear()
+            # save it for later
+            cfg.save()
+        # in any case continue with the config we got
+        self._config = cfg
+        self._diskmgr = DiskManager()
+        ret = True
+        return ret
+
+    def _on_system_startup(self):
+        if self._config.eject_unused_backup_discs:
+            print('eject unused discs')
+            if self._diskmgr.eject():
+                ret = 0
+            else:
+                ret = 1
+        else:
+            # nothing to do here
+            ret = 0
+        return ret
+    
+    def _do_rsync(self):
+        backup_dir = self._config.backup_directory
+        if not self._config.use_filesystem_snapshots:
+            now = datetime.utcnow()
+            nowstr = now.strftime('%Y%m%d%H%M%S')
+            backup_dir = os.path.join(backup_dir, nowstr)
+        inst = Rsync(source=self._config.filelist_include, dest=backup_dir, delete=True, deleteExcluded=True, use_ssh=False, dryrun=True)
+        return inst.execute()
+    
+    def _perform_backup(self):
+        disc_loaded = False
+        disc_ready = False
+        # load all available external discs
+        if not self._diskmgr.is_disc_ready():
+            if not self._diskmgr.load():
+                sys.stderr.write('Failed to load external discs\n')
+                ret = 1
+            else:
+                disc_loaded = True
+                disc_ready = True
+        else:
+            disc_ready = True
+        
+        if disc_ready:
+            ret = 0
+            # backup disc is already mounted by DiskManager/edskmgr
+            # rsync to backup discs
+            if not self._do_rsync():
+                sys.stderr.write('rsync failed\n')
+                ret = 1
+            # create new snapshot of the disc
+            # remove old snapshot from the disc
+
+        if disc_loaded:
+            if not self._diskmgr.eject():
+                sys.stderr.write('Failed to eject external discs\n')
+                ret = 1
+        return ret
+
+    def main(self, argv=None):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='frontend for the AR Soft backup functionality.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+
+        parser.add_argument('--config-directory', dest='configdir', default='/etc/arsoft-backup', help='name of the directory containing the backup configuration.')
+        parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
+        parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+
+        if not self._load_config(args.configdir):
+            sys.stderr.write('Failed to load configuration from %s.\n' % (args.configdir)) 
+            ret = 1
+        else:
+            if self._verbose:
+                print(self._config)
+            if args.system_startup:
+                ret = self._on_system_startup()
+            elif args.perform_backup:
+                ret = self._perform_backup()
+            else:
+                ret = 1
+
+        return ret
+
+
+if __name__ == "__main__":
+    app = ARSoftBackupApp()
+    sys.exit(app.main(sys.argv))

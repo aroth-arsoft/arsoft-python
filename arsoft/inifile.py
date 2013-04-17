@@ -522,7 +522,6 @@ class IniFile(object):
         if filename is None:
             filename = self.m_filename
         try:
-            print ('m_keyValueSeperator=' + str( self.m_keyValueSeperator))
             f = open(filename, 'w')
             for section in self.m_sections:
                 f.write(str(section))

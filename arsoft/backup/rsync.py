@@ -14,15 +14,14 @@ class RsyncDefaults(object):
     RSYNC_BIN = '/usr/bin/rsync'
 
 class Rsync(object):
-        
-    
     def __init__(self, source, dest, include=None, exclude=None, 
                  recursive=True, 
                  preservePermissions=True, preserveOwner=True, preserveGroup=True, preserveTimes=True, 
                  preserveDevices=True, preserveSpecials=True, perserveACL=False, preserveXAttrs=False,
-                 verbose=False, compress=True, links=True,
+                 verbose=False, compress=True, links=True, dryrun=False,
                  delete=False, deleteExcluded=False, force=False, delayUpdates=False,
                  rsh=None, bandwidthLimit=None,
+                 use_ssh=False, ssh_key=None,
                  rsync_bin=RsyncDefaults.RSYNC_BIN):
         self._rsync_bin = rsync_bin
         self._source = source
@@ -43,7 +42,10 @@ class Rsync(object):
         self.deleteExcluded = deleteExcluded
         self.force = force
         self.delayUpdates = delayUpdates
+        self.dryrun = dryrun
         self.rsh = rsh
+        self.use_ssh = use_ssh
+        self.ssh_key = ssh_key
         self.bandwidthLimit = bandwidthLimit
         self._include = include
         self._exclude = exclude
@@ -82,8 +84,15 @@ class Rsync(object):
             args.append('--force')
         if self.delayUpdates:
             args.append('--delay-updates')
+        if self.dryrun:
+            args.append('--dry-run')
         if self.rsh:
             args.append('--rsh=' + str(self.rsh))
+        elif self.use_ssh:
+            rsh = '/usr/bin/ssh -x'
+            if self.ssh_key:
+                rsh = rsh + ' -i ' + self.ssh_key
+            args.append('--rsh=' + str(rsh))
         if self.bandwidthLimit:
             args.append('--bwlimit=' + str(self.bandwidthLimit))
 
