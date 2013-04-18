@@ -1,3 +1,11 @@
+arsoft-python (1.48) quantal; urgency=low
+
+  * relocate edskmgr to arsoft-python
+  * improve disk manager
+  * more improvements to backup
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 18 Apr 2013 19:19:34 +0200
+
 arsoft-python (1.47) quantal; urgency=low
 
   * include nagios tools to send xmpp notifications
