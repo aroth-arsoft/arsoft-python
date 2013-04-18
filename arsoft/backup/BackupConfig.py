@@ -24,16 +24,21 @@ class BackupConfig(object):
                  backup_directory=BackupConfigDefaults.BACKUP_DIR, 
                  restore_directory=BackupConfigDefaults.RESTORE_DIR, 
                  filesystem=BackupConfigDefaults.FILESYSTEM,
+                 filelist_include_dir=BackupConfigDefaults.INCLUDE_DIR,
+                 filelist_exclude_dir=BackupConfigDefaults.EXCLUDE_DIR,
                  eject_unused_backup_discs=BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS,
                  use_filesystem_snapshots=BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS,
                  filelist_include=None, 
                  filelist_exclude=None):
         self.config_dir = config_dir
+        self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
         self.filesystem = filesystem
         self.retention_time = retention_time
         self.backup_directory = backup_directory
         self.filelist_include = filelist_include
         self.filelist_exclude = filelist_exclude
+        self.filelist_include_dir = filelist_include_dir
+        self.filelist_exclude_dir = filelist_exclude_dir
         self.eject_unused_backup_discs = eject_unused_backup_discs
         self.use_filesystem_snapshots = use_filesystem_snapshots
 
@@ -44,6 +49,8 @@ class BackupConfig(object):
         self.backup_directory = BackupConfigDefaults.BACKUP_DIR
         self.filelist_include = None
         self.filelist_exclude = None
+        self.filelist_include_dir = BackupConfigDefaults.INCLUDE_DIR
+        self.filelist_exclude_dir = BackupConfigDefaults.EXCLUDE_DIR
         self.eject_unused_backup_discs = BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS
         self.use_filesystem_snapshots = BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS
 
@@ -96,22 +103,40 @@ class BackupConfig(object):
     def open(self, config_dir=None):
         if config_dir is None:
             config_dir = self.config_dir
-            
-        main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
+        else:
+            self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
 
-        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-        ret = inifile.open(main_conf)
-        self.filesystem = inifile.get(None, 'Filesystem', BackupConfigDefaults.FILESYSTEM)
-        self.retention_time = inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)
-        self.backup_directory = inifile.get(None, 'BackupDirectory', BackupConfigDefaults.BACKUP_DIR)
-        self.restore_directory = inifile.get(None, 'RestoreDirectory', BackupConfigDefaults.RESTORE_DIR)
-        self.eject_unused_backup_discs = inifile.getAsBoolean(None, 'EjectUnusedBackupDiscs', BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS)
-        self.use_filesystem_snapshots = inifile.getAsBoolean(None, 'UseFilesystemSnapshots', BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS)
-        
-        filelist_path = os.path.join(config_dir, BackupConfigDefaults.INCLUDE_DIR)
+        if not os.path.isdir(config_dir):
+            try:
+                os.mkdir(config_dir)
+            except OSError:
+                pass
+
+        if not os.path.isfile(self.main_conf):
+            save_config_file = True
+        else:
+            save_config_file = False
+
+        ret = self._read_main_conf(self.main_conf)
+        if save_config_file:
+            ret = self._write_main_conf(self.main_conf)
+
+        filelist_path = os.path.join(config_dir, self.filelist_include_dir)
+        if not os.path.isdir(filelist_path):
+            try:
+                os.mkdir(filelist_path)
+            except OSError:
+                pass
+
         self.filelist_include = FileList(filelist_path)
 
-        filelist_path = os.path.join(config_dir, BackupConfigDefaults.EXCLUDE_DIR)
+        filelist_path = os.path.join(config_dir, self.filelist_exclude_dir)
+        if not os.path.isdir(filelist_path):
+            try:
+                os.mkdir(filelist_path)
+            except OSError:
+                pass
+
         self.filelist_exclude = FileList(filelist_path)
 
         return ret
@@ -119,20 +144,49 @@ class BackupConfig(object):
     def save(self, config_dir=None):
         if config_dir is None:
             config_dir = self.config_dir
+        else:
+            self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
 
-        main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
+        ret = self._write_main_conf(self.main_conf)
 
+        filelist_path = os.path.join(config_dir, self.filelist_include_dir)
+        if self.filelist_include:
+            self.filelist_include.save(filelist_path)
+
+        filelist_path = os.path.join(config_dir, self.filelist_exclude_dir)
+        if self.filelist_exclude:
+            self.filelist_exclude.save(filelist_path)
+
+        return ret
+    
+    def _read_main_conf(self, filename):
+        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        ret = inifile.open(filename)
+        self.filesystem = inifile.get(None, 'Filesystem', BackupConfigDefaults.FILESYSTEM)
+        self.retention_time = datetime.timedelta(seconds=float(inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)))
+        self.backup_directory = inifile.get(None, 'BackupDirectory', BackupConfigDefaults.BACKUP_DIR)
+        self.restore_directory = inifile.get(None, 'RestoreDirectory', BackupConfigDefaults.RESTORE_DIR)
+        self.eject_unused_backup_discs = inifile.getAsBoolean(None, 'EjectUnusedBackupDiscs', BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS)
+        self.use_filesystem_snapshots = inifile.getAsBoolean(None, 'UseFilesystemSnapshots', BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS)
+        self.filelist_include_dir = inifile.get(None, 'FileListIncludeDirectory', BackupConfigDefaults.INCLUDE_DIR)
+        self.filelist_exclude_dir = inifile.get(None, 'FileListExcludeDirectory', BackupConfigDefaults.EXCLUDE_DIR)
+        return ret
+        
+    def _write_main_conf(self, filename):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         # read existing file
-        inifile.open(main_conf)
+        inifile.open(filename)
         # and modify it according to current config
         inifile.set(None, 'Filesystem', self.filesystem)
-        inifile.set(None, 'RetentionTime', self.retention_time)
+        inifile.set(None, 'RetentionTime', self.retention_time.total_seconds())
         inifile.set(None, 'BackupDirectory', self.backup_directory)
         inifile.set(None, 'RestoreDirectory', self.restore_directory)
         inifile.setAsBoolean(None, 'EjectUnusedBackupDiscs', self.eject_unused_backup_discs)
         inifile.setAsBoolean(None, 'UseFilesystemSnapshots', self.use_filesystem_snapshots)
-        ret = inifile.save(main_conf)
+        inifile.set(None, 'FileListIncludeDirectory', self.filelist_include_dir)
+        inifile.set(None, 'FileListExcludeDirectory', self.filelist_exclude_dir)
+
+        ret = inifile.save(filename)
         return ret
 
     def __str__(self):

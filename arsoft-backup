@@ -19,15 +19,19 @@ class ARSoftBackupApp(object):
         
     def _load_config(self, configdir):
         cfg = BackupConfig(configdir)
-        if not cfg.open():
-            # start with a fresh config
-            cfg.clear()
-            # save it for later
-            cfg.save()
+        cfg.open()
         # in any case continue with the config we got
         self._config = cfg
         self._diskmgr = DiskManager()
         ret = True
+        return ret
+    
+    def _check_config(self):
+        ret = True
+        backup_dir = self._config.backup_directory
+        if backup_dir is None or len(backup_dir) == 0:
+            sys.stderr.write('No backup directory configured in %s\n' % (self._config.main_conf) )
+            ret = False
         return ret
 
     def _on_system_startup(self):
@@ -48,10 +52,12 @@ class ARSoftBackupApp(object):
             now = datetime.utcnow()
             nowstr = now.strftime('%Y%m%d%H%M%S')
             backup_dir = os.path.join(backup_dir, nowstr)
-        inst = Rsync(source=self._config.filelist_include, dest=backup_dir, delete=True, deleteExcluded=True, use_ssh=False, dryrun=True)
+        inst = Rsync(source=self._config.filelist_include, dest=backup_dir, delete=True, deleteExcluded=True, use_ssh=False, dryrun=True, verbose=True)
         return inst.execute()
     
     def _perform_backup(self):
+        if not self._check_config():
+            return 1
         disc_loaded = False
         disc_ready = False
         # load all available external discs
@@ -107,6 +113,7 @@ class ARSoftBackupApp(object):
             elif args.perform_backup:
                 ret = self._perform_backup()
             else:
+                sys.stderr.write('No operation specified.\n')
                 ret = 1
 
         return ret

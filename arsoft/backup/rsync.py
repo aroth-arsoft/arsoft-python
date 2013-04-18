@@ -51,6 +51,20 @@ class Rsync(object):
         self._exclude = exclude
 
     def execute(self):
+
+        if self._source is None or \
+            (isinstance(self._source, str) and len(self._source) == 0) or \
+            (isinstance(self._source, FileList) and self._source.empty()):
+            raise ValueError('invalid source file or directory %s'%(str(self._source)))
+
+        if self._dest is None or \
+            (isinstance(self._dest, str) and len(self._dest) == 0) or \
+            (isinstance(self._dest, FileList) and self._dest.empty()):
+            raise ValueError('invalid destination file or directory %s'%(str(self._dest)))
+
+        if self._rsync_bin is None or len(self._rsync_bin) == 0:
+            raise ValueError('Invalid rsync executeable %s specified'%(str(self._rsync_bin)))
+
         args = [self._rsync_bin]
         if self.verbose:
             args.append('--verbose')

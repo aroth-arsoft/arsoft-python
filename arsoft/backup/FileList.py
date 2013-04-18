@@ -11,25 +11,35 @@ class FileListItem(object):
         if filename is not None:
             self.open(filename)
 
-    def open(self, filename=None):
-        if filename is None:
-            filename = self._filename
+    def open(self, filename_or_fileobj=None):
+        if filename_or_fileobj is None:
+            filename_or_fileobj = self._filename
 
-        try:
-            f = open(filename, 'r')
-            for rawline in f:
-                line = rawline.strip()
-                # comment or blank line?
-                if line == '':
-                    # skip blank lines
-                    continue
-                if line[0] == '#':
-                    # skip comments
-                    continue
-                self._items.append(line)
-            f.close()
-            ret = True
-        except IOError:
+        if isinstance(filename_or_fileobj, str):
+            try:
+                fobj = open(filename_or_fileobj, 'r')
+            except IOError:
+                fobj = None
+        else:
+            fobj = filename_or_fileobj
+
+        if fobj:
+            try:
+                for rawline in fobj:
+                    line = rawline.strip()
+                    # comment or blank line?
+                    if line == '':
+                        # skip blank lines
+                        continue
+                    if line[0] == '#':
+                        # skip comments
+                        continue
+                    self._items.append(line)
+                fobj.close()
+                ret = True
+            except IOError:
+                ret = False
+        else:
             ret = False
         return ret
 
@@ -44,19 +54,24 @@ class FileListItem(object):
                 fobj = None
         else:
             fobj = filename_or_fileobj
-            
+
         if fobj:
             try:
                 for it in self._items:
-                    f.write(it + '\n')
-                f.close()
+                    fobj.write(it + '\n')
+                fobj.close()
                 ret = True
             except IOError:
                 ret = False
         else:
             ret = False
         return ret
-    
+    def clear(self):
+        self._items = []
+
+    def empty(self):
+        return True if len(self._items) == 0 else False
+
     @property
     def filename(self):
         return self._filename
@@ -86,6 +101,14 @@ class FileList(object):
 
     def clear(self):
         self._items = []
+        
+    def empty(self):
+        ret = True
+        for it in self._items:
+            if not it.empty():
+                ret = False
+                break
+        return ret
 
     def open(self, filename):
         self.clear()
@@ -117,6 +140,7 @@ class FileList(object):
         for it in self._items:
             if not it.save():
                 ret = False
+                break
         return ret
     
     def save(self, filename_or_fileobj):
@@ -132,7 +156,7 @@ class FileList(object):
         return ret
 
     def __str__(self):
-        return str(self.items)
+        return 'FileList(' + str(self.items) + ')'
 
 
 if __name__ == "__main__":
