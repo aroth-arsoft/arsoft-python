@@ -68,3 +68,17 @@ Depends: arsoft-python, python-django (>= 1.4), python-flup, ${python:Depends}, 
 Description: base package for Django based web applications
  This package installs all required packages for Django based web applications.
 
+Package: arsoft-edskmgr
+Architecture: all
+Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
+Replaces: edskmgr
+Description: external disk management tools
+ This package provides scripts and tools to work with external disks.
+
+Package: arsoft-edskmgr-suid
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, arsoft-edskmgr
+Replaces: edskmgr-suid
+Description: suid helpers for the external disk management tools
+ This package suid helpers to allow all users to use the external disk 
+ management tools.

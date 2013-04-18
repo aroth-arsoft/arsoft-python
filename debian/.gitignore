@@ -12,3 +12,5 @@
 /files
 /*.debhelper.log
 /arsoft-python-web/
+/arsoft-edskmgr/
+/arsoft-edskmgr-suid/

@@ -4,6 +4,7 @@ PYTHON2=$(shell pyversions -vr)
 
 # Don't compress .py files
 DEB_COMPRESS_EXCLUDE := .py
+EDSKMGR_SUID_SOURCES = edskmgr-support/edskmgr-suid.c
 
 TARGET_DISTRIBUTION := $(shell dpkg-parsechangelog  | awk '/Distribution/ { print $$2}')
 SUBSTVARS=
@@ -18,6 +19,31 @@ endif
 
 %:
 	dh $@ --buildsystem=python_distutils --with=python2
+
+edskload: $(EDSKMGR_SUID_SOURCES)
+	cc -Wall -DEDSKMGR_LOAD -o $@ $(EDSKMGR_SUID_SOURCES)
+
+edskeject: $(EDSKMGR_SUID_SOURCES)
+	cc -Wall -DEDSKMGR_EJECT -o $@ $(EDSKMGR_SUID_SOURCES)
+
+override_dh_clean:
+	dh_clean -O--buildsystem=python_distutils
+	test -f edskload && rm edskload || true
+	test -f edskeject && rm edskeject || true
+	
+override_dh_auto_build: edskeject edskload
+	dh_auto_build -O--buildsystem=python_distutils
+	
+override_dh_auto_install:
+	dh_auto_install -O--buildsystem=python_distutils
+	install -d $(CURDIR)/debian/tmp/usr/bin
+	install -o root -g root -m 04755 -s edskload $(CURDIR)/debian/tmp/usr/bin/edskload
+	install -o root -g root -m 04755 -s edskeject $(CURDIR)/debian/tmp/usr/bin/edskeject
+	
+override_dh_fixperms:
+	dh_fixperms -O--buildsystem=python_distutils
+	chmod 04755 $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
+	chown root.root $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
 
 override_dh_gencontrol:
 	dh_gencontrol -- $(SUBSTVARS)

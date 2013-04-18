@@ -1,0 +1,16 @@
+#!/bin/sh -e
+
+case "$DEVTYPE" in
+	"partition")
+		/usr/bin/edskmgr --verbose --udev-partition $@
+		;;
+	"disk")
+		/usr/bin/edskmgr --verbose --udev-disk $@
+		;;
+	*)
+		echo "$0: unhandled device type $DEVTYPE"
+		false
+		;;
+esac
+
+

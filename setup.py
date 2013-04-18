@@ -41,7 +41,8 @@ setup(name='arsoft-python',
             'jabber-send',
             'trac-sqlite2mysql',
             'trac-svn2git',
-            'arsoft-backup'
+            'arsoft-backup',
+            'edskmgr'
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
@@ -49,5 +50,7 @@ setup(name='arsoft-python',
 			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg', 'nagios/openvpn.cfg', 'nagios/kernel_modules.cfg', 'nagios/xmpp_notify.cfg']),
 			('/usr/sbin', ['svnbackup', 'cups-admin', 'slapd-config', 'pxeconfig', 'efiinfo', 'nsswitch-config', 'nsswitch-ldap', 'autofs-ldap-auth', 'managehosts', 'heimdal-password-expire']),
 			('/usr/lib/nagios/plugins', ['check_fritzbox', 'check_openvpn', 'check_kernel_modules']),
+			('/lib/udev', [ 'edskmgr-support/external-disk' ]),
+			('/lib/udev/rules.d', [ 'edskmgr-support/88-external-disk.rules' ]),
 			]
 		)
