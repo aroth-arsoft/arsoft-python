@@ -1,0 +1,112 @@
+#!/usr/bin/python
+import os,sys
+from datetime import datetime, timedelta
+import time
+
+from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
+from arsoft.utils import runcmdAndGetData
+import yaml
+
+## Create the plugin option
+np = NagiosPlugin(must_threshold=False)
+np.add_arg('w', 'warning', 'warning threshold in seconds', default=3600, required=0)
+np.add_arg('c', 'critical', 'critical threshold in seconds', default=7200, required=0)
+np.add_arg('s', 'statefile', 'name of puppet agent state file', default='/var/lib/puppet/state/last_run_summary.yaml', required=0)
+np.add_arg('p', 'pidfile', 'name of puppet agent state file', default='/var/run/puppet/agent.pid', required=0)
+np.add_arg('m', 'minversion', 'specifies the minimum version.', default='3.0.0', required=0)
+np.add_arg('r', 'running', 'if not specified checks if agent is running; if set to zero checks if agent is stopped.', default=1, required=0)
+
+## This starts the actual plugin activation
+np.activate()
+
+np.add_value('time_since_last', has_argument=False)
+
+np.add_value('skipped', has_argument=False)
+np.add_value('restarted', has_argument=False)
+np.add_value('changed', has_argument=False)
+np.add_value('failed', has_argument=False)
+np.add_value('failed_to_restart', has_argument=False)
+np.add_value('out_of_sync', has_argument=False)
+np.add_value('total', has_argument=False)
+
+np.set_value_range('time_since_last', warning=np['warning'], critical=np['critical'])
+np.set_value_range('failed', warning=None, critical=1)
+np.set_value_range('failed_to_restart', warning=None, critical=1)
+
+running = True if int(np['running']) != 0 else False
+
+def version_str_to_num(s):
+    (major, minor, patch) = s.split('.')
+    try:
+        ret = (int(major) * 10000) + (int(minor) * 100) + int(patch)
+    except ValueError:
+        ret = 0
+    return ret
+
+try:
+    f = open(np['pidfile'], 'r')
+    pid = int(f.read())
+    f.close()
+except IOError:
+    pid = None
+except ValueError:
+    pid = None
+
+if pid:
+    try:
+        pgid = os.getpgid(pid)
+        puppet_running = True if pgid > 0 else False
+    except:
+        puppet_running = False
+else:
+    puppet_running = False
+
+if running:
+    if not puppet_running:
+        exit_code = CRITICAL
+        exit_message = 'Puppet agent not running'
+    else:
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/puppet', ['--version'])
+        if sts == 0:
+            puppet_version_str = stdoutdata.strip()
+            puppet_version = version_str_to_num(puppet_version_str)
+            minversion = version_str_to_num(np['minversion'])
+
+            if puppet_version > minversion:
+                (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/sudo', ['/bin/cat', np['statefile'] ])
+                if sts == 0:
+                    now = time.mktime(time.gmtime())
+                    last_run_summary = yaml.load(stdoutdata)
+                    last_run = last_run_summary['version']['config']
+                    time_since_last = now - last_run
+
+                    np.set_value('time_since_last', time_since_last)
+                    np.set_value('skipped', last_run_summary['resources']['skipped'])
+                    np.set_value('restarted', last_run_summary['resources']['restarted'])
+                    np.set_value('changed', last_run_summary['resources']['changed'])
+                    np.set_value('failed', last_run_summary['resources']['failed'])
+                    np.set_value('failed_to_restart', last_run_summary['resources']['failed_to_restart'])
+                    np.set_value('out_of_sync', last_run_summary['resources']['out_of_sync'])
+                    np.set_value('total', last_run_summary['resources']['total'])
+                    
+                    (exit_code, exit_message) = np.check_values()
+                    if exit_code == OK:
+                        exit_message = 'Puppet agent running'
+                else:
+                    exit_code = CRITICAL
+                    exit_message = 'Failed to read ' + str(np['statefile']) + '; error ' + str(stderrdata)
+            else:
+                exit_code = CRITICAL
+                exit_message = 'Puppet version ' + puppet_version_str + ' < ' + str(np['minversion'])
+        else:
+            exit_code = CRITICAL
+            exit_message = 'Failed to retrieve puppet version; error ' + str(stderrdata)
+else:
+    if not puppet_running:
+        exit_code = OK
+        exit_message = 'Puppet agent not running'
+    else:
+        exit_code = CRITICAL
+        exit_message = 'Puppet agent is running, but should not be running'
+
+np.nagios_exit(exit_code, exit_message)

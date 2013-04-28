@@ -1,3 +1,9 @@
+arsoft-python (1.49) raring; urgency=low
+
+  * re-implement check_puppet_agent in python
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 28 Apr 2013 19:26:17 +0200
+
 arsoft-python (1.48) quantal; urgency=low
 
   * relocate edskmgr to arsoft-python
