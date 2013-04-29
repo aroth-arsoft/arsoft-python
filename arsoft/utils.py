@@ -14,7 +14,7 @@ def isRoot():
     euid = os.geteuid()
     return True if euid == 0 else False
 
-def runcmd(exe, args=[], verbose=False, stdin=None, input=None):
+def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
@@ -23,7 +23,7 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None):
         stdin_param = stdin
     else:
         stdin_param = subprocess.PIPE
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False)
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None:
@@ -46,7 +46,7 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None):
     return sts
 
 
-def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, input=None):
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, input=None, cwd=None, env=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
@@ -55,7 +55,7 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
         stdin_param = stdin
     else:
         stdin_param = subprocess.PIPE
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False)
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None and outputStdOut:
