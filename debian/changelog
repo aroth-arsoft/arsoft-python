@@ -1,3 +1,9 @@
+arsoft-python (1.50) raring; urgency=low
+
+  * fixed check_puppet_agent
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 29 Apr 2013 08:00:42 +0200
+
 arsoft-python (1.49) raring; urgency=low
 
   * re-implement check_puppet_agent in python
