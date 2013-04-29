@@ -19,15 +19,15 @@ np.add_arg('r', 'running', 'if not specified checks if agent is running; if set 
 ## This starts the actual plugin activation
 np.activate()
 
-np.add_value('time_since_last', has_argument=False)
-
-np.add_value('skipped', has_argument=False)
-np.add_value('restarted', has_argument=False)
-np.add_value('changed', has_argument=False)
-np.add_value('failed', has_argument=False)
-np.add_value('failed_to_restart', has_argument=False)
-np.add_value('out_of_sync', has_argument=False)
-np.add_value('total', has_argument=False)
+np.add_value('time_since_last', 'time since last puppet run', 'time since last run', units='s', has_argument=False, value=0)
+np.add_value('config', 'timestamp of the applied catalog', 'catalog version', has_argument=False, value=0)
+np.add_value('skipped', 'number of skipped resources', 'skipped', has_argument=False, value=0)
+np.add_value('restarted', 'number of restarted resources', 'restarted', has_argument=False, value=0)
+np.add_value('changed', 'number of changed resources', 'changed', has_argument=False, value=0)
+np.add_value('failed', 'number of failed resources', 'failed', has_argument=False, value=0)
+np.add_value('failed_to_restart', 'number of resources which failed to restart', 'failed to restart', has_argument=False, value=0)
+np.add_value('out_of_sync', 'number of resources which are out of sync', 'out-of-sync', has_argument=False, value=0)
+np.add_value('total', 'total number of resources', 'total', has_argument=False, value=0)
 
 np.set_value_range('time_since_last', warning=np['warning'], critical=np['critical'])
 np.set_value_range('failed', warning=None, critical=1)
@@ -66,7 +66,7 @@ if running:
         exit_code = CRITICAL
         exit_message = 'Puppet agent not running'
     else:
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/puppet', ['--version'])
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/puppet', ['--version'], env={'HOME':'/tmp', 'LANG':'C'})
         if sts == 0:
             puppet_version_str = stdoutdata.strip()
             puppet_version = version_str_to_num(puppet_version_str)
@@ -75,12 +75,13 @@ if running:
             if puppet_version > minversion:
                 (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/sudo', ['/bin/cat', np['statefile'] ])
                 if sts == 0:
-                    now = time.mktime(time.gmtime())
+                    now = time.time()
                     last_run_summary = yaml.load(stdoutdata)
-                    last_run = last_run_summary['version']['config']
+                    last_run = last_run_summary['time']['last_run']
                     time_since_last = now - last_run
 
-                    np.set_value('time_since_last', time_since_last)
+                    np.set_value('config', last_run_summary['version']['config'])
+                    np.set_value('time_since_last', int(time_since_last))
                     np.set_value('skipped', last_run_summary['resources']['skipped'])
                     np.set_value('restarted', last_run_summary['resources']['restarted'])
                     np.set_value('changed', last_run_summary['resources']['changed'])
@@ -88,7 +89,7 @@ if running:
                     np.set_value('failed_to_restart', last_run_summary['resources']['failed_to_restart'])
                     np.set_value('out_of_sync', last_run_summary['resources']['out_of_sync'])
                     np.set_value('total', last_run_summary['resources']['total'])
-                    
+
                     (exit_code, exit_message) = np.check_values()
                     if exit_code == OK:
                         exit_message = 'Puppet agent running'
