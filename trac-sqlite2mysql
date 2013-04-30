@@ -25,17 +25,6 @@ class trac_sqlite2mysql(object):
         self._trac_components = None
         self._trac_plugins = None
 
-    def _cleanup_sql(self, sql_sqlite):
-        # Strip all CREATE/COMMIT/BEGIN TRANSACTION/PRAGMA statements
-        sql_sqlite = re.sub(r'(CREATE (TABLE|INDEX)[^;]*|COMMIT|BEGIN TRANSACTION|PRAGMA[^;]*);', '', sql_sqlite)
-        # Use backticks (`) for table names
-        sql_sqlite = re.sub(r'INSERT INTO "([^"]+)"', lambda m: 'INSERT INTO `%s`' % m.groups(1), sql_sqlite)
-        # Change report SQLs: CAST(p.value AS int) -> CAST(p.value AS signed)
-        sql_sqlite = sql_sqlite.replace('CAST(p.value AS int)', 'CAST(p.value AS signed)')
-        # Sometimes you need to deal with those backslashes..
-        sql_sqlite = sql_sqlite.replace("\\''", "\\'")
-        return sql_sqlite
-
     def _run_mysql_query(self, query):
         (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysql', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '-e', query ], verbose=self._verbose)
         if sts == 0:
@@ -81,7 +70,7 @@ class trac_sqlite2mysql(object):
                         print('trac configuration saved.')
                     else:
                         print('failed to save trac configuration. error ' + trac.last_error)
-                    if trac.upgrade():
+                    if trac.upgrade(backup=False):
                         print('trac database upgrade.')
                         (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysqldump', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '--no-data', dbname ], verbose=self._verbose)
                         if sts == 0:
@@ -107,9 +96,25 @@ class trac_sqlite2mysql(object):
         cmd_args = [dbfile, '.dump']
         (sts, stdoutdata, stderrdata) = runcmdAndGetData('sqlite3', cmd_args, verbose=self._verbose)
         if sts == 0:
+            print('sqlite database dump complete. clean up SQL')
             stdoutdata = stdoutdata.decode('utf-8')
             if cleanup_sql:
-                stdoutdata = self._cleanup_sql(stdoutdata)
+                print('clean up SQL dump and prepare for MySQL import')
+                # Strip all CREATE/COMMIT/BEGIN TRANSACTION/PRAGMA statements
+                stdoutdata = re.sub(r'(CREATE (TABLE|INDEX)[^;]*|COMMIT|BEGIN TRANSACTION|PRAGMA[^;]*);', '', stdoutdata)
+                re.purge()
+                print('clean up \'CREATE/COMMIT/BEGIN TRANSACTION/PRAGMA statements\' done')
+                # Use backticks (`) for table names
+                stdoutdata = re.sub(r'INSERT INTO "([^"]+)"', lambda m: 'INSERT INTO `%s`' % m.groups(1), stdoutdata)
+                re.purge()
+                print('clean up \'INSERT INTO\' done')
+                # Change report SQLs: CAST(p.value AS int) -> CAST(p.value AS signed)
+                stdoutdata = stdoutdata.replace('CAST(p.value AS int)', 'CAST(p.value AS signed)')
+                print('clean up \'CAST(p.value AS int) -> CAST(p.value AS signed)\' done')
+                # Sometimes you need to deal with those backslashes..
+                stdoutdata = stdoutdata.replace("\\''", "\\'")
+                print('clean up \'double-single-quote-chars\' done')
+            print('SQL data ready.')
             self._db_data = stdoutdata
             ret = True
         else:
@@ -118,9 +123,11 @@ class trac_sqlite2mysql(object):
         return ret
 
     def _write_sql_file(self, outfile):
+        print('Save SQL file to %s' %(outfile))
         try:
             f = codecs.open(outfile, 'w', 'utf-8')
             f.write('SET autocommit=0;\n')
+            f.write('SET sql_mode=\'NO_BACKSLASH_ESCAPES\';\n')
             f.write(self._db_struct)
             f.write(self._db_data)
             f.write('COMMIT;\n')
@@ -155,7 +162,7 @@ class trac_sqlite2mysql(object):
     def _load_tracenv(self, tracenv):
         trac = TracAdmin(tracenv)
         if trac.database_type != 'sqlite':
-            print('This script is designed to convert SQLite3 database only.')
+            print('This script is designed to convert SQLite3 database only. Current database is of type \'' + str(trac.database_type) + '\'')
             ret = False
         else:
             self._trac_components = trac.configured_components
@@ -187,7 +194,6 @@ class trac_sqlite2mysql(object):
         self._mysql_server = args.mysql_server
         self._mysql_user = args.mysql_user
         self._mysql_password = args.mysql_password
-        self._dbfile = args.dbfile
 
         if args.trac_plugins:
             plugins = []
@@ -212,9 +218,14 @@ class trac_sqlite2mysql(object):
                 self._write_sql_file(output_sqlfile)
 
                 if args.mysql_database:
+                    print('Import %s into MySQL database %s.' %(output_sqlfile, args.mysql_database))
                     ret = self._import_sql_file_to_database(output_sqlfile, args.mysql_database)
                     if ret:
                         print('import converted database to mysql successful.')
+                    else:
+                        print('Failed to import')
+                else:
+                    print('No database specified to import sql file %s' %(output_sqlfile))
         
                 if not args.outfile:
                     # remove temp sql file

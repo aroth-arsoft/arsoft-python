@@ -43,8 +43,11 @@ class TracAdmin(object):
             args.append(repository_path)
         return self._run_trac_admin(args)
 
-    def upgrade(self):
-        return self._run_trac_admin(['upgrade'])
+    def upgrade(self, backup=True):
+        args = ['upgrade']
+        if backup == False:
+            args.append('--no-backup')
+        return self._run_trac_admin(args)
     
     def _init_env(self):
         if self._env is None:
@@ -184,11 +187,16 @@ class TracAdmin(object):
 
     def enable_plugin(self, plugin):
         plugin_components = self.get_plugin_components(plugin)
-        for comp in plugin_components:
-            if self._verbose:
-                print('enable ' + comp)
-            self._env.enable_component(comp)
-            self._env.config.set('components', comp, 'enabled')
+        if plugin_components is not None:
+            for comp in plugin_components:
+                if self._verbose:
+                    print('enable ' + comp)
+                self._env.enable_component(comp)
+                self._env.config.set('components', comp, 'enabled')
+            ret = True
+        else:
+            ret = False
+        return ret
 
     def save_config(self):
         """Try to save the config, and display either a success notice or a
