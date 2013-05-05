@@ -14,6 +14,15 @@ class TracAdmin(object):
         self._trac_config = None
         self._plugin_info = None
         self._repository_manager = None
+        self._db_repository_provider = None
+        self._env = None
+
+    def reinitialize(self):
+        self._last_error = None
+        self._trac_config = None
+        self._plugin_info = None
+        self._repository_manager = None
+        self._db_repository_provider = None
         self._env = None
 
     @property
@@ -23,6 +32,11 @@ class TracAdmin(object):
     @property
     def verbose(self):
         return self._verbose
+
+    @property
+    def valid(self):
+        self._init_env()
+        return True if self._env else False
 
     def _run_trac_admin(self, args):
         self._last_error = None
@@ -74,6 +88,15 @@ class TracAdmin(object):
                 self._repository_manager = RepositoryManager(self._env)
             except:
                 self._repository_manager = []
+
+    def _retrieve_db_repository_provider(self):
+        if self._db_repository_provider is None:
+            self._init_env()
+            try:
+                from trac.versioncontrol import DbRepositoryProvider
+                self._db_repository_provider = DbRepositoryProvider(self._env)
+            except:
+                self._db_repository_provider = []
 
     @property
     def plugins(self):
@@ -155,12 +178,18 @@ class TracAdmin(object):
 
     @property
     def repositories(self):
+        ret = []
+        self._retrieve_db_repository_provider()
+        if self._db_repository_provider:
+            ret = self._db_repository_provider.get_repositories()
+        return ret
+    
+    @property
+    def supported_repository_types(self):
         self._retrieve_repository_manager()
         ret = []
         if self._repository_manager:
-            tmp = self._repository_manager.get_real_repositories()
-            for tmp_repo in tmp:
-                ret.append(tmp_repo)
+            ret = self._repository_manager.get_supported_types()
         return ret
 
     def get_repository(self, reponame):
@@ -169,6 +198,58 @@ class TracAdmin(object):
             return self._repository_manager.get_repository(reponame)
         else:
             return None
+        
+    def sync_repository(self, reponame, rev_callback=None, clean=False):
+        ret = False
+        self._retrieve_repository_manager()
+        if self._repository_manager:
+            from trac.core import TracError
+            try:
+                repo = self._repository_manager.get_repository(reponame)
+                if repo:
+                    repo.sync(rev_callback=rev_callback, clean=clean)
+                    ret = True
+                else:
+                    ret = False
+            except TracError as e:
+                self._last_error = str(e)
+        return ret
+
+    def add_repository(self, reponame, path, repotype):
+        ret = False
+        self._retrieve_db_repository_provider()
+        if self._db_repository_provider:
+            from trac.core import TracError
+            try:
+                self._db_repository_provider.add_repository(reponame, path, repotype)
+                ret = True
+            except TracError as e:
+                self._last_error = str(e)
+        return ret
+
+    def remove_repository(self, reponame):
+        ret = False
+        self._retrieve_db_repository_provider()
+        if self._db_repository_provider:
+            from trac.core import TracError
+            try:
+                self._db_repository_provider.remove_repository(reponame)
+                ret = True
+            except TracError as e:
+                self._last_error = str(e)
+        return ret
+
+    def modify_repository(self, reponame, changes):
+        ret = False
+        self._retrieve_db_repository_provider()
+        if self._db_repository_provider:
+            from trac.core import TracError
+            try:
+                self._db_repository_provider.modify_repository(reponame, changes)
+                ret = True
+            except TracError as e:
+                self._last_error = str(e)
+        return ret
 
     def set_logging(self, logfile='trac.log', level='DEBUG', logtype='file'):
         self._init_env()

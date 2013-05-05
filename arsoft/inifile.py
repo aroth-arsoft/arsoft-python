@@ -509,6 +509,13 @@ class IniFile(object):
                 ret = False
         return ret
 
+    @property
+    def sections(self):
+        ret = []
+        for section_obj in self.m_sections:
+            ret.append(section_obj.name)
+        return ret
+
     def __str__(self):
         return self.asString(only_data=False)
 
