@@ -1,3 +1,9 @@
+arsoft-python (1.52) raring; urgency=low
+
+  * add trac-manage script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 05 May 2013 18:02:31 +0200
+
 arsoft-python (1.51) raring; urgency=low
 
   * added yaml depends
