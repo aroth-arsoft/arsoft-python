@@ -82,13 +82,14 @@ if running:
 
                     np.set_value('config', last_run_summary['version']['config'])
                     np.set_value('time_since_last', int(time_since_last))
-                    np.set_value('skipped', last_run_summary['resources']['skipped'])
-                    np.set_value('restarted', last_run_summary['resources']['restarted'])
-                    np.set_value('changed', last_run_summary['resources']['changed'])
-                    np.set_value('failed', last_run_summary['resources']['failed'])
-                    np.set_value('failed_to_restart', last_run_summary['resources']['failed_to_restart'])
-                    np.set_value('out_of_sync', last_run_summary['resources']['out_of_sync'])
-                    np.set_value('total', last_run_summary['resources']['total'])
+                    if 'resources' in last_run_summary:
+                        np.set_value('skipped', last_run_summary['resources']['skipped'])
+                        np.set_value('restarted', last_run_summary['resources']['restarted'])
+                        np.set_value('changed', last_run_summary['resources']['changed'])
+                        np.set_value('failed', last_run_summary['resources']['failed'])
+                        np.set_value('failed_to_restart', last_run_summary['resources']['failed_to_restart'])
+                        np.set_value('out_of_sync', last_run_summary['resources']['out_of_sync'])
+                        np.set_value('total', last_run_summary['resources']['total'])
 
                     (exit_code, exit_message) = np.check_values()
                     if exit_code == OK:
