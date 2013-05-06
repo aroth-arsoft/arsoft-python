@@ -58,7 +58,15 @@ class trac_manage(object):
 
         if args.action_list_repos:
             for (reponame, repoprops) in self._trac.repositories:
-                print('%s: %s (%s)' %(reponame, repoprops['dir'], repoprops['type']))
+                repodir = repoprops['dir'] if 'dir' in repoprops else 'unknown'
+                repotype = repoprops['type'] if 'type' in repoprops else 'unknown'
+                repoalias = repoprops['alias'] if 'alias' in repoprops else None
+                if reponame == '':
+                    reponame = '(default)'
+                if repoalias:
+                    print('%s: alias for %s' %(reponame, repoalias))
+                else:
+                    print('%s: %s (%s)' %(reponame, repodir, repotype))
             ret = True
         elif args.action_config_repos:
             inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
@@ -76,38 +84,51 @@ class trac_manage(object):
                     reponame = inifile.get(section, 'name', None)
                     repopath = inifile.get(section, 'path', None)
                     repotype = inifile.get(section, 'type', None)
+                    repoalias = inifile.get(section, 'alias', None)
                     repodesc = inifile.get(section, 'description', None)
                     
-                    if reponame is None or repopath is None or repotype is None:
+                    if reponame is None:
                         continue
-                    
-                    if repotype not in supported_repository_types:
-                        if repotype == 'svn':
-                            self._enable_svn()
-                            supported_repository_types = self._trac.supported_repository_types
-                        elif repotype == 'git':
-                            self._enable_git()
-                            supported_repository_types = self._trac.supported_repository_types
-                        else:
-                            print('Repository type %s of repository %s is not supported (only %s is supported).' % 
-                                (repotype, reponame, ','.join(supported_repository_types)))
-                    changes = {}
-                    if reponame in repos_to_remove:
-                        # repo already exists, so check if we need to modify it
-                        repos_to_remove.remove(reponame)
-                        changes['description'] = repodesc
-                        changes['type'] = repotype
-                        changes['dir'] = repopath
-                        result = True
-                    else:
-                        result = self._trac.add_repository(reponame, repopath, repotype)
-                    if result:
-                        print('modify repository %s changes=%s' % (reponame, str(changes)))
-                        result = self._trac.modify_repository(reponame, changes)
+                    elif reponame == '(default)':
+                        reponame = ''
+
+                    if repoalias is not None:
+                        pass
+                    elif repopath is None or repotype is None:
+                        continue
+
+                    if repoalias:
+                        result = self._trac.add_repository_alias(reponame, repoalias)
                         if not result:
                             print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
                     else:
-                        print('Failed to add repository %s, error %s' % (reponame, self._trac.last_error))
+                        if repotype not in supported_repository_types:
+                            if repotype == 'svn':
+                                self._enable_svn()
+                                supported_repository_types = self._trac.supported_repository_types
+                            elif repotype == 'git':
+                                self._enable_git()
+                                supported_repository_types = self._trac.supported_repository_types
+                            else:
+                                print('Repository type %s of repository %s is not supported (only %s is supported).' % 
+                                    (repotype, reponame, ','.join(supported_repository_types)))
+                        changes = {}
+                        if reponame in repos_to_remove:
+                            # repo already exists, so check if we need to modify it
+                            repos_to_remove.remove(reponame)
+                            changes['description'] = repodesc
+                            changes['type'] = repotype
+                            changes['dir'] = repopath
+                            result = True
+                        else:
+                            result = self._trac.add_repository(reponame, repopath, repotype)
+                        if result:
+                            print('modify repository %s changes=%s' % (reponame, str(changes)))
+                            result = self._trac.modify_repository(reponame, changes)
+                            if not result:
+                                print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
+                        else:
+                            print('Failed to add repository %s, error %s' % (reponame, self._trac.last_error))
                     if not result:
                         break
 

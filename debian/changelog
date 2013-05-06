@@ -1,3 +1,9 @@
+arsoft-python (1.53) raring; urgency=low
+
+  * add support to configure repo aliases in trac-manage
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 06 May 2013 08:07:49 +0200
+
 arsoft-python (1.52) raring; urgency=low
 
   * add trac-manage script

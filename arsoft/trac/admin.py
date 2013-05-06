@@ -65,11 +65,16 @@ class TracAdmin(object):
     
     def _init_env(self):
         if self._env is None:
+            from trac.core import TracError
             try:
                 from trac.env import Environment
                 self._env = Environment(self._tracenv)
-            except:
+            except TracError as e:
                 self._env = None
+                self._last_error = str(e)
+            except IOError as e:
+                self._env = None
+                self._last_error = str(e)
     
     def _retrieve_plugin_info(self):
         if self._plugin_info is None:
@@ -198,7 +203,7 @@ class TracAdmin(object):
             return self._repository_manager.get_repository(reponame)
         else:
             return None
-        
+
     def sync_repository(self, reponame, rev_callback=None, clean=False):
         ret = False
         self._retrieve_repository_manager()
@@ -246,6 +251,18 @@ class TracAdmin(object):
             from trac.core import TracError
             try:
                 self._db_repository_provider.modify_repository(reponame, changes)
+                ret = True
+            except TracError as e:
+                self._last_error = str(e)
+        return ret
+    
+    def add_repository_alias(self, reponame, target):
+        ret = False
+        self._retrieve_db_repository_provider()
+        if self._db_repository_provider:
+            from trac.core import TracError
+            try:
+                self._db_repository_provider.add_alias(reponame, target)
                 ret = True
             except TracError as e:
                 self._last_error = str(e)
