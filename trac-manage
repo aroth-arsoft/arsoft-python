@@ -75,9 +75,9 @@ class trac_manage(object):
                 ret = False
             else:
                 supported_repository_types = self._trac.supported_repository_types
-                repos_to_remove = set()
+                repos_to_remove = {}
                 for (reponame, repoprops) in self._trac.repositories:
-                    repos_to_remove.add(reponame)
+                    repos_to_remove[reponame] = repoprops
 
                 result = True
                 for section in inifile.sections:
@@ -98,9 +98,19 @@ class trac_manage(object):
                         continue
 
                     if repoalias:
-                        result = self._trac.add_repository_alias(reponame, repoalias)
-                        if not result:
-                            print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
+                        if reponame in repos_to_remove:
+                            # repo already exists, so check if we need to modify it
+                            current_props = repos_to_remove[reponame]
+                            del repos_to_remove[reponame]
+                            if repoalias != current_props['alias']:
+                                changes = {'alias':repoalias}
+                                result = self._trac.modify_repository(reponame, changes)
+                            else:
+                                result = True
+                        else:
+                            result = self._trac.add_repository_alias(reponame, repoalias)
+                            if not result:
+                                print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
                     else:
                         if repotype not in supported_repository_types:
                             if repotype == 'svn':
@@ -115,27 +125,39 @@ class trac_manage(object):
                         changes = {}
                         if reponame in repos_to_remove:
                             # repo already exists, so check if we need to modify it
-                            repos_to_remove.remove(reponame)
-                            changes['description'] = repodesc
-                            changes['type'] = repotype
-                            changes['dir'] = repopath
+                            current_props = repos_to_remove[reponame]
+                            del repos_to_remove[reponame]
+
+                            if 'description' in current_props:
+                                if current_props['description'] != repodesc:
+                                    changes['description'] = repodesc
+                            if 'type' in current_props:
+                                if current_props['type'] != repotype:
+                                    changes['type'] = repotype
+                            if 'dir' in current_props:
+                                if current_props['dir'] != repopath:
+                                    changes['dir'] = repopath
                             result = True
                         else:
                             result = self._trac.add_repository(reponame, repopath, repotype)
+                            if result:
+                                if repodesc is not None and len(repodesc) != 0:
+                                    changes['description'] = repodesc
                         if result:
-                            print('modify repository %s changes=%s' % (reponame, str(changes)))
-                            result = self._trac.modify_repository(reponame, changes)
-                            if not result:
-                                print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
+                            if len(changes) != 0:
+                                print('modify repository %s changes=%s' % (reponame, str(changes)))
+                                result = self._trac.modify_repository(reponame, changes)
+                                if not result:
+                                    print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
                         else:
                             print('Failed to add repository %s, error %s' % (reponame, self._trac.last_error))
                     if not result:
                         break
 
                 inifile.close()
-                
+
                 if result:
-                    for reponame in repos_to_remove:
+                    for reponame in repos_to_remove.iterkeys():
                         print('remove repository %s' % (reponame))
                         if not self._trac.remove_repository(reponame):
                             print('Failed to remove repository %s, error %s' % (reponame, self._trac.last_error))
