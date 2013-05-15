@@ -38,6 +38,7 @@ class jabbersend:
         parser.add_argument('--version', dest='version', action='store_true', help='enable verbose output.')
         parser.add_argument('--save', dest='save', action='store_true', help='save the command line parameters into the config file.')
         parser.add_argument('-m', '--message', dest='message', help='message body text', metavar='MSG')
+        parser.add_argument('--html', dest='html', help='HTML message body text', metavar='HTML')
         parser.add_argument('-s', '--subject', dest='subject', help='message subject', metavar='SUB')
         parser.add_argument('-f', '--from', dest='sender', help='sender name')
         parser.add_argument('-t', '--to', dest='recipient', help='recipient name')
@@ -54,6 +55,7 @@ class jabbersend:
         recipient = None
         password = None
         subject = args.subject
+        html = args.html
         self.verbose = args.verbose
         
         if self.verbose:
@@ -110,16 +112,19 @@ class jabbersend:
 
         if args.message:
             body = args.message
+        elif args.html:
+            body = ''
         else:
             body = sys.stdin.read()
 
-        if not body or len(body) == 0:
+        if (not body or len(body) == 0) and (not html or len(html) == 0) :
             sys.stderr.write('No message given.\n') 
             return 1
 
         if self.verbose:
             print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
-        if arsoft.xmpp.send_message(sender, password, recipient, body, subject, 
+        if arsoft.xmpp.send_message(sender, password, recipient, body, 
+                                    html=html, subject=subject, 
                                   ipv4=(True if ipv6 == False else False),
                                   ipv6=(True if ipv4 == False else False)):
             ret = 0

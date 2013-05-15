@@ -1,3 +1,9 @@
+arsoft-python (1.55) raring; urgency=low
+
+  * add html functionality to jabber-send
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 15 May 2013 08:04:55 +0200
+
 arsoft-python (1.54) raring; urgency=low
 
   * improve trac-manage to avoid duplicate configuration
