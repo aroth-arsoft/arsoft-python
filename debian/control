@@ -58,7 +58,7 @@ Description: utilities for trac administration
 
 Package: arsoft-python-kerberos
 Architecture: all
-Depends: arsoft-python, python-pexpect, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, python-pexpect, python-ldap, ${python:Depends}, ${misc:Depends}
 Description: python module to access and control a Kerberos environment
  Includes functions to change the kerberos password with a simple function call.
 
