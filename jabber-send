@@ -27,6 +27,13 @@ class jabbersend:
         print('Backend Version: ' + str(info.version))
         return 0
         
+    def _run_daemon(self, sender, password, ipv4, ipv6):
+        bot = arsoft.xmpp.message_bot(sender, password, ipv4=ipv4, ipv6=ipv6)
+        if bot is None:
+            return 1
+        else:
+            return 0
+        
     def main(self):
         #=============================================================================================
         # process command line
@@ -37,6 +44,8 @@ class jabbersend:
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--version', dest='version', action='store_true', help='enable verbose output.')
         parser.add_argument('--save', dest='save', action='store_true', help='save the command line parameters into the config file.')
+        parser.add_argument('--daemon', dest='daemon', action='store_true', help='start as daemon and work in the background.')
+        parser.add_argument('--socket', dest='socket', default='/run/jabber_send.sock', help='specifies the socket for interaction.')
         parser.add_argument('-m', '--message', dest='message', help='message body text', metavar='MSG')
         parser.add_argument('--html', dest='html', help='HTML message body text', metavar='HTML')
         parser.add_argument('-s', '--subject', dest='subject', help='message subject', metavar='SUB')
@@ -114,23 +123,34 @@ class jabbersend:
             body = args.message
         elif args.html:
             body = ''
-        else:
+        elif not args.daemon:
             body = sys.stdin.read()
+        else:
+            body = None
 
-        if (not body or len(body) == 0) and (not html or len(html) == 0) :
-            sys.stderr.write('No message given.\n') 
+        if not args.daemon:
+            if (not body or len(body) == 0) and (not html or len(html) == 0) :
+                sys.stderr.write('No message given.\n') 
+                return 1
+        elif not args.socket:
+            sys.stderr.write('Socket for daemon must be specified.\n') 
             return 1
 
-        if self.verbose:
-            print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
-        if arsoft.xmpp.send_message(sender, password, recipient, body, 
-                                    html=html, subject=subject, 
-                                  ipv4=(True if ipv6 == False else False),
-                                  ipv6=(True if ipv4 == False else False)):
-            ret = 0
+        if args.daemon:
+            ret = self._run_daemon(sender, password, 
+                             ipv4=(True if ipv6 == False else False),
+                             ipv6=(True if ipv4 == False else False))
         else:
-            sys.stderr.write('Failed to send message from %s to %s.\n' %(sender, recipient))
-            ret = 1
+            if self.verbose:
+                print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
+            if arsoft.xmpp.send_message(sender, password, recipient, body, 
+                                        html=html, subject=subject, 
+                                    ipv4=(True if ipv6 == False else False),
+                                    ipv6=(True if ipv4 == False else False)):
+                ret = 0
+            else:
+                sys.stderr.write('Failed to send message from %s to %s.\n' %(sender, recipient))
+                ret = 1
         return ret
 
 if __name__ == "__main__":

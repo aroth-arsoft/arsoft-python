@@ -15,7 +15,6 @@ np.activate()
 np.add_value('temp_c', 'temperature in celsius', 'temperature in celsius', units='degree', has_argument=False, value=0)
 np.add_value('temp_f', 'temperature in fahrenheit', 'temperature in fahrenheit', units='degree', has_argument=False, value=0)
 
-np.add_value('wind_dir', 'wind direction', 'wind direction', has_argument=False, value='')
 np.add_value('wind_degrees', 'wind direction in degree', 'wind direction in degree', units='degree', has_argument=False, value=0)
 np.add_value('wind_mph', 'wind speed', 'wind speed', units='mph', has_argument=False, value=0)
 np.add_value('wind_gust_mph', 'wind gust speed', 'wind gust speed', units='mph', has_argument=False, value=0)
@@ -74,14 +73,13 @@ if current_observation:
             np.set_value('temp_c', _get_node_float(tree, 'temp_c'))
             np.set_value('temp_f', _get_node_float(tree, 'temp_f'))
             
-            np.set_value('wind_dir', _get_node_str(tree, 'wind_dir'))
             np.set_value('wind_degrees', _get_node_float(tree, 'wind_degrees'))
             np.set_value('wind_mph', _get_node_float(tree, 'wind_mph'))
             np.set_value('wind_gust_mph', _get_node_float(tree, 'wind_gust_mph'))
             
             np.set_value('pressure_mb', _get_node_float(tree, 'pressure_mb'))
-            np.set_value('dewpoint_f', _get_node_float(tree, 'dewpoint_f'))
             np.set_value('dewpoint_c', _get_node_float(tree, 'dewpoint_c'))
+            np.set_value('dewpoint_f', _get_node_float(tree, 'dewpoint_f'))
             
             np.set_value('precip_1hr', _get_node_float(tree, 'precip_1hr_metric'))
             np.set_value('precip_today', _get_node_float(tree, 'precip_today_metric'))
