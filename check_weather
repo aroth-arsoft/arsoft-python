@@ -64,6 +64,10 @@ if current_observation:
         location_node = tree.find('location')
         if location_node is not None:
             station_full_name = _get_node_str(location_node, 'full')
+            if station_full_name is not None:
+                station_full_name = station_full_name.strip()
+                while station_full_name[-1] in ',.':
+                    station_full_name = station_full_name[:-1]
         else:
             station_full_name = None
         if station_full_name is not None and len(station_full_name) != 0:
