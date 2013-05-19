@@ -8,9 +8,11 @@ import argparse
 import sys
 import logging
 import time
+import json
 
 import arsoft.xmpp
 from arsoft.inifile import IniFile
+from arsoft.socket_utils import *
 
 # version of this script
 __version__  = '1.0'
@@ -18,7 +20,8 @@ __version__  = '1.0'
 class jabbersend:
     def __init__(self):
         self.verbose = False
-        
+        self._config = None
+
     def version(self):
         print('Version: ' + str(__version__))
         print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
@@ -26,14 +29,7 @@ class jabbersend:
         print('Backend: ' + str(info.name))
         print('Backend Version: ' + str(info.version))
         return 0
-        
-    def _run_daemon(self, sender, password, ipv4, ipv6):
-        bot = arsoft.xmpp.message_bot(sender, password, ipv4=ipv4, ipv6=ipv6)
-        if bot is None:
-            return 1
-        else:
-            return 0
-        
+
     def main(self):
         #=============================================================================================
         # process command line
@@ -44,8 +40,6 @@ class jabbersend:
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--version', dest='version', action='store_true', help='enable verbose output.')
         parser.add_argument('--save', dest='save', action='store_true', help='save the command line parameters into the config file.')
-        parser.add_argument('--daemon', dest='daemon', action='store_true', help='start as daemon and work in the background.')
-        parser.add_argument('--socket', dest='socket', default='/run/jabber_send.sock', help='specifies the socket for interaction.')
         parser.add_argument('-m', '--message', dest='message', help='message body text', metavar='MSG')
         parser.add_argument('--html', dest='html', help='HTML message body text', metavar='HTML')
         parser.add_argument('-s', '--subject', dest='subject', help='message subject', metavar='SUB')
@@ -54,9 +48,10 @@ class jabbersend:
         parser.add_argument('-p', '--password', dest='password', help='password for sender')
         parser.add_argument('-4', dest='ipv4', default=False, action='store_true', help='only use IPv4 to connect to server.')
         parser.add_argument('-6', dest='ipv6', default=False, action='store_true', help='only use IPv6 to connect to server.')
+        parser.add_argument('-d', '--daemon', dest='use_daemon', action='store_true', help='use daemon to send message.')
 
         args = parser.parse_args()
-        
+
         if args.version:
             return self.version()
 
@@ -69,7 +64,7 @@ class jabbersend:
         
         if self.verbose:
             logger.setLevel(logging.DEBUG) # change to DEBUG for higher verbosity
-            
+
         if args.configfile:
             configfile = args.configfile
         elif args.noconfig == False:
@@ -78,14 +73,13 @@ class jabbersend:
             configfile = None
 
         if configfile:
-            inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-            inifile.open(configfile)
+            self._config = arsoft.xmpp.xmpp_config(configfile)
 
-            sender = inifile.get(None, 'From', '') 
-            recipient = inifile.get(None, 'To', '') 
-            password = inifile.get(None, 'Password', '') 
-            ipv4 = inifile.getAsBoolean(None, 'IPv4', False)
-            ipv6 = inifile.getAsBoolean(None, 'IPv6', False)
+            sender = self._config.sender
+            recipient = self._config.recipient
+            password = self._config.password
+            ipv4 = self._config.ipv4
+            ipv6 = self._config.ipv6
         else:
             ipv4 = args.ipv4
             ipv6 = args.ipv6
@@ -102,15 +96,9 @@ class jabbersend:
             if not configfile:
                 sys.stderr.write('No config file specified to save parameters.\n') 
                 return 1
-            inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-            inifile.open(configfile)
-
-            inifile.set(None, 'From', sender) 
-            inifile.set(None, 'To', recipient) 
-            inifile.set(None, 'Password', password) 
-            inifile.setAsBoolean(None, 'IPv4', ipv4)
-            inifile.setAsBoolean(None, 'IPv6', ipv6)
-            inifile.save(configfile)
+            
+            self._config = arsoft.xmpp.xmpp_config(filename=None, sender=sender, password=password, recipient=recipient, ipv4=ipv4, ipv6=ipv6)
+            self._config.save(configfile)
 
         if not sender:
             sys.stderr.write('No sender specified.\n') 
@@ -121,28 +109,31 @@ class jabbersend:
 
         if args.message:
             body = args.message
-        elif args.html:
+        elif len(html) > 0:
             body = ''
-        elif not args.daemon:
-            body = sys.stdin.read()
         else:
-            body = None
+            body = sys.stdin.read()
 
-        if not args.daemon:
-            if (not body or len(body) == 0) and (not html or len(html) == 0) :
-                sys.stderr.write('No message given.\n') 
-                return 1
-        elif not args.socket:
-            sys.stderr.write('Socket for daemon must be specified.\n') 
+        if (not body or len(body) == 0) and (not html or len(html) == 0) :
+            sys.stderr.write('No message given.\n') 
             return 1
 
-        if args.daemon:
-            ret = self._run_daemon(sender, password, 
-                             ipv4=(True if ipv6 == False else False),
-                             ipv6=(True if ipv4 == False else False))
+        if self.verbose:
+            print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
+            
+        if args.use_daemon:
+            msg_obj = { 'recipient':recipient }
+            if len(html) > 0:
+                msg_obj['html'] = html
+            else:
+                msg_obj['body'] = body
+            if subject:
+                msg_obj['subject'] = subject
+            self._sock = connect_unix_socket('/tmp/jabber-daemon.sock')
+            self._sock.sendall(json.dumps(msg_obj) + '\n')
+            self._sock.close()
+            ret = 0
         else:
-            if self.verbose:
-                print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
             if arsoft.xmpp.send_message(sender, password, recipient, body, 
                                         html=html, subject=subject, 
                                     ipv4=(True if ipv6 == False else False),

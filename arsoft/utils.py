@@ -161,3 +161,7 @@ def is_localhost(hostname):
 
 def enum(**enums):
     return type('Enum', (), enums)
+
+def get_main_script_filename():
+    import __main__
+    return os.path.realpath(os.path.abspath(__main__.__file__))

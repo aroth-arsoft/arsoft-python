@@ -15,3 +15,7 @@ class BackendInfo(object):
             ret = ret + 'Homepage: ' + str(self.homepage) + '\n'
         ret = ret + 'Version: ' + str(self.version) + '\n'
         return ret
+
+class BackendBot(object):
+    def __init__(self):
+        pass

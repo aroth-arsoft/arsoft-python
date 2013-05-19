@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.56',
+		version='1.58',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -39,6 +39,7 @@ setup(name='arsoft-python',
             'fritzbox-status',
             'ini-util',
             'jabber-send',
+            'jabber-daemon',
             'trac-sqlite2mysql',
             'trac-svn2git',
             'trac-manage',

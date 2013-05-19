@@ -1,0 +1,280 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import os.path
+import argparse
+import sys
+import logging
+import time
+import signal
+from daemon import runner
+import threading
+import errno
+import json
+
+import arsoft.xmpp
+from arsoft.utils import get_main_script_filename
+from arsoft.inifile import IniFile
+from arsoft.socket_utils import *
+
+# version of this script
+__version__  = '1.0'
+
+class JabberDaemonRunner(runner.DaemonRunner):
+    def __init__(self, app):
+        """ Set up the parameters of a new runner.
+
+            The `app` argument must have the following attributes:
+
+            * `stdin_path`, `stdout_path`, `stderr_path`: Filesystem
+              paths to open and replace the existing `sys.stdin`,
+              `sys.stdout`, `sys.stderr`.
+
+            * `pidfile_path`: Absolute filesystem path to a file that
+              will be used as the PID file for the daemon. If
+              ``None``, no PID file will be used.
+
+            * `pidfile_timeout`: Used as the default acquisition
+              timeout value supplied to the runner's PID lock file.
+
+            * `run`: Callable that will be invoked when the daemon is
+              started.
+            
+            """
+        super(JabberDaemonRunner, self).__init__(app)
+        self.progname = os.path.basename(get_main_script_filename())
+        self.daemon_context.signal_map = {
+            signal.SIGTERM: self.signal_terminate,
+            signal.SIGHUP: self.signal_reload
+            }
+
+    def signal_terminate(self, signal_number, stack_frame):
+        self.app.terminate()
+
+    def signal_reload(self, signal_number, stack_frame):
+        self.app.reload()
+
+    def _usage_exit(self, argv):
+        """ Emit a usage message, then exit.
+            """
+        progname = os.path.basename(argv[0])
+        usage_exit_code = 2
+        action_usage = "|".join(self.action_funcs.keys())
+        message = "usage: %(progname)s %(action_usage)s" % vars()
+        runner.emit_message(message)
+        sys.exit(usage_exit_code)
+
+    def parse_args(self, argv=None):
+        """ Parse command-line arguments.
+            """
+        if argv is None:
+            argv = sys.argv
+
+        min_args = 2
+        if len(argv) < min_args:
+            self._usage_exit(argv)
+
+        self.action = argv[1]
+        if self.action not in self.action_funcs:
+            self._usage_exit(argv)
+
+    def _terminate_daemon_process(self, wait=True):
+        """ Terminate the daemon process specified in the current PID file.
+            """
+
+        pid = self.pidfile.read_pid()
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError as exc:
+            raise DaemonRunnerStopFailureError(
+                "Failed to terminate %(pid)d: %(exc)s" % vars())
+        while wait:
+            try:
+                os.kill(pid, 0)
+            except OSError as ex:
+                if ex.errno == errno.ESRCH:
+                    break
+            time.sleep(0.25)
+
+    def _start(self):
+        """ Open the daemon context and run the application.
+            """
+        """ Open the daemon context and run the application.
+            """
+        if runner.is_pidfile_stale(self.pidfile):
+            self.pidfile.break_lock()
+
+        try:
+            self.daemon_context.open()
+        except pidlockfile.AlreadyLocked:
+            pidfile_path = self.pidfile.path
+            runner.emit_message('%s is already running' % (self.progname))
+            return
+
+        pid = os.getpid()
+        message = self.start_message % vars()
+        runner.emit_message(message)
+
+        self.app.run()
+        self.app.terminate()
+
+    def _stop(self):
+        """ Exit the daemon process specified in the current PID file.
+            """
+        if not self.pidfile.is_locked():
+            pidfile_path = self.pidfile.path
+            runner.emit_message('%s is not running' % self.progname)
+            return
+
+        if runner.is_pidfile_stale(self.pidfile):
+            self.pidfile.break_lock()
+        else:
+            self._terminate_daemon_process(wait=True)
+
+    def _status(self):
+        (running, pid) = pidfile_status(self.pidfile)
+        if running:
+            runner.emit_message('%s is running (PID %i)' % (self.progname, pid))
+        else:
+            runner.emit_message('%s is not running' % (self.progname))
+
+    action_funcs = {
+        'start': _start,
+        'stop': _stop,
+        'restart': runner.DaemonRunner._restart,
+        'status': _status
+        }
+
+def pidfile_status(pidfile):
+    """ Determine the status of the process specified in the a PID file.
+
+        Return tuple of (running as bool, process id)
+
+        """
+    result = (False, -1)
+
+    pidfile_pid = pidfile.read_pid()
+    if pidfile_pid is not None:
+        try:
+            os.kill(pidfile_pid, signal.SIG_DFL)
+            result = (True, pidfile_pid)
+        except OSError, exc:
+            if exc.errno == errno.ESRCH:
+                # The specified PID does not exist
+                result = (False, pidfile_pid)
+    else:
+        result = (False, -1)
+
+    return result
+
+
+class jabberdaemon:
+    def __init__(self):
+        self.verbose = False
+        self.stdin_path = '/dev/null'
+        self.stdout_path = '/dev/tty'
+        self.stderr_path = '/dev/tty'
+        self.pidfile_path =  '/tmp/jabber-daemon.pid'
+        self.pidfile_timeout = 5
+
+        #self._configfile = '/etc/jabber/daemon.conf'
+        self._configfile = os.path.expanduser("~/.jabber-send.conf")
+        self._config = arsoft.xmpp.xmpp_config(self._configfile)
+        self._do_exit = False
+        self._sock = None
+        logger = logging.getLogger()
+        logger.setLevel(self._config.loglevel_numeric)
+
+    def version(self):
+        print('Version: ' + str(__version__))
+        print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
+        info = arsoft.xmpp.backend_info()
+        print('Backend: ' + str(info.name))
+        print('Backend Version: ' + str(info.version))
+        return 0
+    
+    def _xmpp_handler(self, xmppbot, eventtype, *args):
+        logger.info('_xmpp_handler ' + str(xmppbot) + eventtype + str(args))
+        
+    class ClientConnection(threading.Thread):
+        def __init__(self, sock, addr, bot):
+            threading.Thread.__init__(self)
+            self._sock = sock
+            self._addr = addr
+            self._bot = bot
+
+        def run(self):
+            current_message = ''
+            try:
+                # Receive the data in small chunks and retransmit it
+                while True:
+                    data = self._sock.recv(1024)
+
+                    if data:
+                        current_message = current_message + data
+                        while '\n' in current_message:
+                            idx = current_message.find('\n')
+                            msg = current_message[0:idx]
+                            current_message = current_message[idx + 1:]
+                            msg_obj = json.loads(msg)
+                            recipient = str(msg_obj['recipient']) if 'recipient' in msg_obj else None
+                            body = str(msg_obj['body']) if 'body' in msg_obj else None
+                            subject = str(msg_obj['subject']) if 'subject' in msg_obj else None
+                            html = str(msg_obj['html']) if 'html' in msg_obj else None
+                            if recipient:
+                                logger.info('send msg to %s: %s, %s, %s' %(recipient, body, subject, html))
+                                self._bot.send(recipient=recipient, message=body, subject=subject, html=html)
+
+                    else:
+                        logger.info('connection from %s closed.' %(self._addr))
+                        break
+            finally:
+                # Clean up the connection
+                self._sock.close()
+
+    def run(self):
+        self._sock = create_unix_socket('/tmp/jabber-daemon.sock')
+        self._bot = arsoft.xmpp.message_bot(self._config.sender, 
+                                            self._config.password, 
+                                            callback=self._xmpp_handler, 
+                                            ipv4=(True if self._config.ipv6 == False else False),
+                                            ipv6=(True if self._config.ipv4 == False else False))
+        while not self._do_exit:
+            try:
+                connection, client_address = self._sock.accept()
+            except socket.error as e:
+                logger.debug('failed to accept socket %s' %(str(e)))
+                
+            if self._do_exit:
+                break
+            cxn = jabberdaemon.ClientConnection(connection, client_address, self._bot)
+            cxn.start()
+
+    def terminate(self):
+        self._do_exit = True
+        if self._sock is not None:
+            close_unix_socket(self._sock)
+        self._bot.close()
+
+    def main(self, argv=None):
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        handler = logging.FileHandler("/tmp/jabber-daemon.log")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        daemon_runner = JabberDaemonRunner(app)
+        #This ensures that the logger file handle does not get closed during daemonization
+        daemon_runner.daemon_context.files_preserve=[handler.stream]
+        daemon_runner.do_action()
+
+if __name__ == "__main__":
+    # PyXMPP uses `logging` module for its debug output
+    # applications should set it up as needed
+    logger = logging.getLogger()
+
+    app = jabberdaemon()
+    app.main()
