@@ -7,6 +7,8 @@ import pwd
 import grp
 import subprocess
 import sys
+from pwd import getpwnam
+from grp import getgrnam
 
 (python_major, python_minor, python_micro, python_releaselevel, python_serial) = sys.version_info
 
@@ -165,3 +167,17 @@ def enum(**enums):
 def get_main_script_filename():
     import __main__
     return os.path.realpath(os.path.abspath(__main__.__file__))
+
+def to_uid(user):
+    try:
+        uid = int(user)
+    except ValueError:
+        uid = getpwnam(user).pw_uid
+    return uid
+
+def to_gid(group):
+    try:
+        gid = int(group)
+    except ValueError:
+        gid = getgrnam(group).gr_gid
+    return gid

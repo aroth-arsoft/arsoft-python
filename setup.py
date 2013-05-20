@@ -49,6 +49,8 @@ setup(name='arsoft-python',
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients']),
+			('/etc/init', ['upstart/jabber-daemon.conf']),
+			('/etc', ['config/jabber-daemon.conf']),
 			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg', 'nagios/openvpn.cfg', 'nagios/kernel_modules.cfg', 'nagios/xmpp_notify.cfg', 'nagios/puppet_agent.cfg', 'nagios/weather.cfg']),
 			('/usr/sbin', ['svnbackup', 'cups-admin', 'slapd-config', 'pxeconfig', 'efiinfo', 'nsswitch-config', 'nsswitch-ldap', 'autofs-ldap-auth', 'managehosts', 'heimdal-password-expire']),
 			('/usr/lib/nagios/plugins', ['check_fritzbox', 'check_openvpn', 'check_kernel_modules', 'check_puppet_agent', 'check_weather']),

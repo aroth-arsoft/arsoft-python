@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+import json
+from arsoft.socket_utils import *
+
 class BackendInfo(object):
     def __init__(self, module_name, module_description, module_homepage, module_version):
         self.name = module_name
@@ -19,3 +22,36 @@ class BackendInfo(object):
 class BackendBot(object):
     def __init__(self):
         pass
+    
+    def send_msg_json(self, msg):
+        msg_obj = json.loads(msg)
+        recipient = str(msg_obj['recipient']) if 'recipient' in msg_obj else None
+        body = str(msg_obj['body']) if 'body' in msg_obj else None
+        subject = str(msg_obj['subject']) if 'subject' in msg_obj else None
+        html = str(msg_obj['html']) if 'html' in msg_obj else None
+        if recipient:
+            ret = self.send(recipient=recipient, message=body, subject=subject, html=html)
+        else:
+            ret = False
+        return ret
+
+def daemon_send_message(sender, password, recipient, body, html=None, subject=None, message_type='chat', socket_path='/run/jabber/daemon.sock'):
+    msg_obj = { 'recipient':recipient }
+    if html is not None and len(html) > 0:
+        msg_obj['html'] = html
+    elif body is not None:
+        msg_obj['body'] = body
+    if subject:
+        msg_obj['subject'] = subject
+    sock = connect_unix_socket(socket_path)
+    if sock:
+        try:
+            sock.sendall(json.dumps(msg_obj) + '\n')
+            sock.close()
+            ret = True
+        except socket.error:
+            ret = False
+    else:
+        ret = False
+    return ret
+

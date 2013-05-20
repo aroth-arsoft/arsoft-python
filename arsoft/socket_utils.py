@@ -6,7 +6,7 @@ import os
 import sys
 import socket
 
-def create_unix_socket(path, socktype=socket.SOCK_STREAM):
+def create_unix_socket(path, mode, socktype=socket.SOCK_STREAM):
     # Make sure the socket does not already exist
     try:
         os.unlink(path)
@@ -16,9 +16,12 @@ def create_unix_socket(path, socktype=socket.SOCK_STREAM):
 
     # Create a UDS socket
     sock = socket.socket(socket.AF_UNIX, socktype)
-    
+
     # Bind the socket to the port
     sock.bind(path)
+
+    # change permissions of the socket
+    os.fchmod(sock.fileno(), mode)
 
     # Listen for incoming connections
     sock.listen(5)

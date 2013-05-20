@@ -12,7 +12,6 @@ import json
 
 import arsoft.xmpp
 from arsoft.inifile import IniFile
-from arsoft.socket_utils import *
 
 # version of this script
 __version__  = '1.0'
@@ -38,7 +37,7 @@ class jabbersend:
         parser.add_argument('--configfile', dest='configfile', help='input config file')
         parser.add_argument('--noconfig', dest='noconfig', action='store_true', help='do not read the default configuration file.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
-        parser.add_argument('--version', dest='version', action='store_true', help='enable verbose output.')
+        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
         parser.add_argument('--save', dest='save', action='store_true', help='save the command line parameters into the config file.')
         parser.add_argument('-m', '--message', dest='message', help='message body text', metavar='MSG')
         parser.add_argument('--html', dest='html', help='HTML message body text', metavar='HTML')
@@ -80,9 +79,11 @@ class jabbersend:
             password = self._config.password
             ipv4 = self._config.ipv4
             ipv6 = self._config.ipv6
-        else:
-            ipv4 = args.ipv4
-            ipv6 = args.ipv6
+
+        if args.ipv4 != parser.get_default('ipv4'):
+            self.ipv4 = args.ipv4
+        if args.ipv6 != parser.get_default('ipv6'):
+            self.ipv6 = args.ipv6
 
         # override config from config file by command line value (if there are any).
         if args.sender:
@@ -91,12 +92,12 @@ class jabbersend:
             recipient = args.recipient
         if args.password:
             password = args.password
-            
+
         if args.save:
             if not configfile:
                 sys.stderr.write('No config file specified to save parameters.\n') 
                 return 1
-            
+
             self._config = arsoft.xmpp.xmpp_config(filename=None, sender=sender, password=password, recipient=recipient, ipv4=ipv4, ipv6=ipv6)
             self._config.save(configfile)
 
@@ -121,27 +122,15 @@ class jabbersend:
         if self.verbose:
             print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
             
-        if args.use_daemon:
-            msg_obj = { 'recipient':recipient }
-            if len(html) > 0:
-                msg_obj['html'] = html
-            else:
-                msg_obj['body'] = body
-            if subject:
-                msg_obj['subject'] = subject
-            self._sock = connect_unix_socket('/tmp/jabber-daemon.sock')
-            self._sock.sendall(json.dumps(msg_obj) + '\n')
-            self._sock.close()
+        if arsoft.xmpp.send_message(sender, password, recipient, body, 
+                                    html=html, subject=subject, 
+                                    ipv4=(True if ipv6 == False else False),
+                                    ipv6=(True if ipv4 == False else False),
+                                    use_daemon=args.use_daemon):
             ret = 0
         else:
-            if arsoft.xmpp.send_message(sender, password, recipient, body, 
-                                        html=html, subject=subject, 
-                                    ipv4=(True if ipv6 == False else False),
-                                    ipv6=(True if ipv4 == False else False)):
-                ret = 0
-            else:
-                sys.stderr.write('Failed to send message from %s to %s.\n' %(sender, recipient))
-                ret = 1
+            sys.stderr.write('Failed to send message from %s to %s.\n' %(sender, recipient))
+            ret = 1
         return ret
 
 if __name__ == "__main__":
