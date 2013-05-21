@@ -25,11 +25,18 @@ class trac_svn2git(object):
         try:
             f = open(filename, 'r')
             for line in f:
-                (svnrevno, gitcommithash) = line.split('\t')
+                (reponame, svnrevno, gitcommithash) = line.split('\t')
+                reponame = reponame.encode('utf-8')
                 svnrevno = int(svnrevno)
                 gitcommithash = gitcommithash.encode('utf-8')
-                self._svn2git[svnrevno] = gitcommithash
-                self._git2svn[gitcommithash] = svnrevno
+                if svnrevno in self._svn2git:
+                    self._svn2git[svnrevno].append( (reponame, gitcommithash) )
+                else:
+                    self._svn2git[svnrevno] = [ (reponame, gitcommithash) ]
+
+                if not reponame in self._git2svn:
+                    self._git2svn[reponame] = {}
+                self._git2svn[reponame][gitcommithash] = svnrevno
             f.close()
             ret = True
         except IOError as e:
@@ -44,10 +51,14 @@ class trac_svn2git(object):
         for match in re.finditer(self.svn_revno_pattern, text):
             svnrevno = int(match.group(1))
             if svnrevno in self._svn2git:
-                gitid = self._svn2git[svnrevno]
-                gitidstr = gitid[0:nrHashCharacters]
                 org_text = match.group(0)
-                new_text = u'[' + gitidstr + u'] (SVN r' + str(svnrevno) + u')'
+
+                new_text_elems = []
+                gitcommitlist = self._svn2git[svnrevno]
+                for (reponame, gitcommithash) in gitcommitlist:
+                    gitidstr = gitcommithash[0:nrHashCharacters]
+                    new_text_elems.append(u'[' + gitidstr + u'/' + reponame + u']')
+                new_text = new_text_elems.join(',') + u' (SVN r' + str(svnrevno) + u')'
                 text = text.replace(org_text, new_text)
                 num_matches = num_matches + 1
                 print('replace ' + str(org_text) + ' with '+str(new_text))
