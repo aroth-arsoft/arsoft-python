@@ -68,6 +68,10 @@ class arsoft_daemon_runner(runner.DaemonRunner):
         # ignore all arguments because this should be done by the user
         return
 
+    def emit_message(self, message, stream=None):
+        """ Emit a message to the specified stream (default `sys.stderr`). """
+        runner.emit_message(message, stream)
+
     def _terminate_daemon_process(self, wait=True):
         """ Terminate the daemon process specified in the current PID file.
             """
@@ -91,19 +95,15 @@ class arsoft_daemon_runner(runner.DaemonRunner):
             """
         """ Open the daemon context and run the application.
             """
-        print('_start')
         if runner.is_pidfile_stale(self.pidfile):
             self.pidfile.break_lock()
 
-        print('before fork')
         try:
             self.daemon_context.open()
         except pidlockfile.AlreadyLocked:
             pidfile_path = self.pidfile.path
-            print('failed fork')
             runner.emit_message('%s is already running' % (self.progname))
             return
-        print('after fork')
         pid = os.getpid()
         message = self.start_message % vars()
         runner.emit_message(message)

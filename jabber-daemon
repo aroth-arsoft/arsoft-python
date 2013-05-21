@@ -28,7 +28,7 @@ class jabberdaemon:
         self.stdin_path = '/dev/null'
         self.stdout_path = '/dev/tty'
         self.stderr_path = '/dev/tty'
-        self.pidfile_path =  '/run/jabber-daemon.pid'
+        self.pidfile_path =  '/run/jabber/daemon.pid'
         self.pidfile_timeout = 5
         self._configfile = '/etc/jabber/daemon.conf'
 
@@ -95,7 +95,6 @@ class jabberdaemon:
                 self._sock.close()
 
     def run(self):
-        emit_message('got run')
         self._sock = create_unix_socket(self.socket_path, 0666)
         self._bot = arsoft.xmpp.message_bot(self.sender, 
                                             self.password, 
@@ -114,7 +113,6 @@ class jabberdaemon:
             cxn.start()
 
     def terminate(self):
-        print('terminate')
         self._do_exit = True
         if self._sock is not None:
             close_unix_socket(self._sock)
@@ -209,9 +207,7 @@ class jabberdaemon:
             except OSError:
                 pass
 
-            print('runner')
             runner = arsoft_daemon_runner(self)
-            print('runner start')
             runner._start()
 
         elif args.start_upstart:
