@@ -44,8 +44,8 @@ override_dh_fixperms:
 	dh_fixperms -O--buildsystem=python_distutils
 	chmod 04755 $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
 	chown root.root $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
-	chown root.root $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf
-	chmod 0600 $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf
+	chown root.root $(CURDIR)/debian/tmp/etc/jabber-daemon.conf
+	chmod 0600 $(CURDIR)/debian/tmp/etc/jabber-daemon.conf
 
 override_dh_gencontrol:
 	dh_gencontrol -- $(SUBSTVARS)
