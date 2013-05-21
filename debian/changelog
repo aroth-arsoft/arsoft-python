@@ -6,7 +6,7 @@ arsoft-python (1.58) raring; urgency=low
 
 arsoft-python (1.57) raring; urgency=low
 
-  * fixed range for fritxbox test
+  * fixed range for fritzbox test
 
  -- Andreas Roth <aroth@arsoft-online.com>  Thu, 16 May 2013 18:19:03 +0200
 
