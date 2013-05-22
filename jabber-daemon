@@ -223,4 +223,4 @@ if __name__ == "__main__":
     logger = logging.getLogger()
 
     app = jabberdaemon()
-    app.main()
+    sys.exit(app.main())
