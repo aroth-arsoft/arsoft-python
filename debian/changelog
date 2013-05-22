@@ -1,3 +1,9 @@
+arsoft-python (1.59) raring; urgency=low
+
+  * fixed upstart trouble with new jabber-daemon
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 22 May 2013 18:26:33 +0200
+
 arsoft-python (1.58.1) raring; urgency=low
 
   * fix build errors

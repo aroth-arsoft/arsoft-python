@@ -87,7 +87,10 @@ class jabbersend:
 
         # override config from config file by command line value (if there are any).
         if args.sender:
-            sender = args.sender
+            if args.use_daemon:
+                sys.stderr.write('Sender is ignored when using the jabber-daemon.\n') 
+            else:
+                sender = args.sender
         if args.recipient:
             recipient = args.recipient
         if args.password:
@@ -101,7 +104,7 @@ class jabbersend:
             self._config = arsoft.xmpp.xmpp_config(filename=None, sender=sender, password=password, recipient=recipient, ipv4=ipv4, ipv6=ipv6)
             self._config.save(configfile)
 
-        if not sender:
+        if not sender and not args.use_daemon:
             sys.stderr.write('No sender specified.\n') 
             return 1
         if not recipient:

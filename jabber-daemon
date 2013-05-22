@@ -26,8 +26,19 @@ class jabberdaemon:
     def __init__(self):
         self.verbose = False
         self.stdin_path = '/dev/null'
-        self.stdout_path = '/dev/tty'
-        self.stderr_path = '/dev/tty'
+        tty_ready = False
+        try:
+            f = open('/dev/tty', 'w+')
+            f.close()
+            tty_ready = True
+        except IOError:
+            pass
+        if tty_ready:
+            self.stdout_path = '/dev/tty'
+            self.stderr_path = '/dev/tty'
+        else:
+            self.stdout_path = '/dev/null'
+            self.stderr_path = '/dev/null'
         self.pidfile_path =  '/run/jabber/daemon.pid'
         self.pidfile_timeout = 5
         self._configfile = '/etc/jabber/daemon.conf'
