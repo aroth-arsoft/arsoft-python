@@ -39,6 +39,6 @@ if fritz.isPhysicalConnected():
         
         np.nagios_exit(exit_code, exit_message)
     else:
-        np.nagios_exit("CRITICAL", 'DSL link is not up! (%s)' % str(fritz.dslLinkStatus()))
+        np.nagios_exit(CRITICAL, 'DSL link is not up! (%s)' % str(fritz.dslLinkStatus()))
 else:
-    np.nagios_exit("CRITICAL", 'Physical link is not up! (%s)' % str(fritz.physicalLinkStatus()))
+    np.nagios_exit(CRITICAL, 'Physical link is not up! (%s)' % str(fritz.physicalLinkStatus()))

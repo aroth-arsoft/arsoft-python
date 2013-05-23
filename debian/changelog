@@ -1,3 +1,9 @@
+arsoft-python (1.60) raring; urgency=low
+
+  * add check_ipp nagios plugin
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 23 May 2013 08:46:29 +0200
+
 arsoft-python (1.59) raring; urgency=low
 
   * fixed upstart trouble with new jabber-daemon

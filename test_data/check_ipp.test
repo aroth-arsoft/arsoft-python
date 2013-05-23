@@ -1,0 +1,64 @@
+# Get printer attributes using get-printer-attributes
+{
+        # The name of the test...
+        NAME "Get printer attributes using Get-Printer-Attributes"
+
+        # The operation to use
+        OPERATION Get-Printer-Attributes
+
+        # Attributes, starting in the operation group...
+        GROUP operation-attributes-tag
+        ATTR charset attributes-charset utf-8
+        ATTR language attributes-natural-language en
+        ATTR uri printer-uri $uri
+        ATTR keyword requested-attributes
+             charset-configured,charset-supported,compression-supported,document-format-default,document-format-supported,generated-natural-language-supported,ipp-versions-supported,natural-language-configured,operations-supported,pdl-override-supported,printer-is-accepting-jobs,printer-name,printer-location,printer-make-and-model,printer-state,printer-state-reasons,printer-up-time,printer-uri-supported,queued-job-count,uri-authentication-supported,uri-security-supported
+
+        # What statuses are OK?
+        STATUS successful-ok
+
+        # What attributes do we expect?
+        EXPECT charset-configured
+        EXPECT charset-supported
+        EXPECT compression-supported
+        EXPECT document-format-default
+        EXPECT document-format-supported
+        EXPECT generated-natural-language-supported
+        EXPECT ipp-versions-supported
+        EXPECT natural-language-configured
+        EXPECT operations-supported
+        EXPECT pdl-override-supported
+        EXPECT printer-is-accepting-jobs
+        EXPECT printer-name
+        EXPECT printer-location
+        EXPECT printer-state
+        EXPECT printer-state-reasons
+        EXPECT printer-up-time
+        EXPECT printer-uri-supported
+        EXPECT printer-make-and-model
+        EXPECT queued-job-count
+        EXPECT uri-authentication-supported
+        EXPECT uri-security-supported
+
+        DISPLAY charset-configured
+        DISPLAY charset-supported
+        DISPLAY compression-supported
+        DISPLAY document-format-default
+        DISPLAY document-format-supported
+        DISPLAY generated-natural-language-supported
+        DISPLAY ipp-versions-supported
+        DISPLAY natural-language-configured
+        DISPLAY operations-supported
+        DISPLAY pdl-override-supported
+        DISPLAY printer-is-accepting-jobs
+        DISPLAY printer-name
+        DISPLAY printer-state
+        DISPLAY printer-state-reasons
+        DISPLAY printer-up-time
+        DISPLAY printer-uri-supported
+        DISPLAY printer-make-and-model
+        DISPLAY queued-job-count
+        DISPLAY uri-authentication-supported
+        DISPLAY uri-security-supported
+}
+
