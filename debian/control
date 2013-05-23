@@ -50,11 +50,12 @@ Description: nagios plugin module
 
 Package: arsoft-python-trac
 Architecture: all
-Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, trac, ${python:Depends}, ${misc:Depends}
 Description: utilities for trac administration
  Several adminstration helper scripts for trac:
  - convert repository from SVN to GIT
  - convert trac database from SQLite to MySQL
+ - manage the trac environment by using command line
 
 Package: arsoft-python-kerberos
 Architecture: all
