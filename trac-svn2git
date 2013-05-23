@@ -258,19 +258,19 @@ class trac_svn2git(object):
         #=============================================================================================
         parser = argparse.ArgumentParser(description='converts SVN reference with trac to GIT commits')
         parser.add_argument('tracenv', help='trac environment', metavar='tracenv')
-        parser.add_argument('gitrepo', help='GIT repository', metavar='gitrepo')
+        parser.add_argument('lookuptable', help='SVN Revision to GIT commit look table', metavar='lookuptable')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
 
         args = parser.parse_args()
         self._verbose = args.verbose
-        self._gitrepo = args.gitrepo
+        self._lookuptable = args.lookuptable
 
         if not self._load_tracenv(args.tracenv):
             sys.stderr.write('Failed to load trac environment ' + args.tracenv + ', error ' + str(self._last_error) + '\n')
             return 1
             
-        if not self._load_lookup_table(os.path.join(args.gitrepo, 'svn2git_lookup')):
-            sys.stderr.write('Failed to load lookup table, error ' + str(self._last_error) + '\n')
+        if not self._load_lookup_table(self._lookuptable):
+            sys.stderr.write('Failed to load lookup table %s, error %s\n' %(self._lookuptable, self._last_error))
             ret = False
         else:
             if self._open_db():
