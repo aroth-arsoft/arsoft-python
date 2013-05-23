@@ -22,10 +22,17 @@ class trac_svn2git(object):
         trac_svn2git.svn_revno_pattern = r'\[([0-9]+)\]'.encode('utf-8')
 
     def _load_lookup_table(self, filename):
+        
         try:
+            ret = True
             f = open(filename, 'r')
             for line in f:
-                (reponame, svnrevno, gitcommithash) = line.split('\t')
+                try:
+                    (svnrevno, reponame, gitcommithash) = line.split(' ')
+                except ValueError:
+                    sys.stderr.write('Invalid line in lookup table: %s\n' % (line))
+                    ret = False
+                    continue
                 reponame = reponame.encode('utf-8')
                 svnrevno = int(svnrevno)
                 gitcommithash = gitcommithash.encode('utf-8')
@@ -38,7 +45,6 @@ class trac_svn2git(object):
                     self._git2svn[reponame] = {}
                 self._git2svn[reponame][gitcommithash] = svnrevno
             f.close()
-            ret = True
         except IOError as e:
             ret = False
             pass
@@ -58,7 +64,7 @@ class trac_svn2git(object):
                 for (reponame, gitcommithash) in gitcommitlist:
                     gitidstr = gitcommithash[0:nrHashCharacters]
                     new_text_elems.append(u'[' + gitidstr + u'/' + reponame + u']')
-                new_text = new_text_elems.join(',') + u' (SVN r' + str(svnrevno) + u')'
+                new_text = ','.join(new_text_elems) + u' (SVN r' + str(svnrevno) + u')'
                 text = text.replace(org_text, new_text)
                 num_matches = num_matches + 1
                 print('replace ' + str(org_text) + ' with '+str(new_text))
@@ -120,8 +126,8 @@ class trac_svn2git(object):
                     stmt = "UPDATE ticket SET description=? WHERE id=?"
                     params = [description, ticket_id]
                 elif self._dbtype == 'mysql':
-                    stmt = "UPDATE ticket SET description=%(description)s WHERE id=%(id)i"
-                    params = {'description': description, 'id':ticket_id}
+                    stmt = "UPDATE ticket SET description=%(description)s WHERE id=%(id)s"
+                    params = {'description': description, 'id':str(ticket_id)}
                 print(stmt, params)
                 update_cur.execute(stmt, params)
                 
