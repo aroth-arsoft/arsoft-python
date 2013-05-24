@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.60',
+		version='1.61',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -53,6 +53,7 @@ setup(name='arsoft-python',
 			('/etc', ['config/jabber-daemon.conf']),
 			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg', 'nagios/openvpn.cfg', 'nagios/kernel_modules.cfg', 'nagios/xmpp_notify.cfg', 'nagios/puppet_agent.cfg', 'nagios/weather.cfg', 'nagios/ipp.cfg']),
 			('/usr/sbin', ['svnbackup', 'cups-admin', 'slapd-config', 'pxeconfig', 'efiinfo', 'nsswitch-config', 'nsswitch-ldap', 'autofs-ldap-auth', 'managehosts', 'heimdal-password-expire']),
+			('/usr/lib/nagios', ['send_xmpp_notification']),
 			('/usr/lib/nagios/plugins', ['check_fritzbox', 'check_openvpn', 'check_kernel_modules', 'check_puppet_agent', 'check_weather', 'check_ipp']),
 			('/usr/lib/nagios/plugins/test_data', ['test_data/check_ipp.test', 'test_data/check_ipp_jobs.test', 'test_data/check_ipp_completed_jobs.test']),
 			('/lib/udev', [ 'edskmgr-support/external-disk' ]),

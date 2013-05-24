@@ -8,10 +8,8 @@ import argparse
 import sys
 import logging
 import time
-import json
 
 import arsoft.xmpp
-from arsoft.inifile import IniFile
 
 # version of this script
 __version__  = '1.0'
@@ -58,7 +56,6 @@ class jabbersend:
         recipient = None
         password = None
         subject = args.subject
-        html = args.html
         self.verbose = args.verbose
         
         if self.verbose:
@@ -111,10 +108,30 @@ class jabbersend:
             sys.stderr.write('No recipient specified.\n') 
             return 1
 
+        html = None
         if args.message:
-            body = args.message
-        elif len(html) > 0:
+            if args.message.startswith('file://'):
+                try:
+                    f = open(args.message[7:], 'r')
+                    body = f.read()
+                    f.close()
+                except IOError as e:
+                    sys.stderr.write('Failed to read message file %s.\n' % args.message[7:]) 
+                    return 1
+            else:
+                body = args.message
+        elif args.html and len(args.html) > 0:
             body = ''
+            if args.html.startswith('file://'):
+                try:
+                    f = open(args.html[7:], 'r')
+                    html = f.read()
+                    f.close()
+                except IOError as e:
+                    sys.stderr.write('Failed to read html file %s.\n' % args.html[7:]) 
+                    return 1
+            else:
+                html = args.html
         else:
             body = sys.stdin.read()
 
@@ -123,7 +140,10 @@ class jabbersend:
             return 1
 
         if self.verbose:
-            print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
+            if len(body) != 0:
+                print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
+            else:
+                print('Send message \'%s\' from %s to %s' %(html, sender, recipient))
             
         if arsoft.xmpp.send_message(sender, password, recipient, body, 
                                     html=html, subject=subject, 

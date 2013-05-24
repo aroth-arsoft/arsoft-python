@@ -43,15 +43,9 @@ def daemon_send_message(sender, password, recipient, body, html=None, subject=No
         msg_obj['body'] = body
     if subject:
         msg_obj['subject'] = subject
-    sock = connect_unix_socket(socket_path)
-    if sock:
-        try:
-            sock.sendall(json.dumps(msg_obj) + '\n')
-            sock.close()
-            ret = True
-        except socket.error:
-            ret = False
+    msg = json.dumps(msg_obj) + '\n'
+    if send_unix_socket_message(socket_path,msg) == len(msg):
+        return True
     else:
-        ret = False
-    return ret
+        return False
 

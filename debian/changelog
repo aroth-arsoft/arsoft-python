@@ -1,3 +1,9 @@
+arsoft-python (1.61) raring; urgency=low
+
+  * fixed trouble with html messages
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 24 May 2013 13:42:18 +0200
+
 arsoft-python (1.60) raring; urgency=low
 
   * add check_ipp nagios plugin

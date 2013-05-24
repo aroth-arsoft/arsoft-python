@@ -11,7 +11,10 @@ if sys.version_info < (3, 0):
     sys.setdefaultencoding('utf8')
     
 logger = logging.getLogger(__name__)
-    
+
+def sleekxmpp_prepare_html_message(message):
+    return message.replace('&', '&amp;')
+
 class SleekXMPPBot(BackendBot):
     
     from sleekxmpp import ClientXMPP
@@ -104,7 +107,7 @@ class SleekXMPPBot(BackendBot):
             self.xmpp.send_message(mto=recipient,
                             msubject=subject,
                             mbody=message,
-                            mhtml=html,
+                            mhtml=sleekxmpp_prepare_html_message(html) if html is not None else None,
                             mtype=message_type)
             return True
 
@@ -163,7 +166,7 @@ def sleekxmpp_send_message(sender, password, recipient, body, html=None, subject
             self.send_message(mto=self.recipient,
                               msubject=self.subject,
                               mbody=self.message,
-                              mhtml=self.html,
+                              mhtml=sleekxmpp_prepare_html_message(html) if html is not None else None,
                               mtype=self.message_type)
             self.message_sent = True
 
