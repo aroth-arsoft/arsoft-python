@@ -95,6 +95,10 @@ class jabbersend:
         if args.html:
             text_message=None
             html_message=self._build_html_message(host_notification)
+            validate_html_message_error = None
+            if not arsoft.xmpp.validate_html_message(html_message, validate_html_message_error):
+                sys.stderr.write('Invalid HTML message \'%s\'; error %s.\n' %(html_message, validate_html_message_error))
+                return 1
         else:
             text_message=self._build_text_message(host_notification)
             html_message=None
