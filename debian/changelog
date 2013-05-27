@@ -1,3 +1,16 @@
+arsoft-python (1.63) raring; urgency=low
+
+  * fixed check_ipp and check_fritzbox host parameter
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 27 May 2013 20:01:00 +0200
+
+arsoft-python (1.62) raring; urgency=low
+
+  * fixed send_xmpp_notification permissions
+  * added alog script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 25 May 2013 15:46:00 +0200
+
 arsoft-python (1.61) raring; urgency=low
 
   * fixed trouble with html messages
