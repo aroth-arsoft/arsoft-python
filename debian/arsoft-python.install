@@ -14,6 +14,7 @@ usr/lib/python*/dist-packages/arsoft/nfs/*.py
 usr/lib/python*/dist-packages/arsoft/xdg/*.py
 usr/lib/python*/dist-packages/arsoft/xmpp/*.py
 usr/bin/ini-util
+usr/bin/alog
 usr/bin/jabber-send
 usr/bin/jabber-daemon
 usr/sbin/slapd-config

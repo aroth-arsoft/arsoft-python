@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.61',
+		version='1.62',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -44,7 +44,8 @@ setup(name='arsoft-python',
             'trac-svn2git',
             'trac-manage',
             'arsoft-backup',
-            'edskmgr'
+            'edskmgr',
+            'alog'
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),

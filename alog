@@ -1,0 +1,206 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import re
+import os.path
+from datetime import datetime, timedelta
+
+class alog_application(object):
+    
+    KNOWN_PATTERNS = {
+        'plain': { 'line_re':r'^(?P<message>.*)$' },
+        'icinga': { 'line_re':r'^\[(?P<timestamp>[0-9]+)\] (?P<message>.*)$', 'timestamp':'time_t', 'logfile_names':['icinga.log'] },
+        'icinga-debug': { 'line_re':r'^\[(?P<timestamp>[0-9]+\.[0-9]+)\] (?P<message>.*)$', 'timestamp':'time_t', 'logfile_names':['icinga.debug'] },
+        'kernel': { 'line_re':r'^\[\s*(?P<timestamp>[0-9]+\.[0-9]+)\] (?P<message>.*)$', 'timestamp':'uptime' },
+        'kernel-time': { 'line_re':r'^\[\s*(?P<timestamp>[A-Za-z \:0-9]+)\] (?P<message>.*)$', 'timestamp':'ctime' },
+        'syslog': { 
+            'line_re':r'^(?P<timestamp>[A-Za-z]{2,3} [0-9]{1,2} [0-9]{2}\:[0-9]{2}\:[0-9]{2}) (?P<host>[A-Za-z0-9]+) (?P<ident>[A-Za-z0-9/]+)\[(?P<pid>[0-9]+)\]\: (?P<message>.*)$', 
+            'timestamp':'short', 'logfile_names':['syslog', 'mail.log', 'mail.err', 'mail.warn'],
+            'output_format':'time,ident,pid,host,msg'
+            },
+        }
+    
+    FIELD_ALIAS = {
+        'time':'timestamp',
+        'machine':'host',
+        'msg':'message'
+        }
+    
+    DEFAULT_OUTPUT_FORMAT = 'timestamp,message'
+
+    class MessageObject(object):
+        def __init__(self, message=None, timestamp=None, severity=None, loglevel=None, host=None, ident=None, pid=None):
+            self.message = message
+            self.timestamp = timestamp
+            self.severity = severity
+            self.loglevel = loglevel
+            self.host = host
+            self.ident = ident
+            self.pid = pid
+    
+    def __init__(self):
+        self._verbose = False
+        self._logfile = None
+        self._logfile_obj = None
+        self._boottime = None
+        
+    def _get_boottime(self):
+        if self._boottime is None:
+            uptime = 0
+            with open('/proc/uptime', 'r') as f:
+                uptime = float(f.readline().split()[0])
+            self._boottime = datetime.now() - timedelta(seconds = uptime)
+        return self._boottime
+
+    def _select_pattern(self, pattern):
+        if pattern == 'auto':
+            logfile_basename = os.path.basename(self._logfile)
+            ret = None
+            for (pattern_name, pattern_dict) in alog_application.KNOWN_PATTERNS.iteritems():
+                if 'logfile_names' in pattern_dict:
+                    if logfile_basename in pattern_dict['logfile_names']:
+                        ret = pattern_name
+                        break
+        else:
+            ret = pattern
+        return ret
+
+    def _compile_pattern_re(self, pattern):
+        if pattern in alog_application.KNOWN_PATTERNS:
+            line_re = alog_application.KNOWN_PATTERNS[pattern]['line_re']
+            ret = re.compile(line_re)
+        else:
+            ret = None
+        return ret
+    
+    def _prepare_output_format(self, pattern, format):
+        if format is None:
+            if pattern in alog_application.KNOWN_PATTERNS:
+                pattern_dict = alog_application.KNOWN_PATTERNS[pattern]
+                if 'output_format' in pattern_dict:
+                    format = pattern_dict['output_format']
+            if format is None:
+                format = self.DEFAULT_OUTPUT_FORMAT
+        ret = ''
+        for field in format.split(','):
+            if len(ret) > 0:
+                ret += ' '
+            if field in self.FIELD_ALIAS:
+                field = self.FIELD_ALIAS[field]
+            ret += '%(' + field + ')s'
+        return ret
+    
+    def _timestamp_format(self, pattern):
+        if pattern in alog_application.KNOWN_PATTERNS:
+            pattern_dict = alog_application.KNOWN_PATTERNS[pattern]
+            ret = pattern_dict['timestamp'] if 'timestamp' in pattern_dict else None
+        else:
+            ret = None
+        return ret
+
+    def _parse_timestamp(self, timestamp, format):
+        if format is None:
+            ret = timestamp
+        elif format == 'time_t':
+            try:
+                ret = datetime.fromtimestamp(float(timestamp))
+            except ValueError:
+                ret = None
+        elif format == 'uptime':
+            try:
+                ret = self._get_boottime() + timedelta(seconds = float(timestamp))
+            except ValueError:
+                ret = None
+        elif format == 'ctime':
+            ret = datetime.strptime(timestamp, "%a %b %d %H:%M:%S %Y")
+        elif format == 'short':
+            ret = datetime.strptime(timestamp, '%b %d %H:%M:%S')
+            if ret:
+                ret = ret.replace(year= datetime.now().year)
+        else:
+            ret = datetime.strptime(timestamp, format)
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='shows information from EFI environment')
+        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--pattern', dest='pattern', choices=alog_application.KNOWN_PATTERNS.keys().append('auto'), default='auto', help='named pattern for the log file.')
+        parser.add_argument('-f', '--find', dest='find', help='output only message which contain the given string.')
+        parser.add_argument('--wfind', dest='wfind', help='output only message which contain the given word.')
+        parser.add_argument('-r', '--rfind', dest='find_regex', help='output only message which match the given pattern as regex.')
+        parser.add_argument('-o', '--output', dest='output_format', help='specifies the fields to print; separated by comma')
+        parser.add_argument('logfile', default='-', nargs='?', help='log file to parse')
+        
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        self._logfile = args.logfile
+        self._pattern = self._select_pattern(args.pattern)
+        self._output_format = args.output_format
+        
+        if self._logfile == '-':
+            self._logfile = 'stdin'
+            self._logfile_obj = sys.stdin
+        else:
+            self._logfile_obj = None
+            try:
+                self._logfile_obj = open(self._logfile, 'r')
+            except IOError as e:
+                self._last_error = str(e)
+            except OSError as e:
+                self._last_error = str(e)
+
+        if self._logfile_obj is None:
+            sys.stdout.write('Unable to open log file %s\n' % (self._logfile))
+            ret = 1
+        else:
+            timestamp_format = self._timestamp_format(self._pattern)
+            line_re = self._compile_pattern_re(self._pattern)
+            output_format = self._prepare_output_format(self._pattern, self._output_format)
+            if not line_re:
+                sys.stdout.write('Unable to determine log pattern for log file %s\n' % (self._logfile))
+                ret = 1
+            else:
+                if args.find_regex:
+                    find_re = re.compile(args.find_regex)
+                elif args.find:
+                    find_re = re.compile(r'.*' + re.escape(args.find) + r'.*')
+                elif args.wfind:
+                    find_re = re.compile(re.escape(args.wfind) + r'\b')
+                else:
+                    find_re = None
+                for line in self._logfile_obj:
+                    mo = line_re.match(line)
+                    if mo:
+                        mogrp = mo.groupdict()
+                        timestamp = self._parse_timestamp(mo.group('timestamp'), timestamp_format) if 'timestamp' in mogrp else None
+                        message_text = mo.group('message') if 'message' in mogrp else None
+                        severity = mo.group('severity') if 'severity' in mogrp else None
+                        loglevel = mo.group('loglevel') if 'loglevel' in mogrp else None
+                        host = mo.group('host') if 'host' in mogrp else None
+                        ident = mo.group('ident') if 'ident' in mogrp else None
+                        pid = mo.group('pid') if 'pid' in mogrp else None
+
+                        if find_re:
+                            output = True if find_re.match(message_text) is not None else False
+                        else:
+                            output = True
+                        if output:
+                            msg_obj = self.MessageObject(message=message_text, timestamp=timestamp, 
+                                                         severity=severity, loglevel=loglevel, 
+                                                         host=host, ident=ident, pid=pid)
+                            print( output_format % msg_obj.__dict__)
+                ret = 0
+
+        return ret
+
+if __name__ == "__main__":
+    app =  alog_application()
+    sys.exit(app.main())
