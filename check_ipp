@@ -18,6 +18,8 @@ np.activate()
 ## 'add_arg' method
 if np['host']:
     target_host = np['host']
+else:
+    np.nagios_exit(UNKNOWN, 'No hostname for printer specified.')
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 test_file_dir = os.path.join(script_dir, 'test_data')

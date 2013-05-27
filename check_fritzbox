@@ -18,7 +18,7 @@ np.activate()
 if np['host']:
     target_host = np['host']
 else:
-    target_host = 'fritz.box'
+    np.nagios_exit(UNKNOWN, 'No hostname for FritzBox specified.')
 
 fritz = FritzBox(target_host)
 
