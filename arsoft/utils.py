@@ -48,16 +48,16 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=No
     return sts
 
 
-def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, input=None, cwd=None, env=None):
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, input=None, cwd=None, env=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
         print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
-    if stdin is not None:
-        stdin_param = stdin
-    else:
-        stdin_param = subprocess.PIPE
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False, cwd=cwd, env=env)
+    
+    stdin_param = stdin if stdin is not None else subprocess.PIPE
+    stdout_param = stdout if stdout is not None else subprocess.PIPE
+    stderr_param = stderr if stderr is not None else subprocess.PIPE
+    p = subprocess.Popen(all_args, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None and outputStdOut:
