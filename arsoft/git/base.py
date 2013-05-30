@@ -8,7 +8,10 @@ import platform
 from arsoft.utils import which
 
 def find_git_executable():
-    ret = which('git')
-    return ret
+    candidates = which('git')
+    if len(candidates) > 0:
+        return candidates[0]
+    else:
+        return None
 
 GIT_EXECUTABLE = find_git_executable()

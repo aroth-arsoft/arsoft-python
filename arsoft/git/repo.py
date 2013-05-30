@@ -388,6 +388,8 @@ if __name__ == '__main__':
         ]
         
     repo = GitRepository(sys.argv[1])
+    
+    print('git: %s' % (GIT_EXECUTABLE))
     print('path: %s' % (str(repo.path)))
     print('name: %s' % (str(repo.name)))
     print('bare: %s' % (str(repo.bare)))
