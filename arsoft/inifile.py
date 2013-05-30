@@ -207,7 +207,7 @@ class IniSection(object):
         return self.asString(only_data=False)
 
 class IniFile(object):
-    def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True):
+    def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True, keyIsWord=True):
         self.m_commentPrefix = commentPrefix
         self.m_keyValueSeperator = keyValueSeperator
         self.m_content = []
@@ -228,19 +228,27 @@ class IniFile(object):
                 disabled_re = r'\s*(?P<disabled>[#;]*)'
         else:
             disabled_re = r''
+        if keyIsWord:
+            key_re = r'[\w]+'
+        else:
+            comment_chars = commentPrefix if commentPrefix else '#;'
+            if keyValueSeperator:
+                key_re = r'[^' + keyValueSeperator + comment_chars + ']'
+            else:
+                key_re = r'[^:= \t' + comment_chars + ']'
         if keyValueSeperator:
-            key_re = r'\s*(?P<option>[\w]+[^' + keyValueSeperator + ']*)(?P<vi>[' + keyValueSeperator + '])'
+            key_and_value_separator_re = r'\s*(?P<option>' + key_re + '[^' + keyValueSeperator + ']*)(?P<vi>[' + keyValueSeperator + '])'
         else:
             # very permissive!
             # any number of space/tab,
             # followed by separator
             # (either : or =), followed
             # by any # space/tab
-            key_re = r'\s*(?P<option>[\w]+[^:= \t]*)' \
+            key_and_value_separator_re = r'\s*(?P<option>' + key_re + '[^:= \t]*)' \
                      r'\s*(?P<vi>[:=])\s*'
         self.OPTCRE = re.compile(
             disabled_re + 
-            key_re +
+            key_and_value_separator_re +
             r'(?P<value>.*)$' # everything up to eol is the value
             )
         if commentPrefix:
