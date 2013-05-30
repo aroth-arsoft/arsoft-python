@@ -1,0 +1,148 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os.path
+import sys
+import yaml
+from arsoft.utils import which
+from repo import *
+
+def find_git_commit_notifier_executable():
+    candidates = which('git-commit-notifier')
+    if len(candidates) > 0:
+        return candidates[0]
+    else:
+        return None
+
+GIT_COMMIT_NOTIFIER_EXECUTABLE = find_git_commit_notifier_executable()
+
+class GitCommitNotifierConfig(object):
+
+    def __init__(self, repository=None, configfile=None):
+        object.__setattr__(self, '_data', None)
+
+        if configfile is None:
+            if repository is not None:
+                object.__setattr__(self, '_configfile', os.path.join(repository.magic_directory, 'git-commit-notifier.yml'))
+            else:
+                object.__setattr__(self, '_configfile', None)
+        else:
+            object.__setattr__(self, '_configfile', configfile)
+
+        if self._configfile:
+            self.open()
+            
+    def clear(self):
+        self._data = []
+
+    def open(self, filename=None):
+        if filename is None:
+            filename = self._configfile
+
+        try:
+            print(filename)
+            f = open(filename, 'r')
+            object.__setattr__(self, '_data', yaml.load(f))
+            f.close()
+            ret = True
+        except IOError:
+            ret = False
+
+        return ret
+
+    def save(self, filename=None):
+        if filename is None:
+            filename = self._configfile
+
+        try:
+            f = open(filename, 'w')
+            f.write(yaml.dump(self._data))
+            f.close()
+        except IOError:
+            ret = False
+
+        return ret
+
+    def reset(self):
+        data['ignore_merge'] = False
+        data['emailprefix'] = None
+        data['lines_per_diff'] = 250
+        data['too_many_files'] = 50
+        data['show_summary'] = True
+        data['mailinglist'] = ''
+        data['from'] = ''
+        data['delivery_method'] = 'sendmail'
+        data['sendmail_options'] = { 'location': '/usr/sbin/sendmail', 'arguments': '-i -t' }
+        data['message_integration'] = ''
+        data['unique_commits_per_branch'] = False
+        data['show_master_branch_name'] = False
+        data['ignore_whitespace'] = True
+        object.__setattr__(self, '_data', data)
+
+    @property
+    def email_sender(self):
+        return self._data['from']
+
+    @email_sender.setter
+    def email_sender(self, value):
+        self._data['from'] = value
+
+    @property
+    def email_recipients(self):
+        return self._data['mailinglist'].split(',')
+
+    @email_recipients.setter
+    def email_recipients(self, value):
+        if isinstance(value, list):
+            self._data['mailinglist'] = ','.join(value)
+        else:
+            self._data['mailinglist'] = value
+
+    @property
+    def message_map(self):
+        return self._data['message_map']
+    
+    def enable_trac(self, trac_url, keywords=['refs','ref','close','closes','implements','fixes','fixed']):
+        for (regex, url) in self._data['message_map'].iteritems():
+            if trac_url in url:
+                del self._data['message_map'][regex]
+                break
+
+        regex = '\\b(' + '|'.join(keywords) + ')\\s*\\#(\\d+)'
+        url = trac_url + '/ticket/\\2'
+        self._data['message_map'][regex] = url
+        self._data['trac'] = { 'path': trac_url + '/changeset' }
+        self._data['link_files'] = 'trac'
+
+    def enable_gitweb(self, gitweb_url, project=None):
+        self._data['trac'] = { 'path': gitweb_url, 'project':project  }
+        self._data['link_files'] = 'gitweb'
+
+    def __str__(self):
+        return str(self._data)
+
+    def __getattr__(self, name):
+        return self._data[name]
+
+    def __setattr__(self, name, value):
+        self._data[name] = value
+
+if __name__ == '__main__':
+
+        
+    repo = GitRepository(sys.argv[1])
+    notify_config = GitCommitNotifierConfig(repo)
+    
+    print(notify_config)
+    print('email_sender: %s' % (str(notify_config.email_sender)))
+    print('email_recipients: %s' % (str(notify_config.email_recipients)))
+    print('show_master_branch_name: %s' % (str(notify_config.show_master_branch_name)))
+    print('message_map: %s' % (str(notify_config.message_map)))
+    
+    notify_config.email_recipients = 'me@you'
+    print('email_recipients: %s' % (str(notify_config.email_recipients)))
+
+    notify_config.enable_trac('http://local')
+    print('message_map: %s' % (str(notify_config.message_map)))
+    print('trac: %s' % (str(notify_config.trac)))
