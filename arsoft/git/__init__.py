@@ -7,3 +7,4 @@ __path__ = extend_path(__path__, __name__)
 
 from repo import *
 from notifier import *
+from base import *

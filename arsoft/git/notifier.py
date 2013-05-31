@@ -21,6 +21,7 @@ class GitCommitNotifierConfig(object):
 
     def __init__(self, repository=None, configfile=None):
         object.__setattr__(self, '_data', None)
+        object.__setattr__(self, '_last_error', None)
 
         if configfile is None:
             if repository is not None:
@@ -35,6 +36,7 @@ class GitCommitNotifierConfig(object):
             
     def clear(self):
         self._data = []
+        self._last_error = None
 
     def open(self, filename=None):
         if filename is None:
@@ -47,6 +49,7 @@ class GitCommitNotifierConfig(object):
             f.close()
             ret = True
         except IOError:
+            object.__setattr__(self, '_last_error', str(e))
             ret = False
 
         return ret
@@ -59,9 +62,10 @@ class GitCommitNotifierConfig(object):
             f = open(filename, 'w')
             f.write(yaml.dump(self._data))
             f.close()
-        except IOError:
+            ret = True
+        except IOError as e:
+            object.__setattr__(self, '_last_error', str(e))
             ret = False
-
         return ret
 
     def reset(self):
@@ -78,7 +82,22 @@ class GitCommitNotifierConfig(object):
         data['unique_commits_per_branch'] = False
         data['show_master_branch_name'] = False
         data['ignore_whitespace'] = True
+        data['reply_to_author'] = False
+        data['prefer_git_config_mailinglist'] = False
+        data['send_mail_to_committer'] = False
         object.__setattr__(self, '_data', data)
+
+    @property
+    def last_error(self):
+        return self._last_error
+
+    @property
+    def email_prefix(self):
+        return self._data['emailprefix']
+
+    @email_prefix.setter
+    def email_prefix(self, value):
+        self._data['emailprefix'] = value
 
     @property
     def email_sender(self):

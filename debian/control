@@ -48,14 +48,22 @@ Description: nagios plugin module
  includes ready to use plugins for nagios to monitor an AVM FritzBox
  and an OpenVPN server or client.
 
+Package: arsoft-python-git
+Architecture: all
+Depends: arsoft-python, git, ${python:Depends}, ${misc:Depends}
+Description: utilities for working with GIT
+ Some tools to make working with GIT a bit easier:
+  - git info: display basic information about a repository
+  - git shrink: reduce the disk space of a repository
+
 Package: arsoft-python-trac
 Architecture: all
 Depends: arsoft-python, trac, ${python:Depends}, ${misc:Depends}
 Description: utilities for trac administration
  Several adminstration helper scripts for trac:
- - convert repository from SVN to GIT
- - convert trac database from SQLite to MySQL
- - manage the trac environment by using command line
+  - convert repository from SVN to GIT
+  - convert trac database from SQLite to MySQL
+  - manage the trac environment by using command line
 
 Package: arsoft-python-kerberos
 Architecture: all
@@ -83,3 +91,10 @@ Replaces: edskmgr-suid
 Description: suid helpers for the external disk management tools
  This package suid helpers to allow all users to use the external disk 
  management tools.
+
+Package: arsoft-trac-suid
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: suid helpers for the accessing Trac from a web server
+ This package suid helpers to allow the user of the web server (or any
+ other service) to run trac-admin.

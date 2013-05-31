@@ -4,9 +4,9 @@
 
 import os.path
 import sys
-from arsoft.utils import runcmdAndGetData
+from arsoft.utils import runcmdAndGetData, to_uid, to_gid
 from arsoft.inifile import IniFile
-from base import GIT_EXECUTABLE
+from base import GIT_EXECUTABLE, GIT_HOOKS
 
 class GitRepository(object):
 
@@ -18,6 +18,7 @@ class GitRepository(object):
         else:
             self.bare = bare
         self.verbose = verbose
+        self._last_error = None
         if self.bare:
             self.magic_directory = self.root_directory
         else:
@@ -48,6 +49,20 @@ class GitRepository(object):
             return True
         else:
             return False
+
+    @property
+    def valid(self):
+        if os.path.isdir(self.root_directory):
+            if self.bare:
+                ret = self.is_bare_repository(self.root_directory)
+            else:
+                ret = self.is_regular_repository(self.root_directory)
+        else:
+            ret = False
+        return ret
+    @property
+    def last_error(self):
+        return self._last_error
 
     @property
     def path(self):
@@ -275,6 +290,63 @@ class GitRepository(object):
             f.close()
         except IOError:
             ret = False
+        return ret
+    
+    def _fix_permissions_impl(self, directory, uid, gid, dir_perms, file_perms):
+        if os.path.isdir(directory):
+            try:
+                os.chown(directory, uid, gid)
+                os.chmod(directory, dir_perms)
+                ret = True
+            except IOError as e:
+                self._last_error = str(e)
+                ret = False
+            if ret:
+                for item in os.listdir(directory):
+                    path = os.path.join(directory, item)
+                    ret = self._fix_permissions_impl(path, uid, gid, dir_perms, file_perms)
+                    if not ret:
+                        break
+        elif os.path.isfile(directory):
+            try:
+                os.chown(directory, uid, gid)
+                os.chmod(directory, file_perms)
+                ret = True
+            except IOError as e:
+                self._last_error = str(e)
+                ret = False
+        else:
+            # ignore symlinks and other stuff
+            ret = True
+        return ret
+    
+    def fix_permissions(self, owner=None, group=None, dir_perms=0775, file_perms=0664 ):
+        
+        uid = to_uid(owner) if owner else None
+        gid = to_gid(group) if group else None
+        
+        ret = True
+        # fix perms for selected directories
+        for d in ['branches', 'info', 'logs', 'objects', 'refs' ]:
+            dir_path = os.path.join(self.magic_directory, d)
+            if os.path.isdir(dir_path):
+                ret = self._fix_permissions_impl(dir_path, uid, gid, dir_perms, file_perms)
+                if not ret:
+                    break
+        for hook in GIT_HOOKS:
+            file_path = os.path.join(self.hook_directory, d)
+            if os.path.isfile(file_path):
+                ret = self._fix_permissions_impl(file_path, uid, gid, dir_perms, 0775)
+                if not ret:
+                    break
+
+        # fix perms for selected files
+        for f in ['config', 'description', 'packed-refs', 'git-daemon-export-ok', 'HEAD', 'revlist', 'commitlist' ]:
+            file_path = os.path.join(self.magic_directory, f)
+            if os.path.isfile(file_path):
+                ret = self._fix_permissions_impl(file_path, uid, gid, dir_perms, file_perms)
+                if not ret:
+                    break
         return ret
 
     @property
