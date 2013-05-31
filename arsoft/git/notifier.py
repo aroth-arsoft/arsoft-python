@@ -43,7 +43,6 @@ class GitCommitNotifierConfig(object):
             filename = self._configfile
 
         try:
-            print(filename)
             f = open(filename, 'r')
             object.__setattr__(self, '_data', yaml.load(f))
             f.close()

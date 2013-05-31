@@ -44,8 +44,7 @@ class GitRepository(object):
     @staticmethod
     def is_bare_repository(path):
         # check for bare GIT repo
-        gitpath = os.path.join(path, 'config')
-        if os.path.isfile(os.path.join(path, 'config')) and os.path.isfile(os.path.join(path, 'revlist')):
+        if os.path.isfile(os.path.join(path, 'config')) and os.path.isfile(os.path.join(path, 'HEAD')) and os.path.isdir(os.path.join(path, 'objects')):
             return True
         else:
             return False
@@ -55,10 +54,15 @@ class GitRepository(object):
         if os.path.isdir(self.root_directory):
             if self.bare:
                 ret = self.is_bare_repository(self.root_directory)
+                if not ret:
+                    self._last_error = '%s is not a bare GIT repository' % (self.root_directory)
             else:
                 ret = self.is_regular_repository(self.root_directory)
+                if not ret:
+                    self._last_error = '%s is not a regular GIT repository' % (self.root_directory)
         else:
             ret = False
+            self._last_error = 'invalid directory %s for GIT repository' % (self.root_directory)
         return ret
     @property
     def last_error(self):
