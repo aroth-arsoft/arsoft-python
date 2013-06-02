@@ -6,7 +6,7 @@ import os.path
 import sys
 import yaml
 from arsoft.utils import which
-from repo import *
+from .repo import *
 
 def find_git_commit_notifier_executable():
     candidates = which('git-commit-notifier')
@@ -148,10 +148,9 @@ class GitCommitNotifierConfig(object):
 
 if __name__ == '__main__':
 
-        
     repo = GitRepository(sys.argv[1])
     notify_config = GitCommitNotifierConfig(repo)
-    
+
     print(notify_config)
     print('email_sender: %s' % (str(notify_config.email_sender)))
     print('email_recipients: %s' % (str(notify_config.email_recipients)))

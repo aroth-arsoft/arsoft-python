@@ -6,7 +6,7 @@ import os.path
 import sys
 from arsoft.utils import runcmdAndGetData, to_uid, to_gid
 from arsoft.inifile import IniFile
-from base import GIT_EXECUTABLE, GIT_HOOKS
+from .base import GIT_EXECUTABLE, GIT_HOOKS
 
 class GitRepository(object):
 
@@ -186,8 +186,9 @@ class GitRepository(object):
     def last_commit(self):
         (sts, stdoutdata, stderrdata) = self.git(['rev-parse', 'HEAD'])
         if sts == 0:
-            ret = stdoutdata.strip()
+            ret = stdoutdata.decode("utf-8").strip()
         else:
+            self._last_error = 'Unable to determine (error %i, %s)'%(sts, stderrdata.decode("utf-8").strip())
             ret = None
         return ret
 
@@ -217,6 +218,7 @@ class GitRepository(object):
         (sts, stdoutdata, stderrdata) = self.git(args)
         if sts == 0:
             ret = None
+            stdoutdata = stdoutdata.decode("utf-8")
             for line in stdoutdata.splitlines():
                 if line[0] == '*':
                     elems = line.lstrip().split(' ')
@@ -236,6 +238,7 @@ class GitRepository(object):
         (sts, stdoutdata, stderrdata) = self.git(args)
         if sts == 0:
             ret = []
+            stdoutdata = stdoutdata.decode("utf-8")
             for line in stdoutdata.splitlines():
                 if '(no branch)' in line or 'HEAD' in line:
                     continue
