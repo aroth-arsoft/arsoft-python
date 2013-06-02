@@ -3,8 +3,8 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.utils import isRoot
-from disk import Disk, Disks, RegisteredDiskList
-from scsi import Scsi
+from .disk import Disk, Disks, RegisteredDiskList
+from .scsi import Scsi
 import syslog
 import sys
 
