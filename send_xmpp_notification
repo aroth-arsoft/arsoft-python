@@ -95,21 +95,19 @@ class jabbersend:
         if args.html:
             text_message=None
             html_message=self._build_html_message(host_notification)
-            validate_html_message_error = None
-            if not arsoft.xmpp.validate_html_message(html_message, validate_html_message_error):
-                sys.stderr.write('Invalid HTML message \'%s\'; error %s.\n' %(html_message, validate_html_message_error))
-                return 1
+
+            if args.debug:
+                f = open('/tmp/send_xmpp_notification', 'w')
+                for key in sorted(os.environ.keys()):
+                    f.write('%s=%s\n' %(key,os.environ[key]))
+                f.write('uid=%i\n' % os.getuid())
+                f.write('host_notification=%s\n' %(str(host_notification)))
+                f.write('text=%s\n' % text_message)
+                f.write('html=%s\n' % html_message)
+                f.close()
         else:
             text_message=self._build_text_message(host_notification)
             html_message=None
-
-        if args.debug or True:
-            for key in sorted(os.environ.keys()):
-                print('%s=%s' %(key,os.environ[key]))
-            print('uid=%i' % os.getuid())
-            print('host_notification=%s' %(str(host_notification)))
-            print('test=%s' % text_message)
-            print('html=%s' % html_message)
 
         if arsoft.xmpp.send_message(sender=None, password=None, recipient=recipient, body=text_message, 
                                     subject=subject, html=html_message, 
