@@ -35,6 +35,14 @@ class BackendBot(object):
             ret = False
         return ret
 
+class XMPPInvalidMessage(Exception):
+    def __init__(self, html, parser_error):
+        self._html = html
+        self._parser_error = parser_error
+
+    def __str__(self):
+        return 'XMPPInvalidMessage(%s, %s)' % (self._html, self._parser_error)
+
 def daemon_send_message(sender, password, recipient, body, html=None, subject=None, message_type='chat', socket_path='/run/jabber/daemon.sock'):
     msg_obj = { 'recipient':recipient }
     if html is not None and len(html) > 0:

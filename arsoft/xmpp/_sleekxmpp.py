@@ -5,6 +5,7 @@
 from _backend import *
 import sys
 import logging
+import xml.etree.ElementTree as ET
 
 if sys.version_info < (3, 0):
     reload(sys)
@@ -12,8 +13,17 @@ if sys.version_info < (3, 0):
     
 logger = logging.getLogger(__name__)
 
+def sleekxmpp_validate_html_message(html):
+    try:
+        tree = ET.XML(html)
+    except ET.ParseError as e:
+        raise XMPPInvalidMessage(html, str(e))
+    return True
+
 def sleekxmpp_prepare_html_message(message):
-    return message.replace('&', '&amp;')
+    message = message.replace('&', '&amp;')
+    sleekxmpp_validate_html_message(message)
+    return message
 
 class SleekXMPPBot(BackendBot):
     

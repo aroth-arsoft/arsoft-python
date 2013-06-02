@@ -8,10 +8,9 @@ __path__ = extend_path(__path__, __name__)
 # version of the arsoft.xmpp module
 __version__ = '1.0'
 
-from _sleekxmpp import sleekxmpp_send_message, sleekxmpp_backend_info, sleekxmpp_message_bot
-from _backend import daemon_send_message
+from _sleekxmpp import sleekxmpp_send_message, sleekxmpp_backend_info, sleekxmpp_message_bot, sleekxmpp_validate_html_message
+from _backend import daemon_send_message, XMPPInvalidMessage
 from config import xmpp_config
-import xml.etree.ElementTree as ET
 
 def send_message(sender, password, recipient, body, html=None, subject=None, message_type='chat',
                            ipv4=True, ipv6=True, use_daemon=False, socket_path='/run/jabber/daemon.sock'):
@@ -30,15 +29,8 @@ def message_bot(sender, password, callback=None, ipv4=True, ipv6=True):
     return sleekxmpp_message_bot(sender=sender, password=password, callback=callback,
                                     ipv4=ipv4, ipv6=ipv6)
     
-def validate_html_message(html, error=None):
-    try:
-        tree = ET.XML(html)
-        ret = True
-    except ET.ParseError as e:
-        print(e)
-        error = str(e)
-        ret = False
-    return ret
+def validate_html_message(html):
+    return sleekxmpp_validate_html_message(html)
 
 def version():
     return __version__

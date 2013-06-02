@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 ## This is for the custom nagios module
 from pynag.Plugins import OK, WARNING, CRITICAL, UNKNOWN, \
