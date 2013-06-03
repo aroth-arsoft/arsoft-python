@@ -20,7 +20,7 @@ GIT_COMMIT_NOTIFIER_EXECUTABLE = find_git_commit_notifier_executable()
 class GitCommitNotifierConfig(object):
 
     def __init__(self, repository=None, configfile=None):
-        object.__setattr__(self, '_data', None)
+        object.__setattr__(self, '_data', {})
         object.__setattr__(self, '_last_error', None)
 
         if configfile is None:
@@ -31,9 +31,12 @@ class GitCommitNotifierConfig(object):
         else:
             object.__setattr__(self, '_configfile', configfile)
 
+        do_reset = True
         if self._configfile:
-            self.open()
-            
+            do_reset = True if not self.open() else False
+        if do_reset:
+            self.reset()
+
     def clear(self):
         self._data = []
         self._last_error = None
@@ -47,7 +50,7 @@ class GitCommitNotifierConfig(object):
             object.__setattr__(self, '_data', yaml.load(f))
             f.close()
             ret = True
-        except IOError:
+        except IOError as e:
             object.__setattr__(self, '_last_error', str(e))
             ret = False
 
@@ -68,6 +71,7 @@ class GitCommitNotifierConfig(object):
         return ret
 
     def reset(self):
+        data = {}
         data['ignore_merge'] = False
         data['emailprefix'] = None
         data['lines_per_diff'] = 250
@@ -84,6 +88,7 @@ class GitCommitNotifierConfig(object):
         data['reply_to_author'] = False
         data['prefer_git_config_mailinglist'] = False
         data['send_mail_to_committer'] = False
+        data['message_map'] = {}
         object.__setattr__(self, '_data', data)
 
     @property
@@ -134,7 +139,7 @@ class GitCommitNotifierConfig(object):
         self._data['link_files'] = 'trac'
 
     def enable_gitweb(self, gitweb_url, project=None):
-        self._data['trac'] = { 'path': gitweb_url, 'project':project  }
+        self._data['gitweb'] = { 'path': gitweb_url, 'project':project  }
         self._data['link_files'] = 'gitweb'
 
     def __str__(self):
