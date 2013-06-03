@@ -1,15 +1,26 @@
 #!/usr/bin/python
 
 import os
+import socket, ssl
+from urlparse import urlparse
 from pem import *
 from OpenSSL import crypto
 from arsoft.timestamp import parse_date
 
 class Certificate(PEMItem):
-    def __init__(self, pemitem):
-        PEMItem.__init__(self, pemitem.blockindex, pemitem.blocktype, pemitem.blockdata)
-        self.cert = crypto.load_certificate(crypto.FILETYPE_PEM, self.blockdata) 
-        
+    def __init__(self, pemitem=None, rawitem=None):
+        if pemitem:
+            PEMItem.__init__(self, pemitem.blockindex, pemitem.blocktype, pemitem.blockdata)
+            self.cert = crypto.load_certificate(crypto.FILETYPE_PEM, self.blockdata) 
+        elif rawitem:
+            tmpcert = crypto.load_certificate(crypto.FILETYPE_ASN1, rawitem)
+            blockdata = crypto.dump_certificate(crypto.FILETYPE_PEM, tmpcert)
+            PEMItem.__init__(self, 0, 'CERTIFICATE', blockdata)
+            self.cert = tmpcert
+        else:
+            PEMItem.__init__(self, 0, 'CERTIFICATE', None)
+            self.cert = None
+
     def update(self, newcert):
         if isinstance(newcert, Certificate):
             self.cert = newcert.cert
@@ -225,10 +236,19 @@ class CertificateList:
         return True if len(self.m_certificates) == 0 else False
 
     def add(self, filename):
-        if os.path.isdir(filename):
-            ret = self.addDirectory(filename)
-        else:
-            ret = self.addFile(filename)
+        call_add_file_or_dir = True
+        if '://' in filename:
+            (scheme, rest) = filename.split('://', 2)
+            if scheme == 'file':
+                filename = rest
+            else:
+                call_add_file_or_dir = False
+                ret = self.addServer(scheme, filename)
+        if call_add_file_or_dir:
+            if os.path.isdir(filename):
+                ret = self.addDirectory(filename)
+            else:
+                ret = self.addFile(filename)
         return ret
     
     def addFile(self, filename):
@@ -250,7 +270,34 @@ class CertificateList:
             if self.addFile(file_in_dir):
                 ret = True
         return ret
-        
+
+    def addServer(self, scheme, url):
+        url_obj = urlparse(url)
+        if url_obj.port:
+            port_num = url_obj.port
+        else:
+            port_num = socket.getservbyname(url_obj.scheme)
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # require a certificate from the server
+            ssl_sock = ssl.wrap_socket(s, cert_reqs=ssl.CERT_NONE)
+            ssl_sock.settimeout(30.0)
+            #print((url_obj.hostname, port_num))
+            ssl_sock.connect((url_obj.hostname, port_num))
+            ssl_sock.getpeername()
+
+            cert = Certificate(rawitem=ssl_sock.getpeercert(True))
+            cert_tuple = (url, cert)
+            print(cert_tuple)
+            self.m_certificates.append(cert_tuple)
+            # note that closing the SSLSocket will also close the underlying socket
+            ssl_sock.close()
+            ret = True
+        except socket.error as e:
+            print(e)
+            ret = False
+        return ret
+
     def save(self):
         ret = True
         # find all unique certfiles

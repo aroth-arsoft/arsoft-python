@@ -74,6 +74,21 @@ class KeyList:
         return True if len(self.m_keys) == 0 else False
 
     def add(self, filename):
+        call_add_file_or_dir = True
+        if '://' in filename:
+            (schema, rest) = filename.split('://', 2)
+            if schema == 'file':
+                filename = rest
+            else:
+                call_add_file_or_dir = False
+                ret = False
+        if call_add_file_or_dir:
+            if os.path.isdir(filename):
+                ret = self.addDirectory(filename)
+            else:
+                ret = self.addFile(filename)
+        return ret
+    
         if os.path.isdir(filename):
             ret = self.addDirectory(filename)
         else:

@@ -4,6 +4,7 @@
 
 import sys
 import argparse
+import socket, ssl
 
 from arsoft.crypto import *
 
@@ -21,11 +22,11 @@ class certinfo:
         self.m_certificate_list = CertificateList()
         self.m_key_list = KeyList()
         for filename in filenames:
-            filename_result = True
-            if not self.m_key_list.add(filename):
-                filename_result = False
-            if not self.m_certificate_list.add(filename):
-                filename_result = False
+            filename_result = False
+            if not filename_result and self.m_key_list.add(filename):
+                filename_result = True
+            if not filename_result and self.m_certificate_list.add(filename):
+                filename_result = True
             if not filename_result:
                 ret = False
                 print("Failed to add " + str(filename))
