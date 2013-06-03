@@ -58,7 +58,7 @@ Description: utilities for working with GIT
 
 Package: arsoft-python-trac
 Architecture: all
-Depends: arsoft-python, trac, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, trac, arsoft-trac-suid, ${python:Depends}, ${misc:Depends}
 Description: utilities for trac administration
  Several adminstration helper scripts for trac:
   - convert repository from SVN to GIT
