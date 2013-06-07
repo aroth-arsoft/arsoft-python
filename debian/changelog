@@ -1,3 +1,9 @@
+arsoft-python (1.67.1) raring; urgency=low
+
+  * removed debug output
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 07 Jun 2013 08:46:06 +0200
+
 arsoft-python (1.67) raring; urgency=low
 
   * fixed custom property handling in GitCommitNotifierConfig
