@@ -91,6 +91,8 @@ class GitCommitNotifierConfig(object):
         data['message_map'] = {}
         object.__setattr__(self, '_data', data)
 
+    _CUSTOM_PROPS = ['email_recipients', 'email_sender', 'email_prefix', 'last_error']
+
     @property
     def last_error(self):
         return self._last_error
@@ -105,10 +107,12 @@ class GitCommitNotifierConfig(object):
 
     @property
     def email_sender(self):
+        print('email_sender prop %s' % self._data['from'])
         return self._data['from']
 
     @email_sender.setter
     def email_sender(self, value):
+        print('email_sender set prop %s' % self._data['from'])
         self._data['from'] = value
 
     @property
@@ -117,6 +121,7 @@ class GitCommitNotifierConfig(object):
 
     @email_recipients.setter
     def email_recipients(self, value):
+        print('got %s %s' % (str(value), str(type(value))))
         if isinstance(value, list):
             self._data['mailinglist'] = ','.join(value)
         else:
@@ -146,10 +151,18 @@ class GitCommitNotifierConfig(object):
         return str(self._data)
 
     def __getattr__(self, name):
-        return self._data[name]
+        if name in self._CUSTOM_PROPS:
+            return object.__getattribute__(self, name)
+        else:
+            print('__getattr__ %s' %(name))
+            return self._data[name]
 
     def __setattr__(self, name, value):
-        self._data[name] = value
+        if name in self._CUSTOM_PROPS:
+            return object.__setattr__(self, name, value)
+        else:
+            print('__setattr__ %s=%s' %(name,value))
+            self._data[name] = value
 
 if __name__ == '__main__':
 

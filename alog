@@ -44,7 +44,7 @@ class alog_application(object):
 
         def append_message(self, message):
             self._message.append(message)
-            
+
         @property
         def __dict__(self):
             ret = {
