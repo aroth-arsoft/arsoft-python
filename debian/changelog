@@ -1,3 +1,9 @@
+arsoft-python (1.70) raring; urgency=low
+
+  * check_fritzbox can now check for dymanic DNS names
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 08 Jun 2013 17:46:28 +0200
+
 arsoft-python (1.69) raring; urgency=low
 
   * several minor improvements to nagios plugins
