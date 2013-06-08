@@ -36,16 +36,35 @@ else:
     config_file = ConfigFile(config_name=np['name'])
     status_file = StatusFile(config_file=config_file)
     if config_file.client:
-        np.add_value('sent', has_argument=False)
-        np.add_value('received', has_argument=False)
+        np.add_value('device_read', has_argument=False, value=0, uom='B')
+        np.add_value('device_write', has_argument=False, value=0, uom='B')
+        np.add_value('connection_read', has_argument=False, value=0, uom='B')
+        np.add_value('connection_write', has_argument=False, value=0, uom='B')
+        np.add_value('auth_read', has_argument=False, value=0, uom='B')
+        np.add_value('auth_write', has_argument=False, value=0, uom='B')
+        np.add_value('pre_compress', has_argument=False, value=0, uom='B')
+        np.add_value('post_compress', has_argument=False, value=0, uom='B')
+        np.add_value('compress_ratio', has_argument=False, value=0, uom='%')
+        np.add_value('pre_decompress', has_argument=False, value=0, uom='B')
+        np.add_value('post_decompress', has_argument=False, value=0, uom='B')
+        np.add_value('decompress_ratio', has_argument=False, value=0, uom='%')
 
-        stats = status_file.statistics
-        if stats:
-            np.set_value('sent', stats['TCP/UDP write bytes'])
-            np.set_value('received', stats['TCP/UDP read bytes'])
-        else:
-            np.set_value('sent', 0)
-            np.set_value('received', 0)
+        statistics = status_file.statistics
+        state = status_file.state
+        if statistics is not None:
+            #print('got stats %s' % (statistics))
+            np.set_value('device_read', statistics.device_read)
+            np.set_value('device_write', statistics.device_write)
+            np.set_value('connection_write', statistics.connection_write)
+            np.set_value('connection_read', statistics.connection_read)
+            np.set_value('auth_read', statistics.auth_read)
+            np.set_value('auth_write', statistics.auth_write)
+            np.set_value('pre_compress', statistics.pre_compress)
+            np.set_value('post_compress', statistics.post_compress)
+            np.set_value('compress_ratio', statistics.compress_ratio)
+            np.set_value('pre_decompress', statistics.pre_decompress)
+            np.set_value('post_decompress', statistics.post_decompress)
+            np.set_value('decompress_ratio', statistics.decompress_ratio)
 
         if running:
             delta = now - status_file.last_update
@@ -56,7 +75,14 @@ else:
                 (exit_code, exit_message) = np.check_values()
 
             if exit_code == OK:
-                exit_message = 'Connected'
+                if state is not None:
+                    if state.is_connected:
+                        exit_message = 'Connected to %s as %s' % (state.remoteip, state.localip)
+                    else:
+                        exit_code = WARNING
+                        exit_message = state.long_state
+                else:
+                    exit_message = 'Connected'
         else:
             if status_file.running:
                 exit_code = CRITICAL
@@ -66,19 +92,14 @@ else:
                 exit_message = 'VPN is stopped.'
 
     elif config_file.server:
-        np.add_value('numclients', has_argument=False)
+        state = status_file.state
+        
+        np.add_value('numclients', has_argument=False, value='0')
         
         if np['clients'] is not None:
             np.set_value_range('numclients', warning=(np['clients']), critical=None)
-        np.add_value('clients', has_argument=False)
-        np.add_value('routingtable', has_argument=False)
 
-        np.set_value('routingtable', status_file.routing_table)
-        if status_file.connected_clients is None:
-            np.set_value('clients', [])
-            np.set_value('numclients', 0)
-        else:
-            np.set_value('clients', status_file.connected_clients)
+        if status_file.connected_clients is not None:
             np.set_value('numclients', len(status_file.connected_clients))
 
         if running:
@@ -94,7 +115,14 @@ else:
                     (exit_code, exit_message) = np.check_values()
 
             if exit_code == OK:
-                exit_message = '%i clients' % (len(status_file.connected_clients))
+                if state is not None:
+                    if state.is_connected:
+                        exit_message = '%s with %i clients' % (state.localip, len(status_file.connected_clients))
+                    else:
+                        exit_code = WARNING
+                        exit_message = '%s (%s)' % (state.name, state.description)
+                else:
+                    exit_message = '%i clients' % (len(status_file.connected_clients))
         else:
             if status_file.running:
                 exit_code = CRITICAL

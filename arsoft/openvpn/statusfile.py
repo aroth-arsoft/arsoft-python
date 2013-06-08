@@ -45,6 +45,215 @@ import os
 import configfile
 import management
 
+class Statistics(object):
+    def __init__(self):
+        self.updated = None
+        self.device_read = 0
+        self.device_write = 0
+        self.connection_read = 0
+        self.connection_write = 0
+        self.auth_read = 0
+        self.auth_write = 0
+        self.pre_compress = 0
+        self.post_compress = 0
+        self.pre_decompress = 0
+        self.post_decompress = 0
+
+    def __str__(self):
+        elems = []
+        elems.append('updated=%s' % (self.updated))
+        elems.append('device_read=%s' % (self.device_read))
+        elems.append('device_write=%s' % (self.device_write))
+        elems.append('connection_read=%s' % (self.connection_read))
+        elems.append('connection_write=%s' % (self.connection_write))
+        elems.append('auth_read=%s' % (self.auth_read))
+        elems.append('auth_write=%s' % (self.auth_write))
+        elems.append('pre_compress=%s' % (self.pre_compress))
+        elems.append('post_compress=%s' % (self.post_compress))
+        elems.append('compress_ratio=%s' % (self.compress_ratio))
+        elems.append('pre_decompress=%s' % (self.pre_decompress))
+        elems.append('post_decompress=%s' % (self.post_decompress))
+        elems.append('decompress_ratio=%s' % (self.decompress_ratio))
+        return '{' + ';'.join(elems) + '}'
+
+    @property
+    def compress_ratio(self):
+        if self.post_compress and self.pre_compress:
+            return float(self.post_compress) / float(self.pre_compress)
+        else:
+            return 0.0
+
+    @property
+    def decompress_ratio(self):
+        if self.post_decompress and self.pre_decompress:
+            return float(self.post_decompress) / float(self.pre_decompress)
+        else:
+            return 0.0
+
+    def __setitem__(self, key, value):
+        if key == 'Updated':
+            try:
+                self.updated = datetime.datetime.strptime(value, '%a %b %d %H:%M:%S %Y')
+            except (IndexError, ValueError):
+                logging.error("Updated time is invalid: %s" % value)
+        elif key == 'TUN/TAP read bytes':
+            try:
+                self.device_read = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'TUN/TAP write bytes':
+            try:
+                self.device_write = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'TCP/UDP read bytes':
+            try:
+                self.connection_read = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'TCP/UDP write bytes':
+            try:
+                self.connection_write = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'Auth read bytes':
+            try:
+                self.auth_read = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'Auth write bytes':
+            try:
+                self.auth_write = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'pre-compress bytes':
+            try:
+                self.pre_compress = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'post-compress bytes':
+            try:
+                self.post_compress = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'pre-decompress bytes':
+            try:
+                self.pre_decompress = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+        elif key == 'post-decompress bytes':
+            try:
+                self.post_decompress = int(value)
+            except ValueError:
+                logging.error("%s is invalid: %s" % (key, value))
+
+class State(object):
+    
+    STATE_TO_LONG_STATE = {
+        'CONNECTING': 'Initialize connection',
+        'WAIT': 'Waiting for initial response from server',
+        'AUTH': 'Authenticating with server',
+        'GET_CONFIG': 'Downloading configuration options from server',
+        'ASSIGN_IP': 'Assigning IP address to virtual network interface',
+        'ADD_ROUTES': 'Adding routes to system',
+        'CONNECTED': 'Initialization Sequence Completed',
+        'RECONNECTING': 'Connection restart has occurred',
+        'EXITING': 'Shutting down connection'
+        }
+
+    @property
+    def is_downloading_config(self):
+        return self.name == 'GET_CONFIG'
+
+    @property
+    def is_assigning_ip(self):
+        return self.name == 'ASSIGN_IP'
+
+    @property
+    def is_adding_routes(self):
+        return self.name == 'ADD_ROUTES'
+
+    @property
+    def is_connected(self):
+        return self.name == 'CONNECTED'
+
+    @property
+    def is_reconnecting(self):
+        return self.name == 'RECONNECTING'
+
+    @property
+    def is_exiting(self):
+        return self.name == 'EXITING'
+        
+    def __init__(self, state_line_elements):
+        self.timestamp = None
+        self.name = None
+        self.description = None
+        self.localip = None
+        self.remoteip = None
+        self._parse(state_line_elements)
+
+    def _parse(self, state_line_elements):
+        if len(state_line_elements) >= 5:
+            self.timestamp = datetime.datetime.fromtimestamp(float(state_line_elements[0]))
+            self.name = state_line_elements[1]
+            self.description = state_line_elements[2]
+            self.localip = state_line_elements[3]
+            self.remoteip = state_line_elements[4]
+            ret = True
+        else:
+            ret = False
+        return ret
+
+    @property
+    def is_connecting(self):
+        return self.name == 'CONNECTING'
+
+    @property
+    def is_waiting(self):
+        return self.name == 'WAIT'
+
+    @property
+    def is_authenticating(self):
+        return self.name == 'AUTH'
+
+    @property
+    def is_downloading_config(self):
+        return self.name == 'GET_CONFIG'
+
+    @property
+    def is_assigning_ip(self):
+        return self.name == 'ASSIGN_IP'
+
+    @property
+    def is_adding_routes(self):
+        return self.name == 'ADD_ROUTES'
+
+    @property
+    def is_connected(self):
+        return self.name == 'CONNECTED'
+
+    @property
+    def is_reconnecting(self):
+        return self.name == 'RECONNECTING'
+
+    @property
+    def is_exiting(self):
+        return self.name == 'EXITING'
+    
+    @property
+    def long_state(self):
+        if self.name in self.STATE_TO_LONG_STATE:
+            ret = self.STATE_TO_LONG_STATE[self.name]
+        else:
+            ret = self.name
+        if self.description is not None and len(self.description) != 0:
+            ret = ret + ' (%s)' % (self.description)
+        return ret
+
+    def __str__(self):
+        return '%s,%s,%s,%s,%s' % (self.timestamp,self.name,self.description,self.localip, self.remoteip)
+
 class StatusBase(object):
     def __init__(self, version=2):
         self._connected_clients = None
@@ -53,6 +262,7 @@ class StatusBase(object):
         self._statistics = None
         self._reading_done = False
         self._running = False
+        self._state = None
 
     def _parse_lines(self, lines):
         self._details = {}
@@ -73,12 +283,6 @@ class StatusBase(object):
         for row in csvreader:
             row_title = row[0]
             if row_title == "END":
-                if read_statistics:
-                    if 'Updated' in self._statistics:
-                        try:
-                            self._details["timestamp"] = datetime.datetime.strptime(self._statistics['Updated'], '%a %b %d %H:%M:%S %Y')
-                        except (IndexError, ValueError):
-                            logging.error("Updated time is invalid: %s" % self._statistics['Updated'])
                 return True
             else:
                 if read_statistics == False:
@@ -122,7 +326,7 @@ class StatusBase(object):
 
                     elif row_title == "OpenVPN STATISTICS":
                         read_statistics = True
-                        self._statistics = {}
+                        self._statistics = Statistics()
 
                     else:
                         logging.warning("Line was not parsed. Keyword %s not recognized. %s" % (row_title, row))
@@ -132,6 +336,18 @@ class StatusBase(object):
                     except IndexError:
                         logging.error("statistics row is invalid: %s" % row)
 
+        logging.error("File was incomplete. END line was missing.")
+        return False
+
+    def _parse_state(self, lines):
+        self._state = {}
+        csvreader = csv.reader(lines, delimiter=',')
+        for row in csvreader:
+            row_title = row[0]
+            if row_title == "END":
+                return True
+            else:
+                self._state = State(row)
         logging.error("File was incomplete. END line was missing.")
         return False
 
@@ -146,7 +362,12 @@ class StatusBase(object):
     def running(self):
         if not self._reading_done:
             self._parse_file()
-        return self.self._running
+        return self._running
+
+    @property
+    def state(self):
+        """ Returns state of the OpenVPN connection """
+        return self._state
 
     @property
     def last_update(self):
@@ -155,6 +376,8 @@ class StatusBase(object):
             self._parse_file()
         if self._details is not None and 'timestamp' in self._details:
             return self._details['timestamp']
+        elif self._statistics is not None:
+            return self._statistics.updated
         else:
             return None
 
@@ -216,9 +439,12 @@ class StatusFile(StatusBase):
         if self._is_socket:
             miface = management.ManagementInterface(self.filename)
             if miface.open():
-                lines = miface.status(version=self._version)
-                ret = self._parse_lines(lines)
                 self._running = True
+                lines = miface.state()
+                ret = self._parse_state(lines)
+                if ret:
+                    lines = miface.status(version=self._version)
+                    ret = self._parse_lines(lines)
                 miface.close()
             else:
                 ret = False

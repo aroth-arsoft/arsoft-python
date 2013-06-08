@@ -130,6 +130,9 @@ class ManagementInterface(object):
     def status(self, version=3):
         return self._send_command('status ' + str(version))
 
+    def state(self):
+        return self._send_command('state')
+
 if __name__ == '__main__':
     m = ManagementInterface('unix:/run/openvpn.' + sys.argv[1] + '.socket')
     if m.open():
