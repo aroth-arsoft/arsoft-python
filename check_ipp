@@ -8,7 +8,7 @@ from arsoft.utils import runcmdAndGetData
 ## Create the plugin option
 np = NagiosPlugin(must_threshold=False)
 
-np.add_value('uptime', 'number of seconds the printer is running', guitext='up time', units='s', warning=True)
+np.add_value('uptime', 'number of seconds the printer is running', guitext='up time', uom='s', warning=True)
 
 ## This starts the actual plugin activation
 np.activate()

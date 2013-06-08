@@ -6,8 +6,8 @@ from arsoft.fritzbox import *
 
 ## Create the plugin option
 np = NagiosPlugin(must_threshold=False)
-np.add_value('down', 'defines the range for the down stream speed', guitext='down stream', units='bit/s', warning=True)
-np.add_value('up', 'defines the range for the up stream speed', guitext='up stream', units='bit/s', warning=True)
+np.add_value('down', 'defines the range for the down stream speed', guitext='down stream', uom='KB', warning=True)
+np.add_value('up', 'defines the range for the up stream speed', guitext='up stream', uom='KB', warning=True)
 
 ## This starts the actual plugin activation
 np.activate()
@@ -25,12 +25,15 @@ fritz = FritzBox(target_host)
 if fritz.isPhysicalConnected():
 
     if fritz.isDSLConnected():
-        downStream = fritz.physicalLinkDownStream()
-        upStream = fritz.physicalLinkUpStream()
+        downStream_in_bits = fritz.physicalLinkDownStream()
+        upStream_in_bits = fritz.physicalLinkUpStream()
+        
+        downStream_in_kb = downStream_in_bits / 8 / 1024
+        upStream_in_kb = upStream_in_bits / 8 / 1024
 
         ## set the values
-        np.set_value('down', downStream)
-        np.set_value('up', upStream)
+        np.set_value('down', downStream_in_kb)
+        np.set_value('up', upStream_in_kb)
         
         (exit_code, exit_message) = np.check_values()
         

@@ -15,13 +15,13 @@ class NagiosPlugin(pynagPlugin):
         
         self._named_values = {}
 
-    def add_value(self, label, description=None, guitext=None, value=None, units=None, warning=False, critical=False, has_argument=True):
-        pynagPlugin.add_perfdata(self, label, value=value)
+    def add_value(self, label, description=None, guitext=None, value=None, units=None, uom=None, warning=False, critical=False, has_argument=True):
+        pynagPlugin.add_perfdata(self, label, value=value, uom=uom)
 
         if has_argument:
             self.add_arg(label[0], label, description, required=None)
         
-        self._named_values[label] = { 'description':description, 'guitext':guitext, 'units':units, 'warning': warning, 'critical': critical }
+        self._named_values[label] = { 'description':description, 'guitext':guitext, 'units':units, 'uom':uom, 'warning': warning, 'critical': critical }
         return None
 
     def add_arg(self, spec_abbr, spec, help_text, required=1, action="store", default=None):
@@ -93,7 +93,12 @@ class NagiosPlugin(pynagPlugin):
         elif code == WARNING or code == CRITICAL:
             named_value_item = self._named_values[value_item['label']]
             gui_value_name = named_value_item['guitext'] if named_value_item['guitext'] is not None else value_item['label']
-            gui_units = ' ' + named_value_item['units'] if named_value_item['units'] is not None else ''
+            if named_value_item['units'] is not None:
+                gui_units = named_value_item['units']
+            elif named_value_item['uom'] is not None:
+                gui_units = named_value_item['uom']
+            else:
+                gui_units = ''
             gui_range = value_item['warn'] if code == WARNING else value_item['crit']
             msg = '%s (%s%s) outside specified range %s%s' \
                 % (gui_value_name, str(value_item['value']), gui_units, gui_range, gui_units)

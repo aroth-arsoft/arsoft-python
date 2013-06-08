@@ -19,7 +19,7 @@ np.add_arg('r', 'running', 'if not specified checks if agent is running; if set 
 ## This starts the actual plugin activation
 np.activate()
 
-np.add_value('time_since_last', 'time since last puppet run', 'time since last run', units='s', has_argument=False, value=0)
+np.add_value('time_since_last', 'time since last puppet run', 'time since last run', uom='s', has_argument=False, value=0)
 np.add_value('config', 'timestamp of the applied catalog', 'catalog version', has_argument=False, value=0)
 np.add_value('skipped', 'number of skipped resources', 'skipped', has_argument=False, value=0)
 np.add_value('restarted', 'number of restarted resources', 'restarted', has_argument=False, value=0)
