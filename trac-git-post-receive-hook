@@ -150,7 +150,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     
     # gather all commits, to call trac-admin only once
-    lines = sys.stdin.readlines()
+    lines = sys.stdin.readlines().decode("utf-8")
     log('lines=' + str(lines))
     updates = [line.split() for line in lines]
     log('updates=' + str(updates))
