@@ -22,7 +22,7 @@ TRAC_ENV = '/var/www/trac/myproject'
 GIT_PATH = '/usr/bin/git'
 TRAC_ADMIN = '/usr/bin/trac-admin'
 REPO_NAME = '"(default)"'   # The original one have no "", I change it and work
-LOG_FILE = ""     #"/tmp/traggitplugin.log"
+LOG_FILE = None     #"/tmp/traggitplugin.log"
 VERBOSE = False
 
 # if you are using gitolite or sth similar, you can get the repo name from environemt
@@ -31,7 +31,7 @@ VERBOSE = False
 def log(v):
     if VERBOSE:
         print(v)
-    if LOG_FILE != "":
+    if LOG_FILE is not None:
         f = open(LOG_FILE, "a+")
         f.write(str(v) + '\n')
         f.close()
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     
     # gather all commits, to call trac-admin only once
-    lines = sys.stdin.readlines().decode("utf-8")
+    lines = sys.stdin.readlines()
     log('lines=' + str(lines))
     updates = [line.split() for line in lines]
     log('updates=' + str(updates))
