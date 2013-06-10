@@ -4,6 +4,7 @@ import os,sys
 from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
 from arsoft.fritzbox import *
 import dns.resolver
+import socket
 
 ## Create the plugin option
 np = NagiosPlugin(must_threshold=False)
@@ -36,12 +37,17 @@ if fritz.isPhysicalConnected():
             resolver = dns.resolver.Resolver()
             fritzbox_addresses = []
             try:
-                # use the FritzBox as DNS resolver (since this our gateway to DNS)
-                answers = resolver.query(target_host, 'A')
-                for rdata in answers:
-                    fritzbox_addresses.append(str(rdata))
-            except dns.resolver.NoAnswer:
-                pass
+                socket.inet_aton(target_host)
+                fritzbox_addresses = [target_host]
+            except socket.error:
+                # Not legal
+                try:
+                    # use the FritzBox as DNS resolver (since this our gateway to DNS)
+                    answers = resolver.query(target_host, 'A')
+                    for rdata in answers:
+                        fritzbox_addresses.append(str(rdata))
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                    pass
 
             if len(fritzbox_addresses) != 0:
                 for ddnsname in ddnsnames:
