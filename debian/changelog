@@ -1,3 +1,10 @@
+arsoft-python (1.71) raring; urgency=low
+
+  * minor improvements to git module
+  * fixed trac-git-post-receive-hook
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 12 Jun 2013 07:11:44 +0200
+
 arsoft-python (1.70) raring; urgency=low
 
   * check_fritzbox can now check for dymanic DNS names

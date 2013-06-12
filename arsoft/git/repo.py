@@ -4,13 +4,15 @@
 
 import os.path
 import sys
-from arsoft.utils import runcmdAndGetData, to_uid, to_gid
+from arsoft.utils import runcmdAndGetData, to_uid, to_gid, enum
 from arsoft.inifile import IniFile
 from .base import GIT_EXECUTABLE, GIT_HOOKS
 
 class GitRepository(object):
 
-    def __init__(self, directory, name=None, bare=False, verbose=False):
+    SubmoduleStatus = enum(Invalid=-1, Ok=0, NotInitialized=1, CommitMismatch=2, MergeConflict=3)
+    
+    def __init__(self, directory, name=None, verbose=False):
         self.name = name
         self.root_directory = directory
         if os.path.isdir(directory):
@@ -177,10 +179,25 @@ class GitRepository(object):
                         current_dir = next_current_dir
         return ret
 
-    def git(self, args, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None):
-        return runcmdAndGetData(GIT_EXECUTABLE, args, cwd=self.root_directory, verbose=self.verbose, 
+    def git(self, args, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, use_root_for_cwd=True):
+        return runcmdAndGetData(GIT_EXECUTABLE, args, cwd=(self.root_directory if use_root_for_cwd else None), verbose=self.verbose, 
                                 outputStdErr=outputStdErr, outputStdOut=outputStdErr,
                                 stdin=stdin, stdout=stdout, stderr=stderr)
+
+    def clone(self, url, dest_dir=None, recursive=True, branch=None, origin=None, outputStdErr=True, outputStdOut=True):
+        args = ['clone']
+        if recursive:
+            args.append('--recursive')
+        if branch:
+            args.append('--branch')
+            args.append(branch)
+        if origin:
+            args.append('--origin')
+            args.append(origin)
+        args.append(url)
+        if dest_dir is not None:
+            args.append(dest_dir)
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr, use_root_for_cwd=False)
 
     @property
     def last_commit(self):
@@ -200,6 +217,10 @@ class GitRepository(object):
             args.append('--recurse-submodules')
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
     
+    def submodule_init(self):
+        args = ['submodule', 'init']
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
+    
     def submodule_update(self, recursive=True, remote=True):
         args = ['submodule', 'update']
         if recursive:
@@ -207,6 +228,34 @@ class GitRepository(object):
         if remote:
             args.append('--remote')
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
+    
+    def submodule_status(self, recursive=False):
+        args = ['submodule', 'status']
+        if recursive:
+            args.append('--recursive')
+        (sts, stdoutdata, stderrdata) = self.git(args)
+        if sts == 0:
+            ret = []
+            stdoutdata = stdoutdata.decode("utf-8")
+            for line in stdoutdata.splitlines():
+                if line[0] == '-':
+                    elems = line.rstrip().split(' ')
+                    submodule_name = elems[0][1:]
+                    submodule_status = self.SubmoduleStatus.NotInitialized
+                elif line[0] == '+':
+                    submodule_name = elems[0][1:]
+                    submodule_status = self.SubmoduleStatus.CommitMismatch
+                elif line[0] == 'U':
+                    submodule_name = elems[0][1:]
+                    submodule_status = self.SubmoduleStatus.MergeConflict
+                else:
+                    submodule_status = self.SubmoduleStatus.Ok
+                    submodule_name = elems[0]
+                submodule_path = elems[1]
+                ret.append( (submodule_name, submodule_path, submodule_status) )
+        else:
+            ret = None
+        return ret
     
     def _branch(self):
         args = ['branch', '-a']
