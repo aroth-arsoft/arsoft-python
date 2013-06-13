@@ -56,7 +56,7 @@ def initialize_settings(settings_module, setttings_file):
         app_etc_dir = setttings_dir
     in_devserver = _is_running_in_devserver(appdir)
         
-    #print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver))
+    print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver))
     
     settings_obj.DEBUG = in_devserver
     settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
@@ -144,6 +144,11 @@ def initialize_settings(settings_module, setttings_file):
         settings_obj.TEMPLATE_DIRS = [ os.path.join(app_etc_dir, 'templates') ]
         settings_obj.TEMPLATE_LOADERS = [ 'django.template.loaders.filesystem.Loader' ]
 
+    if in_devserver:
+        settings_obj.CONFIG_DIR = os.path.join(appdir, 'config')
+    else:
+        settings_obj.CONFIG_DIR = os.path.join(app_etc_dir, 'config')
+
     settings_obj.INSTALLED_APPS = [
             'django.contrib.auth',
             'django.contrib.contenttypes',
@@ -163,12 +168,29 @@ def initialize_settings(settings_module, setttings_file):
     settings_obj.LOGGING = {
             'version': 1,
             'disable_existing_loggers': False,
+            'formatters': {
+                'verbose': {
+                    'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+                },
+                'simple': {
+                    'format': '%(levelname)s %(message)s'
+                },
+            },
             'filters': {
                 'require_debug_false': {
                     '()': 'django.utils.log.RequireDebugFalse'
                 }
             },
             'handlers': {
+                'null': {
+                    'level': 'DEBUG',
+                    'class': 'django.utils.log.NullHandler',
+                },
+                'console':{
+                    'level': 'DEBUG',
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'simple'
+                },
                 'mail_admins': {
                     'level': 'ERROR',
                     'filters': ['require_debug_false'],
@@ -179,6 +201,11 @@ def initialize_settings(settings_module, setttings_file):
                 'django.request': {
                     'handlers': ['mail_admins'],
                     'level': 'ERROR',
+                    'propagate': True,
+                },
+                appname: {
+                    'handlers': ['console'],
+                    'level': 'DEBUG',
                     'propagate': True,
                 },
             }
