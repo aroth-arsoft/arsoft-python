@@ -72,7 +72,7 @@ def read_key_file(filename):
         f = open(filename, 'r')
         for line in f:
             keyline = line.strip()
-            print('keyline %s' % keyline)
+            #print('keyline %s' % keyline)
             keyline_elems = keyline.rsplit(' ')
             keyprotocol = int(keyline_elems[4])
             keyalgorithm = get_algorithm_for_number(int(keyline_elems[5]))
@@ -88,7 +88,6 @@ def read_key_file(filename):
 def use_key_file(update_obj, keyfile):
     keys = read_key_file(keyfile)
     if keys:
-        print(keys)
         keyalgorithm = None
         first_keyname = None
         keyring = {}

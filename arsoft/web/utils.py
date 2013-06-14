@@ -51,9 +51,11 @@ def initialize_settings(settings_module, setttings_file):
             appdir = setttings_dir[:-len(settings_dir_end)]
         else:
             appdir = setttings_dir
+        app_data_dir = os.path.join('/var/lib', settings_dir_end)
     else:
         appdir = setttings_dir
         app_etc_dir = setttings_dir
+        app_data_dir = setttings_dir
     in_devserver = _is_running_in_devserver(appdir)
         
     print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver))
@@ -118,7 +120,7 @@ def initialize_settings(settings_module, setttings_file):
             'django.contrib.messages.middleware.MessageMiddleware',
         ]
 
-    settings_obj.AUTHENTICATION_BACKENDS = []
+    settings_obj.AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
     
     # Additional locations of static files and the  List of finder classes 
     # that know how to find static files in various locations.
@@ -148,6 +150,11 @@ def initialize_settings(settings_module, setttings_file):
         settings_obj.CONFIG_DIR = os.path.join(appdir, 'config')
     else:
         settings_obj.CONFIG_DIR = os.path.join(app_etc_dir, 'config')
+
+    if in_devserver:
+        settings_obj.APP_DATA_DIR = os.path.join(appdir, 'data')
+    else:
+        settings_obj.APP_DATA_DIR = app_data_dir
 
     settings_obj.INSTALLED_APPS = [
             'django.contrib.auth',
