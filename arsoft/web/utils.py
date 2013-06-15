@@ -57,9 +57,9 @@ def initialize_settings(settings_module, setttings_file):
         app_etc_dir = setttings_dir
         app_data_dir = setttings_dir
     in_devserver = _is_running_in_devserver(appdir)
-        
-    print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver))
-    
+
+    #print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver))
+
     settings_obj.DEBUG = in_devserver
     settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
 
@@ -217,3 +217,10 @@ def initialize_settings(settings_module, setttings_file):
                 },
             }
         }
+
+    custom_settings_file = os.path.join(settings_obj.CONFIG_DIR, 'settings.py')
+    #print(custom_settings_file)
+    if os.path.exists(custom_settings_file):
+        execfile(custom_settings_file)
+
+    #print(settings_obj.INSTALLED_APPS)
