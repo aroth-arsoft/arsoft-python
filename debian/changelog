@@ -1,3 +1,9 @@
+arsoft-python (1.73) UNRELEASED; urgency=low
+
+  * fixed loading of certs and keys in certinfo script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 15 Jun 2013 19:00:40 +0200
+
 arsoft-python (1.72) raring; urgency=low
 
   * django improvements
