@@ -11,22 +11,32 @@ from arsoft.crypto import *
 
 class certinfo:
     def __init__(self):
-        self.m_verbose = False
-        self.m_certificate_filename = None
-        self.m_certificate_list_filename = None
-        self.m_certificate_list = None
-        self.m_key_list = None
+        self._verbose = False
+        self._certificate_filename = None
+        self._certificate_list_filename = None
+        self._certificate_list = None
+        self._key_list = None
 
     def _loadCerts(self, filenames):
         ret = True
-        self.m_certificate_list = CertificateList()
-        self.m_key_list = KeyList()
+        self._certificate_list = CertificateList()
+        self._key_list = KeyList()
         for filename in filenames:
+            if self._verbose:
+                print('add %s' % str(filename))
             filename_result = False
-            if not filename_result and self.m_key_list.add(filename):
-                filename_result = True
-            if not filename_result and self.m_certificate_list.add(filename):
-                filename_result = True
+            num_keys = len(self._key_list)
+            num_certs = len(self._certificate_list)
+            if not filename_result and self._key_list.add(filename):
+                if self._verbose:
+                    print('add keys from %s' % str(filename))
+                if len(self._key_list) > num_keys:
+                    filename_result = True
+            if not filename_result and self._certificate_list.add(filename):
+                if self._verbose:
+                    print('add certicates from %s' % str(filename))
+                if len(self._certificate_list) > num_certs:
+                    filename_result = True
             if not filename_result:
                 ret = False
                 print("Failed to add " + str(filename))
@@ -34,8 +44,8 @@ class certinfo:
 
     def find(self, term, output_number=True):
         num_certs = 0
-        for (certfile, cert) in self.m_certificate_list.find(term):
-            self.m_certificate_list.printCert(cert, filename=certfile)
+        for (certfile, cert) in self._certificate_list.find(term):
+            self._certificate_list.printCert(cert, filename=certfile)
             num_certs = num_certs + 1
 
         if output_number:
@@ -56,7 +66,7 @@ class certinfo:
                 else:
                     short_cert_filename = basename
                     
-                certlist = CertificateListFile(self.m_certificate_list_filename)
+                certlist = CertificateListFile(self._certificate_list_filename)
                 if certlist.open():
                     certlist.addCertificate(short_cert_filename, enable)
                     ret = self.save()
@@ -82,7 +92,7 @@ class certinfo:
             ret = False
             pass
         if ret:
-            certlist = CertificateListFile(self.m_certificate_list_filename)
+            certlist = CertificateListFile(self._certificate_list_filename)
             if certlist.open():
                 certlist.removeCertificate(short_cert_filename)
                 ret = self.save()
@@ -103,7 +113,7 @@ class certinfo:
             outdir = os.getcwd()
 
         num_certs = 0
-        for (certfile, cert) in self.m_certificates:
+        for (certfile, cert) in self._certificates:
             if self._matchCert(cert, term):
                 perform_extract = False
                 if expired_only:
@@ -136,16 +146,16 @@ class certinfo:
         outdir_certificate_list.add(outdir)
         
         #print('current certicates')
-        #self.m_certificate_list.write(sys.stdout)
+        #self._certificate_list.write(sys.stdout)
         #print('outdir certicates')
         #outdir_certificate_list.write(sys.stdout)
         
         #print('update certicates')
-        num_updated = self.m_certificate_list.update(outdir_certificate_list)
+        num_updated = self._certificate_list.update(outdir_certificate_list)
         #print('updated certicates ' + str(num_updated) + ' and list:')
-        #self.m_certificate_list.write(sys.stdout)
+        #self._certificate_list.write(sys.stdout)
         
-        ret = self.m_certificate_list.save()
+        ret = self._certificate_list.save()
         
         return ret
 
@@ -169,24 +179,24 @@ class certinfo:
 
         args = parser.parse_args()
 
-        self.m_verbose = args.verbose
+        self._verbose = args.verbose
         
         if args.certfile is None:
-            self.m_certificate_filename = [ '/etc/ssl/certs/ca-certificates.crt' ]
+            self._certificate_filename = [ '/etc/ssl/certs/ca-certificates.crt' ]
         else:
-            self.m_certificate_filename = args.certfile
+            self._certificate_filename = args.certfile
             
         if args.listfile is None:
-            self.m_certificate_list_filename = '/etc/ca-certificates.conf'
+            self._certificate_list_filename = '/etc/ca-certificates.conf'
         else:
-            self.m_certificate_list_filename = args.listfile
+            self._certificate_list_filename = args.listfile
         
         if args.addcertfile:
             self._addcertificate(args.addcertfile)
         elif args.removecertfile:
             self._removeCertificate(args.removecertfile)
         else:
-            if not self._loadCerts(self.m_certificate_filename):
+            if not self._loadCerts(self._certificate_filename):
                 return 1
 
         if args.findbyname:
@@ -196,13 +206,13 @@ class certinfo:
         elif args.update:
             self.update(args.update)
         else:
-            self.m_key_list.write(sys.stdout, short=args.short)
+            self._key_list.write(sys.stdout, short=args.short)
             if args.list_expired:
-                self.m_certificate_list.write(sys.stdout, expired_only=True, short=args.short)
+                self._certificate_list.write(sys.stdout, expired_only=True, short=args.short)
             elif args.list_valid:
-                self.m_certificate_list.write(sys.stdout, valid_only=True, short=args.short)
+                self._certificate_list.write(sys.stdout, valid_only=True, short=args.short)
             else:
-                self.m_certificate_list.write(sys.stdout, short=args.short)
+                self._certificate_list.write(sys.stdout, short=args.short)
         return 0
 
 if __name__ == "__main__":

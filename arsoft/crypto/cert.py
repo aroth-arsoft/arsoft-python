@@ -235,6 +235,17 @@ class CertificateList:
     def empty(self):
         return True if len(self.m_certificates) == 0 else False
 
+    def __getitem__(self, key):
+        # if key is of invalid type or value, the list values will raise the error
+        return self.m_certificates[key]
+    def __setitem__(self, key, value):
+        self.m_certificates[key] = value
+
+    def __len__(self):
+        return len(self.m_certificates)
+    def __iter__(self):
+        return iter(self.m_certificates)
+
     def add(self, filename):
         call_add_file_or_dir = True
         if '://' in filename:

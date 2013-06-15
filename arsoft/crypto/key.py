@@ -73,6 +73,17 @@ class KeyList:
     def empty(self):
         return True if len(self.m_keys) == 0 else False
 
+    def __getitem__(self, key):
+        # if key is of invalid type or value, the list values will raise the error
+        return self.m_keys[key]
+    def __setitem__(self, key, value):
+        self.m_keys[key] = value
+
+    def __len__(self):
+        return len(self.m_keys)
+    def __iter__(self):
+        return iter(self.m_keys)
+
     def add(self, filename):
         call_add_file_or_dir = True
         if '://' in filename:
@@ -88,13 +99,7 @@ class KeyList:
             else:
                 ret = self.addFile(filename)
         return ret
-    
-        if os.path.isdir(filename):
-            ret = self.addDirectory(filename)
-        else:
-            ret = self.addFile(filename)
-        return ret
-    
+
     def addFile(self, filename):
         pemfile = KeyPEMFile(filename)
         if pemfile.open():
