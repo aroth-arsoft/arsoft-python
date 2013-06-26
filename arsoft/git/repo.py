@@ -12,7 +12,7 @@ class GitRepository(object):
 
     SubmoduleStatus = enum(Invalid=-1, Ok=0, NotInitialized=1, CommitMismatch=2, MergeConflict=3)
     
-    def __init__(self, directory, name=None, verbose=False):
+    def __init__(self, directory, name=None, bare=False, verbose=False):
         self.name = name
         self.root_directory = directory
         if os.path.isdir(directory):
@@ -321,6 +321,21 @@ class GitRepository(object):
             return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
         else:
             return (0, None, None)
+
+    def create_branch(self, branch, start_point=None):
+        args = ['branch']
+        args.append(branch)
+        if start_point:
+            args.append(start_point)
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
+
+    def create_tag(self, tag, object_or_commit='HEAD', force=False):
+        args = ['tag']
+        args.append(tag)
+        if force:
+            args.append('-f')
+        args.append(object_or_commit)
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
 
     def update_config(self, configfile):
         try:
