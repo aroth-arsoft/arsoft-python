@@ -1,4 +1,10 @@
-arsoft-python (1.73) UNRELEASED; urgency=low
+arsoft-python (1.74) raring; urgency=low
+
+  * fixed git syntax issues 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 26 Jun 2013 07:07:30 +0200
+
+arsoft-python (1.73) raring; urgency=low
 
   * fixed loading of certs and keys in certinfo script
 
