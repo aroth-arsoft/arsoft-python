@@ -1,0 +1,85 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import os.path
+import argparse
+import sys
+from arsoft.sshutils import ssh_runcmdAndGetData, SSH_EXECUTABLE, SCP_EXECUTABLE
+
+__version__ = '1.0'
+
+class PuppetSetupApp(object):
+    def __init__(self):
+        self.verbose = False
+        self._config = None
+
+    def version(self):
+        print('Version: %s' % str(__version__))
+        print('SSH: %s' % str(SSH_EXECUTABLE))
+        print('SCP: %s' % str(SCP_EXECUTABLE))
+        return 0
+    
+    def _runssh(self, script):
+        (sts, stdout, stderr) = ssh_runcmdAndGetData(self.target_hostname, commandline=None, script=script, 
+                                                     keyfile=self.keyfile, username=self.username)
+        if sts == 0:
+            return True
+        else:
+            return False
+    
+    def _add_apt_source(self, sourcename, url, distcode=None, components=['main'], has_source=True):
+        distro_cs="`lsb_release -cs`" if distcode is None else ("'%s'" %distcode)
+        components_str = ' '.join(components)
+        sourcefilename = os.path.join('etc', 'apt', 'sources.list.d', sourcename + '.list')
+        script = """
+distro_cs=%(distro_cs)s
+echo "# Automatically generate source file for APT" > "%(sourcefilename)s"
+echo "deb %(url)s $distro_cs %(components_str)s" >> "%(sourcefilename)s"
+echo "deb-src %(url)s $distro_cs %(components_str)s" >> "%(sourcefilename)s"
+""" % { 'distro_cs':distro_cs, 'url':url, 'components_str':components_str, 'sourcefilename':sourcefilename }
+        return self._runssh(script)
+    
+    def _apt_install(self, packages):
+        packages_str = ' '.join(packages)
+        script = """
+apt-get -qq update
+apt-get install -q -y %(packages_str)s
+""" % { 'packages_str':packages_str }
+        return self._runssh(script)
+
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='set up puppet on a host')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
+        parser.add_argument('-u', '--username', dest='username', default='root', help='username to connect to the remote machine.')
+        parser.add_argument('-p', '--password', dest='password', help='password to access the remote machine.')
+        parser.add_argument('hostname', help='name of the host to setup')
+
+        args = parser.parse_args()
+
+        if args.version:
+            return self.version()
+
+        self.verbose = args.verbose
+        self.target_hostname = args.hostname
+        self.username = args.username
+        self.password = args.password
+        self.keyfile = args.keyfile
+        
+        self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu')
+        self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', components=['main', 'dependencies'])
+        self._apt_install(['puppet', 'openvpn'])
+
+        ret = 0
+        return ret
+
+if __name__ == "__main__":
+    app =  PuppetSetupApp()
+    sys.exit(app.main())
+ 

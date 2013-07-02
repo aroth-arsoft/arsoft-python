@@ -7,10 +7,12 @@ import pwd
 import grp
 import subprocess
 import sys
+import platform
 from pwd import getpwnam
 from grp import getgrnam
 
 (python_major, python_minor, python_micro, python_releaselevel, python_serial) = sys.version_info
+platform_is_windows = True if platform.system() == 'Windows' else False
 
 def isRoot():
     euid = os.geteuid()
@@ -80,6 +82,7 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
         stdoutdata = None
         stderrdata = None
     return (sts, stdoutdata, stderrdata)
+
 
 def rmtree(directory):
     def remove_readonly(fn, path, excinfo):
