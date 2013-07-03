@@ -278,10 +278,14 @@ class IniFile(object):
     def open(self, filename=None):
         if filename is None:
             filename = self._m_filename
-        ret = self._open(filename)
-        if not ret:
-            self.m_content = []
-            self.m_sections = []
+        if hasattr(filename , 'read'):
+            self._read(filename)
+            ret = True
+        else:
+            ret = self._open(filename)
+            if not ret:
+                self.m_content = []
+                self.m_sections = []
         return ret
 
     def close(self):
