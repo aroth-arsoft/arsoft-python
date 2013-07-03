@@ -15,21 +15,39 @@ class ConfigFile:
     def __init__(self, filename=None, config_name=None):
         self._conf = None
 
-        if filename is None and config_name is not None:
-            cfg = config.Config()
-            self.filename = cfg.get_config_file(config_name)
+        if filename:
+            if hasattr(filename , 'read'):
+                self.fileobject = filename
+                self.filename = filename.name
+            else:
+                self.fileobject = None
+                self.filename = filename
         else:
-            self.filename = filename
-            
+            self.fileobject = None
+            if config_name is not None:
+                cfg = config.Config()
+                self.filename = cfg.get_config_file(config_name)
+                self.config_directory = os.path.dirname(self.filename)
+            else:
+                self.filename = filename
+
+        self.config_directory = os.path.dirname(self.filename) if self.filename else None
         self._parse_file()
 
     def _parse_file(self):
         self._conf  = IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
-        if not self._conf .open(self.filename):
-            self._conf = None
-            ret = False
+        if self.fileobject is not None:
+            if not self._conf.open(self.fileobject):
+                self._conf = None
+                ret = False
+            else:
+                ret = True
         else:
-            ret = True
+            if not self._conf.open(self.filename):
+                self._conf = None
+                ret = False
+            else:
+                ret = True
         return ret
         
     @property
@@ -54,8 +72,69 @@ class ConfigFile:
     def status_file(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='status', default=None)
-            fe = f.split(' ')
-            ret = fe[0]
+            if f:
+                fe = f.split(' ')
+                ret = os.path.join(self.config_directory, fe[0])
+            else:
+                ret = None
+        else:
+            ret = None
+        return ret
+    
+    @property
+    def cert_file(self):
+        if self._conf is not None:
+            f = self._conf.get(section=None, key='cert', default=None)
+            ret = os.path.join(self.config_directory, f)
+        else:
+            ret = None
+        return ret
+
+    @property
+    def key_file(self):
+        if self._conf is not None:
+            f = self._conf.get(section=None, key='key', default=None)
+            ret = os.path.join(self.config_directory, f) if f else None
+        else:
+            ret = None
+        return ret
+
+    @property
+    def ca_file(self):
+        if self._conf is not None:
+            f = self._conf.get(section=None, key='ca', default=None)
+            ret = os.path.join(self.config_directory, f) if f else None
+        else:
+            ret = None
+        return ret
+
+    @property
+    def dh_file(self):
+        if self._conf is not None:
+            f = self._conf.get(section=None, key='dh', default=None)
+            ret = os.path.join(self.config_directory, f) if f else None
+        else:
+            ret = None
+        return ret
+
+    @property
+    def crl_file(self):
+        if self._conf is not None:
+            f = self._conf.get(section=None, key='crl', default=None)
+            ret = os.path.join(self.config_directory, f) if f else None
+        else:
+            ret = None
+        return ret
+
+    @property
+    def remote(self):
+        if self._conf is not None:
+            f = self._conf.get(section=None, key='remote', default=None)
+            if f:
+                fe = f.split(' ')
+                ret = (fe[0], int(fe[1]))
+            else:
+                ret = None
         else:
             ret = None
         return ret
@@ -91,11 +170,14 @@ class ConfigFile:
     def status_interval(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='status', default=None)
-            fe = f.split(' ')
-            if len(fe) > 1:
-                ret = int(fe[1])
+            if f:
+                fe = f.split(' ')
+                if len(fe) > 1:
+                    ret = int(fe[1])
+                else:
+                    ret = -1
             else:
-                ret = -1
+                ret = None
         else:
             ret = None
         return ret
@@ -107,6 +189,14 @@ class ConfigFile:
             "status interval: " + str(self.status_interval) + "\r\n" +\
             "client: " + str(self.client) + "\r\n" +\
             "server: " + str(self.server) + "\r\n" +\
+            "management: " + str(self.management) + "\r\n" +\
+            "management_socket: " + str(self.management_socket) + "\r\n" +\
+            "remote: " + str(self.remote) + "\r\n" +\
+            "crl_file: " + str(self.crl_file) + "\r\n" +\
+            "dh_file: " + str(self.dh_file) + "\r\n" +\
+            "ca_file: " + str(self.ca_file) + "\r\n" +\
+            "cert_file: " + str(self.cert_file) + "\r\n" +\
+            "key_file: " + str(self.key_file) + "\r\n" +\
             ""
         return ret
 
