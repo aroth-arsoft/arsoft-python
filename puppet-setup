@@ -14,6 +14,7 @@ class PuppetSetupApp(object):
     def __init__(self):
         self.verbose = False
         self._config = None
+        self._apt_update_required = True
 
     def version(self):
         print('Version: %s' % str(__version__))
@@ -39,12 +40,25 @@ echo "# Automatically generate source file for APT" > "%(sourcefilename)s"
 echo "deb %(url)s $distro_cs %(components_str)s" >> "%(sourcefilename)s"
 echo "deb-src %(url)s $distro_cs %(components_str)s" >> "%(sourcefilename)s"
 """ % { 'distro_cs':distro_cs, 'url':url, 'components_str':components_str, 'sourcefilename':sourcefilename }
-        return self._runssh(script)
+        ret = self._runssh(script)
+        if ret:
+            self._apt_update_required = True
+        return ret
+    
+    def _apt_update(self):
+        if self._apt_update_required:
+            script = "apt-get -qq update"
+            ret = self._runssh(script)
+            if ret:
+                self._apt_update_required = False
+        else:
+            ret = True
+        return ret
     
     def _apt_install(self, packages):
+        self._apt_update()
         packages_str = ' '.join(packages)
         script = """
-apt-get -qq update
 apt-get install -q -y %(packages_str)s
 """ % { 'packages_str':packages_str }
         return self._runssh(script)
