@@ -88,7 +88,7 @@ class certinfo:
         try:
             os.unlink(dest_cert_filename)
             ret = True
-        except:
+        except IOError:
             ret = False
             pass
         if ret:

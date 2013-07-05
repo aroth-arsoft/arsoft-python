@@ -6,9 +6,10 @@
 
 """
 
-from arsoft.inifile import *
 import sys
 import os
+from arsoft.inifile import *
+from arsoft.crypto import CertificateFile
 import config
 
 class ConfigFile:
@@ -58,6 +59,45 @@ class ConfigFile:
             else:
                 ret = True
         return ret
+    
+    class NestedFile(object):
+        def __init__(self, config, filename):
+            self.config = config
+            self.filename = filename
+            self._fp = None
+
+        @property
+        def abspath(self):
+            return os.path.join(self.config.config_directory, self.filename)
+        
+        def __str__(self):
+            return self.abspath
+        
+        def _open(self):
+            if self._fp is None:
+                self._fp = open(self.filename, 'r')
+            return True if self._fp else False
+        
+        def __iter__(self):
+            self._open()
+            if self._fp:
+                return iter(self._fp)
+            else:
+                raise IOError('no file object')
+
+        def read(self, size=None):
+            self._open()
+            if self._fp:
+                return self._fp.read(size)
+            else:
+                raise IOError('no file object')
+
+        def seek(self, offset, whence=None):
+            self._open()
+            if self._fp:
+                return self._fp.seek(offset, whence)
+            else:
+                raise IOError('no file object')
 
     @property
     def valid(self):
@@ -98,7 +138,7 @@ class ConfigFile:
     def cert_file(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='cert', default=None)
-            ret = os.path.join(self.config_directory, f)
+            ret = CertificateFile(self.NestedFile(self, f)) if f else None
         else:
             ret = None
         return ret
@@ -107,7 +147,7 @@ class ConfigFile:
     def key_file(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='key', default=None)
-            ret = os.path.join(self.config_directory, f) if f else None
+            ret = self.NestedFile(self, f) if f else None
         else:
             ret = None
         return ret
@@ -116,7 +156,7 @@ class ConfigFile:
     def ca_file(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='ca', default=None)
-            ret = os.path.join(self.config_directory, f) if f else None
+            ret = CertificateFile(self.NestedFile(self, f)) if f else None
         else:
             ret = None
         return ret
@@ -125,7 +165,7 @@ class ConfigFile:
     def dh_file(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='dh', default=None)
-            ret = os.path.join(self.config_directory, f) if f else None
+            ret = self.NestedFile(self, f) if f else None
         else:
             ret = None
         return ret
@@ -134,7 +174,7 @@ class ConfigFile:
     def crl_file(self):
         if self._conf is not None:
             f = self._conf.get(section=None, key='crl', default=None)
-            ret = os.path.join(self.config_directory, f) if f else None
+            ret = CertificateFile(self.NestedFile(self, f)) if f else None
         else:
             ret = None
         return ret

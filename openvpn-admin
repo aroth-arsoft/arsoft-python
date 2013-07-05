@@ -6,7 +6,10 @@ import os
 import os.path
 import argparse
 import sys
+import datetime
 import arsoft.openvpn
+import arsoft.crypto
+from arsoft.timestamp import UTC
 
 __version__ = '1.0'
 
@@ -24,6 +27,20 @@ class OpenVPNAdmin(object):
     def _get_config(self):
         if self._config is None:
             self._config = arsoft.openvpn.Config()
+            
+    def _print_cert(self, prefix, cert):
+        if cert:
+            cert_file = cert.filename
+            first_cert = cert.certificates[0] if len(cert.certificates) > 0 else None
+            if first_cert:
+                now = datetime.datetime.utcnow().replace(tzinfo=UTC)
+                expire_in = first_cert.expire_date - now
+                expire_date = str(first_cert.expire_date) + ' in ' + str(expire_in)
+            else:
+                expire_date = 'unavailable'
+            print('  %s: %s (expires %s)' % (prefix, cert_file, expire_date))
+        else:
+            print('  %s: none' % (prefix))
 
     def action_status(self, selected_vpns):
         self._get_config()
@@ -43,10 +60,15 @@ class OpenVPNAdmin(object):
                     is_running = self._config.is_running(vpnname)
                     status_file = arsoft.openvpn.StatusFile(config_file=config_file)
                     print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
-                    
+
                     print('  Running: %s' % is_running)
                     print('  State: %s' % status_file.state.long_state)
                     print('  Last updated: %s' % status_file.last_update)
+                    self._print_cert('Certificate file', config_file.cert_file)
+                    print('  Key file: %s' % config_file.key_file)
+                    self._print_cert('CA file', config_file.ca_file)
+                    self._print_cert('CRL file', config_file.crl_file)
+                    print('  DH file: %s' % config_file.dh_file)
                     
                     if config_file.server:
                         print('  Connected clients:')
