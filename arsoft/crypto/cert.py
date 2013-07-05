@@ -6,12 +6,13 @@ from urlparse import urlparse
 from pem import *
 from OpenSSL import crypto
 from arsoft.timestamp import parse_date
+from arsoft.utils import detect_file_type
 
 class Certificate(PEMItem):
     def __init__(self, pemitem=None, rawitem=None):
         if pemitem:
             PEMItem.__init__(self, pemitem.blockindex, pemitem.blocktype, pemitem.blockdata)
-            self.cert = crypto.load_certificate(crypto.FILETYPE_PEM, self.blockdata) 
+            self.cert = crypto.load_certificate(crypto.FILETYPE_PEM, pemitem.blockdata) 
         elif rawitem:
             tmpcert = crypto.load_certificate(crypto.FILETYPE_ASN1, rawitem)
             blockdata = crypto.dump_certificate(crypto.FILETYPE_PEM, tmpcert)
@@ -75,19 +76,47 @@ class Certificate(PEMItem):
     def get_subject(self):
         return self.cert.get_subject()
 
+    @property
+    def subject(self):
+        return self.cert.get_subject()
+
     def get_issuer(self):
         return self.cert.get_issuer()
-        
+
+    @property
+    def issuer(self):
+        return self.cert.get_issuer()
+
     def get_version(self):
+        return self.cert.get_version()
+
+    @property
+    def version(self):
         return self.cert.get_version()
 
     def get_serial_number(self):
         return self.cert.get_serial_number()
 
+    @property
+    def serial_number(self):
+        return self.cert.get_serial_number()
+
     def get_pubkey(self):
         return self.cert.get_pubkey()
 
+    @property
+    def public_key(self):
+        return self.cert.get_pubkey()
+
     def get_pubkey_bits(self):
+        pkey = self.cert.get_pubkey()
+        if pkey is not None:
+            return pkey.bits()
+        else:
+            return None
+
+    @property
+    def public_key_bits(self):
         pkey = self.cert.get_pubkey()
         if pkey is not None:
             return pkey.bits()
@@ -117,6 +146,7 @@ class Certificate(PEMItem):
     def digest(self, digest_name='sha1'):
         return self.cert.digest(digest_name)
 
+    @property
     def has_expired(self):
         return self.cert.has_expired()
 
@@ -124,6 +154,14 @@ class Certificate(PEMItem):
         return parse_date(self.cert.get_notBefore())
         
     def get_notAfter(self):
+        return parse_date(self.cert.get_notAfter())
+
+    @property
+    def issue_date(self):
+        return parse_date(self.cert.get_notBefore())
+
+    @property
+    def expire_date(self):
         return parse_date(self.cert.get_notAfter())
     
     def _writeName(self, fobj, prefix, name):
@@ -473,3 +511,48 @@ class CertificatePEMFile(PEMFile):
                 ret.append( cert )
             i = i + 1
         return ret
+
+    @property
+    def certificates(self):
+        return self.getCertificates()
+
+class CertificateFile(object):
+    def __init__(self, filename=None):
+        self.filename = filename
+        self.file_type = None
+        self._impl = None
+        if self.filename is not None:
+            self.open()
+
+    def open(self, filename=None):
+        if filename is None:
+            filename = self.filename
+
+        if self.file_type is None:
+            self.file_type = detect_file_type(filename) if filename else None
+
+        if self.file_type == 'PEM certificate':
+            self._impl = CertificatePEMFile(self.filename)
+            ret = self._impl.open()
+        else:
+            ret = False
+        return ret
+
+    def __str__(self):
+        if self._impl:
+            return str(self._impl)
+        else:
+            return self.__class__.__name__ + '(%s)' % (self.filename)
+
+    def close(self):
+        if self._impl:
+            self._impl.close()
+            self._impl = None
+
+    @property
+    def certificates(self):
+        if self._impl:
+            return self._impl.certificates
+        else:
+            return []
+    

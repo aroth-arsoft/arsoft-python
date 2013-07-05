@@ -25,7 +25,10 @@ class PEMFile:
         self.m_filename = filename
         self.m_passphrase = passphrase
         self.m_blocks = []
-        
+
+    def __str__(self):
+        return self.__class__.__name__ + '(%s)' % (self.m_filename)
+
     def open(self, filename=None, passphrase=None):
         if filename is None:
             filename = self.m_filename
@@ -36,40 +39,50 @@ class PEMFile:
         blockdata = ''
         blocktype = None
         lineno = 0
+        close_file_required = False
         try:
             ret = True
-            f = open(filename, 'rU')
-            for line in f:
-                result = self.s_begin_or_end_pattern.match(line)
-                if result is not None:
-                    cmd = result.group('cmd')
-                    blocktype = result.group('type')
-                    if cmd == "BEGIN":
-                        # clear the cert buffer
-                        #print('got blockstart ' + blocktype)
-                        blockdata = ''
-                        blockdata += line
-                    elif cmd == "END":
-                        #print('got blockend ' + blocktype)
+            if hasattr(filename, 'read'):
+                f = filename
+            else:
+                f = open(filename, 'rU')
+                close_file_required = True if f else False
+        except IOError as e:
+            ret = False
+        if ret:
+            try:
+                for line in f:
+                    result = self.s_begin_or_end_pattern.match(line)
+                    if result is not None:
+                        cmd = result.group('cmd')
+                        blocktype = result.group('type')
+                        if cmd == "BEGIN":
+                            # clear the cert buffer
+                            #print('got blockstart ' + blocktype)
+                            blockdata = ''
+                            blockdata += line
+                        elif cmd == "END":
+                            #print('got blockend ' + blocktype)
+                            if blocktype:
+                                blockdata += line
+                                blockindex = len(self.m_blocks)
+                                self.m_blocks.append( PEMItem(blockindex, blocktype, blockdata) )
+                            # prepare for next cert
+                            blocktype = None
+                            blockdata = ''
+                        else:
+                            #print('unexpected block')
+                            ret = False
+                            break
+                    else:
                         if blocktype:
                             blockdata += line
-                            blockindex = len(self.m_blocks)
-                            self.m_blocks.append( PEMItem(blockindex, blocktype, blockdata) )
-                        # prepare for next cert
-                        blocktype = None
-                        blockdata = ''
-                    else:
-                        #print('unexpected block')
-                        ret = False
-                        break
-                else:
-                    if blocktype:
-                        blockdata += line
-                lineno = lineno + 1
+                    lineno = lineno + 1
+            except IOError:
+                ret = False
+                pass
+        if close_file_required:
             f.close()
-        except:
-            ret = False
-            pass
         return ret
         
     def save(self, filename=None):
@@ -82,7 +95,7 @@ class PEMFile:
                 pemitem.write(f)
             f.close()
             ret = True
-        except:
+        except IOError:
             ret = False
             pass
         return ret
