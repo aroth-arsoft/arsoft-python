@@ -207,9 +207,10 @@ class IniSection(object):
         return self.asString(only_data=False)
 
 class IniFile(object):
-    def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True, keyIsWord=True):
+    def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True, keyIsWord=True, autoQuoteStrings=False):
         self.m_commentPrefix = commentPrefix
         self.m_keyValueSeperator = keyValueSeperator
+        self.m_autoQuoteStrings = autoQuoteStrings
         self.m_content = []
         self.m_sections = []
         self.m_filename = filename

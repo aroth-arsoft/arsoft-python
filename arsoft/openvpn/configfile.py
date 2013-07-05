@@ -14,6 +14,7 @@ import config
 class ConfigFile:
     def __init__(self, filename=None, config_name=None):
         self._conf = None
+        self.name = None
 
         if filename:
             if hasattr(filename , 'read'):
@@ -28,8 +29,12 @@ class ConfigFile:
                 cfg = config.Config()
                 self.filename = cfg.get_config_file(config_name)
                 self.config_directory = os.path.dirname(self.filename)
+                self.name = config_name
             else:
                 self.filename = filename
+                if self.filename is not None:
+                    bname = os.path.basename(self.filename)
+                    (self.name, ext) = os.path.splitext(bname)
 
         self.config_directory = os.path.dirname(self.filename) if self.filename else None
         self._parse_file()
@@ -45,11 +50,15 @@ class ConfigFile:
         else:
             if not self._conf.open(self.filename):
                 self._conf = None
+                self._name = None
                 ret = False
             else:
                 ret = True
         return ret
-        
+    @property
+    def valid(self):
+        return True if self._conf is not None else False
+
     @property
     def client(self):
         remote = self._conf.get(section=None, key='remote', default=None)

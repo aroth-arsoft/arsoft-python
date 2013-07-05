@@ -1,0 +1,87 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import os.path
+import argparse
+import sys
+import arsoft.openvpn
+
+__version__ = '1.0'
+
+class OpenVPNAdmin(object):
+    def __init__(self):
+        self.verbose = False
+        self._config = None
+
+    def version(self):
+        print('Version: %s' % str(__version__))
+        print('SSH: %s' % str(SSH_EXECUTABLE))
+        print('SCP: %s' % str(SCP_EXECUTABLE))
+        return 0
+    
+    def _get_config(self):
+        if self._config is None:
+            self._config = arsoft.openvpn.Config()
+
+    def action_status(self, selected_vpns):
+        self._get_config()
+        if len(selected_vpns) == 0:
+            selected_vpns = self._config.names
+    
+        ret = 0
+        if len(selected_vpns) == 0:
+            print('No VPNs configured.')
+        else:
+            for vpnname in selected_vpns:
+                config_file = ConfigFile(vpnname)
+                if not config_file.valid():
+                    sys.stderr.write('Failed to open configuration for VPN %s\n' % (vpnname))
+                    ret += 1
+                else:
+                    status_file = StatusFile(config_file=config_file)
+                    print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
+                    print('  Last updated: %s' % status_file.last_update)
+                    
+                    if config_file.server:
+                        print('  Connected clients:')
+                        for (clientname, clientinfo) in status_file.connected_clients.itemiter():
+                            print('    %s: %s' % (clientname, clientinfo))
+                    print('  Routing table:')
+                    for (address, entry) in status_file.routing_table.itemiter():
+                        print('    %s: %s' % (address, entry))
+                    print('  Details:')
+                    for (name, value) in status_file.details.itemiter():
+                        print('    %s: %s' % (name, value))
+                    print('  Statistics:')
+                    for (name, value) in status_file.statistics.itemiter():
+                        print('    %s: %s' % (name, value))
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='helper script to manage/configure a local OpenVPN installation.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
+        parser.add_argument('--status', dest='action_status', nargs='*', help='show the status of the configured VPNs')
+
+        args = parser.parse_args()
+        self.verbose = args.verbose
+
+        if args.version:
+            return self.version()
+        
+        if args.action_status is not None:
+            ret = self.action_status(args.action_status)
+        else:
+            sys.stderr.write('No action selected.\n')
+            ret = 1
+        return ret
+
+if __name__ == "__main__":
+    app =  OpenVPNAdmin()
+    sys.exit(app.main())
+ 

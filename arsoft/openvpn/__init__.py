@@ -5,3 +5,5 @@
 from statusfile import *
 from config import *
 from configfile import *
+from zippedconfigfile import ZippedConfigFile
+from systemconfig import SystemConfig

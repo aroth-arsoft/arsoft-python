@@ -127,7 +127,7 @@ class iniutil(object):
         parser.add_argument('--value', dest='only_values', action='store_true', help='writes the only the values to stdout.')
         parser.add_argument('--dry-run', dest='dry_run', action='store_true', help='try to make changes without storing to disk.')
         parser.add_argument('--cmdfile', dest='cmdfile', metavar='file', nargs='?', help='file which contains commands to modify the INI file.')
-        parser.add_argument('--style', dest='style', type=str, choices=['auto', 'ini','conf', 'http', 'cmd'], default='auto', nargs='?', help='specifies the style to parse the INI file.')
+        parser.add_argument('--style', dest='style', type=str, choices=['auto', 'ini', 'conf', 'http', 'cmd', 'shell'], default='auto', nargs='?', help='specifies the style to parse the INI file.')
         parser.add_argument('-g', '--get', dest='values_get', metavar='value', nargs='+', help='specifies values to get.')
         parser.add_argument('-e', '--edit', dest='values_edit', metavar='value', nargs='+', help='specifies values to set.')
         parser.add_argument('-d', '--delete', dest='values_delete', metavar='value', nargs='+', help='specifies values to delete.')
@@ -145,18 +145,27 @@ class iniutil(object):
             if args.style == 'auto':
                 commentPrefix=None
                 keyValueSeperator=None
+                autoQuoteStrings=False
             elif args.style == 'ini':
                 commentPrefix=';'
                 keyValueSeperator='='
+                autoQuoteStrings=False
             elif args.style == 'conf':
                 commentPrefix='#'
                 keyValueSeperator='='
+                autoQuoteStrings=False
             elif args.style == 'http':
                 commentPrefix='#'
                 keyValueSeperator=':'
+                autoQuoteStrings=False
             elif args.style == 'cmd':
                 commentPrefix='#'
                 keyValueSeperator=' '
+                autoQuoteStrings=False
+            elif args.style == 'shell':
+                commentPrefix='#'
+                keyValueSeperator=' '
+                autoQuoteStrings=True
             else:
                 sys.stderr.write('Invalid style specified ' + args.style + '\n')
                 return 1

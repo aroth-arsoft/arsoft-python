@@ -6,6 +6,7 @@ import os
 import sys
 from arsoft.zipfileutils import ZipFileEx
 from configfile import ConfigFile
+from systemconfig import SystemConfig
 import arsoft.utils
 
 
@@ -62,6 +63,14 @@ class ZippedConfigFile(object):
         return ret
 
     @property
+    def name(self):
+        cfgfile = self.config_file
+        if cfgfile is not None:
+            return cfgfile.name
+        else:
+            return None
+
+    @property
     def config_filename(self):
         self._find_config_file()
         return self._config_file_info.filename if self._config_file_info else None
@@ -76,6 +85,10 @@ class ZippedConfigFile(object):
     def extractall(self, target_directory):
         if self._ensure_open():
             self._zip.extractall(target_directory)
+            ret = True
+        else:
+            ret = False
+        return ret
 
     def __getitem__(self, name):
         fileinfo = self._find_file(name)
@@ -86,7 +99,22 @@ class ZippedConfigFile(object):
             return iter(self._zip)
         else:
             return None
-
+        
+    def install(self, autoStart=True, config_directory=None, root_directory=None):
+        if config_directory is None:
+            root_directory = '/etc/openvpn'
+        if root_directory is None:
+            target_config_directory = config_directory
+        else:
+            target_config_directory = root_directory + config_directory
+        ret = self.extractall(target_config_directory)
+        if ret:
+            syscfg = SystemConfig(root_directory=root_directory)
+            if autoStart:
+                syscfg.autostart += self.name
+            else:
+                syscfg.autostart -= self.name
+        return ret
 if __name__ == '__main__':
     c = ZippedConfigFile(sys.argv[1])
 

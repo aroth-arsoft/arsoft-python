@@ -76,16 +76,15 @@ apt-get install -q -y %(packages_str)s
         parser.add_argument('hostname', help='name of the host to setup')
 
         args = parser.parse_args()
-
-        if args.version:
-            return self.version()
-
         self.verbose = args.verbose
         self.target_hostname = args.hostname
         self.username = args.username
         self.password = args.password
         self.keyfile = args.keyfile
-        
+
+        if args.version:
+            return self.version()
+
         self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu')
         self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', components=['main', 'dependencies'])
         self._apt_install(['puppet', 'openvpn'])

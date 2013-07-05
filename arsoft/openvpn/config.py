@@ -50,6 +50,10 @@ class Config(object):
         else:
             ret = None
         return ret
+    
+    @property
+    def names(self):
+        return self._names.keys()
 
     def __str__(self):
         ret = "config directory: " + str(self._config_directory) + "\r\n" +\
