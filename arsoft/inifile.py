@@ -214,6 +214,7 @@ class IniFile(object):
         self.m_content = []
         self.m_sections = []
         self.m_filename = filename
+        self.m_lasterror = None
         #
         # Regular expressions for parsing section headers and options.
         #
@@ -272,7 +273,8 @@ class IniFile(object):
             self._read(f)
             f.close()
             ret = True
-        except IOError:
+        except IOError as e:
+            self.m_lasterror = e
             ret = False
         return ret
         
@@ -294,18 +296,22 @@ class IniFile(object):
         self.m_sections = []
         self.m_commentPrefix = None
         self.m_keyValueSeperator = None
-        
+        self.m_lasterror = None
+
     @property
     def filename(self):
-        return m_filename
+        return self.m_filename
+    @property
+    def last_error(self):
+        return self.m_lasterror
 
     @property
     def commentPrefix(self):
-        return m_commentPrefix
+        return self.m_commentPrefix
 
     @property
     def keyValueSeperator(self):
-        return m_keyValueSeperator
+        return self.m_keyValueSeperator
 
     def _getSection(self, name):
         for section in self.m_sections:
