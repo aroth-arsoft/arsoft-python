@@ -238,3 +238,20 @@ def import_non_local(name, custom_name=None):
     f.close()
 
     return module
+
+def detect_file_type(filename):
+    import magic
+    ms = magic.open(magic.NONE)
+    ms.load()
+    file_type = None
+    if hasattr(filename, 'read'):
+        try:
+            buf = filename.read(256)
+            if hasattr(filename, 'seek'):
+                filename.seek(-len(buf),1)
+            file_type = ms.buffer(buf)
+        except IOError:
+            file_type = None
+    else:
+        file_type = ms.file(filename)
+    return file_type
