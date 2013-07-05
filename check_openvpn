@@ -9,35 +9,41 @@ from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
 from arsoft.openvpn import StatusFile, ConfigFile, Config
 from arsoft.timestamp import parse_timedelta, format_timedelta, UTC
 
-def _check_certificate(prefix, cert):
+def _check_certificate(prefix, perfdata_key, cert):
     exit_code = UNKNOWN
     exit_message = None
     if cert:
         cert_file = cert.filename
         now = datetime.utcnow().replace(tzinfo=UTC)
         if len(cert.certificates) > 0:
+            min_expire_in = timedelta(days=100*365)
             for cert in cert.certificates:
                 expire_in = cert.expire_date - now
+                if expire_in < min_expire_in:
+                    min_expire_in = expire_in
                 if expire_in < threshold_critical:
                     exit_code = CRITICAL
-                    exit_message = '%s expires in %s at %s' % (prefix, expire_in, expire_date)
+                    exit_message = '%s expires in %s at %s' % (prefix, format_timedelta(expire_in), expire_date)
                 elif expire_in < threshold_warning:
                     exit_code = WARNING
-                    exit_message = '%s expires in %s at %s' % (prefix, expire_in, expire_date)
+                    exit_message = '%s expires in %s at %s' % (prefix, format_timedelta(expire_in), expire_date)
                 else:
                     exit_code = OK
+            np.set_value(perfdata_key, min_expire_in.days)
         else:
+            np.exclude_value(perfdata_key)
             exit_code = CRITICAL
             exit_message = '%s no certificate in %s' % (prefix, cert_file)
     else:
+        np.exclude_value(perfdata_key)
         exit_code = CRITICAL
         exit_message = 'No %s available' % (prefix)
     return (exit_code, exit_message)
 
 ## Create the plugin option
-np = NagiosPlugin(must_threshold=False)
+np = NagiosPlugin(must_threshold=False, optional_threshold=True, has_host_argument=False)
 np.add_arg('n', 'name', 'name of the VPN configuration')
-np.add_arg('c', 'clients', 'number of clients required (server only).', default=0, required=0)
+np.add_arg('C', 'clients', 'number of clients required (server only).', default=0, required=0)
 np.add_arg('r', 'running', 'if not specified checks if VPN is running; if set to zero checks if VPN is stopped.', default=1, required=0)
 np.add_flag('s', 'cert', 'check only certificates', default=False)
     
@@ -53,27 +59,43 @@ if not config.get_config_file(np['name']):
     exit_message = 'VPN %s is not configured.' % (str(np['name']))
 else:
     if check_certificates:
-        threshold_warning = timedelta(days=30)
-        threshold_critical = timedelta(days=15)
+        if np['warning']:
+            threshold_warning = timedelta(days=np['warning'])
+        else:
+            threshold_warning = timedelta(days=30)
+        if np['critical']:
+            threshold_critical = timedelta(days=np['critical'])
+        else:
+            threshold_critical = timedelta(days=15)
+        
+        np.add_value('cert_days', has_argument=False, value=-1)
+        np.add_value('ca_days', has_argument=False, value=-1)
+        np.add_value('crl_days', has_argument=False, value=-1)
+
+        np.set_value_range('cert_days', warning=str(threshold_warning.days) + ':', critical=str(threshold_critical.days) + ':')
+        np.set_value_range('ca_days', warning=str(threshold_warning.days) + ':', critical=str(threshold_critical.days) + ':')
+        np.set_value_range('crl_days', warning=str(threshold_warning.days) + ':', critical=str(threshold_critical.days) + ':')
 
         config_file = ConfigFile(config_name=np['name'])
         
         if config_file.cert_file:
-            (exit_code, exit_message) = _check_certificate('Certificate file', config_file.cert_file)
+            (exit_code, exit_message) = _check_certificate('Certificate file', 'cert_days', config_file.cert_file)
         else:
             exit_code = CRITICAL
             exit_message = 'VPN %s no certificate configured.' % (str(np['name']))
 
         if exit_code == OK:
             if config_file.ca_file:
-                (exit_code, exit_message) = _check_certificate('CA file', config_file.ca_file)
+                (exit_code, exit_message) = _check_certificate('CA file', 'ca_days', config_file.ca_file)
             else:
                 exit_code = CRITICAL
-                exit_message = 'VPN %s no certificate configured.' % (str(np['name']))
+                exit_message = 'VPN %s no CA certificate configured.' % (str(np['name']))
 
         if exit_code == OK:
             if config_file.crl_file:
-                (exit_code, exit_message) = _check_certificate('CRL file', config_file.crl_file)
+                (exit_code, exit_message) = _check_certificate('CRL file', 'crl_days', config_file.crl_file)
+            else:
+                np.exclude_value('crl_days')
         if exit_code == OK:
             exit_message = 'All certificates ok'
     else:
