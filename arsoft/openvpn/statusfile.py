@@ -75,6 +75,22 @@ class Statistics(object):
         elems.append('post_decompress=%s' % (self.post_decompress))
         elems.append('decompress_ratio=%s' % (self.decompress_ratio))
         return '{' + ';'.join(elems) + '}'
+    
+    class _StatisticsIterator(object):
+        def __init__(self, stats):
+            self._stats = stats
+            self._properties = []
+            for prop in dir(stats):
+                if prop[0] == '_':
+                    continue
+                self._properties.append(prop)
+            self._it = iter(self._properties)
+
+        def next(self):
+            return next(self._it)
+
+    def __iter__(self):
+        return self._StatisticsIterator(self)
 
     @property
     def compress_ratio(self):
@@ -150,6 +166,7 @@ class Statistics(object):
 class State(object):
     
     STATE_TO_LONG_STATE = {
+        'DOWN': 'Connection is down',
         'CONNECTING': 'Initialize connection',
         'WAIT': 'Waiting for initial response from server',
         'AUTH': 'Authenticating with server',
@@ -161,37 +178,14 @@ class State(object):
         'EXITING': 'Shutting down connection'
         }
 
-    @property
-    def is_downloading_config(self):
-        return self.name == 'GET_CONFIG'
-
-    @property
-    def is_assigning_ip(self):
-        return self.name == 'ASSIGN_IP'
-
-    @property
-    def is_adding_routes(self):
-        return self.name == 'ADD_ROUTES'
-
-    @property
-    def is_connected(self):
-        return self.name == 'CONNECTED'
-
-    @property
-    def is_reconnecting(self):
-        return self.name == 'RECONNECTING'
-
-    @property
-    def is_exiting(self):
-        return self.name == 'EXITING'
-        
-    def __init__(self, state_line_elements):
-        self.timestamp = None
-        self.name = None
-        self.description = None
-        self.localip = None
-        self.remoteip = None
-        self._parse(state_line_elements)
+    def __init__(self, timestamp=None, name=None, description=None, localip=None, remoteip=None, state_line_elements=None):
+        self.timestamp = timestamp
+        self.name = name
+        self.description = description
+        self.localip = localip
+        self.remoteip = remoteip
+        if state_line_elements is not None:
+            self._parse(state_line_elements)
 
     def _parse(self, state_line_elements):
         if len(state_line_elements) >= 5:
@@ -240,7 +234,11 @@ class State(object):
     @property
     def is_exiting(self):
         return self.name == 'EXITING'
-    
+
+    @property
+    def is_down(self):
+        return self.name == 'DOWN'
+
     @property
     def long_state(self):
         if self.name in self.STATE_TO_LONG_STATE:
@@ -253,6 +251,58 @@ class State(object):
 
     def __str__(self):
         return '%s,%s,%s,%s,%s' % (self.timestamp,self.name,self.description,self.localip, self.remoteip)
+    
+class ConnectedClient(object):
+    def __init__(self, headers, row):
+        self.name = row[1]
+        self._info = dict(zip(headers, row[1:]))
+        
+        self.connected_since = self._get_info('Connected Since (time_t)', type=datetime.datetime, default_value=0)
+        self.virtual_address = self._get_info('Virtual Address', type=str)
+        self.real_address = self._get_info('Real Address', type=str)
+        self.common_name = self._get_info('Common Name', type=str)
+        self.bytes_sent = self._get_info('Bytes Sent', type=int)
+        self.bytes_received = self._get_info('Bytes Received', type=int)
+        
+    def _get_info(self, key, type, default_value=None):
+        if key in self._info:
+            value = self._info[key]
+        else:
+            value = default_value
+        if type == int:
+            return int(value)
+        elif type == datetime.datetime:
+            return datetime.datetime.fromtimestamp(float(value))
+        else:
+            return value
+
+    def __str__(self):
+        return "%s [%s] %s<>%s (%s; %i/%i)" % (self.name, self.common_name, self.virtual_address, self.real_address, self.connected_since, self.bytes_sent, self.bytes_received)
+
+class RoutingTableEntry(object):
+    def __init__(self, headers, row):
+        self.name = row[1]
+        self._info = dict(zip(headers, row[1:]))
+        
+        self.last_ref = self._get_info('Last Ref (time_t)', type=datetime.datetime, default_value=0)
+        self.virtual_address = self._get_info('Virtual Address', type=str)
+        self.real_address = self._get_info('Real Address', type=str)
+        self.common_name = self._get_info('Common Name', type=str)
+        
+    def _get_info(self, key, type, default_value=None):
+        if key in self._info:
+            value = self._info[key]
+        else:
+            value = default_value
+        if type == int:
+            return int(value)
+        elif type == datetime.datetime:
+            return datetime.datetime.fromtimestamp(float(value))
+        else:
+            return value
+
+    def __str__(self):
+        return "%s [%s] %s<>%s (%s)" % (self.name, self.common_name, self.virtual_address, self.real_address, self.last_ref)
 
 class StatusBase(object):
     def __init__(self, version=2):
@@ -262,7 +312,7 @@ class StatusBase(object):
         self._statistics = None
         self._reading_done = False
         self._running = False
-        self._state = None
+        self._state = State(name='DOWN')
 
     def _parse_lines(self, lines):
         self._details = {}
@@ -306,15 +356,15 @@ class StatusBase(object):
 
                     elif row_title == "CLIENT_LIST":
                         try:
-                            self._connected_clients[row[1]] = dict(zip(topics_for["CLIENT_LIST"], row[1:]))
-                            self._connected_clients[row[1]]["connected_since"] = datetime.datetime.fromtimestamp(int(row[-1]))
+                            client = ConnectedClient(headers=topics_for["CLIENT_LIST"], row=row)
+                            self._connected_clients[client.name] = client
                         except IndexError:
                             logging.error("CLIENT_LIST row is invalid: %s" % row)
 
                     elif row_title == "ROUTING_TABLE":
                         try:
-                            self._routing_table[row[2]] = dict(zip(topics_for["ROUTING_TABLE"], row[1:]))
-                            self._routing_table[row[2]]["last_ref"] = datetime.datetime.fromtimestamp(int(row[-1]))
+                            entry = RoutingTableEntry(headers=topics_for["ROUTING_TABLE"], row=row)
+                            self._routing_table[row[2]] = entry
                         except IndexError:
                             logging.error("ROUTING_TABLE row is invalid: %s" % row)
 
@@ -347,7 +397,7 @@ class StatusBase(object):
             if row_title == "END":
                 return True
             else:
-                self._state = State(row)
+                self._state = State(state_line_elements=row)
         logging.error("File was incomplete. END line was missing.")
         return False
 

@@ -14,6 +14,7 @@ import config
 class ConfigFile:
     def __init__(self, filename=None, config_name=None):
         self._conf = None
+        self.last_error = None
         self.name = None
 
         if filename:
@@ -43,18 +44,21 @@ class ConfigFile:
         self._conf  = IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
         if self.fileobject is not None:
             if not self._conf.open(self.fileobject):
+                self.last_error = self._conf.last_error
                 self._conf = None
                 ret = False
             else:
                 ret = True
         else:
             if not self._conf.open(self.filename):
+                self.last_error = self._conf.last_error
                 self._conf = None
                 self._name = None
                 ret = False
             else:
                 ret = True
         return ret
+
     @property
     def valid(self):
         return True if self._conf is not None else False

@@ -35,28 +35,31 @@ class OpenVPNAdmin(object):
             print('No VPNs configured.')
         else:
             for vpnname in selected_vpns:
-                config_file = ConfigFile(vpnname)
-                if not config_file.valid():
-                    sys.stderr.write('Failed to open configuration for VPN %s\n' % (vpnname))
+                config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
+                if not config_file.valid:
+                    sys.stderr.write('Failed to open configuration for VPN %s; error %s\n' % (vpnname, config_file.last_error))
                     ret += 1
                 else:
-                    status_file = StatusFile(config_file=config_file)
+                    is_running = self._config.is_running(vpnname)
+                    status_file = arsoft.openvpn.StatusFile(config_file=config_file)
                     print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
+                    
+                    print('  Running: %s' % is_running)
+                    print('  State: %s' % status_file.state.long_state)
                     print('  Last updated: %s' % status_file.last_update)
                     
                     if config_file.server:
                         print('  Connected clients:')
-                        for (clientname, clientinfo) in status_file.connected_clients.itemiter():
-                            print('    %s: %s' % (clientname, clientinfo))
-                    print('  Routing table:')
-                    for (address, entry) in status_file.routing_table.itemiter():
-                        print('    %s: %s' % (address, entry))
-                    print('  Details:')
-                    for (name, value) in status_file.details.itemiter():
-                        print('    %s: %s' % (name, value))
-                    print('  Statistics:')
-                    for (name, value) in status_file.statistics.itemiter():
-                        print('    %s: %s' % (name, value))
+                        for (clientname, clientinfo) in status_file.connected_clients.iteritems():
+                            print('    %s' % (clientinfo))
+                    if status_file.routing_table:
+                        print('  Routing table:')
+                        for (address, entry) in status_file.routing_table.iteritems():
+                            print('    %s' % (entry))
+                    if status_file.statistics:
+                        print('  Statistics:')
+                        for name in status_file.statistics:
+                            print('    %s: %s' % (name, getattr(status_file.statistics, name)))
         return ret
 
     def main(self):
