@@ -41,7 +41,7 @@ Description: python module to access the OpenVPN status files
 
 Package: arsoft-python-nagios
 Architecture: all
-Depends: arsoft-python, arsoft-python-fritzbox, python-pynag, python-yaml, arsoft-python-openvpn, 
+Depends: arsoft-python, arsoft-python-fritzbox, python-yaml, arsoft-python-openvpn, 
  ${python:Depends}, ${misc:Depends}
 Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
