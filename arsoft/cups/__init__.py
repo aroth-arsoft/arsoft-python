@@ -2,10 +2,15 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-import cups
 import os
+import sys
 import socket
+import cups
+import cupshelpers
 from urlparse import urlparse
+
+def _get_dict_value(dict, key, default_value=None):
+    return dict[key] if key in dict else default_value
 
 class CupsConnection(object):
 
@@ -23,6 +28,7 @@ class CupsConnection(object):
         self._server = cups.getServer()
         self._serverip = None
         self._port = cups.getPort()
+        self._ppds = None
         if server is not None:
             cups.setServer(old_server)
             cups.setPort(old_port)
@@ -49,9 +55,37 @@ class CupsConnection(object):
 
     @property
     def printers(self):
-        ret = self._conn.getPrinters ()
-        return ret.items()
-        
+        ret = cupshelpers.getPrinters(self._conn)
+        return ret
+
+    @property
+    def devices(self):
+        ret = cupshelpers.getDevices(self._conn)
+        return ret
+
+    @property
+    def jobs(self):
+        ret = self._conn.getJobs (requested_attributes=r)
+        return ret
+    
+    @property
+    def ppds(self):
+        if self._ppds is None:
+            cupsppds = None
+            try:
+                cupsppds = self._conn.getPPDs2()
+                print "Using getPPDs2()"
+            except AttributeError:
+                # Need pycups >= 1.9.52 for getPPDs2
+                cupsppds = self._conn.getPPDs ()
+                print "Using getPPDs()"
+            if cupsppds:
+                self._ppds = cupshelpers.ppds.PPDs(cupsppds)
+        return self._ppds
+
+    def getQueue(self, name):
+        queue = self._conn.getPrinterAttributes (name)
+
     def retrievePPD(self, printername):
         if printername in self._temp_ppds:
             ret = self._temp_ppds[printername]
@@ -67,46 +101,38 @@ class CupsConnection(object):
                 ret = None
         return ret
 
-    def _show_printer(self, printername, printer_obj, include_raw=False):
-        if 'printer-uri-supported' in printer_obj:
-            printer_uri = printer_obj['printer-uri-supported']
-        else:
-            printer_uri = None
-        if 'device-uri' in printer_obj:
-            device_uri = printer_obj['device-uri']
-        else:
-            device_uri = None
-        if 'printer-info' in printer_obj:
-            description = printer_obj['printer-info']
-        else:
-            description = None
-        if 'printer-location' in printer_obj:
-            location = printer_obj['printer-location']
-        else:
-            location = None
-
-        print('  Printer: ' + printername)
-        print('    URI: ' + str(printer_uri))
-        print('    Device URI: ' + str(device_uri))
-        ppd = self.retrievePPD(printername)
-        if ppd is not None:
-            print('    PPD file: ' + str(ppd))
-        else:
-            print('    PPD file: not available')
-        if include_raw:
-            for (name, value) in printer_obj.items():
-                print('    ' + name + ': ' + str(value))
-    
-    def show_printers(self, include_raw=False):
-        print('Printers on ' + str(self._server) + ':' + str(self._port))
-        for (printername, printer_obj) in self.printers:
-            self._show_printer(printername, printer_obj, include_raw=include_raw)
-        return True
-
     def _equal_printer(self, printer_obj):
         if 'device-uri' in printer_obj:
             o = urlparse(printer_obj['device-uri'])
             ret = True if o.hostname == self._server and o.port == self._port else False
+        else:
+            ret = False
+        return ret
+    
+    def show_ppds(self, make_filter=None, list_models=True):
+        all_ppds = self.ppds
+        if all_ppds:
+            ret = True
+            makes = all_ppds.getMakes ()
+            models_count = 0
+            if make_filter:
+                lower_make_filter = []
+                if type(make_filter) == str:
+                    lower_make_filter.append(make_filter.lower())
+                else:
+                    for f in make_filter:
+                        lower_make_filter.append(f.lower())
+            else:
+                lower_make_filter = None
+            for make in makes:
+                if lower_make_filter and make.lower() not in lower_make_filter:
+                    continue
+                models = all_ppds.getModels (make)
+                models_count += len (models)
+                if list_models:
+                    print make
+                    for model in models:
+                        print "  " + model
         else:
             ret = False
         return ret
