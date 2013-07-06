@@ -20,68 +20,109 @@ class OpenVPNAdmin(object):
 
     def version(self):
         print('Version: %s' % str(__version__))
-        print('SSH: %s' % str(SSH_EXECUTABLE))
-        print('SCP: %s' % str(SCP_EXECUTABLE))
         return 0
     
     def _get_config(self):
         if self._config is None:
             self._config = arsoft.openvpn.Config()
-            
+
     def _print_cert(self, prefix, cert):
         if cert:
             cert_file = cert.filename
-            first_cert = cert.certificates[0] if len(cert.certificates) > 0 else None
-            if first_cert:
-                now = datetime.datetime.utcnow().replace(tzinfo=UTC)
-                expire_in = first_cert.expire_date - now
-                expire_date = str(first_cert.expire_date) + ' in ' + str(expire_in)
+            num_certs = len(cert.certificates)
+            if num_certs == 0:
+                print('  %s: %s (%s)' % (prefix, cert_file, cert.last_error))
             else:
-                expire_date = 'unavailable'
-            print('  %s: %s (expires %s)' % (prefix, cert_file, expire_date))
+                now = datetime.datetime.utcnow().replace(tzinfo=UTC)
+                min_expire_in = datetime.timedelta(days=100*365)
+                min_expire_cert = None
+                for cert in cert.certificates:
+                    expire_in = cert.expire_date - now
+                    if expire_in < min_expire_in:
+                        min_expire_in = expire_in
+                        min_expire_cert = cert
+
+                if min_expire_cert:
+                    expire_date = str(min_expire_cert.expire_date) + ' in ' + str(min_expire_in)
+                else:
+                    expire_date = 'unavailable'
+                print('  %s: %s (expires %s)' % (prefix, cert_file, expire_date))
         else:
             print('  %s: none' % (prefix))
 
     def action_status(self, selected_vpns):
         self._get_config()
+        all_vpn_names = self._config.names
         if len(selected_vpns) == 0:
-            selected_vpns = self._config.names
-    
-        ret = 0
-        if len(selected_vpns) == 0:
-            print('No VPNs configured.')
+            selected_vpns = all_vpn_names
+            ret = 0
         else:
+            all_vpns_found = True
             for vpnname in selected_vpns:
-                config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
-                if not config_file.valid:
-                    sys.stderr.write('Failed to open configuration for VPN %s; error %s\n' % (vpnname, config_file.last_error))
-                    ret += 1
-                else:
-                    is_running = self._config.is_running(vpnname)
-                    status_file = arsoft.openvpn.StatusFile(config_file=config_file)
-                    print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
+                if vpnname not in all_vpn_names:
+                    sys.stderr.write('VPN %s not configured.\n' % (vpnname))
+                    all_vpns_found = False
+            ret = 0 if all_vpns_found else 2
+        
+        if ret == 0:
+            if len(selected_vpns) == 0:
+                print('No VPNs configured.')
+            else:
+                for vpnname in selected_vpns:
+                    config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
+                    if not config_file.valid:
+                        sys.stderr.write('Failed to open configuration for VPN %s; error %s\n' % (vpnname, config_file.last_error))
+                        ret += 1
+                    else:
+                        is_running = self._config.is_running(vpnname)
+                        status_file = arsoft.openvpn.StatusFile(config_file=config_file)
+                        print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
 
-                    print('  Running: %s' % is_running)
-                    print('  State: %s' % status_file.state.long_state)
-                    print('  Last updated: %s' % status_file.last_update)
-                    self._print_cert('Certificate file', config_file.cert_file)
-                    print('  Key file: %s' % config_file.key_file)
-                    self._print_cert('CA file', config_file.ca_file)
-                    self._print_cert('CRL file', config_file.crl_file)
-                    print('  DH file: %s' % config_file.dh_file)
-                    
-                    if config_file.server:
-                        print('  Connected clients:')
-                        for (clientname, clientinfo) in status_file.connected_clients.iteritems():
-                            print('    %s' % (clientinfo))
-                    if status_file.routing_table:
-                        print('  Routing table:')
-                        for (address, entry) in status_file.routing_table.iteritems():
-                            print('    %s' % (entry))
-                    if status_file.statistics:
-                        print('  Statistics:')
-                        for name in status_file.statistics:
-                            print('    %s: %s' % (name, getattr(status_file.statistics, name)))
+                        print('  Running: %s' % is_running)
+                        print('  State: %s' % status_file.state.long_state)
+                        print('  Last updated: %s' % status_file.last_update)
+                        self._print_cert('Certificate file', config_file.cert_file)
+                        print('  Key file: %s' % config_file.key_file)
+                        self._print_cert('CA file', config_file.ca_file)
+                        self._print_cert('CRL file', config_file.crl_file)
+                        print('  DH file: %s' % config_file.dh_file)
+                        
+                        if config_file.server:
+                            print('  Connected clients:')
+                            for (clientname, clientinfo) in status_file.connected_clients.iteritems():
+                                print('    %s' % (clientinfo))
+                        if status_file.routing_table:
+                            print('  Routing table:')
+                            for (address, entry) in status_file.routing_table.iteritems():
+                                print('    %s' % (entry))
+                        if status_file.statistics:
+                            print('  Statistics:')
+                            for name in status_file.statistics:
+                                print('    %s: %s' % (name, getattr(status_file.statistics, name)))
+        return ret
+    
+    def action_zip_info(self, zipfile):
+        ret = 0
+        if os.path.exists(zipfile):
+            zipcfg = arsoft.openvpn.ZippedConfigFile(zipfile)
+            if zipcfg.valid:
+                print('Config file: %s' % (zipcfg.config_file.filename))
+                self._print_cert('Certificate file', zipcfg.config_file.cert_file)
+                print('  Key file: %s' % zipcfg.config_file.key_file)
+                self._print_cert('CA file', zipcfg.config_file.ca_file)
+                self._print_cert('CRL file', zipcfg.config_file.crl_file)
+                print('  DH file: %s' % zipcfg.config_file.dh_file)
+                
+                print('Files in %s:' % (zipfile))
+                for f in iter(zipcfg):
+                    print('  ' + f.name)
+                ret = 0
+            else:
+                sys.stderr.write('ZIP file %s does not contain a valid VPN configuration.\n' % (zipfile))
+                ret = 1
+        else:
+            sys.stderr.write('ZIP file %s does not exist.\n' % (zipfile))
+            ret = 2
         return ret
 
     def main(self):
@@ -92,6 +133,7 @@ class OpenVPNAdmin(object):
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
         parser.add_argument('--status', dest='action_status', nargs='*', help='show the status of the configured VPNs')
+        parser.add_argument('--zip', dest='action_zip_info', help='shows information about the configuration in the given ZIP file.')
 
         args = parser.parse_args()
         self.verbose = args.verbose
@@ -101,6 +143,8 @@ class OpenVPNAdmin(object):
         
         if args.action_status is not None:
             ret = self.action_status(args.action_status)
+        elif args.action_zip_info is not None:
+            ret = self.action_zip_info(args.action_zip_info)
         else:
             sys.stderr.write('No action selected.\n')
             ret = 1

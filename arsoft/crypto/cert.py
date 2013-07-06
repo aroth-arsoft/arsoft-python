@@ -521,6 +521,7 @@ class CertificateFile(object):
         self.filename = filename
         self.file_type = None
         self._impl = None
+        self._last_error = None
         if self.filename is not None:
             self.open()
 
@@ -529,12 +530,16 @@ class CertificateFile(object):
             filename = self.filename
 
         if self.file_type is None:
-            self.file_type = detect_file_type(filename) if filename else None
+            if hasattr(filename, 'read'):
+                self.file_type = 'PEM certificate'
+            else:
+                self.file_type = detect_file_type(filename) if filename else None
 
         if self.file_type == 'PEM certificate':
             self._impl = CertificatePEMFile(self.filename)
             ret = self._impl.open()
         else:
+            self._last_error = TypeError('file type %s not supported' % (self.file_type))
             ret = False
         return ret
 
@@ -548,6 +553,13 @@ class CertificateFile(object):
         if self._impl:
             self._impl.close()
             self._impl = None
+
+    @property
+    def last_error(self):
+        if self._impl:
+            return self._impl.last_error
+        else:
+            return self._last_error
 
     @property
     def certificates(self):

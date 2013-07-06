@@ -35,6 +35,11 @@ class ZippedConfigFile(object):
         ret = True if self._zip else False
         return ret
 
+    @property
+    def valid(self):
+        ret = self._find_config_file()
+        return ret
+
     def close(self):
         if self._zip is not None:
             self._zip.close()
@@ -79,7 +84,7 @@ class ZippedConfigFile(object):
     def config_file(self):
         self._find_config_file()
         fp = self._zip.open(self._config_file_info.filename, self.mode) if self._config_file_info else None
-        ret = ConfigFile(fp) if fp else None
+        ret = ConfigFile(fp, zipfile=self) if fp else None
         return ret
     
     def extractall(self, target_directory):

@@ -25,6 +25,7 @@ class PEMFile:
         self.m_filename = filename
         self.m_passphrase = passphrase
         self.m_blocks = []
+        self.m_last_error = None
 
     def __str__(self):
         return self.__class__.__name__ + '(%s)' % (self.m_filename)
@@ -48,6 +49,7 @@ class PEMFile:
                 f = open(filename, 'rU')
                 close_file_required = True if f else False
         except IOError as e:
+            self.m_last_error = e
             ret = False
         if ret:
             try:
@@ -78,13 +80,14 @@ class PEMFile:
                         if blocktype:
                             blockdata += line
                     lineno = lineno + 1
-            except IOError:
+            except IOError as e:
+                self.m_last_error = e
                 ret = False
                 pass
         if close_file_required:
             f.close()
         return ret
-        
+
     def save(self, filename=None):
         if filename is None:
             filename = self.m_filename
@@ -95,7 +98,8 @@ class PEMFile:
                 pemitem.write(f)
             f.close()
             ret = True
-        except IOError:
+        except IOError as e:
+            self.m_last_error = e
             ret = False
             pass
         return ret
@@ -104,7 +108,16 @@ class PEMFile:
         self.m_filename = None
         self.m_passphrase = None
         self.m_blocks = []
-        
+        self.m_last_error = None
+
+    @property
+    def filename(self):
+        return self.m_filename
+
+    @property
+    def last_error(self):
+        return self.m_last_error
+
     def getBlocks(self, blocktype):
         ret = []
         for pemitem in self.m_blocks:

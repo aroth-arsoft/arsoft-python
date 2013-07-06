@@ -13,10 +13,11 @@ from arsoft.crypto import CertificateFile
 import config
 
 class ConfigFile:
-    def __init__(self, filename=None, config_name=None):
+    def __init__(self, filename=None, config_name=None, zipfile=None):
         self._conf = None
         self.last_error = None
         self.name = None
+        self._zipfile = zipfile
 
         if filename:
             if hasattr(filename , 'read'):
@@ -75,7 +76,10 @@ class ConfigFile:
         
         def _open(self):
             if self._fp is None:
-                self._fp = open(self.filename, 'r')
+                if self.config._zipfile is None:
+                    self._fp = open(self.filename, 'r')
+                else:
+                    self._fp = self.config._zipfile[self.filename]
             return True if self._fp else False
         
         def __iter__(self):
