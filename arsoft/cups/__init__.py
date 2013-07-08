@@ -14,7 +14,8 @@ def _get_dict_value(dict, key, default_value=None):
 
 class CupsConnection(object):
 
-    def __init__(self, server=None, port=631):
+    def __init__(self, server=None, port=631, user=None, encryption=None):
+        self._temp_ppds = {}
         if server is not None:
             i = server.find(':')
             if i > 0:
@@ -24,6 +25,17 @@ class CupsConnection(object):
             old_port = cups.getPort()
             cups.setServer(server)
             cups.setPort(port)
+        if user is not None:
+            old_user = cups.getUser()
+            print('set user %s' %user)
+            cups.setUser(user)
+        if encryption is not None:
+            old_encryption = cups.getEncryption()
+            print('encryption %s' % (encryption))
+            real_encryption = CupsConnection._getEncryption(encryption)
+            print('real_encryption %i' % (real_encryption))
+            cups.setEncryption(real_encryption)
+        cups.setPasswordCB2(self._password_callback, self)
         self._conn = cups.Connection ()
         self._server = cups.getServer()
         self._serverip = None
@@ -32,12 +44,36 @@ class CupsConnection(object):
         if server is not None:
             cups.setServer(old_server)
             cups.setPort(old_port)
-        self._temp_ppds = {}
-        
+        if user is not None:
+            cups.setUser(old_user)
+        if encryption is not None:
+            cups.setEncryption(old_encryption)
+
+    def _password_callback(self, context):
+        print('_password_callback %s' % (context))
+        return None
+
     def __del__(self):
         for (printername, ppdfile) in self._temp_ppds.items():
             if os.path.exists(ppdfile):
                 os.remove(ppdfile)
+
+    @staticmethod
+    def _getEncryption(value):
+        if type(value) == str:
+            if value.lower() == 'always':
+                ret = cups.HTTP_ENCRYPT_ALWAYS
+            elif value.lower() == 'ifrequested':
+                ret = cups.HTTP_ENCRYPT_IF_REQUESTED
+            elif value.lower() == 'never':
+                ret = cups.HTTP_ENCRYPT_NEVER
+            elif value.lower() == 'required':
+                ret = cups.HTTP_ENCRYPT_REQUIRED
+            else:
+                ret = int(value)
+        else:
+            ret = value
+        return ret
 
     @property
     def server(self):
