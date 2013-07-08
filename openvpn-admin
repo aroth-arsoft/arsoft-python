@@ -124,6 +124,32 @@ class OpenVPNAdmin(object):
             sys.stderr.write('ZIP file %s does not exist.\n' % (zipfile))
             ret = 2
         return ret
+    
+    def action_install(self, filename, root_directory=None):
+        ret = 0
+        if filename == '-':
+            filename = sys.stdin
+            file_ok = True
+        else:
+            file_ok = os.path.exists(filename)
+        if file_ok:
+            if arsoft.openvpn.ZippedConfigFile.is_zip_config_file(filename):
+                zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
+                if zipcfg.install(root_directory=root_directory):
+                    ret = 0
+                else:
+                    sys.stderr.write('Failed to install OpenVPN configuration from %s.\n' % (filename))
+                    ret = 1
+            elif arsoft.openvpn.ConfigFile.is_config_file(filename):
+                print('use raw config file %s' % filename)
+                ret = 0
+            else:
+                sys.stderr.write('Given file %s is neither a ZIP file nor a valid OpenVPN configuration.\n' % (filename))
+                ret = 1
+        else:
+            sys.stderr.write('File %s does not exist.\n' % (filename))
+            ret = 2
+        return ret
 
     def main(self):
         #=============================================================================================
@@ -134,6 +160,7 @@ class OpenVPNAdmin(object):
         parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
         parser.add_argument('--status', dest='action_status', nargs='*', help='show the status of the configured VPNs')
         parser.add_argument('--zip', dest='action_zip_info', help='shows information about the configuration in the given ZIP file.')
+        parser.add_argument('--install', dest='action_install', help='installs the given OpenVPN configuration (can be either a ZIP file or plain config)')
 
         args = parser.parse_args()
         self.verbose = args.verbose
@@ -145,6 +172,8 @@ class OpenVPNAdmin(object):
             ret = self.action_status(args.action_status)
         elif args.action_zip_info is not None:
             ret = self.action_zip_info(args.action_zip_info)
+        elif args.action_install is not None:
+            ret = self.action_install(args.action_install, root_directory='/tmp')
         else:
             sys.stderr.write('No action selected.\n')
             ret = 1

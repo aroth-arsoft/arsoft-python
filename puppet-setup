@@ -6,7 +6,9 @@ import os
 import os.path
 import argparse
 import sys
+from arsoft.dnsutils import get_dns_srv_record
 from arsoft.sshutils import ssh_runcmdAndGetData, SSH_EXECUTABLE, SCP_EXECUTABLE
+import arsoft.openvpn
 
 __version__ = '1.0'
 
@@ -62,7 +64,37 @@ echo "deb-src %(url)s $distro_cs %(components_str)s" >> "%(sourcefilename)s"
 apt-get install -q -y %(packages_str)s
 """ % { 'packages_str':packages_str }
         return self._runssh(script)
+    
+    def _get_local_puppet_server(self):
+        puppet_servers = get_dns_srv_record('puppet')
+        if len(puppet_servers) > 0:
+            servername, serverport = puppet_servers[0]
+            return '%s:%i' % (servername, serverport)
+        else:
+            return None
 
+    def _rename_host(self, new_hostname):
+        pass
+        
+    def _install_openvpn_config(self, config_file):
+        zipfile = arsoft.openvpn.ZippedConfigFile(config_file)
+        if not zipfile.valid:
+            sys.stderr.write('The given file %s is not a valid OpenVPN configuration.\n' % (config_file))
+            ret = False
+        else:
+            # copy zip file to target host
+            commandline = '/usr/bin/openvpn-admin 
+            
+        (sts, stdout, stderr) = ssh_runcmdAndGetData(self.target_hostname, commandline=None, script=script, 
+                                                     keyfile=self.keyfile, username=self.username)
+        if sts == 0:
+            return True
+        else:
+            return False
+            
+            zipfile.install()
+            ret = True
+        return ret
 
     def main(self):
         #=============================================================================================
@@ -72,7 +104,11 @@ apt-get install -q -y %(packages_str)s
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
         parser.add_argument('-u', '--username', dest='username', default='root', help='username to connect to the remote machine.')
+        parser.add_argument('-k', '--keyfile', dest='keyfile', default='root', help='keyfile to connect to the remote machine.')
         parser.add_argument('-p', '--password', dest='password', help='password to access the remote machine.')
+        parser.add_argument('--openvpn', dest='openvpn_zipfile', help='path to the OpenVPN configuration zip.')
+        parser.add_argument('--rename-host', dest='rename_host', help='path to the OpenVPN configuration zip.')
+        parser.add_argument('--puppet-server', dest='puppet_server', help='hostname of the puppet server')
         parser.add_argument('hostname', help='name of the host to setup')
 
         args = parser.parse_args()
@@ -81,13 +117,32 @@ apt-get install -q -y %(packages_str)s
         self.username = args.username
         self.password = args.password
         self.keyfile = args.keyfile
+        self.puppet_server = args.puppet_server
 
         if args.version:
             return self.version()
+        
+        if self.puppet_server is None:
+            self.puppet_server = self._get_local_puppet_server()
+
+        packages_to_install = []
+        packages_to_install.append('arsoft-base')
+        packages_to_install.append('arsoft-python')
+        packages_to_install.append('puppet')
+        
+        if args.openvpn_zipfile:
+            packages_to_install.append('openvpn')
+            packages_to_install.append('arsoft-python-openvpn')
 
         self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu')
         self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', components=['main', 'dependencies'])
-        self._apt_install(['puppet', 'openvpn'])
+        self._apt_install(packages_to_install)
+        
+        if args.rename_host:
+            self._rename_host(args.rename_host)
+
+        if args.openvpn_zipfile:
+            self._install_openvpn_config(args.openvpn_zipfile)
 
         ret = 0
         return ret

@@ -44,6 +44,16 @@ class SystemConfig(object):
 
         print('open %s ret=%s' % (self.filename, ret))
         return ret
+    
+    def save(self, filename=None):
+        if filename is None:
+            filename = self.filename
+        if self._conf:
+            print('save %s' % filename)
+            ret = self._conf.save(filename)
+        else:
+            ret = False
+        return ret
 
     @property
     def autostart(self):

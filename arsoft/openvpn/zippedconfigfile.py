@@ -8,7 +8,7 @@ from arsoft.zipfileutils import ZipFileEx
 from configfile import ConfigFile
 from systemconfig import SystemConfig
 import arsoft.utils
-
+import zipfile
 
 class ZippedConfigFile(object):
 
@@ -17,6 +17,7 @@ class ZippedConfigFile(object):
         self.mode = mode
         self._zip = None
         self._config_file_info = None
+        self.last_error = None
         
     def _ensure_open(self):
         if self._zip is None:
@@ -33,6 +34,25 @@ class ZippedConfigFile(object):
 
         self._zip = ZipFileEx(filename, mode)
         ret = True if self._zip else False
+        return ret
+
+    @staticmethod
+    def is_zip_config_file(filename, mode='r'):
+        try:
+            fobj = ZipFileEx(filename, mode)
+            if fobj:
+                config_file_info = None
+                fileinfolist = fobj.infolist()
+                for fileinfo in fileinfolist:
+                    (basename, ext) = os.path.splitext(fileinfo.filename)
+                    if ext == '.ovpn' or ext == '.conf':
+                        config_file_info = fileinfo
+                        break
+                ret = True if config_file_info else False
+            else:
+                ret = False
+        except zipfile.BadZipfile as e:
+            ret = False
         return ret
 
     @property
@@ -105,20 +125,51 @@ class ZippedConfigFile(object):
         else:
             return None
         
+    def extract(self, name, target_directory):
+        if self._ensure_open():
+            self._zip.extract(name, target_directory)
+            ret = True
+        else:
+            ret = False
+        return ret
+
     def install(self, autoStart=True, config_directory=None, root_directory=None):
         if config_directory is None:
-            root_directory = '/etc/openvpn'
+            config_directory = '/etc/openvpn'
         if root_directory is None:
             target_config_directory = config_directory
         else:
             target_config_directory = root_directory + config_directory
-        ret = self.extractall(target_config_directory)
+        target_config_file = os.path.join(target_config_directory, self.name + '.conf')
+        
+        cfgfile = self.config_file
+        ret = True if cfgfile else False
         if ret:
+            ret = cfgfile.save(target_config_file)
+        if ret and cfgfile.cert_filename:
+            ret = self.extract(cfgfile.cert_filename, target_config_directory)
+        if ret and cfgfile.key_filename:
+            ret = self.extract(cfgfile.key_filename, target_config_directory)
+        if ret and cfgfile.ca_filename:
+            ret = self.extract(cfgfile.ca_filename, target_config_directory)
+        if ret and cfgfile.dh_filename:
+            ret = self.extract(cfgfile.dh_filename, target_config_directory)
+        if ret and cfgfile.crl_filename:
+            ret = self.extract(cfgfile.crl_filename, target_config_directory)
+
+        if ret:
+            print('update syscofn')
             syscfg = SystemConfig(root_directory=root_directory)
+            new_autostart = syscfg.autostart
             if autoStart:
-                syscfg.autostart += self.name
+                print('add %s' % self.name)
+                new_autostart.add(self.name)
             else:
-                syscfg.autostart -= self.name
+                print('remove %s' % self.name)
+                new_autostart.remove(self.name)
+            syscfg.autostart = new_autostart
+            print(syscfg.autostart)
+            ret = syscfg.save()
         return ret
 if __name__ == '__main__':
     c = ZippedConfigFile(sys.argv[1])

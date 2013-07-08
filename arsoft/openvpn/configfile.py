@@ -23,6 +23,9 @@ class ConfigFile:
             if hasattr(filename , 'read'):
                 self.fileobject = filename
                 self.filename = filename.name
+                if self._zipfile:
+                    bname = os.path.basename(self._zipfile.filename)
+                    (self.name, ext) = os.path.splitext(bname)
             else:
                 self.fileobject = None
                 self.filename = filename
@@ -61,6 +64,28 @@ class ConfigFile:
                 ret = True
         return ret
     
+    def save(self, filename=None):
+        if filename is None:
+            filename = self.fileobject if self.fileobject else self.filename
+        if self._conf:
+            ret = self._conf.save(filename)
+        else:
+            ret = False
+        return ret
+
+    @staticmethod
+    def is_config_file(filename):
+        conf  = IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
+        if conf.open(filename):
+            # must have either a remote or a server line
+            remote = conf.get(section=None, key='remote', default=None)
+            server = conf.get(section=None, key='server', default=None)
+
+            ret = True if remote or server else False
+        else:
+            ret = False
+        return ret
+
     class NestedFile(object):
         def __init__(self, config, filename):
             self.config = config
@@ -102,6 +127,22 @@ class ConfigFile:
                 return self._fp.seek(offset, whence)
             else:
                 raise IOError('no file object')
+            
+        def copyTo(self, target_directory):
+            self._open()
+            if self._fp:
+                target_fullname = os.path(target_directory, self.filename)
+                try:
+                    target_fp = open(target_fullname, 'w')
+                    shutil.copyfileobj(self._fp, target_fp)
+                    target_fp.close()
+                    ret = True
+                except IOError as e:
+                    self.last_error = e
+                    ret = False
+            else:
+                ret = False
+            return ret
 
     @property
     def valid(self):
@@ -137,47 +178,87 @@ class ConfigFile:
         else:
             ret = None
         return ret
-    
+
+    @property
+    def cert_filename(self):
+        if self._conf is not None:
+            ret = self._conf.get(section=None, key='cert', default=None)
+        else:
+            ret = None
+        return ret
+
     @property
     def cert_file(self):
-        if self._conf is not None:
-            f = self._conf.get(section=None, key='cert', default=None)
+        f = self.cert_filename
+        if f is not None:
             ret = CertificateFile(self.NestedFile(self, f)) if f else None
+        else:
+            ret = None
+        return ret
+
+    @property
+    def key_filename(self):
+        if self._conf is not None:
+            ret = self._conf.get(section=None, key='key', default=None)
         else:
             ret = None
         return ret
 
     @property
     def key_file(self):
-        if self._conf is not None:
-            f = self._conf.get(section=None, key='key', default=None)
+        f = self.key_filename
+        if f is not None:
             ret = self.NestedFile(self, f) if f else None
+        else:
+            ret = None
+        return ret
+
+    @property
+    def ca_filename(self):
+        if self._conf is not None:
+            ret = self._conf.get(section=None, key='ca', default=None)
         else:
             ret = None
         return ret
 
     @property
     def ca_file(self):
-        if self._conf is not None:
-            f = self._conf.get(section=None, key='ca', default=None)
+        f = self.ca_filename
+        if f is not None:
             ret = CertificateFile(self.NestedFile(self, f)) if f else None
         else:
             ret = None
         return ret
 
     @property
-    def dh_file(self):
+    def dh_filename(self):
         if self._conf is not None:
-            f = self._conf.get(section=None, key='dh', default=None)
+            ret = self._conf.get(section=None, key='dh', default=None)
+        else:
+            ret = None
+        return ret
+
+    @property
+    def dh_file(self):
+        f = self.dh_filename
+        if f is not None:
             ret = self.NestedFile(self, f) if f else None
         else:
             ret = None
         return ret
 
     @property
-    def crl_file(self):
+    def crl_filename(self):
         if self._conf is not None:
-            f = self._conf.get(section=None, key='crl', default=None)
+            ret = self._conf.get(section=None, key='crl', default=None)
+        else:
+            ret = None
+        return ret
+
+    @property
+    def crl_file(self):
+        f = self.crl_filename
+        if f is not None:
             ret = CertificateFile(self.NestedFile(self, f)) if f else None
         else:
             ret = None

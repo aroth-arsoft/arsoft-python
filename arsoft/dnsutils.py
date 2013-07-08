@@ -8,7 +8,7 @@ import base64
 import dns
 import dns.dnssec
 import dns.tsigkeyring
-
+import dns.resolver
 
 ALGORITHM_ID_TO_NAME = {
     157: dns.tsig.HMAC_MD5,
@@ -104,4 +104,18 @@ def use_key_file(update_obj, keyfile):
         ret = True
     else:
         ret = False
+    return ret
+
+def get_dns_srv_record(service, domain=None, default_value=None, tcp=True):
+    if domain is None:
+        fqdn = socket.getfqdn()
+        if '.' in fqdn:
+            (hostname, domain) = fqdn.split('.', 1)
+        else:
+            domain = 'localdomain'
+    query = '_%s.%s.%s.' % (service.lower(), '_tcp' if tcp else '_udp', domain)
+    ret = []
+    answers = dns.resolver.query(query, 'SRV')
+    for rdata in answers:
+        ret.append( ( rdata.target.to_text(omit_final_dot=True), rdata.port ) )
     return ret
