@@ -163,6 +163,9 @@ class HostsFile(object):
                 new_line.hostnames = value
             if new_line:
                 self._content.append(new_line)
+                
+    def __iter__(self):
+        return self.hosts.iteritems()
 
 if __name__ == "__main__":
     hosts = HostsFile()

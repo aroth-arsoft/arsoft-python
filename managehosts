@@ -32,7 +32,7 @@ class ManageHostsApp(object):
             update_values = args.update[1].split(',')
             self.hostsfile[update_key] = update_values
         elif args.list:
-            for (address, hostnames) in self.hostsfile.hosts.iteritems():
+            for (address, hostnames) in self.hostsfile:
                 print('%s\t%s' % (address, ','.join(hostnames)))
         else:
             sys.stderr.write('No operation specified.\n')
