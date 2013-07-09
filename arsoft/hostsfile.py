@@ -26,19 +26,23 @@ class HostnameFile(object):
         if filename is None:
             filename = self.filename
         self.hostname = None
+        ret = False
         with open(filename, 'r') as f:
             line = f.readline()
             self.hostname = line.strip()
-        return 0
+            ret = True
+        return ret
 
     def save(self, filename=None):
         if filename is None:
             filename = self.filename
+        ret = False
         with open(filename, 'w') as f:
             if self.hostname:
                 f.write(str(self.hostname) + '\n')
             f.close()
-        return 0
+            ret = True
+        return ret
 
 class HostsFile(object):
     def __init__(self, filename=DEFAULT_HOSTS_FILE):
@@ -130,21 +134,26 @@ class HostsFile(object):
         if filename is None:
             filename = self.filename
         self._content = []
+        ret = False
         with open(filename, 'r') as f:
             for line in f:
                 line_stripped = line.strip()
                 self._content.append(self.HostLine(line))
-        return 0
-    
+            f.close()
+            ret = True
+        return ret
+
     def save(self, filename=None):
         if filename is None:
             filename = self.filename
+        ret = False
         with open(filename, 'w') as f:
             for line in self._content:
                 f.write(str(line))
             f.close()
-        return 0
-    
+            ret = True
+        return ret
+
     @property
     def hosts(self):
         ret = {}
