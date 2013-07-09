@@ -107,12 +107,12 @@ def use_key_file(update_obj, keyfile):
     return ret
 
 def gethostname_tuple(fqdn=None):
-    if fqdn:
+    if fqdn is None:
         fqdn = socket.getfqdn().lower()
     else:
         fqdn = fqdn.lower()
     if '.' in fqdn:
-        (hostname, domain) = ret.split('.', 1)
+        (hostname, domain) = fqdn.split('.', 1)
     else:
         hostname = fqdn
         domain = 'localdomain'
