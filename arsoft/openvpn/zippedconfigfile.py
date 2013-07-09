@@ -53,6 +53,7 @@ class ZippedConfigFile(object):
                         config_file_info = fileinfo
                         break
                 ret = True if config_file_info else False
+                fobj.close()
             else:
                 ret = False
         except zipfile.BadZipfile as e:
