@@ -158,6 +158,16 @@ def bytes2human(n):
             return '%.1f%s' % (value, s)
     return "%sB" % n
 
+def replace_invalid_chars(str, invalid_chars=['\r', '\n', '\t', ' ', ':', '@'], replacement='_'):
+    ret = str
+    idx = 0
+    l = len(ret)
+    while idx < l:
+        if ret[idx] in invalid_chars:
+            ret[idx] = replacement
+        idx += 1
+    return ret
+
 def is_localhost(hostname):
     if hostname == 'localhost' or hostname == 'loopback' or hostname == '127.0.0.1' or hostname == '::1':
         return True
