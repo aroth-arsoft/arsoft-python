@@ -5,7 +5,8 @@
 import sys
 import os
 import argparse
-from arsoft.hostsfile import HostsFile
+from arsoft.hostsfile import HostsFile, HostnameFile
+from arsoft.dnsutils import gethostname_tuple
 
 class ManageHostsApp(object):
     
@@ -22,10 +23,11 @@ class ManageHostsApp(object):
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--update', dest='update', nargs=2, help='update the specified host entry.')
         parser.add_argument('--list', dest='list', action='store_true', help='lists all host entries.')
+        parser.add_argument('--set-hostname', dest='set_hostname', help='sets the hostname to the given one.')
 
         args = parser.parse_args()
         self.verbose = args.verbose
-        
+
         ret = 0
         if args.update:
             update_key = args.update[0]
@@ -34,6 +36,35 @@ class ManageHostsApp(object):
         elif args.list:
             for (address, hostnames) in self.hostsfile:
                 print('%s\t%s' % (address, ','.join(hostnames)))
+        elif args.set_hostname:
+            (old_fqdn, old_hostname, old_domain) = gethostname_tuple()
+            (new_fqdn, new_hostname, new_domain) = gethostname_tuple(args.set_hostname)
+            if old_fqdn == new_fqdn:
+                print('Old hostname and new hostname is identical.')
+                ret = 0
+            else:
+                ok = True
+                for (address, hostnames) in self.hostsfile:
+                    changed_entry = False
+                    if old_fqdn in hostnames:
+                        changed_entry = True
+                        hostnames = [new_fqdn if x==old_fqdn else x for x in hostnames]
+                    if old_hostname in hostnames:
+                        changed_entry = True
+                        hostnames = [new_hostname if x==old_hostname else x for x in hostnames]
+                    
+                    if changed_entry:
+                        self.hostsfile[address] = hostnames
+                hostnamefile = HostnameFile()
+                hostnamefile.hostname = new_hostname
+                if ok:
+                    ok = sethostname(new_hostname)
+                if ok:
+                    ok = hostnamefile.save()
+                if ok:
+                    ok = self.hostsfile.save()
+
+                ret = 0 if ok else 1
         else:
             sys.stderr.write('No operation specified.\n')
         return ret

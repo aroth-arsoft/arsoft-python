@@ -106,13 +106,36 @@ def use_key_file(update_obj, keyfile):
         ret = False
     return ret
 
+def gethostname_tuple(fqdn=None):
+    if fqdn:
+        fqdn = socket.getfqdn().lower()
+    else:
+        fqdn = fqdn.lower()
+    if '.' in fqdn:
+        (hostname, domain) = ret.split('.', 1)
+    else:
+        hostname = fqdn
+        domain = 'localdomain'
+    return (fqdn, hostname, domain)
+
+def gethostname(fqdn=True):
+    ret = socket.getfqdn()
+    if not fqdn:
+        if '.' in ret:
+            (ret, domain) = ret.split('.', 1)
+    return ret
+
+def getdomainname():
+    fqdn = socket.getfqdn()
+    if '.' in ret:
+        (hostname, ret) = ret.split('.', 1)
+    else:
+        ret = 'localdomain'
+    return ret
+
 def get_dns_srv_record(service, domain=None, default_value=None, tcp=True):
     if domain is None:
-        fqdn = socket.getfqdn()
-        if '.' in fqdn:
-            (hostname, domain) = fqdn.split('.', 1)
-        else:
-            domain = 'localdomain'
+        domain = getdomainname()
     query = '_%s.%s.%s.' % (service.lower(), '_tcp' if tcp else '_udp', domain)
     ret = []
     answers = dns.resolver.query(query, 'SRV')

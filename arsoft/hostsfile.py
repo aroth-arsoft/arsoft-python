@@ -10,8 +10,35 @@ import socket
 
 if platform_is_windows:
     DEFAULT_HOSTS_FILE = 'windows/system32/etc/hosts'
+    DEFAULT_HOSTNAME_FILE = None
 else:
     DEFAULT_HOSTS_FILE = '/etc/hosts'
+    DEFAULT_HOSTNAME_FILE = '/etc/hostname'
+    
+class HostnameFile(object):
+    def __init__(self, filename=DEFAULT_HOSTNAME_FILE):
+        self.filename = filename
+        self.hostname = None
+        if filename is not None:
+            self.open(filename)
+
+    def open(self, filename=None):
+        if filename is None:
+            filename = self.filename
+        self.hostname = None
+        with open(filename, 'r') as f:
+            line = f.readline()
+            self.hostname = line.strip()
+        return 0
+
+    def save(self, filename=None):
+        if filename is None:
+            filename = self.filename
+        with open(filename, 'w') as f:
+            if self.hostname:
+                f.write(str(self.hostname) + '\n')
+            f.close()
+        return 0
 
 class HostsFile(object):
     def __init__(self, filename=DEFAULT_HOSTS_FILE):

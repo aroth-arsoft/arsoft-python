@@ -5,6 +5,7 @@
 import os
 import sys
 import socket
+from utils import runcmdAndGetData
 
 def create_unix_socket(path, mode, socktype=socket.SOCK_STREAM):
     # Make sure the socket does not already exist
@@ -63,4 +64,9 @@ def send_unix_socket_message(path, message, socktype=socket.SOCK_STREAM):
             ret = len(message)
         finally:
             sock.close()
+    return ret
+
+def sethostname(new_hostname):
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData('/bin/hostname', [new_hostname])
+    ret = True if sts == 0 else False
     return ret
