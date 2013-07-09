@@ -10,22 +10,20 @@ import sys
 import os
 from arsoft.inifile import *
 from arsoft.crypto import CertificateFile
+from arsoft.utils import replace_invalid_chars
 import config
 
-class ConfigFile:
+class ConfigFile(object):
     def __init__(self, filename=None, config_name=None, zipfile=None):
         self._conf = None
         self.last_error = None
-        self.name = None
+        self._name = None
         self._zipfile = zipfile
 
         if filename:
             if hasattr(filename , 'read'):
                 self.fileobject = filename
                 self.filename = filename.name
-                if self._zipfile:
-                    bname = os.path.basename(self._zipfile.filename)
-                    (self.name, ext) = os.path.splitext(bname)
             else:
                 self.fileobject = None
                 self.filename = filename
@@ -35,12 +33,9 @@ class ConfigFile:
                 cfg = config.Config()
                 self.filename = cfg.get_config_file(config_name)
                 self.config_directory = os.path.dirname(self.filename)
-                self.name = config_name
+                self._name = config_name
             else:
                 self.filename = filename
-                if self.filename is not None:
-                    bname = os.path.basename(self.filename)
-                    (self.name, ext) = os.path.splitext(bname)
 
         self.config_directory = os.path.dirname(self.filename) if self.filename else None
         self._parse_file()
@@ -58,7 +53,6 @@ class ConfigFile:
             if not self._conf.open(self.filename):
                 self.last_error = self._conf.last_error
                 self._conf = None
-                self._name = None
                 ret = False
             else:
                 ret = True
@@ -68,7 +62,11 @@ class ConfigFile:
         if filename is None:
             filename = self.fileobject if self.fileobject else self.filename
         if self._conf:
-            ret = self._conf.save(filename)
+            if not self._conf.save(filename):
+                ret = False
+                self.last_error = self._conf.last_error
+            else:
+                ret = True
         else:
             ret = False
         return ret
@@ -143,6 +141,41 @@ class ConfigFile:
             else:
                 ret = False
             return ret
+        
+    @property
+    def name(self):
+        if self._name:
+            return self._name
+        else:
+            for comment in self._conf.comments:
+                if comment.startswith('name'):
+                    (dummy, self._name) = comment.split(' ', 1)
+                    break
+            return self._name
+
+    @property
+    def suggested_private_directory(self):
+        name = self.name
+        if name:
+            at_char = name.find('@')
+            if at_char > 0:
+                name = name[0:at_char]
+            ret = replace_invalid_chars(name)
+        else:
+            ret = None
+        return ret
+
+    @property
+    def suggested_filename(self):
+        name = self.name
+        if name:
+            at_char = name.find('@')
+            if at_char > 0:
+                name = name[0:at_char]
+            ret = replace_invalid_chars(name) + '.conf'
+        else:
+            ret = None
+        return ret
 
     @property
     def valid(self):
@@ -186,6 +219,12 @@ class ConfigFile:
         else:
             ret = None
         return ret
+
+    @cert_filename.setter
+    def cert_filename(self, value):
+        print('cert_filename.setter %s' %value)
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='cert', value=value)
 
     @property
     def cert_file(self):

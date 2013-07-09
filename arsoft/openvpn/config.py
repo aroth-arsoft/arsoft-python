@@ -11,9 +11,9 @@ class Config(object):
         self._config_directory = configdir
         self._run_directory = rundir
         self._config_extension = extension
-        self._refresh()
+        self.refresh()
         
-    def _refresh(self):
+    def refresh(self):
         self._names = {}
         if os.path.isdir(self._config_directory):
             ret = True

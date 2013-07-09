@@ -27,6 +27,10 @@ class SystemConfig(object):
         self._conf = None
         self.open(filename, root_directory)
 
+    @property
+    def valid(self):
+        return True if self._conf else False
+
     def open(self, filename=None, root_directory=None):
         if filename is None:
             filename = '/etc/default/openvpn'
@@ -35,21 +39,25 @@ class SystemConfig(object):
         else:
             self.filename = filename
         self._conf  = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-        print('open %s' % (self.filename))
         if not self._conf.open(self.filename):
-            self._conf = None
+            #self._conf = None
             ret = False
         else:
             ret = True
 
-        print('open %s ret=%s' % (self.filename, ret))
         return ret
     
-    def save(self, filename=None):
+    def save(self, filename=None, create_dirs=True):
         if filename is None:
             filename = self.filename
         if self._conf:
-            print('save %s' % filename)
+            if create_dirs:
+                d = os.path.dirname(filename)
+                if not os.path.isdir(d):
+                    try:
+                        os.makedirs(d)
+                    except IOError:
+                        ret = False
             ret = self._conf.save(filename)
         else:
             ret = False
@@ -58,7 +66,7 @@ class SystemConfig(object):
     @property
     def autostart(self):
         value = unquote_string(self._conf.get(None, 'AUTOSTART', ''))
-        if value == 'none':
+        if value == 'none' or value == '':
             ret = set()
         else:
             ret = set(value.split(' ')) if value is not None else set()
@@ -66,7 +74,6 @@ class SystemConfig(object):
 
     @autostart.setter
     def autostart(self, value):
-        print('set AUTOSTART to %s' %(value))
         if type(value) == str:
             if value == '':
                 real_value = set('none')

@@ -7,6 +7,7 @@ import os.path
 import argparse
 import sys
 import datetime
+import tempfile
 import arsoft.openvpn
 import arsoft.crypto
 from arsoft.timestamp import UTC
@@ -25,6 +26,16 @@ class OpenVPNAdmin(object):
     def _get_config(self):
         if self._config is None:
             self._config = arsoft.openvpn.Config()
+            
+    def _save_stdin_to_file(self):
+        self._stdin_file = tempfile.NamedTemporaryFile()
+        buf_length = 4096
+        while 1:
+            buf = sys.stdin.read(buf_length)
+            if not buf:
+                break
+            self._stdin_file.write(buf)
+        self._stdin_file.seek(0)
 
     def _print_cert(self, prefix, cert):
         if cert:
@@ -127,20 +138,29 @@ class OpenVPNAdmin(object):
     
     def action_install(self, filename, root_directory=None):
         ret = 0
+        conf_file_ok = False
+        file_ok = False
+        zip_ok = False
         if filename == '-':
-            filename = sys.stdin
+            self._save_stdin_to_file()
+            filename = self._stdin_file.name
             file_ok = True
+            zip_ok = True
         else:
             file_ok = os.path.exists(filename)
+            if file_ok:
+                zip_ok = arsoft.openvpn.ZippedConfigFile.is_zip_config_file(filename)
+                if not zip_ok:
+                    conf_file_ok = arsoft.openvpn.ConfigFile.is_config_file(filename)
         if file_ok:
-            if arsoft.openvpn.ZippedConfigFile.is_zip_config_file(filename):
+            if zip_ok:
                 zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
                 if zipcfg.install(root_directory=root_directory):
                     ret = 0
                 else:
-                    sys.stderr.write('Failed to install OpenVPN configuration from %s.\n' % (filename))
+                    sys.stderr.write('Failed to install OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
                     ret = 1
-            elif arsoft.openvpn.ConfigFile.is_config_file(filename):
+            elif conf_file_ok:
                 print('use raw config file %s' % filename)
                 ret = 0
             else:

@@ -32,7 +32,11 @@ class ZippedConfigFile(object):
         if mode is None:
             mode = self.mode
 
-        self._zip = ZipFileEx(filename, mode)
+        try:
+            self._zip = ZipFileEx(filename, mode)
+        except zipfile.BadZipfile as e:
+            self.last_error = e
+            self._zip = None
         ret = True if self._zip else False
         return ret
 
@@ -125,10 +129,29 @@ class ZippedConfigFile(object):
         else:
             return None
         
-    def extract(self, name, target_directory):
+    def extract(self, name, target_directory, target_name=None):
+        print('extract %s to %s' %(name, target_directory))
         if self._ensure_open():
-            self._zip.extract(name, target_directory)
-            ret = True
+            if target_name is None:
+                self._zip.extract(name, target_directory)
+                ret = True
+            else:
+                dstname = os.path.join(target_directory, target_name)
+                fileinfo = self._find_file(name)
+                if fileinfo:
+                    fsrc = self._zip.open(fileinfo.filename, 'r')
+                    fdst = open(dstname, 'w')
+                    buf_length = 4096
+                    while 1:
+                        buf = fsrc.read(buf_length)
+                        if not buf:
+                            break
+                        fdst.write(buf)
+                    fsrc.close()
+                    fdst.close()
+                    ret = True
+                else:
+                    ret = False
         else:
             ret = False
         return ret
@@ -140,22 +163,53 @@ class ZippedConfigFile(object):
             target_config_directory = config_directory
         else:
             target_config_directory = root_directory + config_directory
-        target_config_file = os.path.join(target_config_directory, self.name + '.conf')
+
         
+
         cfgfile = self.config_file
         ret = True if cfgfile else False
         if ret:
-            ret = cfgfile.save(target_config_file)
+            if not os.path.isdir(target_config_directory):
+                try:
+                    os.makedirs(target_config_directory)
+                    ret = True
+                except IOError:
+                    ret = False
+        if ret:
+            if not os.path.isdir(target_config_directory):
+                try:
+                    os.makedirs(target_config_directory)
+                    ret = True
+                except IOError:
+                    ret = False
+        if ret:
+            private_config_directory = os.path.join(target_config_directory, cfgfile.suggested_private_directory)
+            if not os.path.isdir(private_config_directory):
+                try:
+                    os.makedirs(private_config_directory)
+                    ret = True
+                except IOError:
+                    ret = False
         if ret and cfgfile.cert_filename:
-            ret = self.extract(cfgfile.cert_filename, target_config_directory)
+            ret = self.extract(cfgfile.cert_filename, private_config_directory, 'cert.pem')
+            if ret:
+                new = os.path.relpath(os.path.join(private_config_directory,'cert.pem'), target_config_directory)
+                print('new cert path %s' %new)
+                cfgfile.cert_filename = new
+                print('new cert path got %s' %cfgfile.cert_filename)
         if ret and cfgfile.key_filename:
-            ret = self.extract(cfgfile.key_filename, target_config_directory)
+            ret = self.extract(cfgfile.key_filename, private_config_directory, 'key.pem')
         if ret and cfgfile.ca_filename:
-            ret = self.extract(cfgfile.ca_filename, target_config_directory)
+            ret = self.extract(cfgfile.ca_filename, private_config_directory, 'ca.pem')
         if ret and cfgfile.dh_filename:
-            ret = self.extract(cfgfile.dh_filename, target_config_directory)
+            ret = self.extract(cfgfile.dh_filename, private_config_directory, 'dh.pem')
         if ret and cfgfile.crl_filename:
-            ret = self.extract(cfgfile.crl_filename, target_config_directory)
+            ret = self.extract(cfgfile.crl_filename, private_config_directory, 'crl.pem')
+        if ret:
+            target_config_file = os.path.join(target_config_directory, cfgfile.suggested_filename)
+            ret = cfgfile.save(target_config_file)
+            if not ret:
+                self.last_error = cfgfile.last_error
 
         if ret:
             print('update syscofn')
