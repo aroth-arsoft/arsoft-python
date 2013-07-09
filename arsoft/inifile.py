@@ -181,6 +181,14 @@ class IniSection(object):
     def empty(self):
         return True if len(self.values) == 0 else False
 
+    @property
+    def comments(self):
+        ret = []
+        for value in self.values:
+            if value.comment is not None and len(value.comment) != 0:
+                ret.append(value.comment)
+        return ret
+
     def asString(self, only_data=False):
         if self.original is not None and not only_data:
             ret = self.original + '\n'
@@ -214,7 +222,7 @@ class IniFile(object):
         self.m_content = []
         self.m_sections = []
         self.m_filename = filename
-        self.m_lasterror = None
+        self.m_last_error = None
         #
         # Regular expressions for parsing section headers and options.
         #
@@ -274,7 +282,7 @@ class IniFile(object):
             f.close()
             ret = True
         except IOError as e:
-            self.m_lasterror = e
+            self.m_last_error = e
             ret = False
         return ret
         
@@ -296,14 +304,14 @@ class IniFile(object):
         self.m_sections = []
         self.m_commentPrefix = None
         self.m_keyValueSeperator = None
-        self.m_lasterror = None
+        self.m_last_error = None
 
     @property
     def filename(self):
         return self.m_filename
     @property
     def last_error(self):
-        return self.m_lasterror
+        return self.m_last_error
 
     @property
     def commentPrefix(self):
@@ -534,6 +542,13 @@ class IniFile(object):
         for section_obj in self.m_sections:
             ret.append(section_obj.name)
         return ret
+    
+    @property
+    def comments(self):
+        ret = []
+        for section_obj in self.m_sections:
+            ret.extend(section_obj.comments)
+        return ret
 
     def __str__(self):
         return self.asString(only_data=False)
@@ -547,13 +562,16 @@ class IniFile(object):
     def save(self, filename=None):
         if filename is None:
             filename = self.m_filename
+        print('ini save to ', filename)
         try:
             f = open(filename, 'w')
             for section in self.m_sections:
                 f.write(str(section))
             f.close()
             ret = True
-        except IOError:
+        except IOError as e:
+            print('got error %s' %e)
+            self.m_last_error = e
             ret = False
         return ret
 
