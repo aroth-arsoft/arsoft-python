@@ -31,6 +31,15 @@ class PuppetSetupApp(object):
             return True
         else:
             return False
+
+    def _runssh_with_inputfile(self, commandline, inputfile):
+        (sts, stdout, stderr) = ssh_runcmdAndGetData(self.target_hostname, commandline=commandline, script=None, 
+                                                     stdin=inputfile,
+                                                     keyfile=self.keyfile, username=self.username)
+        if sts == 0:
+            return True
+        else:
+            return False
     
     def _add_apt_source(self, sourcename, url, distcode=None, components=['main'], has_source=True):
         distro_cs="`lsb_release -cs`" if distcode is None else ("'%s'" %distcode)
@@ -75,25 +84,25 @@ apt-get install -q -y %(packages_str)s
 
     def _rename_host(self, new_hostname):
         pass
-        
+
     def _install_openvpn_config(self, config_file):
-        zipfile = arsoft.openvpn.ZippedConfigFile(config_file)
-        if not zipfile.valid:
+        if not arsoft.openvpn.ZippedConfigFile.is_zip_config_file(config_file):
             sys.stderr.write('The given file %s is not a valid OpenVPN configuration.\n' % (config_file))
             ret = False
         else:
-            # copy zip file to target host
-            commandline = '/usr/bin/openvpn-admin 
-            
-        (sts, stdout, stderr) = ssh_runcmdAndGetData(self.target_hostname, commandline=None, script=script, 
-                                                     keyfile=self.keyfile, username=self.username)
-        if sts == 0:
-            return True
-        else:
-            return False
-            
-            zipfile.install()
-            ret = True
+            try:
+                inputfile = open(config_file, 'r')
+            except IOError as e:
+                sys.stderr.write('Failed top open config file %s.\n' % (config_file))
+                inputfile = None
+            if inputfile:
+                # copy zip file to target host
+                commandline = '/usr/bin/openvpn-admin --install -'
+
+                ret = self._runssh_with_inputfile(commandline, inputfile)
+                inputfile.close()
+            else:
+                ret = False
         return ret
 
     def main(self):
