@@ -6,8 +6,10 @@ import os
 import os.path
 import argparse
 import sys
-from arsoft.dnsutils import get_dns_srv_record
-from arsoft.sshutils import ssh_runcmdAndGetData, SSH_EXECUTABLE, SCP_EXECUTABLE
+import tempfile
+from arsoft.dnsutils import get_dns_srv_record, gethostname
+from arsoft.utils import rmtree
+from arsoft.sshutils import *
 import arsoft.openvpn
 
 __version__ = '1.0'
@@ -17,16 +19,60 @@ class PuppetSetupApp(object):
         self.verbose = False
         self._config = None
         self._apt_update_required = True
+        self._temp_directory = None
+        self._private_keyfile = None
+        self._public_keyfile = None
+        self._public_key_comment = None
+
+    def __del__(self):
+        if self._temp_directory:
+            rmtree(self._temp_directory)
 
     def version(self):
         print('Version: %s' % str(__version__))
         print('SSH: %s' % str(SSH_EXECUTABLE))
+        print('SSH keygen: %s' % str(SSH_KEYGEN_EXECUTABLE))
         print('SCP: %s' % str(SCP_EXECUTABLE))
         return 0
     
+    def _generate_key(self):
+        if self.keyfile is None:
+            self._temp_directory = tempfile.mkdtemp()
+            keyfile = os.path.join(self._temp_directory, 'puppet-setup')
+            comment = 'puppet-setup@%s' % gethostname()
+            
+            (private_keyfile, public_keyfile) = ssh_keygen(keyfile, comment=comment, verbose=self.verbose)
+            if private_keyfile and public_keyfile:
+                if ssh_copy_id(public_keyfile, self.target_hostname, username=self.username, verbose=self.verbose):
+                    self._public_key_comment = comment
+                    self._private_keyfile = private_keyfile
+                    self._public_keyfile = public_keyfile
+                    self.keyfile = self._private_keyfile
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return True
+
+    def _remove_key(self):
+        if self._public_key_comment:
+            if self.verbose:
+                print('remove key %s' % self._public_key_comment)
+            script = """
+sed '/%(public_key_comment)s/d' -i.old ~/.ssh/authorized_keys
+""" % { 'public_key_comment':self._public_key_comment }
+            ret = self._runssh(script)
+        else:
+            ret = True
+        return ret
+            
+
+
     def _runssh(self, script):
         (sts, stdout, stderr) = ssh_runcmdAndGetData(self.target_hostname, commandline=None, script=script, 
-                                                     keyfile=self.keyfile, username=self.username)
+                                                     keyfile=self.keyfile, username=self.username, verbose=self.verbose)
         if sts == 0:
             return True
         else:
@@ -35,7 +81,7 @@ class PuppetSetupApp(object):
     def _runssh_with_inputfile(self, commandline, inputfile):
         (sts, stdout, stderr) = ssh_runcmdAndGetData(self.target_hostname, commandline=commandline, script=None, 
                                                      stdin=inputfile,
-                                                     keyfile=self.keyfile, username=self.username)
+                                                     keyfile=self.keyfile, username=self.username, verbose=self.verbose)
         if sts == 0:
             return True
         else:
@@ -83,7 +129,10 @@ apt-get install -q -y %(packages_str)s
             return None
 
     def _rename_host(self, new_hostname):
-        pass
+        script = """
+managehosts --set-hostname "%(new_hostname)s"
+""" % { 'new_hostname':new_hostname }
+        return self._runssh(script)
 
     def _install_openvpn_config(self, config_file):
         if not arsoft.openvpn.ZippedConfigFile.is_zip_config_file(config_file):
@@ -113,7 +162,7 @@ apt-get install -q -y %(packages_str)s
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
         parser.add_argument('-u', '--username', dest='username', default='root', help='username to connect to the remote machine.')
-        parser.add_argument('-k', '--keyfile', dest='keyfile', default='root', help='keyfile to connect to the remote machine.')
+        parser.add_argument('-k', '--keyfile', dest='keyfile', help='keyfile to connect to the remote machine.')
         parser.add_argument('-p', '--password', dest='password', help='password to access the remote machine.')
         parser.add_argument('--openvpn', dest='openvpn_zipfile', help='path to the OpenVPN configuration zip.')
         parser.add_argument('--rename-host', dest='rename_host', help='path to the OpenVPN configuration zip.')
@@ -143,18 +192,37 @@ apt-get install -q -y %(packages_str)s
             packages_to_install.append('openvpn')
             packages_to_install.append('arsoft-python-openvpn')
 
-        self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu')
-        self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', components=['main', 'dependencies'])
-        self._apt_install(packages_to_install)
+        ret = True
+        if ret:
+            ret = self._generate_key()
+            if not ret:
+                sys.stderr.write('Failed to generate SSH key\n')
+
+        if ret:
+            ret = self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu')
+            if not ret:
+                sys.stderr.write('Failed to add PPA aroth\n')
+
+        if ret:
+            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', components=['main', 'dependencies'])
+            if not ret:
+                sys.stderr.write('Failed to add PuppetLabs APT repository\n')
+
+        if ret:
+            ret = self._apt_install(packages_to_install)
         
-        if args.rename_host:
-            self._rename_host(args.rename_host)
+        if ret:
+            if args.rename_host:
+                ret = self._rename_host(args.rename_host)
 
-        if args.openvpn_zipfile:
-            self._install_openvpn_config(args.openvpn_zipfile)
+        if ret:
+            if args.openvpn_zipfile:
+                ret = self._install_openvpn_config(args.openvpn_zipfile)
 
-        ret = 0
-        return ret
+        # in any case remove the newly install SSH key
+        self._remove_key()
+
+        return 0 if ret else 1
 
 if __name__ == "__main__":
     app =  PuppetSetupApp()
