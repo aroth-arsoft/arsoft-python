@@ -43,6 +43,7 @@ def _find_scp_executable(scp=None):
 
 def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, username=None, password=None, 
                          verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
+                         allocateTerminal=False, x11Forwarding=False,
                          ssh_executable=SSH_EXECUTABLE, use_putty=SSH_USE_PUTTY):
 
     if use_putty:
@@ -59,6 +60,8 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
             args.extend(['-l', username ])
         if keyfile:
             args.extend(['-i', keyfile])
+        args.append( '-t' if allocateTerminal else '-T')
+        args.append( '-X' if x11Forwarding else '-x')
 
     args.append(server)
     if commandline:
