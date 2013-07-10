@@ -15,6 +15,12 @@ class alog_application(object):
         'icinga': { 'line_re':r'^\[(?P<timestamp>[0-9]+)\] (?P<message>.*)$', 'timestamp':'time_t', 'logfile_names':['icinga.log'] },
         'icinga-debug': { 'line_re':r'^\[(?P<timestamp>[0-9]+\.[0-9]+)\] (?P<message>.*)$', 'timestamp':'time_t', 'logfile_names':['icinga.debug'] },
         'kernel': { 'line_re':r'^\[\s*(?P<timestamp>[0-9]+\.[0-9]+)\] (?P<message>.*)$', 'timestamp':'uptime' },
+        'apt-cacher-ng': { 
+            'line_re':r'^(?P<timestamp>[0-9]+)|(?P<input_output>[IO])|(?P<length>[0-9]+)|(?P<host>[0-9\.]+)|(?P<message>.*)$', 
+            'timestamp':'time_t', 
+            'logfile_names':['apt-cacher-ng.log', 'apt-cacher.log'],
+            'output_format':'time,host,msg'
+            },
         'kernel-time': { 'line_re':r'^\[\s*(?P<timestamp>[A-Za-z \:0-9]+)\] (?P<message>.*)$', 'timestamp':'ctime' },
         'syslog': { 
             'line_re':r'^(?P<timestamp>[A-Za-z]{2,3} [0-9]{1,2} [0-9]{2}\:[0-9]{2}\:[0-9]{2}) (?P<host>[A-Za-z0-9]+) (?P<ident>[A-Za-z0-9/]+)\[(?P<pid>[0-9]+)\]\: (?P<message>.*)$', 
@@ -207,14 +213,15 @@ class alog_application(object):
         #=============================================================================================
         # process command line
         #=============================================================================================
-        parser = argparse.ArgumentParser(description='shows information from EFI environment')
-        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser = argparse.ArgumentParser(description='parses a log file and displays the information')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('--pattern', dest='pattern', choices=alog_application.KNOWN_PATTERNS.keys().append('auto'), default='auto', help='named pattern for the log file.')
         parser.add_argument('-f', '--find', dest='find', help='output only message which contain the given string.')
         parser.add_argument('--wfind', dest='wfind', help='output only message which contain the given word.')
         parser.add_argument('--ifind', dest='ifind', help='output only message which contain the given string (case-insensitive).')
         parser.add_argument('-r', '--rfind', dest='find_regex', help='output only message which match the given pattern as regex.')
         parser.add_argument('-o', '--output', dest='output_format', help='specifies the fields to print; separated by comma')
+        parser.add_argument('-n', '--limit', dest='limit', default=-1, type=int, help='limit the number of log outputs.')
         parser.add_argument('logfile', default='-', nargs='?', help='log file to parse')
         
 
@@ -265,6 +272,7 @@ class alog_application(object):
                 else:
                     find_re = None
                 last_msg_obj = None
+                max_outputs = args.limit
                 if self._first_line:
                     msg_obj = self._process_line(line_re, find_re, timestamp_format, self._first_line)
                     if msg_obj:
@@ -273,11 +281,16 @@ class alog_application(object):
                         last_msg_obj = msg_obj
                     elif last_msg_obj:
                         last_msg_obj.append_message(self._first_line.rstrip())
+                num_outputs = 0
                 for line in self._logfile_obj:
                     msg_obj = self._process_line(line_re, find_re, timestamp_format, line)
                     if msg_obj:
                         if last_msg_obj:
                             self._output_msg(last_msg_obj)
+                            num_outputs += 1
+                            if max_outputs > 0 and num_outputs >= max_outputs:
+                                last_msg_obj = None
+                                break
                         last_msg_obj = msg_obj
                     elif last_msg_obj:
                         #print('was message ' + last_msg_obj.message)
@@ -289,6 +302,7 @@ class alog_application(object):
                         #print('new message ' + last_msg_obj.message)
                 if last_msg_obj:
                     self._output_msg(last_msg_obj)
+                    num_outputs += 1
 
                 ret = 0
                 
