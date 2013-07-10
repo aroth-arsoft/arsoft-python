@@ -127,8 +127,8 @@ def gethostname(fqdn=True):
 
 def getdomainname():
     fqdn = socket.getfqdn()
-    if '.' in ret:
-        (hostname, ret) = ret.split('.', 1)
+    if '.' in fqdn:
+        (hostname, ret) = fqdn.split('.', 1)
     else:
         ret = 'localdomain'
     return ret
