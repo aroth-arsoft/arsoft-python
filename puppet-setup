@@ -89,19 +89,26 @@ sed '/%(public_key_comment)s/d' -i.old ~/.ssh/authorized_keys
         components_str = ' '.join(components)
         sourcefilename = os.path.join('/etc/apt/sources.list.d', sourcename + '.list')
         script = """
-if [ ! -f "%(sourcefilename)s" ]; then
-    distro_cs=%(distro_cs)s
-    tmpfile=`mktemp`
-    echo "# Automatically generate source file for APT" > "$tmpfile"
-    echo "deb %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
-    echo "deb-src %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
+distro_cs=%(distro_cs)s
+if [ "%(sourcename)s" == 'puppetlabs' ]; then
+    [ "$distro_cs" == 'raring' ] && distro_cs='quantal'
+fi
+tmpfile=`mktemp`
+echo "# Automatically generate source file for APT" > "$tmpfile"
+echo "deb %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
+echo "deb-src %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
+if ! /usr/bin/diff -q "$tmpfile" "%(sourcefilename)s" > /dev/null; then
     %(sudo_command)smv "$tmpfile" "%(sourcefilename)s"; RES=$?
 else
+    rm -f "$tmpfile"
     RES=3
 fi
 exit $RES
 """ % { 'sudo_command': self.sudo_command,
-       'distro_cs':distro_cs, 'url':url, 'components_str':components_str, 'sourcefilename':sourcefilename }
+       'distro_cs':distro_cs, 'url':url, 
+       'components_str':components_str, 
+       'sourcename':sourcename,
+       'sourcefilename':sourcefilename }
         (sts, stdout, stderr) = self._runssh(script)
         print('sts = %i' % sts)
         if sts == 0:
@@ -169,7 +176,7 @@ exit $RES
         return ret
     
     def _puppet_agent_run(self, screen_session='puppet-setup'):
-        commandline = "screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent -tv --waitforcert 30 --server %(puppet_server)s | tee /tmp/puppet-setup.log\"" % { 
+        commandline = "screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent -tv --waitforcert 30 --server %(puppet_server)s 2>&1 | tee /tmp/puppet-setup.log\"" % { 
                 'sudo_command': self.sudo_command, 
                 'screen_session': screen_session,
                 'puppet_server': self.puppet_server }
