@@ -39,25 +39,28 @@ class OpenVPNAdmin(object):
 
     def _print_cert(self, prefix, cert):
         if cert:
-            cert_file = cert.filename
-            num_certs = len(cert.certificates)
-            if num_certs == 0:
-                print('  %s: %s (%s)' % (prefix, cert_file, cert.last_error))
-            else:
-                now = datetime.datetime.utcnow().replace(tzinfo=UTC)
-                min_expire_in = datetime.timedelta(days=100*365)
-                min_expire_cert = None
-                for cert in cert.certificates:
-                    expire_in = cert.expire_date - now
-                    if expire_in < min_expire_in:
-                        min_expire_in = expire_in
-                        min_expire_cert = cert
-
-                if min_expire_cert:
-                    expire_date = str(min_expire_cert.expire_date) + ' in ' + str(min_expire_in)
+            cert_file = str(cert.filename)
+            if os.path.isfile(cert_file):
+                num_certs = len(cert.certificates)
+                if num_certs == 0:
+                    print('  %s: %s (%s)' % (prefix, cert_file, cert.last_error))
                 else:
-                    expire_date = 'unavailable'
-                print('  %s: %s (expires %s)' % (prefix, cert_file, expire_date))
+                    now = datetime.datetime.utcnow().replace(tzinfo=UTC)
+                    min_expire_in = datetime.timedelta(days=100*365)
+                    min_expire_cert = None
+                    for cert in cert.certificates:
+                        expire_in = cert.expire_date - now
+                        if expire_in < min_expire_in:
+                            min_expire_in = expire_in
+                            min_expire_cert = cert
+
+                    if min_expire_cert:
+                        expire_date = str(min_expire_cert.expire_date) + ' in ' + str(min_expire_in)
+                    else:
+                        expire_date = 'unavailable'
+                    print('  %s: %s (expires %s)' % (prefix, cert_file, expire_date))
+            else:
+                print('  %s: %s (does not exist)' % (prefix, cert_file))
         else:
             print('  %s: none' % (prefix))
 
@@ -100,8 +103,9 @@ class OpenVPNAdmin(object):
                         
                         if config_file.server:
                             print('  Connected clients:')
-                            for (clientname, clientinfo) in status_file.connected_clients.iteritems():
-                                print('    %s' % (clientinfo))
+                            if status_file.connected_clients:
+                                for (clientname, clientinfo) in status_file.connected_clients.iteritems():
+                                    print('    %s' % (clientinfo))
                         if status_file.routing_table:
                             print('  Routing table:')
                             for (address, entry) in status_file.routing_table.iteritems():
