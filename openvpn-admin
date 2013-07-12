@@ -102,10 +102,35 @@ class OpenVPNAdmin(object):
                         print('  DH file: %s' % config_file.dh_file)
                         
                         if config_file.server:
+                            print('  Configured clients:')
+                            if config_file.client_config_files:
+                                for (clientname, ccdfile) in config_file.client_config_files.iteritems():
+                                    
+                                    if status_file.connected_clients:
+                                        client_is_connected = True if clientname in status_file.connected_clients else False
+                                    else:
+                                        client_is_connected = False
+                                    print('    %s (%s; %s)' % (ccdfile.name, 'Connected' if client_is_connected else 'Not connected', ccdfile.ostype))
+                                    if len(ccdfile.routes):
+                                        print('    Routes:')
+                                        for (network, netmask) in ccdfile.routes:
+                                            print('      %s/%s' % (network, netmask))
+                                    if len(ccdfile.push_options):
+                                        print('    Pushed options:')
+                                        for (option, value) in ccdfile.push_options:
+                                            print('      %s %s' % (option, value))
                             print('  Connected clients:')
                             if status_file.connected_clients:
                                 for (clientname, clientinfo) in status_file.connected_clients.iteritems():
                                     print('    %s' % (clientinfo))
+                        if len(config_file.routes):
+                            print('    Routes:')
+                            for (network, netmask) in ccdfile.routes:
+                                print('      %s/%s' % (network, netmask))
+                        if len(config_file.push_options):
+                            print('    Pushed options:')
+                            for (option, value) in ccdfile.push_options:
+                                print('      %s %s' % (option, value))
                         if status_file.routing_table:
                             print('  Routing table:')
                             for (address, entry) in status_file.routing_table.iteritems():

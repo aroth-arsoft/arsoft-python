@@ -72,7 +72,16 @@ class IniSection(object):
             if v.key == key:
                 return v.value
         return default
-    
+
+    def getAsArray(self, key, default=[]):
+        ret = []
+        found = False
+        for v in self.values:
+            if v.key == key:
+                ret.append( v.value )
+                found = True
+        return ret if found else default
+
     def get_all(self):
         ret = []
         for v in self.values:
@@ -486,6 +495,13 @@ class IniFile(object):
                     ret = default
         else:
             ret = default
+        return ret
+
+    def getAsArray(self, section, key, default=[]):
+        ret = default
+        section_obj = self._getSection(section)
+        if section_obj is not None:
+            ret = section_obj.getAsArray(key, default)
         return ret
 
     def set(self, section, key, value, comment=None):

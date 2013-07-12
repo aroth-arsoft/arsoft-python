@@ -10,8 +10,9 @@ import sys
 import os
 from arsoft.inifile import *
 from arsoft.crypto import CertificateFile
-from arsoft.utils import replace_invalid_chars
+from arsoft.utils import replace_invalid_chars, is_quoted_string, unquote_string, quote_string
 import config
+from ccdfile import CCDFile
 
 class ConfigFile(object):
     def __init__(self, filename=None, config_name=None, zipfile=None):
@@ -222,7 +223,6 @@ class ConfigFile(object):
 
     @cert_filename.setter
     def cert_filename(self, value):
-        print('cert_filename.setter %s' %value)
         if self._conf is not None:
             ret = self._conf.set(section=None, key='cert', value=value)
 
@@ -243,6 +243,11 @@ class ConfigFile(object):
             ret = None
         return ret
 
+    @key_filename.setter
+    def key_filename(self, value):
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='key', value=value)
+
     @property
     def key_file(self):
         f = self.key_filename
@@ -259,6 +264,11 @@ class ConfigFile(object):
         else:
             ret = None
         return ret
+
+    @ca_filename.setter
+    def ca_filename(self, value):
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='ca', value=value)
 
     @property
     def ca_file(self):
@@ -277,6 +287,11 @@ class ConfigFile(object):
             ret = None
         return ret
 
+    @dh_filename.setter
+    def dh_filename(self, value):
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='dh', value=value)
+
     @property
     def dh_file(self):
         f = self.dh_filename
@@ -293,6 +308,11 @@ class ConfigFile(object):
         else:
             ret = None
         return ret
+
+    @crl_filename.setter
+    def crl_filename(self, value):
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='crl', value=value)
 
     @property
     def crl_file(self):
@@ -359,6 +379,68 @@ class ConfigFile(object):
             ret = None
         return ret
 
+    @property
+    def client_config_directory(self):
+        if self._conf is not None:
+            ret = self._conf.get(section=None, key='client-config-dir', default=None)
+        else:
+            ret = None
+        return ret
+
+    @client_config_directory.setter
+    def client_config_directory(self, value):
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='client-config-dir', value=value)
+            
+    @property
+    def client_config_files(self):
+        if self.client_config_directory:
+            if self.config_directory:
+                dirname = os.path.join(self.config_directory, self.client_config_directory)
+            else:
+                dirname = os.path.abspath(self.client_config_directory)
+            ret = {}
+            if os.path.isdir(dirname):
+                for item in os.listdir(dirname):
+                    fullpath = os.path.join(dirname, item)
+                    if os.path.isfile(fullpath):
+                        ccdfile = CCDFile(fullpath, configfile=self)
+                        ret[item] = ccdfile
+        else:
+            ret = None
+        return ret
+
+    @property
+    def routes(self):
+        if self._conf:
+            ret = []
+            iroute = self._conf.getAsArray(section=None, key='route', default=[])
+            for r in iroute:
+                (network, netmask) = r.split(' ', 1)
+                ret.append( (network, netmask) )
+        else:
+            ret = None
+        return ret
+
+    @property
+    def push_options(self):
+        if self._conf:
+            ret = []
+            opts = self._conf.getAsArray(section=None, key='push', default=[])
+            for r in opts:
+                r = unquote_string(r)
+                idx = r.find(' ')
+                if idx > 0:
+                    option = r[0:idx].strip()
+                    value = r[idx+1:]
+                else:
+                    option = r.strip()
+                    value = None
+                ret.append( (option, value) )
+        else:
+            ret = None
+        return ret
+
     def __str__(self):
         ret = "config file " + str(self.filename) + "\r\n" +\
             "status file: " + str(self.status_file) + "\r\n" +\
@@ -374,6 +456,7 @@ class ConfigFile(object):
             "ca_file: " + str(self.ca_file) + "\r\n" +\
             "cert_file: " + str(self.cert_file) + "\r\n" +\
             "key_file: " + str(self.key_file) + "\r\n" +\
+            "client-config-dir: " + str(self.client_config_directory) + "\r\n" +\
             ""
         return ret
 

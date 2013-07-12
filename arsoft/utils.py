@@ -269,3 +269,18 @@ def detect_file_type(filename, fallback=None):
     if file_type is None:
         file_type = fallback
     return file_type
+
+def is_quoted_string(str):
+    if len(str) > 1 and ((str[0] == '"' and str[-1] == '"') or (str[0] == '\'' and str[-1] == '\'')):
+        return True
+    else:
+        return False
+
+def unquote_string(str):
+    if is_quoted_string(str):
+        return str[1:-1]
+    else:
+        return str
+
+def quote_string(str, quote_char='\''):
+    return quote_char + str + quote_char
