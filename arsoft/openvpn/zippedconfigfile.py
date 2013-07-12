@@ -9,6 +9,7 @@ from configfile import ConfigFile
 from systemconfig import SystemConfig
 import arsoft.utils
 import zipfile
+import StringIO
 
 class ZippedConfigFile(object):
 
@@ -59,6 +60,52 @@ class ZippedConfigFile(object):
         except zipfile.BadZipfile as e:
             ret = False
         return ret
+    
+    @staticmethod
+    def _create_add_file_to_zip(zipfile_fobj, cfgfile, file_to_add, arcname=None):
+        source_file = os.path.join(cfgfile.config_directory, file_to_add)
+        if os.path.isfile(source_file):
+            zipfile_fobj.write(source_file, arcname if arcname else file_to_add)
+            ret = True
+            error = None
+        else:
+            ret = False
+            error = 'File %s does not exist' %(source_file)
+        return (ret, error)
+
+    @staticmethod
+    def create(cfgfile, output_file):
+        try:
+            fobj = ZipFileEx(output_file, 'w')
+            if fobj:
+                ret = True
+                if ret and cfgfile.cert_filename:
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.cert_filename, cfgfile.suggested_private_directory + '/cert.pem')
+                if ret and cfgfile.key_filename:
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, cfgfile.suggested_private_directory + '/key.pem')
+                if ret and cfgfile.ca_filename:
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.ca_filename, cfgfile.suggested_private_directory + '/ca.pem')
+                if ret and cfgfile.dh_filename:
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.dh_filename, cfgfile.suggested_private_directory + '/dh.pem')
+                if ret and cfgfile.crl_filename:
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, cfgfile.suggested_private_directory + '/crl.pem')
+                if ret:
+                    zip_cfgfile = cfgfile
+                    zip_cfgfile_stream = StringIO.StringIO()
+                    zip_cfgfile.save(zip_cfgfile_stream)
+                    fobj.writestr(zip_cfgfile.suggested_filename, zip_cfgfile_stream.getvalue())
+                fobj.close()
+                output_zip = ZippedConfigFile(output_file)
+                if not ret:
+                    os.remove(output_file)
+                    output_zip.last_error = error
+                ret = output_zip
+            else:
+                ret = None
+        except zipfile.BadZipfile as e:
+            ret = None
+        return ret
+        
 
     @property
     def valid(self):

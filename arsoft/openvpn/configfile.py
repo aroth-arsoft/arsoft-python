@@ -13,6 +13,7 @@ from arsoft.crypto import CertificateFile
 from arsoft.utils import replace_invalid_chars, is_quoted_string, unquote_string, quote_string
 import config
 from ccdfile import CCDFile
+import StringIO
 
 class ConfigFile(object):
     def __init__(self, filename=None, config_name=None, zipfile=None):
@@ -24,7 +25,10 @@ class ConfigFile(object):
         if filename:
             if hasattr(filename , 'read'):
                 self.fileobject = filename
-                self.filename = filename.name
+                if hasattr(filename , 'name'):
+                    self.filename = filename.name
+                else:
+                    self.filename = None
             else:
                 self.fileobject = None
                 self.filename = filename
@@ -155,6 +159,32 @@ class ConfigFile(object):
             return self._name
 
     @property
+    def public_address(self):
+        if self._conf:
+            ret = self._conf.get(section=None, key='local', default=None)
+            for comment in self._conf.comments:
+                if comment.startswith('public-address'):
+                    (dummy, ret) = comment.split(' ', 1)
+                    break
+        else:
+            ret = None
+        return ret
+
+    @property
+    def public_port(self):
+        if self._conf:
+            ret = self._conf.get(section=None, key='port', default=1194)
+            for comment in self._conf.comments:
+                if comment.startswith('public-port'):
+                    (dummy, ret) = comment.split(' ', 1)
+                    break
+            if ret:
+                ret = int(ret)
+        else:
+            ret = None
+        return ret
+
+    @property
     def suggested_private_directory(self):
         name = self.name
         if name:
@@ -174,6 +204,18 @@ class ConfigFile(object):
             if at_char > 0:
                 name = name[0:at_char]
             ret = replace_invalid_chars(name) + '.conf'
+        else:
+            ret = None
+        return ret
+
+    @property
+    def suggested_zip_filename(self):
+        name = self.name
+        if name:
+            at_char = name.find('@')
+            if at_char > 0:
+                name = name[0:at_char]
+            ret = replace_invalid_chars(name) + '.zip'
         else:
             ret = None
         return ret
@@ -337,7 +379,58 @@ class ConfigFile(object):
         return ret
 
     @property
+    def local(self):
+        if self._conf is not None:
+            ret = self._conf.get(section=None, key='local', default=None)
+        else:
+            ret = None
+        return ret
+
+    @property
+    def protocol(self):
+        if self._conf is not None:
+            ret = self._conf.get(section=None, key='proto', default=None)
+        else:
+            ret = None
+        return ret
+
+    @protocol.setter
+    def protocol(self, value):
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='proto', value=value)
+
+    @property
+    def cipher(self):
+        if self._conf is not None:
+            ret = self._conf.get(section=None, key='cipher', default=None)
+        else:
+            ret = None
+        return ret
+
+    @cipher.setter
+    def cipher(self, value):
+        if self._conf is not None:
+            ret = self._conf.set(section=None, key='cipher', value=value)
+
+    @property
+    def keepalive(self):
+        if self._conf is not None:
+            f = self._conf.get(section=None, key='keepalive', default=None)
+            if f:
+                fe = f.split(' ')
+                if len(fe) >= 2:
+                    ret = (int(fe[0]), int(fe[1]))
+                else:
+                    ret = (None, None)
+            else:
+                ret = (None, None)
+        else:
+            ret = (None, None)
+        return ret
+
+    @property
     def management(self):
+        ret = (None, None, None)
         if self._conf is not None:
             f = self._conf.get(section=None, key='management', default=None)
             if f:
@@ -346,12 +439,6 @@ class ConfigFile(object):
                     ret = (fe[0], fe[1], None)
                 elif len(fe) > 2:
                     ret = (fe[0], fe[1], fe[2])
-                else:
-                    ret = (None, None, None)
-            else:
-                ret = (None, None, None)
-        else:
-            ret = None
         return ret
 
     @property
@@ -391,7 +478,7 @@ class ConfigFile(object):
     def client_config_directory(self, value):
         if self._conf is not None:
             ret = self._conf.set(section=None, key='client-config-dir', value=value)
-            
+
     @property
     def client_config_files(self):
         if self.client_config_directory:
@@ -423,6 +510,18 @@ class ConfigFile(object):
         return ret
 
     @property
+    def plugins(self):
+        if self._conf:
+            ret = []
+            plugins = self._conf.getAsArray(section=None, key='plugin', default=[])
+            for r in plugins:
+                (plugin, plugin_params) = r.split(' ', 1)
+                ret.append( (plugin, plugin_params) )
+        else:
+            ret = None
+        return ret
+
+    @property
     def push_options(self):
         if self._conf:
             ret = []
@@ -441,6 +540,149 @@ class ConfigFile(object):
             ret = None
         return ret
 
+    @property
+    def auth_user_pass(self):
+        if self._conf:
+            f = self._conf.get(section=None, key='auth-user-pass', default=None)
+            ret = True if f else False
+        else:
+            ret = None
+        return ret
+
+    @auth_user_pass.setter
+    def auth_user_pass(self, value):
+        if self._conf is not None:
+            if value:
+                auth_file = None
+                f = self._conf.get(section=None, key='auth-user-pass', default=None)
+                if f:
+                    fe = f.split(' ')
+                    if len(fe) > 1:
+                        auth_file = fe[1]
+                self._conf.set(section=None, key='auth-user-pass', value=auth_file)
+            else:
+                self._conf.remove(section=None, key='auth-user-pass')
+
+    @property
+    def auth_user_pass_file(self):
+        if self._conf:
+            f = self._conf.get(section=None, key='auth-user-pass', default=None)
+            if f:
+                fe = f.split(' ')
+                if len(fe) > 1:
+                    ret = fe[1]
+                else:
+                    ret = None
+            else:
+                ret = None
+        else:
+            ret = None
+        return ret
+
+    @auth_user_pass_file.setter
+    def auth_user_pass_file(self, value):
+        if self._conf is not None:
+            self._conf.set(section=None, key='auth-user-pass', value=value)
+
+    def client_config_file(self, client_ccdfile=None):
+        if not self.server:
+            return None
+        
+        keepalive_ping, keepalive_pingrestart = self.keepalive
+
+        cert_line = ''
+        key_line = ''
+        ca_line = ''
+        dh_line = ''
+        crl_line = ''
+        if client_ccdfile and client_ccdfile.certfile:
+            cert_line = 'cert %s' % (client_ccdfile.certfile)
+        if client_ccdfile and client_ccdfile.keyfile:
+            key_line = 'key %s' % (client_ccdfile.keyfile)
+        if self.ca_filename:
+            ca_line = 'ca %s' % (self.ca_filename)
+        if self.dh_filename:
+            dh_line = 'dh %s' % (self.dh_filename)
+        if self.crl_filename:
+            crl_line = 'crl %s' % (self.crl_filename)
+
+        if 'openvpn-auth-pam.so' in self.plugins:
+            if client_ccdfile and client_ccdfile.auth_user_pass_file:
+                server_auth = "auth-user-pass %s" % (client_ccdfile.auth_user_pass_file)
+            else:
+                server_auth = "auth-user-pass"
+        else:
+            server_auth = ''
+
+        routes = []
+        clientname = 'unknown'
+        clientostype = 'unknown'
+        if client_ccdfile:
+            for (network, netmask) in client_ccdfile.routes:
+                routes.append('route %s %s' % (network, netmask))
+            clientname = client_ccdfile.name
+            clientostype = client_ccdfile.ostype
+
+        template_buf = """
+#
+# THIS FILE IS AUTOMATICALLY GENERATED BY
+# openvpn-zip-config
+#
+# name %(clientname)s
+# ostype %(clientostype)s
+client
+remote %(public_address)s %(public_port)i
+ns-cert-type server
+nobind
+proto %(protocol)s
+dev tun
+cipher %(cipher)s
+verb 1
+mute 20
+keepalive %(keepalive_ping)i %(keepalive_pingrestart)i
+resolv-retry infinite
+
+comp-lzo
+float
+persist-tun
+persist-key
+persist-local-ip
+persist-remote-ip
+push "persist-key"
+push "persist-tun"
+
+%(cert_line)s
+%(key_line)s
+%(ca_line)s
+%(dh_line)s
+%(crl_line)s
+
+%(server_auth)s
+%(routes)s
+
+#
+# EOF
+#
+""" % {
+    'clientname': clientname,
+    'clientostype': clientostype,
+    'protocol': self.protocol,
+    'cipher': self.cipher,
+    'public_address': self.public_address,
+    'public_port': self.public_port,
+    'cert_line': cert_line,
+    'key_line': key_line,
+    'ca_line': ca_line,
+    'dh_line': dh_line,
+    'crl_line': crl_line,
+    'keepalive_ping':keepalive_ping, 
+    'keepalive_pingrestart':keepalive_pingrestart,
+    'server_auth':server_auth,
+    'routes':'\n'.join(routes)
+        }
+        zip_cfgfile_stream = StringIO.StringIO(template_buf)
+        return ConfigFile(zip_cfgfile_stream)
+
     def __str__(self):
         ret = "config file " + str(self.filename) + "\r\n" +\
             "status file: " + str(self.status_file) + "\r\n" +\
@@ -451,11 +693,22 @@ class ConfigFile(object):
             "management: " + str(self.management) + "\r\n" +\
             "management_socket: " + str(self.management_socket) + "\r\n" +\
             "remote: " + str(self.remote) + "\r\n" +\
+            "local: " + str(self.local) + "\r\n" +\
+            "protocol: " + str(self.protocol) + "\r\n" +\
+            "cipher: " + str(self.cipher) + "\r\n" +\
+            "public_address: " + str(self.public_address) + "\r\n" +\
+            "public_port: " + str(self.public_port) + "\r\n" +\
+            "keepalive: " + str(self.keepalive) + "\r\n" +\
             "crl_file: " + str(self.crl_file) + "\r\n" +\
             "dh_file: " + str(self.dh_file) + "\r\n" +\
             "ca_file: " + str(self.ca_file) + "\r\n" +\
             "cert_file: " + str(self.cert_file) + "\r\n" +\
             "key_file: " + str(self.key_file) + "\r\n" +\
+            "push_options: " + str(self.push_options) + "\r\n" +\
+            "routes: " + str(self.routes) + "\r\n" +\
+            "plugins: " + str(self.plugins) + "\r\n" +\
+            "auth_user_pass: " + str(self.auth_user_pass) + "\r\n" +\
+            "auth_user_pass_file: " + str(self.auth_user_pass_file) + "\r\n" +\
             "client-config-dir: " + str(self.client_config_directory) + "\r\n" +\
             ""
         return ret

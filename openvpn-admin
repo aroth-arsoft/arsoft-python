@@ -164,7 +164,47 @@ class OpenVPNAdmin(object):
             sys.stderr.write('ZIP file %s does not exist.\n' % (zipfile))
             ret = 2
         return ret
-    
+
+    def action_zip_compress(self, selected_vpns, output_directory):
+        self._get_config()
+        all_vpn_names = self._config.names
+        if len(selected_vpns) == 0:
+            selected_vpns = all_vpn_names
+            ret = 0
+        else:
+            all_vpns_found = True
+            for vpnname in selected_vpns:
+                if vpnname not in all_vpn_names:
+                    sys.stderr.write('VPN %s not configured.\n' % (vpnname))
+                    all_vpns_found = False
+            ret = 0 if all_vpns_found else 2
+        
+        if ret == 0:
+            if len(selected_vpns) == 0:
+                print('No VPNs configured.')
+            else:
+                ret = 0
+                for vpnname in selected_vpns:
+                    config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
+                    if config_file.valid:
+                        output_zip_file = os.path.join(output_directory, config_file.suggested_zip_filename)
+                        zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, output_zip_file)
+                        if zipcfg.valid:
+                            print('Compressed %s to %s' % (vpnname, output_zip_file))
+                            if config_file.server:
+                                for (clientname, ccdfile) in config_file.client_config_files.iteritems():
+                                    client_cfgfile = config_file.client_config_file(ccdfile)
+                                    output_zip_file = os.path.join(output_directory, vpnname + '_' + client_cfgfile.suggested_zip_filename)
+                                    zipcfg = arsoft.openvpn.ZippedConfigFile.create(client_cfgfile, output_zip_file)
+                                    print('Compressed %s/%s to %s' % (vpnname, clientname, output_zip_file))
+                        else:
+                            sys.stderr.write('Failed to compress VPN %s to %s. %s\n' % (vpnname, output_zip_file, zipcfg.last_error))
+                            pass
+                    else:
+                        sys.stderr.write('VPN %s not configured.\n' % (vpnname))
+                        ret = 1
+        return ret
+
     def action_install(self, filename, root_directory=None):
         ret = 0
         conf_file_ok = False
@@ -259,18 +299,21 @@ class OpenVPNAdmin(object):
         parser = argparse.ArgumentParser(description='helper script to manage/configure a local OpenVPN installation.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
-        parser.add_argument('--status', dest='action_status', nargs='*', help='show the status of the configured VPNs')
-        parser.add_argument('--zip', dest='action_zip_info', help='shows information about the configuration in the given ZIP file.')
-        parser.add_argument('--root-directory', dest='root_directory', default='/', help='specifies the root directory for the configuration.')
-        parser.add_argument('--install', dest='action_install', help='installs the given OpenVPN configuration (can be either a ZIP file or plain config)')
-        parser.add_argument('--start', dest='action_start', help='starts the specified VPN')
-        parser.add_argument('--stop', dest='action_stop', help='stops the specified VPN')
-        parser.add_argument('--restart', dest='action_restart', help='restart the specified VPN')
-        parser.add_argument('--reload', dest='action_reload', help='reload the configuration of the specified VPN')
+        parser.add_argument('--status', dest='action_status', metavar='VPNNAME', nargs='*', help='show the status of the configured VPNs')
+        parser.add_argument('--zipinfo', dest='action_zip_info', metavar='ZIPFILE', help='shows information about the configuration in the given ZIP file.')
+        parser.add_argument('--zip', dest='action_zip_compress', metavar='VPNNAME', nargs='*', help='generate ZIP files for all OpenVPN configurations in the given directory.')
+        parser.add_argument('--root-directory', dest='root_directory', default='/', metavar='DIR', help='specifies the root directory for the configuration.')
+        parser.add_argument('--output-directory', dest='output_directory', default='/tmp', metavar='DIR', help='specifies the output directory for the configuration.')
+        parser.add_argument('--install', dest='action_install', metavar='CFGFILE', help='installs the given OpenVPN configuration (can be either a ZIP file or plain config)')
+        parser.add_argument('--start', dest='action_start', metavar='VPNNAME', help='starts the specified VPN')
+        parser.add_argument('--stop', dest='action_stop', metavar='VPNNAME', help='stops the specified VPN')
+        parser.add_argument('--restart', dest='action_restart', metavar='VPNNAME', help='restart the specified VPN')
+        parser.add_argument('--reload', dest='action_reload', metavar='VPNNAME', help='reload the configuration of the specified VPN')
 
         args = parser.parse_args()
         self.verbose = args.verbose
         self.root_directory = args.root_directory
+        self.output_directory = args.output_directory
 
         if args.version:
             return self.version()
@@ -279,6 +322,8 @@ class OpenVPNAdmin(object):
             ret = self.action_status(args.action_status)
         elif args.action_zip_info is not None:
             ret = self.action_zip_info(args.action_zip_info)
+        elif args.action_zip_compress is not None:
+            ret = self.action_zip_compress(args.action_zip_compress, output_directory=self.output_directory)
         elif args.action_install is not None:
             ret = self.action_install(args.action_install, root_directory=self.root_directory)
         elif args.action_start is not None:

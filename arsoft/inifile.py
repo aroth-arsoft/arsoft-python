@@ -578,17 +578,26 @@ class IniFile(object):
     def save(self, filename=None):
         if filename is None:
             filename = self.m_filename
-        print('ini save to ', filename)
-        try:
-            f = open(filename, 'w')
-            for section in self.m_sections:
-                f.write(str(section))
-            f.close()
-            ret = True
-        except IOError as e:
-            print('got error %s' %e)
-            self.m_last_error = e
-            ret = False
+        
+        if hasattr(filename, 'write'):
+            f = filename
+        else:
+            try:
+                f = open(filename, 'w')
+            except IOError as e:
+                self.m_last_error = e
+                f = None
+        if f:
+            try:
+                for section in self.m_sections:
+                    f.write(str(section))
+                ret = True
+            except IOError as e:
+                self.m_last_error = e
+                ret = False
+            if not hasattr(filename, 'write'):
+                f.close()
+
         return ret
 
     def merge(self, another_inifile):

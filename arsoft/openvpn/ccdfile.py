@@ -17,7 +17,10 @@ class CCDFile(object):
         self.last_error = None
         self._name = None
         self._ostype = None
+        self._auth_user_pass_file = None
         self._configfile = configfile
+        self._certfile = None
+        self._keyfile = None
         self.filename = filename
         self._parse_file()
 
@@ -65,6 +68,28 @@ class CCDFile(object):
             return self._name
 
     @property
+    def certfile(self):
+        if self._certfile:
+            return self._certfile
+        else:
+            for comment in self._conf.comments:
+                if comment.startswith('certfile'):
+                    (dummy, self._certfile) = comment.split(' ', 1)
+                    break
+            return self._certfile
+
+    @property
+    def keyfile(self):
+        if self._keyfile:
+            return self._keyfile
+        else:
+            for comment in self._conf.comments:
+                if comment.startswith('keyfile'):
+                    (dummy, self._keyfile) = comment.split(' ', 1)
+                    break
+            return self._keyfile
+
+    @property
     def ostype(self):
         if self._ostype:
             return self._ostype
@@ -74,6 +99,17 @@ class CCDFile(object):
                     (dummy, self._ostype) = comment.split(' ', 1)
                     break
             return self._ostype
+
+    @property
+    def auth_user_pass_file(self):
+        if self._auth_user_pass_file:
+            return self._auth_user_pass_file
+        else:
+            for comment in self._conf.comments:
+                if comment.startswith('auth-user-pass-file'):
+                    (dummy, self._auth_user_pass_file) = comment.split(' ', 1)
+                    break
+            return self._auth_user_pass_file
 
     @property
     def routes(self):
