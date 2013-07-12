@@ -60,11 +60,11 @@ if not config.get_config_file(np['name']):
 else:
     if check_certificates:
         if np['warning']:
-            threshold_warning = timedelta(days=np['warning'])
+            threshold_warning = timedelta(days=int(np['warning']))
         else:
             threshold_warning = timedelta(days=30)
         if np['critical']:
-            threshold_critical = timedelta(days=np['critical'])
+            threshold_critical = timedelta(days=int(np['critical']))
         else:
             threshold_critical = timedelta(days=15)
         
