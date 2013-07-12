@@ -12,6 +12,7 @@ class Config(object):
         self._run_directory = rundir
         self._config_extension = extension
         self.refresh()
+        self.last_error = None
         
     def refresh(self):
         self._names = {}
@@ -36,7 +37,7 @@ class Config(object):
         else:
             ret = False
         return ret
-                    
+
     def get_config_file(self, config_name):
         if config_name in self._names:
             ret = self._names[config_name]['configfile']
@@ -50,10 +51,43 @@ class Config(object):
         else:
             ret = None
         return ret
-    
+
+    def start(self, config_name):
+        if config_name in self._names:
+            ret = self._invoke_rc_d_openvpn('start', [config_name])
+        else:
+            ret = False
+        return ret
+
+    def stop(self, config_name):
+        if config_name in self._names:
+            ret = self._invoke_rc_d_openvpn('stop', [config_name])
+        else:
+            ret = False
+        return ret
+
+    def restart(self, config_name):
+        if config_name in self._names:
+            ret = self._invoke_rc_d_openvpn('restart', [config_name])
+        else:
+            ret = False
+        return ret
+
     @property
     def names(self):
         return self._names.keys()
+    
+    def _invoke_rc_d_openvpn(self, action, args):
+        invoke_args = ['openvpn', action]
+        invoke_args.extend(args)
+        (sts, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData('/usr/sbin/invoke-rc.d', invoke_args)
+        if sts == 0:
+            self.last_error = None
+            ret = True
+        else:
+            self.last_error = stderrdata
+            ret = False
+        return ret
 
     def __str__(self):
         ret = "config directory: " + str(self._config_directory) + "\r\n" +\
