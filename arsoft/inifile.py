@@ -297,7 +297,7 @@ class IniFile(object):
         
     def open(self, filename=None):
         if filename is None:
-            filename = self._m_filename
+            filename = self.m_filename
         if hasattr(filename , 'read'):
             self._read(filename)
             ret = True

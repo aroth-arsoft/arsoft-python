@@ -38,6 +38,9 @@ class ZippedConfigFile(object):
         except zipfile.BadZipfile as e:
             self.last_error = e
             self._zip = None
+        except IOError as e:
+            self.last_error = e
+            self._zip = None
         ret = True if self._zip else False
         return ret
 
@@ -63,7 +66,10 @@ class ZippedConfigFile(object):
     
     @staticmethod
     def _create_add_file_to_zip(zipfile_fobj, cfgfile, file_to_add, arcname=None):
-        source_file = os.path.join(cfgfile.config_directory, file_to_add)
+        if cfgfile.config_directory:
+            source_file = os.path.join(cfgfile.config_directory, file_to_add)
+        else:
+            source_file = file_to_add
         if os.path.isfile(source_file):
             zipfile_fobj.write(source_file, arcname if arcname else file_to_add)
             ret = True
@@ -75,25 +81,36 @@ class ZippedConfigFile(object):
 
     @staticmethod
     def create(cfgfile, output_file):
+        zip_cfgfile = cfgfile.clone()
         try:
             fobj = ZipFileEx(output_file, 'w')
             if fobj:
                 ret = True
                 if ret and cfgfile.cert_filename:
                     ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.cert_filename, cfgfile.suggested_private_directory + '/cert.pem')
+                    if ret:
+                        zip_cfgfile.cert_filename = cfgfile.suggested_private_directory + '/cert.pem'
                 if ret and cfgfile.key_filename:
                     ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, cfgfile.suggested_private_directory + '/key.pem')
+                    if ret:
+                        zip_cfgfile.key_filename = cfgfile.suggested_private_directory + '/key.pem'
                 if ret and cfgfile.ca_filename:
                     ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.ca_filename, cfgfile.suggested_private_directory + '/ca.pem')
+                    if ret:
+                        zip_cfgfile.ca_filename = cfgfile.suggested_private_directory + '/ca.pem'
                 if ret and cfgfile.dh_filename:
                     ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.dh_filename, cfgfile.suggested_private_directory + '/dh.pem')
+                    if ret:
+                        zip_cfgfile.dh_filename = cfgfile.suggested_private_directory + '/dh.pem'
                 if ret and cfgfile.crl_filename:
                     ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, cfgfile.suggested_private_directory + '/crl.pem')
+                    if ret:
+                        zip_cfgfile.crl_filename = cfgfile.suggested_private_directory + '/crl.pem'
                 if ret:
-                    zip_cfgfile = cfgfile
                     zip_cfgfile_stream = StringIO.StringIO()
-                    zip_cfgfile.save(zip_cfgfile_stream)
-                    fobj.writestr(zip_cfgfile.suggested_filename, zip_cfgfile_stream.getvalue())
+                    ret = zip_cfgfile.save(zip_cfgfile_stream)
+                    if ret:
+                        fobj.writestr(zip_cfgfile.suggested_filename, zip_cfgfile_stream.getvalue())
                 fobj.close()
                 output_zip = ZippedConfigFile(output_file)
                 if not ret:
@@ -103,6 +120,8 @@ class ZippedConfigFile(object):
             else:
                 ret = None
         except zipfile.BadZipfile as e:
+            ret = None
+        except IOError as e:
             ret = None
         return ret
         
@@ -242,17 +261,27 @@ class ZippedConfigFile(object):
             ret = self.extract(cfgfile.cert_filename, private_config_directory, 'cert.pem')
             if ret:
                 new = os.path.relpath(os.path.join(private_config_directory,'cert.pem'), target_config_directory)
-                print('new cert path %s' %new)
                 cfgfile.cert_filename = new
-                print('new cert path got %s' %cfgfile.cert_filename)
         if ret and cfgfile.key_filename:
             ret = self.extract(cfgfile.key_filename, private_config_directory, 'key.pem')
+            if ret:
+                new = os.path.relpath(os.path.join(private_config_directory,'key.pem'), target_config_directory)
+                cfgfile.key_filename = new
         if ret and cfgfile.ca_filename:
             ret = self.extract(cfgfile.ca_filename, private_config_directory, 'ca.pem')
+            if ret:
+                new = os.path.relpath(os.path.join(private_config_directory,'ca.pem'), target_config_directory)
+                cfgfile.ca_filename = new
         if ret and cfgfile.dh_filename:
             ret = self.extract(cfgfile.dh_filename, private_config_directory, 'dh.pem')
+            if ret:
+                new = os.path.relpath(os.path.join(private_config_directory,'dh.pem'), target_config_directory)
+                cfgfile.dh_filename = new
         if ret and cfgfile.crl_filename:
             ret = self.extract(cfgfile.crl_filename, private_config_directory, 'crl.pem')
+            if ret:
+                new = os.path.relpath(os.path.join(private_config_directory,'crl.pem'), target_config_directory)
+                cfgfile.crl_filename = new
         if ret:
             target_config_file = os.path.join(target_config_directory, cfgfile.suggested_filename)
             ret = cfgfile.save(target_config_file)
@@ -260,14 +289,11 @@ class ZippedConfigFile(object):
                 self.last_error = cfgfile.last_error
 
         if ret:
-            print('update syscofn')
             syscfg = SystemConfig(root_directory=root_directory)
             new_autostart = syscfg.autostart
             if autoStart:
-                print('add %s' % self.name)
                 new_autostart.add(self.name)
             else:
-                print('remove %s' % self.name)
                 new_autostart.remove(self.name)
             syscfg.autostart = new_autostart
             print(syscfg.autostart)

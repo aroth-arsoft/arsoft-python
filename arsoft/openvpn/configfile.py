@@ -63,6 +63,13 @@ class ConfigFile(object):
                 ret = True
         return ret
     
+    def clone(self):
+        filename = self.fileobject if self.fileobject else self.filename
+        ret = ConfigFile(filename=filename, config_name=None, zipfile=self._zipfile)
+        ret._name = self._name
+        ret.config_directory = self.config_directory
+        return ret
+    
     def save(self, filename=None):
         if filename is None:
             filename = self.fileobject if self.fileobject else self.filename
@@ -212,9 +219,7 @@ class ConfigFile(object):
     def suggested_zip_filename(self):
         name = self.name
         if name:
-            at_char = name.find('@')
-            if at_char > 0:
-                name = name[0:at_char]
+            name = replace_invalid_chars(name, invalid_chars=['@'], replacement='_at_')
             ret = replace_invalid_chars(name) + '.zip'
         else:
             ret = None
@@ -600,11 +605,14 @@ class ConfigFile(object):
         if client_ccdfile and client_ccdfile.keyfile:
             key_line = 'key %s' % (client_ccdfile.keyfile)
         if self.ca_filename:
-            ca_line = 'ca %s' % (self.ca_filename)
+            abspath = os.path.join(self.config_directory, self.ca_filename)
+            ca_line = 'ca %s' % abspath
         if self.dh_filename:
-            dh_line = 'dh %s' % (self.dh_filename)
+            abspath = os.path.join(self.config_directory, self.dh_filename)
+            dh_line = 'dh %s' % abspath
         if self.crl_filename:
-            crl_line = 'crl %s' % (self.crl_filename)
+            abspath = os.path.join(self.config_directory, self.crl_filename)
+            crl_line = 'crl %s' % abspath
 
         if 'openvpn-auth-pam.so' in self.plugins:
             if client_ccdfile and client_ccdfile.auth_user_pass_file:

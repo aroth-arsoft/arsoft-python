@@ -189,17 +189,25 @@ class OpenVPNAdmin(object):
                     if config_file.valid:
                         output_zip_file = os.path.join(output_directory, config_file.suggested_zip_filename)
                         zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, output_zip_file)
-                        if zipcfg.valid:
+                        if zipcfg and zipcfg.last_error is None:
                             print('Compressed %s to %s' % (vpnname, output_zip_file))
                             if config_file.server:
                                 for (clientname, ccdfile) in config_file.client_config_files.iteritems():
                                     client_cfgfile = config_file.client_config_file(ccdfile)
                                     output_zip_file = os.path.join(output_directory, vpnname + '_' + client_cfgfile.suggested_zip_filename)
                                     zipcfg = arsoft.openvpn.ZippedConfigFile.create(client_cfgfile, output_zip_file)
-                                    print('Compressed %s/%s to %s' % (vpnname, clientname, output_zip_file))
+                                    if zipcfg and zipcfg.last_error is None:
+                                        print('Compressed %s/%s to %s' % (vpnname, clientname, output_zip_file))
+                                    else:
+                                        if zipcfg:
+                                            sys.stderr.write('Failed to compress VPN %s/%s to %s. %s\n' % (vpnname, clientname, output_zip_file, zipcfg.last_error))
+                                        else:
+                                            sys.stderr.write('Failed to compress VPN %s/%s to %s (unspecified error).\n' % (vpnname, clientname, output_zip_file))
                         else:
-                            sys.stderr.write('Failed to compress VPN %s to %s. %s\n' % (vpnname, output_zip_file, zipcfg.last_error))
-                            pass
+                            if zipcfg:
+                                sys.stderr.write('Failed to compress VPN %s to %s. %s\n' % (vpnname, output_zip_file, zipcfg.last_error))
+                            else:
+                                sys.stderr.write('Failed to compress VPN %s to %s (unspecified error).\n' % (vpnname, output_zip_file))
                     else:
                         sys.stderr.write('VPN %s not configured.\n' % (vpnname))
                         ret = 1
@@ -298,7 +306,7 @@ class OpenVPNAdmin(object):
         #=============================================================================================
         parser = argparse.ArgumentParser(description='helper script to manage/configure a local OpenVPN installation.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
-        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
+        parser.add_argument('--version', dest='version', action='store_true', help='shows the version and exits.')
         parser.add_argument('--status', dest='action_status', metavar='VPNNAME', nargs='*', help='show the status of the configured VPNs')
         parser.add_argument('--zipinfo', dest='action_zip_info', metavar='ZIPFILE', help='shows information about the configuration in the given ZIP file.')
         parser.add_argument('--zip', dest='action_zip_compress', metavar='VPNNAME', nargs='*', help='generate ZIP files for all OpenVPN configurations in the given directory.')
