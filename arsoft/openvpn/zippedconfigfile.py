@@ -231,8 +231,6 @@ class ZippedConfigFile(object):
         else:
             target_config_directory = root_directory + config_directory
 
-        
-
         cfgfile = self.config_file
         ret = True if cfgfile else False
         if ret:
@@ -299,6 +297,27 @@ class ZippedConfigFile(object):
             print(syscfg.autostart)
             ret = syscfg.save()
         return ret
+    
+    def compare(self, otherzip):
+        if isinstance(otherzip, ZippedConfigFile):
+            real_otherzip = otherzip._zip
+        elif isinstance(otherzip, str):
+            try:
+                real_otherzip = ZipFileEx(otherzip, 'r')
+            except zipfile.BadZipfile as e:
+                self.last_error = e
+                real_otherzip = None
+            except IOError as e:
+                self.last_error = e
+                real_otherzip = None
+        else:
+            real_otherzip = otherzip
+        self._ensure_open()
+        if self._zip is None:
+            return True if real_otherzip is None else False
+        else:
+            return self._zip.compare(real_otherzip, date_time=False, content=True)
+
 if __name__ == '__main__':
     c = ZippedConfigFile(sys.argv[1])
 
