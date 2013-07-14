@@ -5,7 +5,7 @@
 import zipfile
 
 class ZipFileEx(zipfile.ZipFile):
-    
+
     class ZipFileIterator(object):
         def __init__(self, zipfile):
             self._zipfile = zipfile
@@ -22,3 +22,26 @@ class ZipFileEx(zipfile.ZipFile):
 
     def __iter__(self):
         return self.ZipFileIterator(self)
+
+    def compare(self, otherzip, date_time=True, content=True):
+        selfinfolist = self.infolist()
+        otherinfolist = otherzip.infolist()
+
+        ret = True if len(selfinfolist) == len(otherinfolist) else False
+        if ret:
+            for selfinfo in iter(selfinfolist):
+                found = False
+                for otherinfo in iter(otherinfolist):
+                    if selfinfo.filename == otherinfo.filename:
+                        found = True
+                        if date_time and selfinfo.date_time != otherinfo.date_time:
+                            ret = False
+                        if content and selfinfo.CRC != otherinfo.CRC:
+                            ret = False
+                        break
+                if not found:
+                    ret = False
+
+                if not ret:
+                    break
+        return ret
