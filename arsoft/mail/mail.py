@@ -4,10 +4,16 @@
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
+from email.mime.audio import MIMEAudio
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+import email.encoders
 import smtplib
 import os
 
-class mail(object):
+class Mail(object):
     COMMASPACE = ', '
     
     def __init__(self, sender=None, to=[], cc=[], bcc=[], subject=None, bodytext=None, multipart=True):
@@ -31,22 +37,18 @@ class mail(object):
         self._msg['Subject'] = subject
         self._msg['From'] = self._from
         if len(to) != 0:
-            self._msg['To'] = mail.COMMASPACE.join(to)
+            self._msg['To'] = Mail.COMMASPACE.join(to)
         if len(cc) != 0:
-            self._msg['CC'] = mail.COMMASPACE.join(cc)
+            self._msg['CC'] = Mail.COMMASPACE.join(cc)
         if len(bcc) != 0:
-            self._msg['BCC'] = mail.COMMASPACE.join(bcc)
+            self._msg['BCC'] = Mail.COMMASPACE.join(bcc)
 
     def add_attachment(self, filename, mimetype=None):
         # Guess the content type based on the file's extension.  Encoding
         # will be ignored, although we should check for simple things like
         # gzip'd or compressed files.
         if mimetype is None:
-            ctype, encoding = mimetypes.guess_type(filename)
-            if ctype is None or encoding is not None:
-                # No guess could be made, or the file is encoded (compressed), so
-                # use a generic bag-of-bits type.
-                ctype = 'application/octet-stream'
+            ctype = 'application/octet-stream'
         else:
             ctype = mimetype
         maintype, subtype = ctype.split('/', 1)
@@ -69,7 +71,7 @@ class mail(object):
             msg.set_payload(fp.read())
             fp.close()
             # Encode the payload using Base64
-            encoders.encode_base64(msg)
+            email.encoders.encode_base64(msg)
         # Set the filename parameter
         msg.add_header('Content-Disposition', 'attachment', filename=filename)
         self._msg.attach(msg)
@@ -90,7 +92,7 @@ class mail(object):
         return ret
 
 if __name__ == '__main__':
-    m = mail(to=['root'], subject='Hello')
+    m = Mail(to=['root'], subject='Hello')
     s = smtplib.SMTP('localhost')
     s.sendmail(m.sender, m.recipients, str(m))
     s.quit()
