@@ -17,6 +17,7 @@ class CCDFile(object):
         self.last_error = None
         self._name = None
         self._ostype = None
+        self._mailnotify = None
         self._auth_user_pass_file = None
         self._configfile = configfile
         self._certfile = None
@@ -99,6 +100,17 @@ class CCDFile(object):
                     (dummy, self._ostype) = comment.split(' ', 1)
                     break
             return self._ostype
+
+    @property
+    def mailnotify(self):
+        if self._mailnotify:
+            return self._mailnotify
+        else:
+            for comment in self._conf.comments:
+                if comment.startswith('mailnotify'):
+                    (dummy, self._mailnotify) = comment.split(' ', 1)
+                    break
+            return self._mailnotify
 
     @property
     def auth_user_pass_file(self):

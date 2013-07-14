@@ -10,6 +10,8 @@ import datetime
 import tempfile
 import arsoft.openvpn
 import arsoft.crypto
+import arsoft.mail
+import shutil
 from arsoft.timestamp import UTC
 
 __version__ = '1.0'
@@ -183,13 +185,25 @@ class OpenVPNAdmin(object):
             if len(selected_vpns) == 0:
                 print('No VPNs configured.')
             else:
+                list_of_changed_zip_files = []
                 ret = 0
                 for vpnname in selected_vpns:
                     config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
                     if config_file.valid:
                         output_zip_file = os.path.join(output_directory, config_file.suggested_zip_filename)
-                        zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, output_zip_file)
-                        if zipcfg and zipcfg.last_error is None:
+                        outfile_obj = tempfile.NamedTemporaryFile() if os.path.exists(output_zip_file) else None
+                        zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file)
+                        zip_ok = True if zipcfg and zipcfg.last_error is None else False
+                        
+                        if zip_ok:
+                            if outfile_obj:
+                                if not zipcfg.compare(output_zip_file):
+                                    # zip file has changed, so copy the temp file to the real output file
+                                    shutil.copy2(outfile_obj.name, output_zip_file)
+                                    list_of_changed_zip_files.append(zipcfg)
+                            else:
+                                # zip file does not exists until now, so it's changed
+                                list_of_changed_zip_files.append(zipcfg)
                             print('Compressed %s to %s' % (vpnname, output_zip_file))
                             if config_file.server:
                                 for (clientname, ccdfile) in config_file.client_config_files.iteritems():
@@ -211,7 +225,84 @@ class OpenVPNAdmin(object):
                     else:
                         sys.stderr.write('VPN %s not configured.\n' % (vpnname))
                         ret = 1
+                for zipcfg in list_of_changed_zip_files:
+                    print('Zip config %s changed' % (zipcfg))
         return ret
+    
+    def mail_config(self, zipcfg, recipient=None):
+
+        cfgfile = zipcfg.config_file
+        
+        if recipient is None:
+            recipient = cfgfile.mailnotify
+
+        if recipient is None:
+            return False
+
+        mail_subject="OpenVPN configuration %s" % (cfgfile.name)
+        mail_message_header="""Your OpenVPN configuration has changed. The attached configuration has
+been automatically generated with the latest configuration.
+
+The latest OpenVPN manuals are avialable at:
+http://openvpn.net/index.php/open-source/documentation/manuals.html
+
+"""
+
+        mail_message_footer="""
+
+Have a nice day,
+   your administrator
+"""
+        if cfgfile.ostype == 'linux':
+            mail_message_os = """
+- extract the attached configuration to
+  /etc/openvpn
+- restart the OpenVPN service
+  service openvpn restart $name
+"""
+        elif cfgfile.ostype == 'win' or cfgfile.ostype == 'windows':
+            mail_message_os = """
+Make sure you have installed the latest version of OpenVPN (Community Version).
+http://openvpn.net/index.php/download/community-downloads.html
+
+- Quit the OpenVPN GUI (click the system tray icon)
+- Unzip the attached configuration to 
+  C:\Program Files\OpenVPN\config
+- Restart the OpenVPN GUI (with Administrator privileges)
+- Right click the system tray icon and click Connect to initiate
+  your VPN connection
+"""
+        elif cfgfile.ostype == 'macosx':
+            mail_message_os = """
+Make sure you have installed the latest version of Tunnelblick.
+http://code.google.com/p/tunnelblick/
+
+The wiki page 'Setting up Tunnelblick' provides the necessary
+instructions to install or update your Tunnelblick configuration.
+http://code.google.com/p/tunnelblick/wiki/cConfigT
+"""
+        elif cfgfile.ostype == 'android':
+            mail_message_os = """
+Please install the OpenVPN Settings App from Google Play and unzip the
+attached configuration to 
+/sdcard/openvpn/
+
+OpenVPN Settings Website: http://code.google.com/p/android-openvpn-settings
+Android OpenVPN How to: http://vpnblog.info/android-openvpn-strongvpn.html
+"""
+        else:
+            mail_message_os = """
+Your operating system %s is not handled (yet) on. 
+Please check the OpenVPN documentation and/or your system documentation for how 
+to use the provided configuration.
+""" % (zipcfg.config_file.ostype)
+
+        mail_message = mail_message_header + mail_message_os + mail_message_footer
+        notification_mail = arsoft.mail.Mail(sender=None, to=[recipient], subject=mail_subject, bodytext=mail_message)
+        notification_mail.add_attachment(zipcfg.filename)
+        print(notification_mail)
+        #arsoft.mail.sendmail(notification_mail)
+        return True
 
     def action_install(self, filename, root_directory=None):
         ret = 0
@@ -246,6 +337,32 @@ class OpenVPNAdmin(object):
         else:
             sys.stderr.write('File %s does not exist.\n' % (filename))
             ret = 2
+        return ret
+
+    def action_zip_send(self, filename, recipient=None):
+        ret = 0
+        conf_file_ok = False
+        file_ok = False
+        zip_ok = False
+        if filename == '-':
+            self._save_stdin_to_file()
+            filename = self._stdin_file.name
+            file_ok = True
+            zip_ok = True
+        else:
+            file_ok = os.path.exists(filename)
+            if file_ok:
+                zip_ok = arsoft.openvpn.ZippedConfigFile.is_zip_config_file(filename)
+        if zip_ok:
+            zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
+            if self.mail_config(zipcfg, recipient):
+                ret = 0
+            else:
+                sys.stderr.write('Failed to send OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
+                ret = 1
+        else:
+            sys.stderr.write('Given file %s is not a ZIP file with valid OpenVPN configuration.\n' % (filename))
+            ret = 1
         return ret
 
     def action_start(self, vpnname):
@@ -309,6 +426,7 @@ class OpenVPNAdmin(object):
         parser.add_argument('--version', dest='version', action='store_true', help='shows the version and exits.')
         parser.add_argument('--status', dest='action_status', metavar='VPNNAME', nargs='*', help='show the status of the configured VPNs')
         parser.add_argument('--zipinfo', dest='action_zip_info', metavar='ZIPFILE', help='shows information about the configuration in the given ZIP file.')
+        parser.add_argument('--zipsend', dest='action_zip_send', metavar='ZIPFILE', help='send ZIP file to the administrator of the VPN.')
         parser.add_argument('--zip', dest='action_zip_compress', metavar='VPNNAME', nargs='*', help='generate ZIP files for all OpenVPN configurations in the given directory.')
         parser.add_argument('--root-directory', dest='root_directory', default='/', metavar='DIR', help='specifies the root directory for the configuration.')
         parser.add_argument('--output-directory', dest='output_directory', default='/tmp', metavar='DIR', help='specifies the output directory for the configuration.')
@@ -317,6 +435,7 @@ class OpenVPNAdmin(object):
         parser.add_argument('--stop', dest='action_stop', metavar='VPNNAME', help='stops the specified VPN')
         parser.add_argument('--restart', dest='action_restart', metavar='VPNNAME', help='restart the specified VPN')
         parser.add_argument('--reload', dest='action_reload', metavar='VPNNAME', help='reload the configuration of the specified VPN')
+        parser.add_argument('--recipient', dest='recipient', metavar='RECIPIENT', help='override the mail recipient of the VPN configuration.')
 
         args = parser.parse_args()
         self.verbose = args.verbose
@@ -330,6 +449,8 @@ class OpenVPNAdmin(object):
             ret = self.action_status(args.action_status)
         elif args.action_zip_info is not None:
             ret = self.action_zip_info(args.action_zip_info)
+        elif args.action_zip_send is not None:
+            ret = self.action_zip_send(args.action_zip_send, args.recipient)
         elif args.action_zip_compress is not None:
             ret = self.action_zip_compress(args.action_zip_compress, output_directory=self.output_directory)
         elif args.action_install is not None:

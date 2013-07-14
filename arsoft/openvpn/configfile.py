@@ -192,6 +192,30 @@ class ConfigFile(object):
         return ret
 
     @property
+    def ostype(self):
+        if self._conf:
+            ret = None
+            for comment in self._conf.comments:
+                if comment.startswith('ostype'):
+                    (dummy, ret) = comment.split(' ', 1)
+                    break
+        else:
+            ret = None
+        return ret
+
+    @property
+    def mailnotify(self):
+        if self._conf:
+            ret = None
+            for comment in self._conf.comments:
+                if comment.startswith('mailnotify'):
+                    (dummy, ret) = comment.split(' ', 1)
+                    break
+        else:
+            ret = None
+        return ret
+
+    @property
     def suggested_private_directory(self):
         name = self.name
         if name:
@@ -210,7 +234,10 @@ class ConfigFile(object):
             at_char = name.find('@')
             if at_char > 0:
                 name = name[0:at_char]
-            ret = replace_invalid_chars(name) + '.conf'
+            if self.ostype == 'win' or self.ostype == 'android' or self.ostype == 'windows':
+                ret = replace_invalid_chars(name) + '.ovpn'
+            else:
+                ret = replace_invalid_chars(name) + '.conf'
         else:
             ret = None
         return ret
