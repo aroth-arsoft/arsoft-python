@@ -159,12 +159,14 @@ def bytes2human(n):
     return "%sB" % n
 
 def replace_invalid_chars(str, invalid_chars=['\r', '\n', '\t', ' ', ':', '@'], replacement='_'):
-    ret = str
+    ret = ''
     idx = 0
-    l = len(ret)
+    l = len(str)
     while idx < l:
-        if ret[idx] in invalid_chars:
-            ret[idx] = replacement
+        if str[idx] in invalid_chars:
+            ret += replacement
+        else:
+            ret += str[idx]
         idx += 1
     return ret
 
