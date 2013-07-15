@@ -19,7 +19,13 @@ class ZippedConfigFile(object):
         self._zip = None
         self._config_file_info = None
         self.last_error = None
-        
+
+    def __str__(self):
+        if self._zip:
+            return str(self.__class__.__name__) + '(%s;%s)' % (self.filename, self.name)
+        else:
+            return str(self.__class__.__name__) + '(%s)' % (self.filename)
+
     def _ensure_open(self):
         if self._zip is None:
             ret = self.open()
@@ -197,7 +203,7 @@ class ZippedConfigFile(object):
             return None
         
     def extract(self, name, target_directory, target_name=None):
-        print('extract %s to %s' %(name, target_directory))
+        #print('extract %s to %s' %(name, target_directory))
         if self._ensure_open():
             if target_name is None:
                 self._zip.extract(name, target_directory)
@@ -294,7 +300,6 @@ class ZippedConfigFile(object):
             else:
                 new_autostart.remove(self.name)
             syscfg.autostart = new_autostart
-            print(syscfg.autostart)
             ret = syscfg.save()
         return ret
     

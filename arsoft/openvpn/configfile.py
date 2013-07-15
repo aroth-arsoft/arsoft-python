@@ -54,20 +54,25 @@ class ConfigFile(object):
                 ret = False
             else:
                 ret = True
-        else:
+        elif self.filename is not None:
             if not self._conf.open(self.filename):
                 self.last_error = self._conf.last_error
                 self._conf = None
                 ret = False
             else:
                 ret = True
+        else:
+            ret = False
         return ret
     
     def clone(self):
-        filename = self.fileobject if self.fileobject else self.filename
-        ret = ConfigFile(filename=filename, config_name=None, zipfile=self._zipfile)
+        ret = ConfigFile()
+        ret._zipfile = self._zipfile
         ret._name = self._name
+        ret.fileobject = self.fileobject
+        ret.filename = self.filename
         ret.config_directory = self.config_directory
+        ret._conf = self._conf.clone()
         return ret
     
     def save(self, filename=None):
@@ -719,7 +724,9 @@ push "persist-tun"
         return ConfigFile(zip_cfgfile_stream)
 
     def __str__(self):
-        ret = "config file " + str(self.filename) + "\r\n" +\
+        ret = "name: " + str(self.name) + "\r\n" +\
+            "config file: " + str(self.filename) + "\r\n" +\
+            "conf file: " + str(self._conf.filename) + "\r\n" +\
             "status file: " + str(self.status_file) + "\r\n" +\
             "status version: " + str(self.status_version) + "\r\n" +\
             "status interval: " + str(self.status_interval) + "\r\n" +\

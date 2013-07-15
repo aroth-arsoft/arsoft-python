@@ -166,6 +166,43 @@ class OpenVPNAdmin(object):
             sys.stderr.write('ZIP file %s does not exist.\n' % (zipfile))
             ret = 2
         return ret
+    
+    def _compress_config(self, list_of_changed_zip_files, config_file, output_directory, parent_vpn_name=None):
+        
+        vpn_display_name = '%s/%s' % (config_file.name, parent_vpn_name) if parent_vpn_name else config_file.name
+        if config_file.valid:
+            if parent_vpn_name:
+                output_zip_file = os.path.join(output_directory, parent_vpn_name + '_' + config_file.suggested_zip_filename)
+            else:
+                output_zip_file = os.path.join(output_directory, config_file.suggested_zip_filename)
+            outfile_obj = tempfile.NamedTemporaryFile() if os.path.exists(output_zip_file) and not self.force_notify else None
+            zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file)
+            zip_ok = True if zipcfg and zipcfg.last_error is None else False
+
+            if zip_ok:
+                zip_changed = True
+                if outfile_obj:
+                    if not zipcfg.compare(output_zip_file):
+                        # zip file has changed, so copy the temp file to the real output file
+                        shutil.copy2(outfile_obj.name, output_zip_file)
+                        list_of_changed_zip_files.append(zipcfg)
+                    else:
+                        zip_changed = False
+                else:
+                    # zip file does not exists until now, so it's changed
+                    list_of_changed_zip_files.append(zipcfg)
+                if zip_changed:
+                    print('Compressed %s to %s' % (vpn_display_name, output_zip_file))
+                else:
+                    print('Compressed %s to %s (unchanged)' % (vpn_display_name, output_zip_file))
+            else:
+                if zipcfg:
+                    sys.stderr.write('Failed to compress VPN %s to %s. %s\n' % (vpn_display_name, output_zip_file, zipcfg.last_error))
+                else:
+                    sys.stderr.write('Failed to compress VPN %s to %s (unspecified error).\n' % (vpn_display_name, output_zip_file))
+        else:
+            sys.stderr.write('Configuration of VPN %s is invalid. %s\n' % (vpn_display_name, config_file.last_error))
+        return zip_ok
 
     def action_zip_compress(self, selected_vpns, output_directory):
         self._get_config()
@@ -190,63 +227,47 @@ class OpenVPNAdmin(object):
                 for vpnname in selected_vpns:
                     config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
                     if config_file.valid:
-                        output_zip_file = os.path.join(output_directory, config_file.suggested_zip_filename)
-                        outfile_obj = tempfile.NamedTemporaryFile() if os.path.exists(output_zip_file) else None
-                        zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file)
-                        zip_ok = True if zipcfg and zipcfg.last_error is None else False
-                        
+                        zip_ok = self._compress_config(list_of_changed_zip_files, config_file, output_directory)
                         if zip_ok:
-                            if outfile_obj:
-                                if not zipcfg.compare(output_zip_file):
-                                    # zip file has changed, so copy the temp file to the real output file
-                                    shutil.copy2(outfile_obj.name, output_zip_file)
-                                    list_of_changed_zip_files.append(zipcfg)
-                            else:
-                                # zip file does not exists until now, so it's changed
-                                list_of_changed_zip_files.append(zipcfg)
-                            print('Compressed %s to %s' % (vpnname, output_zip_file))
                             if config_file.server:
+                                # create a ZIP file for each client of the server
                                 for (clientname, ccdfile) in config_file.client_config_files.iteritems():
                                     client_cfgfile = config_file.client_config_file(ccdfile)
-                                    output_zip_file = os.path.join(output_directory, vpnname + '_' + client_cfgfile.suggested_zip_filename)
-                                    zipcfg = arsoft.openvpn.ZippedConfigFile.create(client_cfgfile, output_zip_file)
-                                    if zipcfg and zipcfg.last_error is None:
-                                        print('Compressed %s/%s to %s' % (vpnname, clientname, output_zip_file))
-                                    else:
-                                        if zipcfg:
-                                            sys.stderr.write('Failed to compress VPN %s/%s to %s. %s\n' % (vpnname, clientname, output_zip_file, zipcfg.last_error))
-                                        else:
-                                            sys.stderr.write('Failed to compress VPN %s/%s to %s (unspecified error).\n' % (vpnname, clientname, output_zip_file))
+                                    zip_ok = self._compress_config(list_of_changed_zip_files, client_cfgfile, output_directory, parent_vpn_name=vpnname)
+                                    if not zip_ok:
+                                       ret = 2
                         else:
-                            if zipcfg:
-                                sys.stderr.write('Failed to compress VPN %s to %s. %s\n' % (vpnname, output_zip_file, zipcfg.last_error))
-                            else:
-                                sys.stderr.write('Failed to compress VPN %s to %s (unspecified error).\n' % (vpnname, output_zip_file))
+                            ret = 1
                     else:
-                        sys.stderr.write('VPN %s not configured.\n' % (vpnname))
                         ret = 1
                 for zipcfg in list_of_changed_zip_files:
-                    print('Zip config %s changed' % (zipcfg))
+                    self._mail_config(zipcfg, self.notfication_recipient)
         return ret
     
-    def mail_config(self, zipcfg, recipient=None):
+    def _mail_config(self, zipcfg, recipient=None):
+
+        if not zipcfg.valid:
+            sys.stderr.write('Given ZIP configuration %s is invalid.\n' % (zipcfg.filename))
+            return False
 
         cfgfile = zipcfg.config_file
-        
         if recipient is None:
             recipient = cfgfile.mailnotify
 
         if recipient is None:
+            sys.stderr.write('Zip config %s changed but no notification recipient configured.\n' % (zipcfg.filename))
             return False
 
         mail_subject="OpenVPN configuration %s" % (cfgfile.name)
-        mail_message_header="""Your OpenVPN configuration has changed. The attached configuration has
-been automatically generated with the latest configuration.
+        mail_message_header="""Your OpenVPN configuration has changed.
+The administrator has given the following reason for this update:
+%s
+The attached configuration has been automatically generated with the latest configuration.
 
 The latest OpenVPN manuals are avialable at:
 http://openvpn.net/index.php/open-source/documentation/manuals.html
 
-"""
+""" % (self.notification_reason)
 
         mail_message_footer="""
 
@@ -255,10 +276,9 @@ Have a nice day,
 """
         if cfgfile.ostype == 'linux':
             mail_message_os = """
-- extract the attached configuration to
-  /etc/openvpn
-- restart the OpenVPN service
-  service openvpn restart $name
+- extract the attached configuration ZIP to any directory
+- run openvpn-admin --install /path/to/your/new/config.zip
+  (make sure to run this command as root user).
 """
         elif cfgfile.ostype == 'win' or cfgfile.ostype == 'windows':
             mail_message_os = """
@@ -301,6 +321,8 @@ to use the provided configuration.
         notification_mail = arsoft.mail.Mail(sender=None, to=[recipient], subject=mail_subject, bodytext=mail_message)
         notification_mail.add_attachment(zipcfg.filename)
         print(notification_mail)
+        print('Zip config %s changed and notification sent to %s' % (zipcfg.filename, recipient))
+
         #arsoft.mail.sendmail(notification_mail)
         return True
 
@@ -355,7 +377,7 @@ to use the provided configuration.
                 zip_ok = arsoft.openvpn.ZippedConfigFile.is_zip_config_file(filename)
         if zip_ok:
             zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
-            if self.mail_config(zipcfg, recipient):
+            if self._mail_config(zipcfg, recipient):
                 ret = 0
             else:
                 sys.stderr.write('Failed to send OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
@@ -436,11 +458,16 @@ to use the provided configuration.
         parser.add_argument('--restart', dest='action_restart', metavar='VPNNAME', help='restart the specified VPN')
         parser.add_argument('--reload', dest='action_reload', metavar='VPNNAME', help='reload the configuration of the specified VPN')
         parser.add_argument('--recipient', dest='recipient', metavar='RECIPIENT', help='override the mail recipient of the VPN configuration.')
+        parser.add_argument('--force-notify', dest='force_notify', action='store_true', help='send notification even if the configuration is unchanged.')
+        parser.add_argument('--reason', dest='notification_reason', default='', help='specify the reason for the updated VPN configuration.')
 
         args = parser.parse_args()
         self.verbose = args.verbose
         self.root_directory = args.root_directory
         self.output_directory = args.output_directory
+        self.force_notify = args.force_notify
+        self.notfication_recipient = args.recipient
+        self.notification_reason = args.notification_reason
 
         if args.version:
             return self.version()
@@ -450,7 +477,7 @@ to use the provided configuration.
         elif args.action_zip_info is not None:
             ret = self.action_zip_info(args.action_zip_info)
         elif args.action_zip_send is not None:
-            ret = self.action_zip_send(args.action_zip_send, args.recipient)
+            ret = self.action_zip_send(args.action_zip_send, self.notfication_recipient)
         elif args.action_zip_compress is not None:
             ret = self.action_zip_compress(args.action_zip_compress, output_directory=self.output_directory)
         elif args.action_install is not None:
