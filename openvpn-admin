@@ -320,10 +320,9 @@ to use the provided configuration.
         mail_message = mail_message_header + mail_message_os + mail_message_footer
         notification_mail = arsoft.mail.Mail(sender=None, to=[recipient], subject=mail_subject, bodytext=mail_message)
         notification_mail.add_attachment(zipcfg.filename)
-        print(notification_mail)
+        #print(notification_mail)
         print('Zip config %s changed and notification sent to %s' % (zipcfg.filename, recipient))
-
-        #arsoft.mail.sendmail(notification_mail)
+        arsoft.mail.sendmail(notification_mail)
         return True
 
     def action_install(self, filename, root_directory=None):
@@ -451,7 +450,7 @@ to use the provided configuration.
         parser.add_argument('--zipsend', dest='action_zip_send', metavar='ZIPFILE', help='send ZIP file to the administrator of the VPN.')
         parser.add_argument('--zip', dest='action_zip_compress', metavar='VPNNAME', nargs='*', help='generate ZIP files for all OpenVPN configurations in the given directory.')
         parser.add_argument('--root-directory', dest='root_directory', default='/', metavar='DIR', help='specifies the root directory for the configuration.')
-        parser.add_argument('--output-directory', dest='output_directory', default='/tmp', metavar='DIR', help='specifies the output directory for the configuration.')
+        parser.add_argument('--output-directory', dest='output_directory', metavar='DIR', help='specifies the output directory for the configuration.')
         parser.add_argument('--install', dest='action_install', metavar='CFGFILE', help='installs the given OpenVPN configuration (can be either a ZIP file or plain config)')
         parser.add_argument('--start', dest='action_start', metavar='VPNNAME', help='starts the specified VPN')
         parser.add_argument('--stop', dest='action_stop', metavar='VPNNAME', help='stops the specified VPN')
@@ -464,7 +463,10 @@ to use the provided configuration.
         args = parser.parse_args()
         self.verbose = args.verbose
         self.root_directory = args.root_directory
-        self.output_directory = args.output_directory
+        if args.output_directory:
+            self.output_directory = args.output_directory
+        else:
+            self.output_directory = os.getcwd()
         self.force_notify = args.force_notify
         self.notfication_recipient = args.recipient
         self.notification_reason = args.notification_reason
