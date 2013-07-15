@@ -20,6 +20,12 @@ class IniSection(object):
         self.comment = comment
         self.values = []
 
+    def clone(self, newinifile=None):
+        ret = IniSection(newinifile if newinifile else self.inifile, self.name, self.lineno, self.original, self.comment)
+        for v in iter(self.values):
+            ret.values.append(v.clone(newinifile))
+        return ret
+
     class IniLine(object):
         inifile = None
         lineno = -1
@@ -36,6 +42,10 @@ class IniSection(object):
             self.value = value
             self.comment = comment
             self.disabled = disabled
+
+        def clone(self, newinifile=None):
+            ret = IniSection.IniLine(newinifile if newinifile else self.inifile, self.lineno, self.original, self.key, self.value, self.comment, self.disabled)
+            return ret
 
         def asString(self, only_data=False):
             if self.original is not None and not only_data:
@@ -228,7 +238,6 @@ class IniFile(object):
         self.m_commentPrefix = commentPrefix
         self.m_keyValueSeperator = keyValueSeperator
         self.m_autoQuoteStrings = autoQuoteStrings
-        self.m_content = []
         self.m_sections = []
         self.m_filename = filename
         self.m_last_error = None
@@ -304,16 +313,27 @@ class IniFile(object):
         else:
             ret = self._open(filename)
             if not ret:
-                self.m_content = []
                 self.m_sections = []
         return ret
 
     def close(self):
-        self.m_content = []
         self.m_sections = []
         self.m_commentPrefix = None
         self.m_keyValueSeperator = None
         self.m_last_error = None
+        
+    def clone(self):
+        ret = IniFile(filename=None, commentPrefix=self.m_commentPrefix, keyValueSeperator=self.m_keyValueSeperator, 
+                      disabled_values=True, keyIsWord=True, autoQuoteStrings=self.m_autoQuoteStrings)
+        ret.SECTCRE = self.SECTCRE
+        ret.OPTCRE = self.OPTCRE
+        ret.COMMENTRE = self.COMMENTRE
+        ret.m_sections = []
+        for section in iter(self.m_sections):
+            newsection = section.clone()
+            newsection.inifile = ret
+            ret.m_sections.append(newsection)
+        return ret
 
     @property
     def filename(self):
@@ -356,9 +376,7 @@ class IniFile(object):
         optname = None
         lineno = 0
         e = None                                  # None, or an exception
-        self.m_content = []
         for line in file:
-            self.m_content.append(line)
             # comment or blank line?
             if line.strip() == '': # or line[0] in '#;':
                 if cursect is None:
