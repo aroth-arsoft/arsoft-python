@@ -37,6 +37,7 @@ trac-admin-suid: $(TRAC_ADMIN_SUID_SOURCES)
 
 override_dh_clean:
 	dh_clean -O--buildsystem=python_distutils
+	rm *.zip || true
 	test -f edskload && rm edskload || true
 	test -f edskeject && rm edskeject || true
 	test -f trac-admin-suid && rm trac-admin-suid || true
