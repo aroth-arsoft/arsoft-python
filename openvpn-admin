@@ -104,6 +104,7 @@ class OpenVPNAdmin(object):
                         print('  DH file: %s' % config_file.dh_file)
                         
                         if config_file.server:
+                            print('  Client config directory: %s' % config_file.client_config_directory)
                             print('  Configured clients:')
                             if config_file.client_config_files:
                                 for (clientname, ccdfile) in config_file.client_config_files.iteritems():
@@ -438,6 +439,54 @@ to use the provided configuration.
             ret = 2
         return ret
 
+    def action_add_ccd(self, vpnname, clients):
+        cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
+        if cfgfile.valid:
+            ccd_dir = cfgfile.client_config_directory
+            for client in clients:
+                fullpath = os.path.join(cfgfile.client_config_directory, client)
+                if not os.path.exists(fullpath):
+                    try:
+                        open(fullpath, 'w')
+                        ccd_ok = True
+                    except IOError as e:
+                        sys.stderr.write('Failed to create CCD for client %s on %s. %s\n' % (client, vpnname, str(e)))
+                        ccd_ok = False
+                else:
+                    ccd_ok = True
+            if ccd_ok:
+                ret = 0
+            else:
+                ret = 1
+        else:
+            sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
+            ret = 2
+        return ret
+
+    def action_remove_ccd(self, vpnname, clients):
+        cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
+        if cfgfile.valid:
+            ccd_dir = cfgfile.client_config_directory
+            for client in clients:
+                fullpath = os.path.join(cfgfile.client_config_directory, client)
+                if not os.path.exists(fullpath):
+                    ccd_removed = True
+                else:
+                    try:
+                        os.remove(fullpath)
+                        ccd_removed = True
+                    except IOError as e:
+                        sys.stderr.write('Failed to remove CCD of client %s on %s. %s\n' % (client, vpnname, str(e)))
+                        ccd_removed = False
+            if ccd_removed:
+                ret = 0
+            else:
+                ret = 1
+        else:
+            sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
+            ret = 2
+        return ret
+
     def main(self):
         #=============================================================================================
         # process command line
@@ -459,6 +508,8 @@ to use the provided configuration.
         parser.add_argument('--recipient', dest='recipient', metavar='RECIPIENT', help='override the mail recipient of the VPN configuration.')
         parser.add_argument('--force-notify', dest='force_notify', action='store_true', help='send notification even if the configuration is unchanged.')
         parser.add_argument('--reason', dest='notification_reason', default='', help='specify the reason for the updated VPN configuration.')
+        parser.add_argument('--add-ccd', dest='action_add_ccd', metavar='CLIENTNAME', nargs='+', help='add a client to the given VPN')
+        parser.add_argument('--remove-ccd', dest='action_remove_ccd', metavar='CLIENTNAME', nargs='+', help='remove a client from given VPN')
 
         args = parser.parse_args()
         self.verbose = args.verbose
@@ -492,6 +543,18 @@ to use the provided configuration.
             ret = self.action_restart(args.action_restart)
         elif args.action_reload is not None:
             ret = self.action_reload(args.action_reload)
+        elif args.action_add_ccd:
+            if len(args.action_add_ccd) >= 2:
+                ret = self.action_add_ccd(args.action_add_ccd[0], args.action_add_ccd[1:])
+            else:
+                sys.stderr.write('No client to add.\n')
+                ret = 1
+        elif args.action_remove_ccd:
+            if len(args.action_remove_ccd) >= 2:
+                ret = self.action_remove_ccd(args.action_remove_ccd[0], args.action_remove_ccd[1:])
+            else:
+                sys.stderr.write('No client to remove.\n')
+                ret = 1
         else:
             sys.stderr.write('No action selected.\n')
             ret = 1

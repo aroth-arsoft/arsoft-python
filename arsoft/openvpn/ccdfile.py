@@ -62,6 +62,8 @@ class CCDFile(object):
         if self._name:
             return self._name
         else:
+            if self.filename:
+                self._name = os.path.basename(self.filename)
             for comment in self._conf.comments:
                 if comment.startswith('name'):
                     (dummy, self._name) = comment.split(' ', 1)
