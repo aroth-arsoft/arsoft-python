@@ -37,7 +37,9 @@ Architecture: all
 Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
 Replaces: arsoft-openvpn
 Description: access the OpenVPN configuration and status
- Includes the openvpn-admin script to control and maintain the OpenVPN configuration.
+ Includes the openvpn-admin script to control and maintain the OpenVPN 
+ configuration. This script can also be used to show the status of all
+ configured VPNs and the related certificates and other files.
 
 Package: arsoft-python-nagios
 Architecture: all
