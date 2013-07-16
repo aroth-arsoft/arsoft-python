@@ -20,7 +20,7 @@ class PEMItem(object):
         
 class PEMFile:
 
-    s_begin_or_end_pattern = re.compile('^-----(?P<cmd>BEGIN|END) (?P<type>[A-Za-z ]+)-----$')
+    s_begin_or_end_pattern = re.compile('^-----(?P<cmd>BEGIN|END) (?P<type>[A-Za-z0-9 ]+)-----$')
     def __init__(self, filename=None, passphrase=None):
         self.m_filename = filename
         self.m_passphrase = passphrase
@@ -54,10 +54,12 @@ class PEMFile:
         if ret:
             try:
                 for line in f:
+                    #print('got line ' + line)
                     result = self.s_begin_or_end_pattern.match(line)
                     if result is not None:
                         cmd = result.group('cmd')
                         blocktype = result.group('type')
+                        #print('got %s type %s' % (cmd, blocktype))
                         if cmd == "BEGIN":
                             # clear the cert buffer
                             #print('got blockstart ' + blocktype)

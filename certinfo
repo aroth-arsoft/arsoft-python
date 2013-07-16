@@ -12,21 +12,24 @@ from arsoft.crypto import *
 class certinfo:
     def __init__(self):
         self._verbose = False
-        self._certificate_filename = None
+        self._input_file = None
         self._certificate_list_filename = None
         self._certificate_list = None
         self._key_list = None
+        self._crl_list = None
 
-    def _loadCerts(self, filenames):
+    def _loadFiles(self, filenames):
         ret = True
         self._certificate_list = CertificateList()
         self._key_list = KeyList()
+        self._crl_list = CRLList()
         for filename in filenames:
             if self._verbose:
                 print('add %s' % str(filename))
             filename_result = False
             num_keys = len(self._key_list)
             num_certs = len(self._certificate_list)
+            num_crls = len(self._crl_list)
             if not filename_result and self._key_list.add(filename):
                 if self._verbose:
                     print('add keys from %s' % str(filename))
@@ -36,6 +39,11 @@ class certinfo:
                 if self._verbose:
                     print('add certicates from %s' % str(filename))
                 if len(self._certificate_list) > num_certs:
+                    filename_result = True
+            if not filename_result and self._crl_list.add(filename):
+                if self._verbose:
+                    print('add CRL from %s' % str(filename))
+                if len(self._crl_list) > num_crls:
                     filename_result = True
             if not filename_result:
                 ret = False
@@ -164,11 +172,12 @@ class certinfo:
         # process command line
         #=============================================================================================
         parser = argparse.ArgumentParser(description='shows information about certificates')
-        parser.add_argument('certfile', help='input certificate file or directory', metavar='certfile', nargs='+')
+        parser.add_argument('certfile', help='input certificate/key/crl file or directory', metavar='FILE', nargs='+')
         parser.add_argument('--listfile', dest='listfile', help='input certificate list file', metavar='listfile')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('--find', dest='findbyname', help='find a certificate by name', metavar='term')
         parser.add_argument('--expired', dest='list_expired', action='store_true', help='lists all expired ceritificates')
+        parser.add_argument('--crl', dest='crl', help='loads the given CRL list')
         parser.add_argument('--short', dest='short', action='store_true', help='lists only the certificate file names')
         parser.add_argument('--valid', dest='list_valid', action='store_true', help='lists only valid ceritificates')
         parser.add_argument('--add', dest='addcertfile', help='add the given certificate file', metavar='certfile')
@@ -182,9 +191,9 @@ class certinfo:
         self._verbose = args.verbose
         
         if args.certfile is None:
-            self._certificate_filename = [ '/etc/ssl/certs/ca-certificates.crt' ]
+            self._input_file = [ '/etc/ssl/certs/ca-certificates.crt' ]
         else:
-            self._certificate_filename = args.certfile
+            self._input_file = args.certfile
             
         if args.listfile is None:
             self._certificate_list_filename = '/etc/ca-certificates.conf'
@@ -196,7 +205,7 @@ class certinfo:
         elif args.removecertfile:
             self._removeCertificate(args.removecertfile)
         else:
-            if not self._loadCerts(self._certificate_filename):
+            if not self._loadFiles(self._input_file):
                 return 1
 
         if args.findbyname:
@@ -207,6 +216,7 @@ class certinfo:
             self.update(args.update)
         else:
             self._key_list.write(sys.stdout, short=args.short)
+            self._crl_list.write(sys.stdout, short=args.short)
             if args.list_expired:
                 self._certificate_list.write(sys.stdout, expired_only=True, short=args.short)
             elif args.list_valid:
