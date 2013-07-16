@@ -172,19 +172,21 @@ class OpenVPNAdmin(object):
         
         vpn_display_name = '%s/%s' % (config_file.name, parent_vpn_name) if parent_vpn_name else config_file.name
         if config_file.valid:
+            key_passphrase = 'blubb'
             if parent_vpn_name:
                 output_zip_file = os.path.join(output_directory, parent_vpn_name + '_' + config_file.suggested_zip_filename)
             else:
                 output_zip_file = os.path.join(output_directory, config_file.suggested_zip_filename)
             outfile_obj = tempfile.NamedTemporaryFile() if os.path.exists(output_zip_file) and not self.force_notify else None
-            zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file)
+            zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file, key_passphrase=key_passphrase)
             zip_ok = True if zipcfg and zipcfg.last_error is None else False
 
             if zip_ok:
                 zip_changed = True
                 if outfile_obj:
-                    if not zipcfg.compare(output_zip_file):
+                    if not zipcfg.compare(output_zip_file, key_passphrase=key_passphrase):
                         # zip file has changed, so copy the temp file to the real output file
+                        print('Copy %s to %s' % (outfile_obj.name, output_zip_file))
                         shutil.copy2(outfile_obj.name, output_zip_file)
                         list_of_changed_zip_files.append(zipcfg)
                     else:
@@ -256,7 +258,7 @@ class OpenVPNAdmin(object):
             recipient = cfgfile.mailnotify
 
         if recipient is None:
-            sys.stderr.write('Zip config %s changed but no notification recipient configured.\n' % (zipcfg.filename))
+            sys.stderr.write('Zip config %s changed but no notification recipient configured.\n' % (cfgfile.name))
             return False
 
         mail_subject="OpenVPN configuration %s" % (cfgfile.name)
@@ -320,9 +322,9 @@ to use the provided configuration.
 
         mail_message = mail_message_header + mail_message_os + mail_message_footer
         notification_mail = arsoft.mail.Mail(sender=None, to=[recipient], subject=mail_subject, bodytext=mail_message)
-        notification_mail.add_attachment(zipcfg.filename)
+        notification_mail.add_attachment(zipcfg.filename, attachment_name=cfgfile.name + '.zip')
         #print(notification_mail)
-        print('Zip config %s changed and notification sent to %s' % (zipcfg.filename, recipient))
+        print('Zip config %s changed and notification sent to %s' % (cfgfile.name, recipient))
         arsoft.mail.sendmail(notification_mail)
         return True
 
@@ -515,7 +517,7 @@ to use the provided configuration.
         self.verbose = args.verbose
         self.root_directory = args.root_directory
         if args.output_directory:
-            self.output_directory = args.output_directory
+            self.output_directory = os.path.abspath(args.output_directory)
         else:
             self.output_directory = os.getcwd()
         self.force_notify = args.force_notify

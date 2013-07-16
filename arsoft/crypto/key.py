@@ -16,9 +16,17 @@ class KeyItem(PEMItem):
     def get_bits(self):
         return self.key.bits()
 
+    @property
+    def bits(self):
+        return self.key.bits()
+
     def get_type(self):
         return self.key.type()
-            
+
+    @property
+    def type(self):
+        return self.key.type()
+
     def get_type_str(self):
         if self.key.type() == crypto.TYPE_RSA:
             return 'RSA'
@@ -49,6 +57,8 @@ class KeyItem(PEMItem):
                     fobj.write(prefix + ('Private' if self.private else 'Public') + " Key:\n")
             fobj.write(prefix + "  Bits: " + self.get_type_str() + '/' + str(self.get_bits()) + '\n')
 
+    def export(self, passphrase=None):
+        return crypto.dump_privatekey(crypto.FILETYPE_PEM, self.key, "blowfish", passphrase)
 
 class KeyList:
     def __init__(self):
@@ -148,21 +158,49 @@ class KeyList:
             fobj.write("Number of keys: " + str(num_keys) + "\n")
 
 class KeyPEMFile(PEMFile):
-    def __init__(self, filename=None):
-        PEMFile.__init__(self, filename)
+    def __init__(self, filename=None, passphrase=None):
+        PEMFile.__init__(self, filename, passphrase)
         
     def getKeys(self):
         ret = []
         i = 0
         while i < len(self.m_blocks):
             pemitem = self.m_blocks[i]
-            if pemitem.blocktype == 'RSA PRIVATE KEY' or pemitem.blocktype == 'DSA PRIVATE KEY' or pemitem.blocktype == 'PRIVATE KEY':
-                key = KeyItem(pemitem, private=True)
+            if pemitem.blocktype == 'RSA PRIVATE KEY' or pemitem.blocktype == 'DSA PRIVATE KEY' or pemitem.blocktype == 'PRIVATE KEY' or pemitem.blocktype == 'ENCRYPTED PRIVATE KEY':
+                key = KeyItem(pemitem, private=True, passphrase=self.m_passphrase)
                 ret.append( key )
-            elif pemitem.blocktype == 'RSA PUBLIC KEY' or pemitem.blocktype == 'DSA PUBLIC KEY' or pemitem.blocktype == 'PUBLIC KEY':
-                key = KeyItem(pemitem, private=False)
+            elif pemitem.blocktype == 'RSA PUBLIC KEY' or pemitem.blocktype == 'DSA PUBLIC KEY' or pemitem.blocktype == 'PUBLIC KEY' or pemitem.blocktype == 'ENCRYPTED PUBLIC KEY':
+                key = KeyItem(pemitem, private=False, passphrase=self.m_passphrase)
                 ret.append( key )
             i = i + 1
         return ret
 
+    @property
+    def keys(self):
+        return self.m_keys
  
+    def export(self, filename, passphrase=None):
+        if filename is None:
+            filename = self.m_filename
+
+        if hasattr(filename, 'write'):
+            call_file_close = False
+            f = filename
+        else:
+            call_file_close = True
+            try:
+                f = open(filename, 'w')
+            except IOError as e:
+                self.m_last_error = e
+                f = None
+        if f:
+            for pemitem in self.m_blocks:
+                keyitem = KeyItem(pemitem)
+                keyblock = keyitem.export(passphrase)
+                f.write(keyblock)
+            if call_file_close:
+                f.close()
+            ret = True
+        else:
+            ret = False
+        return ret

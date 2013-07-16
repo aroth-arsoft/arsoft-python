@@ -43,7 +43,7 @@ class Mail(object):
         if len(bcc) != 0:
             self._msg['BCC'] = Mail.COMMASPACE.join(bcc)
 
-    def add_attachment(self, filename, mimetype=None):
+    def add_attachment(self, filename, mimetype=None, attachment_name=None):
         # Guess the content type based on the file's extension.  Encoding
         # will be ignored, although we should check for simple things like
         # gzip'd or compressed files.
@@ -52,28 +52,33 @@ class Mail(object):
         else:
             ctype = mimetype
         maintype, subtype = ctype.split('/', 1)
-        if maintype == 'text':
+        if hasattr(filename, 'read'):
+            fp = filename
+        else:
             fp = open(filename)
+        if maintype == 'text':
             # Note: we should handle calculating the charset
             msg = MIMEText(fp.read(), _subtype=subtype)
-            fp.close()
         elif maintype == 'image':
-            fp = open(filename, 'rb')
             msg = MIMEImage(fp.read(), _subtype=subtype)
-            fp.close()
         elif maintype == 'audio':
-            fp = open(filename, 'rb')
             msg = MIMEAudio(fp.read(), _subtype=subtype)
-            fp.close()
         else:
-            fp = open(filename, 'rb')
             msg = MIMEBase(maintype, subtype)
             msg.set_payload(fp.read())
-            fp.close()
             # Encode the payload using Base64
             email.encoders.encode_base64(msg)
+        if not hasattr(filename, 'read'):
+            fp.close()
         # Set the filename parameter
-        msg.add_header('Content-Disposition', 'attachment', filename=filename)
+        if attachment_name is None:
+            if not hasattr(filename, 'read'):
+                attachment = os.path.basename(filename)
+            else:
+                attachment = os.path.basename(filename.name)
+        else:
+            attachment = attachment_name
+        msg.add_header('Content-Disposition', 'attachment', filename=attachment)
         self._msg.attach(msg)
         
     def __str__(self):

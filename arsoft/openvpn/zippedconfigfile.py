@@ -5,6 +5,8 @@
 import os
 import sys
 from arsoft.zipfileutils import ZipFileEx
+import arsoft.crypto
+from OpenSSL import crypto
 from configfile import ConfigFile
 from systemconfig import SystemConfig
 import arsoft.utils
@@ -69,7 +71,7 @@ class ZippedConfigFile(object):
         except zipfile.BadZipfile as e:
             ret = False
         return ret
-    
+
     @staticmethod
     def _create_add_file_to_zip(zipfile_fobj, cfgfile, file_to_add, arcname=None):
         if cfgfile.config_directory:
@@ -86,7 +88,29 @@ class ZippedConfigFile(object):
         return (ret, error)
 
     @staticmethod
-    def create(cfgfile, output_file):
+    def _create_add_key_file_to_zip(zipfile_fobj, cfgfile, file_to_add, key_passphrase, arcname=None):
+        if cfgfile.config_directory:
+            source_file = os.path.join(cfgfile.config_directory, file_to_add)
+        else:
+            source_file = file_to_add
+        if os.path.isfile(source_file):
+            org_keyfile = arsoft.crypto.KeyPEMFile(source_file)
+            
+            ret = org_keyfile.open()
+            if ret:
+                zip_keyfile_stream = StringIO.StringIO()
+                ret = org_keyfile.export(zip_keyfile_stream, key_passphrase)
+                if ret:
+                    data = zip_keyfile_stream.getvalue()
+                    zipfile_fobj.writestr(arcname if arcname else file_to_add, data)
+                error = None
+        else:
+            ret = False
+            error = 'File %s does not exist' %(source_file)
+        return (ret, error)
+
+    @staticmethod
+    def create(cfgfile, output_file, key_passphrase=None):
         zip_cfgfile = cfgfile.clone()
         try:
             fobj = ZipFileEx(output_file, 'w')
@@ -97,7 +121,10 @@ class ZippedConfigFile(object):
                     if ret:
                         zip_cfgfile.cert_filename = cfgfile.suggested_private_directory + '/cert.pem'
                 if ret and cfgfile.key_filename:
-                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, cfgfile.suggested_private_directory + '/key.pem')
+                    if key_passphrase:
+                        ret, error = ZippedConfigFile._create_add_key_file_to_zip(fobj, cfgfile, cfgfile.key_filename, key_passphrase, cfgfile.suggested_private_directory + '/key.pem')
+                    else:
+                        ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, cfgfile.suggested_private_directory + '/key.pem')
                     if ret:
                         zip_cfgfile.key_filename = cfgfile.suggested_private_directory + '/key.pem'
                 if ret and cfgfile.ca_filename:
@@ -112,6 +139,10 @@ class ZippedConfigFile(object):
                     ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, cfgfile.suggested_private_directory + '/crl.pem')
                     if ret:
                         zip_cfgfile.crl_filename = cfgfile.suggested_private_directory + '/crl.pem'
+                if ret and cfgfile.auth_user_pass_file:
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, cfgfile.suggested_private_directory + '/auth_pass')
+                    if ret:
+                        zip_cfgfile.auth_user_pass_file = cfgfile.suggested_private_directory + '/auth_pass'
                 if ret:
                     zip_cfgfile_stream = StringIO.StringIO()
                     ret = zip_cfgfile.save(zip_cfgfile_stream)
@@ -286,6 +317,11 @@ class ZippedConfigFile(object):
             if ret:
                 new = os.path.relpath(os.path.join(private_config_directory,'crl.pem'), target_config_directory)
                 cfgfile.crl_filename = new
+        if ret and cfgfile.auth_user_pass_file:
+            ret = self.extract(cfgfile.crl_filename, private_config_directory, 'auth_pass')
+            if ret:
+                new = os.path.relpath(os.path.join(private_config_directory,'auth_pass'), target_config_directory)
+                cfgfile.auth_user_pass_file = new
         if ret:
             target_config_file = os.path.join(target_config_directory, cfgfile.suggested_filename)
             ret = cfgfile.save(target_config_file)
@@ -303,7 +339,36 @@ class ZippedConfigFile(object):
             ret = syscfg.save()
         return ret
     
-    def compare(self, otherzip):
+    @staticmethod
+    class zip_config_compare_functor(object):
+        def __init__(self, key_passphrase):
+            self.key_passphrase = key_passphrase
+
+        def __call__(self, selfzip, selfinfo, otherzip, otherinfo):
+            ret = True
+            if selfinfo.CRC != otherinfo.CRC:
+                if os.path.basename(selfinfo.filename) == 'key.pem':
+                    selffp = selfzip.open(selfinfo)
+                    otherfp = otherzip.open(otherinfo)
+                    
+                    selfcontent = selffp.read()
+                    othercontent = otherfp.read()
+                    selffp.close()
+                    otherfp.close()
+                    
+                    print(selfcontent)
+                    print(othercontent)
+                    
+                    selfkey = crypto.load_privatekey(crypto.FILETYPE_PEM, selfcontent, self.key_passphrase)
+                    otherkey = crypto.load_privatekey(crypto.FILETYPE_PEM, othercontent, self.key_passphrase)
+                    
+                    ret = selfkey == otherkey
+                else:
+                    ret = False
+                print('%s changed, ret %i' % (selfinfo.filename, ret))
+            return ret
+    
+    def compare(self, otherzip, key_passphrase=None):
         if isinstance(otherzip, ZippedConfigFile):
             real_otherzip = otherzip._zip
         elif isinstance(otherzip, str):
@@ -321,7 +386,9 @@ class ZippedConfigFile(object):
         if self._zip is None:
             return True if real_otherzip is None else False
         else:
-            return self._zip.compare(real_otherzip, date_time=False, content=True)
+            print('zip compare ')
+            cmpfunc = ZippedConfigFile.zip_config_compare_functor(key_passphrase)
+            return self._zip.compare(real_otherzip, date_time=False, content=True, compare_functor=cmpfunc)
 
 if __name__ == '__main__':
     c = ZippedConfigFile(sys.argv[1])

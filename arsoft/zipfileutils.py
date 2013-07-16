@@ -22,10 +22,27 @@ class ZipFileEx(zipfile.ZipFile):
 
     def __iter__(self):
         return self.ZipFileIterator(self)
+    
+    @staticmethod
+    class default_compare_functor(object):
+        def __init__(self, date_time=True, content=True):
+            self.date_time = date_time
+            self.content = content
+        def __call__(self, selfzip, selfinfo, otherzip, otherinfo):
+            ret = True
+            if self.date_time and selfinfo.date_time != otherinfo.date_time:
+                ret = False
+            if self.content and selfinfo.CRC != otherinfo.CRC:
+                print('%s changed' % (selfinfo.filename))
+                ret = False
+            return ret
 
-    def compare(self, otherzip, date_time=True, content=True):
+    def compare(self, otherzip, date_time=True, content=True, compare_functor=None):
         selfinfolist = self.infolist()
         otherinfolist = otherzip.infolist()
+
+        if compare_functor is None:
+            compare_functor = ZipFileEx.default_compare_functor(date_time, content)
 
         ret = True if len(selfinfolist) == len(otherinfolist) else False
         if ret:
@@ -34,10 +51,7 @@ class ZipFileEx(zipfile.ZipFile):
                 for otherinfo in iter(otherinfolist):
                     if selfinfo.filename == otherinfo.filename:
                         found = True
-                        if date_time and selfinfo.date_time != otherinfo.date_time:
-                            ret = False
-                        if content and selfinfo.CRC != otherinfo.CRC:
-                            ret = False
+                        ret = compare_functor(self, selfinfo, otherzip, otherinfo)
                         break
                 if not found:
                     ret = False
