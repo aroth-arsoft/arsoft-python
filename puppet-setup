@@ -90,9 +90,6 @@ sed '/%(public_key_comment)s/d' -i.old ~/.ssh/authorized_keys
         sourcefilename = os.path.join('/etc/apt/sources.list.d', sourcename + '.list')
         script = """
 distro_cs=%(distro_cs)s
-if [ "%(sourcename)s" == 'puppetlabs' ]; then
-    [ "$distro_cs" == 'raring' ] && distro_cs='quantal'
-fi
 tmpfile=`mktemp`
 echo "# Automatically generate source file for APT" > "$tmpfile"
 echo "deb %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
