@@ -6,6 +6,7 @@ import os
 import sys
 from arsoft.zipfileutils import ZipFileEx
 import arsoft.crypto
+from arsoft.sshutils import *
 from OpenSSL import crypto
 from configfile import ConfigFile
 from systemconfig import SystemConfig
@@ -337,6 +338,30 @@ class ZippedConfigFile(object):
                 new_autostart.remove(self.name)
             syscfg.autostart = new_autostart
             ret = syscfg.save()
+        return ret
+
+    def ssh_install(self, target_hostname, username=None, keyfile=None, stdout=None, stderr=None, 
+                    outputStdErr=False, outputStdOut=False, allocateTerminal=False, x11Forwarding=False,
+                    cwd=None, env=None,
+                    verbose=False):
+        try:
+            inputfile = open(self.filename, 'r')
+        except IOError as e:
+            self.last_error = e
+            inputfile = None
+        if inputfile:
+            # copy zip file to target host as stdin file
+            commandline = '/usr/bin/openvpn-admin --install -'
+
+            #(sts, stdout, stderr) = ssh_runcmdAndGetData(target_hostname, commandline=commandline, script=None, 
+                                                     #outputStdErr=outputStdErr, outputStdOut=outputStdOut, stdin=inputfile, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
+                                                     #allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
+                                                     #keyfile=keyfile, username=username, verbose=verbose)
+            sts = 0
+            ret = True if sts == 0 else False
+            inputfile.close()
+        else:
+            ret = False
         return ret
     
     @staticmethod

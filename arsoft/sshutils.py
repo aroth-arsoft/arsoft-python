@@ -150,3 +150,55 @@ def ssh_copy_id(public_keyfile, server, username=None,
         return True
     else:
         return False
+    
+class SSHUrl(object):
+    def __init__(self, url=None):
+        self.scheme = None
+        self.username = None
+        self.password = None
+        self.hostname = None
+        self.path = None
+        if url is not None:
+            self.parse(url)
+
+    def parse(self, url, scheme='ssh'):
+        idx = url.find('://')
+        if idx != -1:
+            self.scheme = url[0:idx]
+        else:
+            self.scheme = scheme
+        idx = url.find('@')
+        if idx != -1:
+            tmp = url[0:idx]
+            idx = tmp.find(':')
+            if idx != -1:
+                self.username = tmp[0:idx]
+                self.password = tmp[idx+1:]
+            else:
+                self.username = tmp
+                self.password = None
+            tmp = url[idx + 1:]
+            idx = tmp.find(':')
+            if idx != -1:
+                self.hostname = tmp[0:idx]
+                self.path = tmp[idx+1:]
+            else:
+                self.hostname = tmp
+                self.path = None
+        else:
+            self.username = None
+            self.password = None
+            idx = url.find(':')
+            if idx != -1:
+                self.hostname = url[0:idx]
+                self.path = url[idx+1:]
+            else:
+                self.hostname = url
+                self.path = None
+        return False if self.hostname is None else True
+    
+    def __str__(self):
+        return '%(scheme)s://%(username)s:%(password)s@%(hostname)s:%(path)s' % vars(self)
+
+def ssh_parse_url(url):
+    return SSHUrl(url)

@@ -11,6 +11,7 @@ import tempfile
 import arsoft.openvpn
 import arsoft.crypto
 import arsoft.mail
+import arsoft.sshutils
 import shutil
 from arsoft.timestamp import UTC
 
@@ -363,6 +364,44 @@ to use the provided configuration.
             ret = 2
         return ret
 
+    def action_ssh_install(self, filename, sshurl):
+        ret = 0
+        conf_file_ok = False
+        file_ok = False
+        zip_ok = False
+        if filename == '-':
+            self._save_stdin_to_file()
+            filename = self._stdin_file.name
+            file_ok = True
+            zip_ok = True
+        else:
+            file_ok = os.path.exists(filename)
+            if file_ok:
+                zip_ok = arsoft.openvpn.ZippedConfigFile.is_zip_config_file(filename)
+                if not zip_ok:
+                    conf_file_ok = arsoft.openvpn.ConfigFile.is_config_file(filename)
+        if file_ok:
+            if zip_ok:
+                print(sshurl)
+                url = arsoft.sshutils.SSHUrl(sshurl)
+                print(url)
+                zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
+                if zipcfg.ssh_install(url.hostname, username=url.username):
+                    ret = 0
+                else:
+                    sys.stderr.write('Failed to install OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
+                    ret = 1
+            elif conf_file_ok:
+                print('use raw config file %s' % filename)
+                ret = 0
+            else:
+                sys.stderr.write('Given file %s is neither a ZIP file nor a valid OpenVPN configuration.\n' % (filename))
+                ret = 1
+        else:
+            sys.stderr.write('File %s does not exist.\n' % (filename))
+            ret = 2
+        return ret
+
     def action_zip_send(self, filename, recipient=None):
         ret = 0
         conf_file_ok = False
@@ -503,6 +542,7 @@ to use the provided configuration.
         parser.add_argument('--root-directory', dest='root_directory', default='/', metavar='DIR', help='specifies the root directory for the configuration.')
         parser.add_argument('--output-directory', dest='output_directory', metavar='DIR', help='specifies the output directory for the configuration.')
         parser.add_argument('--install', dest='action_install', metavar='CFGFILE', help='installs the given OpenVPN configuration (can be either a ZIP file or plain config)')
+        parser.add_argument('--ssh-install', dest='action_ssh_install', metavar='ZIPFILE', nargs=2, help='installs the given OpenVPN ZIP configuration to the specified remote host')
         parser.add_argument('--start', dest='action_start', metavar='VPNNAME', help='starts the specified VPN')
         parser.add_argument('--stop', dest='action_stop', metavar='VPNNAME', help='stops the specified VPN')
         parser.add_argument('--restart', dest='action_restart', metavar='VPNNAME', help='restart the specified VPN')
@@ -537,6 +577,12 @@ to use the provided configuration.
             ret = self.action_zip_compress(args.action_zip_compress, output_directory=self.output_directory)
         elif args.action_install is not None:
             ret = self.action_install(args.action_install, root_directory=self.root_directory)
+        elif args.action_ssh_install is not None:
+            if len(args.action_ssh_install) == 2:
+                ret = self.action_ssh_install(args.action_ssh_install[0], args.action_ssh_install[1])
+            else:
+                sys.stderr.write('Wrong number of arguments.\n')
+                ret = 1
         elif args.action_start is not None:
             ret = self.action_start(args.action_start)
         elif args.action_stop is not None:
