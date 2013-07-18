@@ -145,14 +145,15 @@ class ZippedConfigFile(object):
                     if ret:
                         zip_cfgfile.auth_user_pass_file = cfgfile.suggested_private_directory + '/auth_pass'
                 if ret and cfgfile.client_config_directory:
-                    print('ccd dir %s' % (cfgfile.client_config_directory))
+                    #print('ccd dir %s' % (cfgfile.client_config_directory))
                     zip_cfgfile.client_config_directory = cfgfile.suggested_private_directory + '/ccd'
                     for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
-                        print('add %s as %s' % (client_config_file, client_name))
+                        #print('add %s as %s' % (client_config_file, client_name))
                         ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, client_config_file.filename, cfgfile.suggested_private_directory + '/ccd/' + client_name)
                         if not ret:
                             break
                 if ret:
+                    zip_cfgfile.name = cfgfile.name
                     zip_cfgfile_stream = StringIO.StringIO()
                     ret = zip_cfgfile.save(zip_cfgfile_stream)
                     if ret:
@@ -227,6 +228,14 @@ class ZippedConfigFile(object):
         ret = ConfigFile(fp, zipfile=self) if fp else None
         return ret
     
+    def get_files_in_directory(self, dirname):
+        ret = []
+        fileinfolist = self._zip.infolist()
+        for fileinfo in fileinfolist:
+            if fileinfo.filename.startswith(dirname):
+                ret.append(fileinfo.filename)
+        return ret
+    
     def extractall(self, target_directory):
         if self._ensure_open():
             self._zip.extractall(target_directory)
@@ -287,14 +296,7 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(target_config_directory)
                     ret = True
-                except IOError:
-                    ret = False
-        if ret:
-            if not os.path.isdir(target_config_directory):
-                try:
-                    os.makedirs(target_config_directory)
-                    ret = True
-                except IOError:
+                except IOError, OSError:
                     ret = False
         if ret:
             private_config_directory = os.path.join(target_config_directory, cfgfile.suggested_private_directory)
@@ -302,7 +304,7 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(private_config_directory)
                     ret = True
-                except IOError:
+                except IOError, OSError:
                     ret = False
         if ret and cfgfile.cert_filename:
             ret = self.extract(cfgfile.cert_filename, private_config_directory, 'cert.pem')
@@ -336,10 +338,17 @@ class ZippedConfigFile(object):
                 cfgfile.auth_user_pass_file = new
         if ret and cfgfile.client_config_directory:
             private_config_directory_ccd = os.path.join(private_config_directory, 'ccd')
-            for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
-                ret = self.extract(client_config_file.filename, private_config_directory_ccd, client_name)
-                if not ret:
-                    break
+            if not os.path.isdir(private_config_directory_ccd):
+                try:
+                    os.makedirs(private_config_directory_ccd)
+                    ret = True
+                except IOError, OSError:
+                    ret = False
+            if ret:
+                for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
+                    ret = self.extract(client_config_file.filename, private_config_directory_ccd, client_name)
+                    if not ret:
+                        break
             if ret:
                 new = os.path.relpath(os.path.join(private_config_directory,'ccd'), target_config_directory)
                 cfgfile.client_config_directory = new
@@ -410,7 +419,7 @@ class ZippedConfigFile(object):
                     ret = selfkey == otherkey
                 else:
                     ret = False
-                print('%s changed, ret %i' % (selfinfo.filename, ret))
+                #print('%s changed, ret %i' % (selfinfo.filename, ret))
             return ret
     
     def compare(self, otherzip, key_passphrase=None):
@@ -431,7 +440,7 @@ class ZippedConfigFile(object):
         if self._zip is None:
             return True if real_otherzip is None else False
         else:
-            print('zip compare ')
+            #print('zip compare ')
             cmpfunc = ZippedConfigFile.zip_config_compare_functor(key_passphrase)
             return self._zip.compare(real_otherzip, date_time=False, content=True, compare_functor=cmpfunc)
 

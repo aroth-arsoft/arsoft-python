@@ -46,7 +46,7 @@ class ConfigFile(object):
         self._parse_file()
 
     def _parse_file(self):
-        self._conf  = IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
+        self._conf = IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
         if self.fileobject is not None:
             if not self._conf.open(self.fileobject):
                 self.last_error = self._conf.last_error
@@ -142,7 +142,7 @@ class ConfigFile(object):
                 return self._fp.seek(offset, whence)
             else:
                 raise IOError('no file object')
-            
+
         def copyTo(self, target_directory):
             self._open()
             if self._fp:
@@ -166,9 +166,19 @@ class ConfigFile(object):
         else:
             for comment in self._conf.comments:
                 if comment.startswith('name'):
-                    (dummy, self._name) = comment.split(' ', 1)
+                    (dummy, name) = comment.split(' ', 1)
+                    self._name = os.path.basename(name)
                     break
             return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+        if self._conf is not None:
+            for comment in self._conf.comments:
+                if comment.startswith('name'):
+                    self._conf.replace_comment(comment, ' name ' + str(self._name))
+                    break
 
     @property
     def public_address(self):
@@ -181,6 +191,14 @@ class ConfigFile(object):
         else:
             ret = None
         return ret
+
+    @public_address.setter
+    def public_address(self, value):
+        if self._conf is not None:
+            for comment in self._conf.comments:
+                if comment.startswith('public-address'):
+                    self._conf.replace_comment(comment, ' public-address ' + str(value))
+                    break
 
     @property
     def public_port(self):
@@ -196,6 +214,14 @@ class ConfigFile(object):
             ret = None
         return ret
 
+    @public_port.setter
+    def public_port(self, value):
+        if self._conf is not None:
+            for comment in self._conf.comments:
+                if comment.startswith('public-port'):
+                    self._conf.replace_comment(comment, ' public-port ' + str(value))
+                    break
+
     @property
     def ostype(self):
         if self._conf:
@@ -208,6 +234,14 @@ class ConfigFile(object):
             ret = None
         return ret
 
+    @ostype.setter
+    def ostype(self, value):
+        if self._conf is not None:
+            for comment in self._conf.comments:
+                if comment.startswith('ostype'):
+                    self._conf.replace_comment(comment, ' ostype ' + str(value))
+                    break
+
     @property
     def mailnotify(self):
         if self._conf:
@@ -219,6 +253,14 @@ class ConfigFile(object):
         else:
             ret = None
         return ret
+
+    @mailnotify.setter
+    def mailnotify(self, value):
+        if self._conf is not None:
+            for comment in self._conf.comments:
+                if comment.startswith('mailnotify'):
+                    self._conf.replace_comment(comment, ' mailnotify ' + str(value))
+                    break
 
     @property
     def suggested_private_directory(self):
@@ -519,17 +561,23 @@ class ConfigFile(object):
     @property
     def client_config_files(self):
         if self.client_config_directory:
-            if self.config_directory:
-                dirname = os.path.join(self.config_directory, self.client_config_directory)
-            else:
-                dirname = os.path.abspath(self.client_config_directory)
             ret = {}
-            if os.path.isdir(dirname):
-                for item in os.listdir(dirname):
-                    fullpath = os.path.join(dirname, item)
-                    if os.path.isfile(fullpath):
-                        ccdfile = CCDFile(fullpath, configfile=self)
-                        ret[item] = ccdfile
+            if self._zipfile:
+                for ccdfilename in self._zipfile.get_files_in_directory(self.client_config_directory):
+                    item = os.path.basename(ccdfilename)
+                    ccdfile = CCDFile(ccdfilename, configfile=self)
+                    ret[item] = ccdfile
+            else:
+                if self.config_directory:
+                    dirname = os.path.join(self.config_directory, self.client_config_directory)
+                else:
+                    dirname = os.path.abspath(self.client_config_directory)
+                if os.path.isdir(dirname):
+                    for item in os.listdir(dirname):
+                        fullpath = os.path.join(dirname, item)
+                        if os.path.isfile(fullpath):
+                            ccdfile = CCDFile(fullpath, configfile=self)
+                            ret[item] = ccdfile
         else:
             ret = None
         return ret

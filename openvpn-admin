@@ -94,6 +94,8 @@ class OpenVPNAdmin(object):
                         is_running = self._config.is_running(vpnname)
                         status_file = arsoft.openvpn.StatusFile(config_file=config_file)
                         print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
+                        if config_file.name != vpnname:
+                            print('  Configured name mismatch %s != %s' % (vpnname, config_file.name) )
 
                         print('  Running: %s' % is_running)
                         print('  State: %s' % status_file.state.long_state)

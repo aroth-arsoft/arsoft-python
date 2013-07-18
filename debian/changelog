@@ -1,3 +1,9 @@
+arsoft-python (1.79) raring; urgency=low
+
+  * fixed installing of openvpn config from zip
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 18 Jul 2013 19:23:15 +0200
+
 arsoft-python (1.78) raring; urgency=low
 
   * fixed trouble in cups-admin
