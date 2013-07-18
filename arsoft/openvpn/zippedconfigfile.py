@@ -144,6 +144,14 @@ class ZippedConfigFile(object):
                     ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, cfgfile.suggested_private_directory + '/auth_pass')
                     if ret:
                         zip_cfgfile.auth_user_pass_file = cfgfile.suggested_private_directory + '/auth_pass'
+                if ret and cfgfile.client_config_directory:
+                    print('ccd dir %s' % (cfgfile.client_config_directory))
+                    zip_cfgfile.client_config_directory = cfgfile.suggested_private_directory + '/ccd'
+                    for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
+                        print('add %s as %s' % (client_config_file, client_name))
+                        ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, client_config_file.filename, cfgfile.suggested_private_directory + '/ccd/' + client_name)
+                        if not ret:
+                            break
                 if ret:
                     zip_cfgfile_stream = StringIO.StringIO()
                     ret = zip_cfgfile.save(zip_cfgfile_stream)
@@ -152,7 +160,10 @@ class ZippedConfigFile(object):
                 fobj.close()
                 output_zip = ZippedConfigFile(output_file)
                 if not ret:
-                    os.remove(output_file)
+                    if hasattr(output_file, 'write'):
+                        os.remove(output_file.name)
+                    else:
+                        os.remove(output_file)
                     output_zip.last_error = error
                 ret = output_zip
             else:
@@ -323,6 +334,15 @@ class ZippedConfigFile(object):
             if ret:
                 new = os.path.relpath(os.path.join(private_config_directory,'auth_pass'), target_config_directory)
                 cfgfile.auth_user_pass_file = new
+        if ret and cfgfile.client_config_directory:
+            private_config_directory_ccd = os.path.join(private_config_directory, 'ccd')
+            for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
+                ret = self.extract(client_config_file.filename, private_config_directory_ccd, client_name)
+                if not ret:
+                    break
+            if ret:
+                new = os.path.relpath(os.path.join(private_config_directory,'ccd'), target_config_directory)
+                cfgfile.client_config_directory = new
         if ret:
             target_config_file = os.path.join(target_config_directory, cfgfile.suggested_filename)
             ret = cfgfile.save(target_config_file)
@@ -381,8 +401,8 @@ class ZippedConfigFile(object):
                     selffp.close()
                     otherfp.close()
                     
-                    print(selfcontent)
-                    print(othercontent)
+                    #print(selfcontent)
+                    #print(othercontent)
                     
                     selfkey = crypto.load_privatekey(crypto.FILETYPE_PEM, selfcontent, self.key_passphrase)
                     otherkey = crypto.load_privatekey(crypto.FILETYPE_PEM, othercontent, self.key_passphrase)
