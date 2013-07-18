@@ -383,7 +383,7 @@ class ConfigFile(object):
     @property
     def crl_filename(self):
         if self._conf is not None:
-            ret = self._conf.get(section=None, key='crl', default=None)
+            ret = self._conf.get(section=None, key='crl-verify', default=None)
         else:
             ret = None
         return ret
@@ -391,7 +391,7 @@ class ConfigFile(object):
     @crl_filename.setter
     def crl_filename(self, value):
         if self._conf is not None:
-            ret = self._conf.set(section=None, key='crl', value=value)
+            ret = self._conf.set(section=None, key='crl-verify', value=value)
 
     @property
     def crl_file(self):
@@ -644,7 +644,7 @@ class ConfigFile(object):
             dh_line = 'dh %s' % abspath
         if self.crl_filename:
             abspath = os.path.join(self.config_directory, self.crl_filename)
-            crl_line = 'crl %s' % abspath
+            crl_line = 'crl-verify %s' % abspath
 
         if 'openvpn-auth-pam.so' in self.plugins:
             if client_ccdfile and client_ccdfile.auth_user_pass_file:
