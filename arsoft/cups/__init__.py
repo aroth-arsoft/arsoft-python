@@ -138,11 +138,8 @@ class CupsConnection(object):
         return ret
 
     def _equal_printer(self, printer_obj):
-        if 'device-uri' in printer_obj:
-            o = urlparse(printer_obj['device-uri'])
-            ret = True if o.hostname == self._server and o.port == self._port else False
-        else:
-            ret = False
+        o = urlparse(printer_obj.device_uri)
+        ret = True if o.hostname == self._server and o.port == self._port else False
         return ret
     
     def show_ppds(self, make_filter=None, list_models=True):
@@ -175,18 +172,15 @@ class CupsConnection(object):
 
     @classmethod
     def _is_printer_on_server(self, printer_obj, serverip, port):
-        if 'device-uri' in printer_obj:
-            o = urlparse(printer_obj['device-uri'])
-            ret = True if o.hostname == serverip and o.port == port else False
-        else:
-            ret = False
+        o = urlparse(printer_obj.device_uri)
+        ret = True if o.hostname == serverip and o.port == port else False
         return ret
 
     def add_remote_printers(self, conn_remote):
         ret = True
         printers_to_remove = set()
         remote_server = conn_remote.server
-        for (printername, printer_obj) in self.printers:
+        for (printername, printer_obj) in self.printers.iteritems():
             # only add the printer from the remote connection
             # to the set of printers to remove (so all local
             # printers and printers from other remote locations
@@ -194,20 +188,19 @@ class CupsConnection(object):
             if conn_remote._equal_printer(printer_obj):
                 printers_to_remove.add(printername)
 
-        for (printername, printer_obj) in conn_remote.printers:
+        for (printername, printer_obj) in self.printers.iteritems():
             if printername in printers_to_remove:
                 printers_to_remove.remove(printername)
             else:
-                if 'printer-uri-supported' in printer_obj:
-                    printer_uri = printer_obj['printer-uri-supported']
-                else:
-                    printer_uri = None
+                printer_uri = printer_obj.uri_supported
+                #print('printer_uri %s' % printer_uri)
                 local_ppdfilename = conn_remote.retrievePPD(printername)
                 if local_ppdfilename is None:
                     ret = False
                 else:
                     try:
-                        self._conn.addPrinter(printername, filename=local_ppdfilename, device=printer_uri)
+                        #print('addPrinter %s, %s, %s' % (printername, local_ppdfilename, printer_uri) )
+                        self._conn.addPrinter(printername, filename=local_ppdfilename, device=str(printer_uri))
                     except cups.IPPError as e:
                         ret = False
 
@@ -221,7 +214,7 @@ class CupsConnection(object):
     def remove_remote_printers_conn(self, conn_remote):
         ret = True
         printers_to_remove = set()
-        for (printername, printer_obj) in self.printers:
+        for (printername, printer_obj) in self.printers.iteritems():
             # only add the printer from the remote connection
             # to the set of printers to remove (so all local
             # printers and printers from other remote locations
@@ -247,7 +240,7 @@ class CupsConnection(object):
             port = 631
             server = remote_server
         serverip = socket.gethostbyname(server)
-        for (printername, printer_obj) in self.printers:
+        for (printername, printer_obj) in self.printers.iteritems():
             # only add the printer from the remote connection
             # to the set of printers to remove (so all local
             # printers and printers from other remote locations

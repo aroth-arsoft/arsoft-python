@@ -1,3 +1,10 @@
+arsoft-python (1.78) raring; urgency=low
+
+  * fixed trouble in cups-admin
+  * more work on openvpn-admin
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 18 Jul 2013 15:08:51 +0200
+
 arsoft-python (1.77) raring; urgency=low
 
   * added ccd file management
