@@ -208,6 +208,16 @@ class IniSection(object):
                 ret.append(value.comment)
         return ret
 
+    def replace_comment(self, comment, new_comment):
+        ret = False
+        for value in iter(self.values):
+            if value.comment is not None and value.comment == comment:
+                value.original = None
+                value.comment = new_comment
+                ret = True
+        return ret
+
+
     def asString(self, only_data=False):
         if self.original is not None and not only_data:
             ret = self.original + '\n'
@@ -576,12 +586,19 @@ class IniFile(object):
         for section_obj in self.m_sections:
             ret.append(section_obj.name)
         return ret
-    
+
     @property
     def comments(self):
         ret = []
         for section_obj in self.m_sections:
             ret.extend(section_obj.comments)
+        return ret
+
+    def replace_comment(self, comment, new_comment):
+        ret = False
+        for section_obj in iter(self.m_sections):
+            if section_obj.replace_comment(comment, new_comment):
+                ret = True
         return ret
 
     def __str__(self):
@@ -615,7 +632,8 @@ class IniFile(object):
                 ret = False
             if not hasattr(filename, 'write'):
                 f.close()
-
+        else:
+            ret = False
         return ret
 
     def merge(self, another_inifile):
