@@ -7,6 +7,7 @@ import os.path
 import argparse
 import sys
 import tempfile
+import socket
 from arsoft.dnsutils import get_dns_srv_record, gethostname
 from arsoft.utils import rmtree
 from arsoft.sshutils import *
@@ -23,6 +24,9 @@ class PuppetSetupApp(object):
         self._private_keyfile = None
         self._public_keyfile = None
         self._public_key_comment = None
+        self.puppet_server = None
+        self.puppet_server_ip = None
+        self.puppet_server_port = 8140
 
     def __del__(self):
         if self._temp_directory:
@@ -107,7 +111,6 @@ exit $RES
        'sourcename':sourcename,
        'sourcefilename':sourcefilename }
         (sts, stdout, stderr) = self._runssh(script)
-        print('sts = %i' % sts)
         if sts == 0:
             self._apt_update_required = True
             ret = True
@@ -134,7 +137,10 @@ exit $RES
 %(sudo_command)sapt-get install -q -y %(packages_str)s
 """ % { 'sudo_command': self.sudo_command, 'packages_str':packages_str }
         (sts, stdout, stderr) = self._runssh(script)
-        return True if sts == 0 else False
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('Failed to install packages %s. %s\n' % (packages_str, stderr))
+        return ret
     
     def _get_local_puppet_server(self):
         puppet_servers = get_dns_srv_record('puppet')
@@ -149,29 +155,44 @@ exit $RES
 """ % { 'sudo_command': self.sudo_command, 
        'new_hostname':new_hostname }
         (sts, stdout, stderr) = self._runssh(script)
-        return True if sts == 0 else False
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('Failed to rename host to %s. %s\n' % (new_hostname, stderr))
+        return ret
+
+    def _add_puppet_server_host_entry(self):
+        script = """
+%(sudo_command)smanagehosts --add "%(hostname)s" "%(addr)s"
+""" % { 'sudo_command': self.sudo_command, 
+       'hostname':self.puppet_server,
+       'addr':self.puppet_server_ip}
+        (sts, stdout, stderr) = self._runssh(script)
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('Failed to add puppet server %s as %s. %s\n' % (self.puppet_server, self.puppet_server_ip, stderr))
+        return ret
 
     def _install_openvpn_config(self, config_file):
         if not arsoft.openvpn.ZippedConfigFile.is_zip_config_file(config_file):
             sys.stderr.write('The given file %s is not a valid OpenVPN configuration.\n' % (config_file))
             ret = False
         else:
-            try:
-                inputfile = open(config_file, 'r')
-            except IOError as e:
-                sys.stderr.write('Failed top open config file %s.\n' % (config_file))
-                inputfile = None
-            if inputfile:
-                # copy zip file to target host
-                commandline = '%(sudo_command)s/usr/bin/openvpn-admin --install -' % { 'sudo_command': self.sudo_command }
-
-                (sts, stdout, stderr) = self._runssh_with_inputfile(commandline, inputfile)
-                ret = True if sts == 0 else False
-                inputfile.close()
+            zipcfg = arsoft.openvpn.ZippedConfigFile(config_file)
+            ret = zipcfg.ssh_install(self.target_hostname, keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+            if not ret:
+                sys.stderr.write('Failed install openvpn config file %s. %s\n' % (config_file, stderr))
             else:
-                ret = False
+                vpnname, ext = os.path.splitext(zipcfg.config_file.suggested_filename)
+                script = """
+%(sudo_command)sopenvpn-admin --start "%(vpnname)s"
+""" % { 'sudo_command': self.sudo_command, 
+       'vpnname':vpnname }
+                (sts, stdout, stderr) = self._runssh(script)
+                ret = True if sts == 0 else False
+                if not ret:
+                    sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, stderr))
         return ret
-    
+
     def _puppet_agent_run(self, screen_session='puppet-setup'):
         commandline = "screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent -tv --waitforcert 30 --server %(puppet_server)s 2>&1 | tee /tmp/puppet-setup.log\"" % { 
                 'sudo_command': self.sudo_command, 
@@ -179,12 +200,16 @@ exit $RES
                 'puppet_server': self.puppet_server }
         (sts, stdout, stderr) = self._runssh(script=None, commandline=commandline, allocateTerminal=True, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
         ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('puppet run failed (%i)\n' % (sts))
         # next step retrieve the log file
         script="""
 cat /tmp/puppet-setup.log
 rm /tmp/puppet-setup.log
 """
         (sts, stdout, stderr) = self._runssh(script=script, outputStdOut=True)
+        if sts != 0:
+            sys.stderr.write('Failed get log file.\n')
         return ret
 
     def main(self):
@@ -197,9 +222,9 @@ rm /tmp/puppet-setup.log
         parser.add_argument('-u', '--username', dest='username', default='root', help='username to connect to the remote machine.')
         parser.add_argument('-k', '--keyfile', dest='keyfile', help='keyfile to connect to the remote machine.')
         parser.add_argument('-p', '--password', dest='password', help='password to access the remote machine.')
-        parser.add_argument('--openvpn', dest='openvpn_zipfile', help='path to the OpenVPN configuration zip.')
-        parser.add_argument('--rename-host', dest='rename_host', help='path to the OpenVPN configuration zip.')
-        parser.add_argument('--puppet-server', dest='puppet_server', help='hostname of the puppet server')
+        parser.add_argument('--openvpn', dest='openvpn_zipfile', metavar='ZIPFILE', help='path to the OpenVPN configuration zip.')
+        parser.add_argument('--rename-host', dest='rename_host', metavar='HOSTNAME', help='path to the OpenVPN configuration zip.')
+        parser.add_argument('--puppet-server', dest='puppet_server', metavar='HOSTNAME', help='hostname of the puppet server')
         parser.add_argument('--sudo', dest='use_sudo', action='store_true', help='use sudo to run command to remote machine')
         parser.add_argument('hostname', help='name of the host to setup')
 
@@ -217,6 +242,8 @@ rm /tmp/puppet-setup.log
 
         if self.puppet_server is None:
             self.puppet_server, self.puppet_server_port = self._get_local_puppet_server()
+        if self.puppet_server:
+            self.puppet_server_ip = socket.gethostbyname(self.puppet_server)
 
         if self.use_sudo:
             self.sudo_command = 'sudo '
@@ -258,7 +285,9 @@ rm /tmp/puppet-setup.log
         if ret:
             if args.openvpn_zipfile:
                 ret = self._install_openvpn_config(args.openvpn_zipfile)
-                
+                if ret:
+                    ret = self._add_puppet_server_host_entry()
+
         if ret:
             ret = self._puppet_agent_run()
 

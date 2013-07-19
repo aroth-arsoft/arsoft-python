@@ -206,3 +206,21 @@ class KeyPEMFile(PEMFile):
         else:
             ret = False
         return ret
+
+def compare_pem_key(key_a, key_b, passphrase=None):
+    if passphrase is not None:
+        try:
+            key_a_bin = crypto.load_privatekey(crypto.FILETYPE_PEM, key_a, passphrase)
+        except crypto.Error:
+            key_a_bin = None
+        try:
+            key_b_bin = crypto.load_privatekey(crypto.FILETYPE_PEM, key_b, passphrase)
+        except crypto.Error:
+            key_b_bin = None
+
+        key_a_real = crypto.dump_privatekey(crypto.FILETYPE_PEM, key_a_bin) if key_a_bin else 'decryptErrorA'
+        key_b_real = crypto.dump_privatekey(crypto.FILETYPE_PEM, key_b_bin) if key_b_bin else 'decryptErrorB'
+    else:
+        key_a_real = key_a
+        key_b_real = key_b
+    return True if key_a_real == key_b_real else False

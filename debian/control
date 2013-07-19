@@ -34,7 +34,7 @@ Description: python module to access a AVM FritzBox
 
 Package: arsoft-python-openvpn
 Architecture: all
-Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, arsoft-crypto, ${python:Depends}, ${misc:Depends}
 Replaces: arsoft-openvpn
 Description: access the OpenVPN configuration and status
  Includes the openvpn-admin script to control and maintain the OpenVPN 

@@ -353,6 +353,10 @@ class ZippedConfigFile(object):
                 new = os.path.relpath(os.path.join(private_config_directory,'ccd'), target_config_directory)
                 cfgfile.client_config_directory = new
         if ret:
+            cfgfile.status_file = cfgfile.suggested_status_file
+            cfgfile.status_version = cfgfile.suggested_status_version
+            cfgfile.management = cfgfile.suggested_management
+        if ret:
             target_config_file = os.path.join(target_config_directory, cfgfile.suggested_filename)
             ret = cfgfile.save(target_config_file)
             if not ret:
@@ -360,11 +364,12 @@ class ZippedConfigFile(object):
 
         if ret:
             syscfg = SystemConfig(root_directory=root_directory)
+            vpnname, ext = os.path.splitext(cfgfile.suggested_filename)
             new_autostart = syscfg.autostart
             if autoStart:
-                new_autostart.add(self.name)
+                new_autostart.add(vpnname)
             else:
-                new_autostart.remove(self.name)
+                new_autostart.remove(vpnname)
             syscfg.autostart = new_autostart
             ret = syscfg.save()
         return ret
@@ -380,12 +385,12 @@ class ZippedConfigFile(object):
             inputfile = None
         if inputfile:
             # copy zip file to target host as stdin file
-            commandline = '/usr/bin/openvpn-admin --install -'
+            commandline = '/usr/sbin/openvpn-admin --install -'
 
-            #(sts, stdout, stderr) = ssh_runcmdAndGetData(target_hostname, commandline=commandline, script=None, 
-                                                     #outputStdErr=outputStdErr, outputStdOut=outputStdOut, stdin=inputfile, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
-                                                     #allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
-                                                     #keyfile=keyfile, username=username, verbose=verbose)
+            (sts, stdout, stderr) = ssh_runcmdAndGetData(target_hostname, commandline=commandline, script=None, 
+                                                     outputStdErr=outputStdErr, outputStdOut=outputStdOut, stdin=inputfile, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
+                                                     allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
+                                                     keyfile=keyfile, username=username, verbose=verbose)
             sts = 0
             ret = True if sts == 0 else False
             inputfile.close()
@@ -404,22 +409,16 @@ class ZippedConfigFile(object):
                 if os.path.basename(selfinfo.filename) == 'key.pem':
                     selffp = selfzip.open(selfinfo)
                     otherfp = otherzip.open(otherinfo)
-                    
+
                     selfcontent = selffp.read()
                     othercontent = otherfp.read()
                     selffp.close()
                     otherfp.close()
-                    
-                    #print(selfcontent)
-                    #print(othercontent)
-                    
-                    selfkey = crypto.load_privatekey(crypto.FILETYPE_PEM, selfcontent, self.key_passphrase)
-                    otherkey = crypto.load_privatekey(crypto.FILETYPE_PEM, othercontent, self.key_passphrase)
-                    
-                    ret = selfkey == otherkey
+
+                    ret = arsoft.crypto.compare_pem_key(selfcontent, othercontent, passphrase=self.key_passphrase)
                 else:
                     ret = False
-                #print('%s changed, ret %i' % (selfinfo.filename, ret))
+
             return ret
     
     def compare(self, otherzip, key_passphrase=None):
@@ -440,7 +439,6 @@ class ZippedConfigFile(object):
         if self._zip is None:
             return True if real_otherzip is None else False
         else:
-            #print('zip compare ')
             cmpfunc = ZippedConfigFile.zip_config_compare_functor(key_passphrase)
             return self._zip.compare(real_otherzip, date_time=False, content=True, compare_functor=cmpfunc)
 

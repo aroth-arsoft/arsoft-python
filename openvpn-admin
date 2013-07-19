@@ -13,23 +13,49 @@ import arsoft.crypto
 import arsoft.mail
 import arsoft.sshutils
 import shutil
+from arsoft.inifile import *
 from arsoft.timestamp import UTC
 
 __version__ = '1.0'
+
+class PrivateKeyPasswordFile(object):
+    def __init__(self, filename):
+        self._conf = IniFile(filename=filename, commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
+
+    def __contains__(self, key):
+        value = self._conf.get(section=None, key=key, default=None)
+        return True if value else False
+
+    def __getitem__(self, key):
+        return self._conf.get(section=None, key=key, default=None)
+
+    def __setitem__(self, key, value):
+        ret = self._conf.set(section=None, key=key, value=value)
+        if ret:
+            print('self.m_filename=%s' % (self._conf.m_filename))
+            ret = self._conf.save()
+            if ret:
+                os.chmod(self._conf.filename, 0600)
 
 class OpenVPNAdmin(object):
     def __init__(self):
         self.verbose = False
         self._config = None
+        self._private_key_passwords = None
 
     def version(self):
         print('Version: %s' % str(__version__))
         return 0
-    
+
     def _get_config(self):
         if self._config is None:
             self._config = arsoft.openvpn.Config()
-            
+
+    def _init_private_key_passwords(self):
+        if self._private_key_passwords is None:
+            password_file = os.path.expanduser('~/.openvpn-private-key')
+            self._private_key_passwords = PrivateKeyPasswordFile(password_file)
+
     def _save_stdin_to_file(self):
         self._stdin_file = tempfile.NamedTemporaryFile()
         buf_length = 4096
@@ -175,11 +201,24 @@ class OpenVPNAdmin(object):
         
         vpn_display_name = '%s/%s' % (config_file.name, parent_vpn_name) if parent_vpn_name else config_file.name
         if config_file.valid:
+            self._init_private_key_passwords()
+            
             key_passphrase = 'blubb'
             if parent_vpn_name:
-                output_zip_file = os.path.join(output_directory, parent_vpn_name + '_' + config_file.suggested_zip_filename)
+                output_zip_file_basename = parent_vpn_name + '_' + config_file.suggested_zip_filename
             else:
-                output_zip_file = os.path.join(output_directory, config_file.suggested_zip_filename)
+                output_zip_file_basename = config_file.suggested_zip_filename
+
+            output_zip_file = os.path.join(output_directory, output_zip_file_basename)
+
+            if output_zip_file_basename in self._private_key_passwords:
+                key_passphrase = self._private_key_passwords[output_zip_file_basename]
+            else:
+                key_passphrase = arsoft.crypto.pwgen(pw_length=20, num_pw=1, no_numerals=False, no_capitalize=False, capitalize=False,
+                         numerals=False, no_symbols=False, symbols=False, allowed_symbols=None,
+                         no_ambiguous=False)
+                self._private_key_passwords[output_zip_file_basename] = key_passphrase
+
             outfile_obj = tempfile.NamedTemporaryFile() if os.path.exists(output_zip_file) and not self.force_notify else None
             zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file, key_passphrase=key_passphrase)
             zip_ok = True if zipcfg and zipcfg.last_error is None else False
@@ -384,9 +423,7 @@ to use the provided configuration.
                     conf_file_ok = arsoft.openvpn.ConfigFile.is_config_file(filename)
         if file_ok:
             if zip_ok:
-                print(sshurl)
                 url = arsoft.sshutils.SSHUrl(sshurl)
-                print(url)
                 zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
                 if zipcfg.ssh_install(url.hostname, username=url.username):
                     ret = 0
@@ -433,6 +470,7 @@ to use the provided configuration.
     def action_start(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
+            self._get_config()
             if self._config.start(vpnname):
                 print('Started %s' % vpnname)
                 ret = 0
@@ -446,6 +484,7 @@ to use the provided configuration.
     def action_stop(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
+            self._get_config()
             if self._config.stop(vpnname):
                 print('Stopped %s' % vpnname)
                 ret = 0
@@ -459,6 +498,7 @@ to use the provided configuration.
     def action_restart(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
+            self._get_config()
             if self._config.restart(vpnname):
                 print('Restart %s' % vpnname)
                 ret = 0
@@ -472,6 +512,7 @@ to use the provided configuration.
     def action_reload(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
+            self._get_config()
             if self._config.reload(vpnname):
                 print('Reload %s' % vpnname)
                 ret = 0
