@@ -498,7 +498,7 @@ class StatusFile(StatusBase):
                 miface.close()
             else:
                 ret = False
-        else:
+        elif self.filename is not None:
             try:
                 file = open(self.filename)
             except IOError:
@@ -511,6 +511,8 @@ class StatusFile(StatusBase):
                 self._running = True
             else:
                 ret = False
+        else:
+            ret = False
         return ret
 
 if __name__ == '__main__':
