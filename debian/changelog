@@ -1,3 +1,9 @@
+arsoft-python (1.81) raring; urgency=low
+
+  * fixed cups module
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 22 Jul 2013 07:33:38 +0200
+
 arsoft-python (1.80) raring; urgency=low
 
   * fixes for openvpn configuration/admin
