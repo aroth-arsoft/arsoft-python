@@ -16,6 +16,7 @@ class CupsConnection(object):
 
     def __init__(self, server=None, port=631, user=None, encryption=None):
         self._temp_ppds = {}
+        self.last_error = None
         if server is not None:
             i = server.find(':')
             if i > 0:
@@ -129,6 +130,7 @@ class CupsConnection(object):
             try:
                 ppd = self._conn.getPPD(printername)
             except cups.IPPError as e:
+                self.last_error = e
                 ppd = None
             if ppd is not None and os.path.exists(ppd):
                 self._temp_ppds[printername] = ppd
@@ -188,26 +190,33 @@ class CupsConnection(object):
             if conn_remote._equal_printer(printer_obj):
                 printers_to_remove.add(printername)
 
-        for (printername, printer_obj) in self.printers.iteritems():
+        for (printername, printer_obj) in conn_remote.printers.iteritems():
             if printername in printers_to_remove:
                 printers_to_remove.remove(printername)
             else:
-                printer_uri = printer_obj.uri_supported
-                #print('printer_uri %s' % printer_uri)
-                local_ppdfilename = conn_remote.retrievePPD(printername)
-                if local_ppdfilename is None:
-                    ret = False
+                if len(printer_obj.uri_supported) >= 1:
+                    printer_uri = printer_obj.uri_supported[0]
                 else:
-                    try:
-                        #print('addPrinter %s, %s, %s' % (printername, local_ppdfilename, printer_uri) )
-                        self._conn.addPrinter(printername, filename=local_ppdfilename, device=str(printer_uri))
-                    except cups.IPPError as e:
+                    printer_uri = None
+                if printer_uri:
+                    #print('printer_uri %s' % printer_uri)
+                    local_ppdfilename = conn_remote.retrievePPD(printername)
+                    if local_ppdfilename is None:
                         ret = False
+                    else:
+                        try:
+                            #print('addPrinter %s, %s, %s' % (printername, local_ppdfilename, printer_uri) )
+                            self._conn.addPrinter(printername, filename=local_ppdfilename, device=str(printer_uri))
+                        except cups.IPPError as e:
+                            self.last_error = e
+                            ret = False
 
         for printername in printers_to_remove:
             try:
+                #print('deletePrinter %s' % (printername) )
                 self._conn.deletePrinter(printername)
             except cups.IPPError as e:
+                self.last_error = e
                 ret = False
         return ret
 
@@ -226,6 +235,7 @@ class CupsConnection(object):
             try:
                 self._conn.deletePrinter(printername)
             except cups.IPPError as e:
+                self.last_error = e
                 ret = False
         return ret
 
@@ -252,6 +262,7 @@ class CupsConnection(object):
             try:
                 self._conn.deletePrinter(printername)
             except cups.IPPError as e:
+                self.last_error = e
                 ret = False
         return ret
 
@@ -260,5 +271,6 @@ class CupsConnection(object):
             self._conn.setDefault(printername)
             ret = True
         except cups.IPPError as e:
+            self.last_error = e
             ret = False
         return ret

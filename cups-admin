@@ -109,10 +109,12 @@ class CupsAdminApp(object):
             display_printers = False
             self._remote_conn = CupsConnection(args.add_remote_server)
             if not self._conn.add_remote_printers(self._remote_conn):
+                sys.stderr.write('Unable to add printers from remote server %s\n' % (self._conn.last_error))
                 ret = 1
         elif args.remove_remote_server:
             display_printers = False
             if not self._conn.remove_remote_printers(args.remove_remote_server):
+                sys.stderr.write('Unable to remove printers from remote server %s\n' % (self._conn.last_error))
                 ret = 1
         elif args.list_ppds:
             display_printers = False
