@@ -9,6 +9,9 @@ import dns
 import dns.dnssec
 import dns.tsigkeyring
 import dns.resolver
+import dns.rdtypes
+import dns.rdtypes.IN.A
+import dns.rdtypes.IN.AAAA
 
 ALGORITHM_ID_TO_NAME = {
     157: dns.tsig.HMAC_MD5,
@@ -133,12 +136,63 @@ def getdomainname():
         ret = 'localdomain'
     return ret
 
-def get_dns_srv_record(service, domain=None, default_value=None, tcp=True):
+def _get_resolver(dnsserver=None):
+    if dnsserver is not None:
+        nameservers = []
+        if not isinstance(dnsserver, list):
+            dnsserver = [dnsserver]
+        for srv in dnsserver:
+            if is_valid_ipv4(srv) or is_valid_ipv6(srv):
+                nameservers.append(srv)
+            else:
+                try:
+                    addr = socket.gethostbyname(srv)
+                except socket.gaierror:
+                    addr = None
+                if addr:
+                    nameservers.append(addr)
+        if len(nameservers) == 0:
+            ret = None
+        else:
+            ret = dns.resolver.Resolver()
+            ret.nameservers = nameservers
+    else:
+       ret = dns.resolver.Resolver()
+    return ret
+
+def get_dns_srv_record(service, domain=None, default_value=None, tcp=True, dnsserver=None):
     if domain is None:
         domain = getdomainname()
     query = '_%s.%s.%s.' % (service.lower(), '_tcp' if tcp else '_udp', domain)
-    ret = []
-    answers = dns.resolver.query(query, 'SRV')
-    for rdata in answers:
-        ret.append( ( rdata.target.to_text(omit_final_dot=True), rdata.port ) )
+    resolver = _get_resolver(dnsserver)
+    if resolver:
+        ret = []
+        answers = resolver.query(query, 'SRV')
+        for rdata in answers:
+            ret.append( ( rdata.target.to_text(omit_final_dot=True), rdata.port ) )
+    else:
+        ret = None
+    return ret
+
+def get_dns_host_record(query=None, hostname=None, domain=None, default_value=None, ipv6=False, dnsserver=None):
+    if query is None:
+        (local_fqdn, local_hostname, local_domain) = gethostname_tuple()
+        if domain is None:
+            domain = local_domain
+        if hostname is None:
+            hostname = local_hostname
+        query = '%s.%s.' % (hostname.lower(), domain)
+    resolver = _get_resolver(dnsserver)
+    if resolver:
+        ret = []
+        answers = resolver.query(query, 'AAAA' if ipv6 else 'A')
+        for rdata in answers:
+            if isinstance(rdata, dns.rdtypes.IN.A.A):
+                if not ipv6:
+                    ret.append( rdata.address )
+            elif isinstance(rdata, dns.rdtypes.IN.AAAA.AAAA):
+                if ipv6:
+                    ret.append( rdata.address )
+    else:
+        ret = None
     return ret
