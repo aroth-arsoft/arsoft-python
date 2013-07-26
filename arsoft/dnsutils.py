@@ -33,12 +33,13 @@ def get_algorithm_for_number(num):
         return None
 
 def get_algorithm_for_name(name):
-    if name in ALGORITHM_NAME_TO_ID:
-        return ALGORITHM_NAME_TO_ID[name]
+    dns_name = dns.name.from_text(name)
+    if dns_name in ALGORITHM_NAME_TO_ID:
+        return ALGORITHM_NAME_TO_ID[dns_name]
     else:
         return None
 
-KeyFileFormat = enum(Invalid=-1, Zone=0, TSIG=1, Private=2)
+KeyFileFormat = enum(Automatic=-2, Invalid=-1, Zone=0, TSIG=1, Private=2)
 
 #
 # Is a valid TTL?
@@ -103,12 +104,11 @@ def _read_key_file_tsig(filename):
     """Accept a TSIG keyfile and a key name to retrieve.
     Return a keyring object with the key name and TSIG secret."""
 
-    arsoft.inifile
     if hasattr(filename, 'read'):
         key_struct = filename.read()
     else:
         try:
-            f = open(tsig_key_file, 'r')
+            f = open(filename, 'r')
             key_struct = f.read()
             f.close()
         except IOError:
@@ -129,6 +129,44 @@ def _read_key_file_tsig(filename):
             ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
         else:
             ret = None
+    else:
+        ret = None
+    return ret
+
+def _read_key_data_zone(data):
+    ret = {}
+    for line in data.splitlines():
+        keyline = line.strip()
+        #print('keyline %s' % keyline)
+        keyline_elems = keyline.rsplit(' ')
+        try:
+            keyprotocol = int(keyline_elems[4])
+            keyalgorithm = get_algorithm_for_number(int(keyline_elems[5]))
+            keyname = dns.name.from_text(keyline_elems[0])
+            secret = base64.decodestring(''.join(keyline_elems[6:]))
+            ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
+        except IndexError:
+            ret = None
+            break
+    return ret
+
+def _read_key_data_tsig(data):
+    """Accept a TSIG keyfile and a key name to retrieve.
+    Return a keyring object with the key name and TSIG secret."""
+    try:
+        m = re.search(r"key \"([a-zA-Z0-9_-]+?)\" \{(.*?)\}\;", data, re.DOTALL)
+        keyname = m.group(1)
+        key_data = m.group(2)
+        keyalgorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
+        secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
+    except AttributeError:
+        keyname = None
+        raise
+
+    if keyname:
+        keyprotocol = get_algorithm_for_name(keyalgorithm)
+        ret = {}
+        ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
     else:
         ret = None
     return ret
@@ -154,8 +192,24 @@ def _read_key_file_private(filename, keyname=None):
         ret = None
     return ret
 
-
 def read_key_file(filename, format=KeyFileFormat.Zone):
+    if format == KeyFileFormat.Automatic:
+        if hasattr(filename, 'read'):
+            keydata = filename.read()
+        else:
+            try:
+                f = open(filename, 'r')
+                keydata = f.read()
+                f.close()
+            except IOError:
+                keydata = None
+        ret = None
+        if keydata is not None:
+            if ret is None:
+                ret = _read_key_data_zone(keydata)
+            if ret is None:
+                ret = _read_key_data_tsig(keydata)
+        return ret
     if format == KeyFileFormat.Zone:
         return _read_key_file_zone(filename)
     elif format == KeyFileFormat.TSIG:

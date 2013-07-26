@@ -144,7 +144,7 @@ class dns_update_app(object):
         self.server = args.server
         
         if args.keyfile:
-            self.keyring = arsoft.dnsutils.read_key_file(args.keyfile)
+            self.keyring = arsoft.dnsutils.read_key_file(args.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic)
         else:
             self.keyring = None
 
