@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.81',
+		version='1.82',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -65,7 +65,8 @@ setup(name='arsoft-python',
                   'managehosts', 
                   'openvpn-admin', 'openvpn-status',
                   'puppet-setup',
-                  'heimdal-password-expire']),
+                  'heimdal-password-expire',
+                  'dns-update']),
 			('/usr/lib/nagios', ['send_xmpp_notification']),
 			('/usr/lib/nagios/plugins', ['check_fritzbox', 'check_openvpn', 'check_kernel_modules', 'check_puppet_agent', 'check_weather', 'check_ipp']),
 			('/usr/lib/nagios/plugins/test_data', ['test_data/check_ipp.test', 'test_data/check_ipp_jobs.test', 'test_data/check_ipp_completed_jobs.test']),

@@ -1,3 +1,9 @@
+arsoft-python (1.82) raring; urgency=low
+
+  * introduce first version of dns-update in python
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 26 Jul 2013 08:05:45 +0200
+
 arsoft-python (1.81) raring; urgency=low
 
   * fixed cups module

@@ -26,3 +26,4 @@ usr/sbin/cups-admin
 usr/sbin/managehosts
 usr/sbin/autofs-ldap-auth
 usr/sbin/puppet-setup
+usr/sbin/dns-update
