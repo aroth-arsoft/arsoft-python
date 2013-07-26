@@ -5,6 +5,7 @@
 import re
 import socket
 import base64
+import arsoft.inifile
 import dns
 import dns.dnssec
 import dns.tsigkeyring
@@ -12,6 +13,7 @@ import dns.resolver
 import dns.rdtypes
 import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
+from arsoft.utils import enum
 
 ALGORITHM_ID_TO_NAME = {
     157: dns.tsig.HMAC_MD5,
@@ -21,6 +23,22 @@ ALGORITHM_ID_TO_NAME = {
     164: dns.tsig.HMAC_SHA384,
     165: dns.tsig.HMAC_SHA512,
     }
+
+ALGORITHM_NAME_TO_ID = {v:k for k, v in ALGORITHM_ID_TO_NAME.items()}
+
+def get_algorithm_for_number(num):
+    if num in ALGORITHM_ID_TO_NAME:
+        return ALGORITHM_ID_TO_NAME[num]
+    else:
+        return None
+
+def get_algorithm_for_name(name):
+    if name in ALGORITHM_NAME_TO_ID:
+        return ALGORITHM_NAME_TO_ID[name]
+    else:
+        return None
+
+KeyFileFormat = enum(Invalid=-1, Zone=0, TSIG=1, Private=2)
 
 #
 # Is a valid TTL?
@@ -62,14 +80,8 @@ def is_valid_name(Name):
         return True
     else:
         return False
-    
-def get_algorithm_for_number(num):
-    if num in ALGORITHM_ID_TO_NAME:
-        return ALGORITHM_ID_TO_NAME[num]
-    else:
-        return None
 
-def read_key_file(filename):
+def _read_key_file_zone(filename):
     try:
         ret = {}
         f = open(filename, 'r')
@@ -84,12 +96,77 @@ def read_key_file(filename):
             ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
         f.close()
     except IOError:
-        keyline = None
         ret = None
     return ret
 
-def use_key_file(update_obj, keyfile):
-    keys = read_key_file(keyfile)
+def _read_key_file_tsig(filename):
+    """Accept a TSIG keyfile and a key name to retrieve.
+    Return a keyring object with the key name and TSIG secret."""
+
+    arsoft.inifile
+    if hasattr(filename, 'read'):
+        key_struct = filename.read()
+    else:
+        try:
+            f = open(tsig_key_file, 'r')
+            key_struct = f.read()
+            f.close()
+        except IOError:
+            key_struct = None
+
+    if key_struct:
+        try:
+            key_data = re.search(r"key \"%s\" \{(.*?)\}\;" % key_name, key_struct, re.DOTALL).group(1)
+            algorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
+            tsig_secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
+        except AttributeError:
+            keyname = None
+            raise
+
+        if keyname:
+            keyprotocol = get_algorithm_for_name(keyalgorithm)
+            ret = {}
+            ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
+        else:
+            ret = None
+    else:
+        ret = None
+    return ret
+
+def _read_key_file_private(filename, keyname=None):
+    if keyname is None:
+        if not hasattr(filename, 'read'):
+            basename = os.path.basename(filename)
+            if basename[0] == 'K':
+                (basename, ext) = os.path.splitext(basename[1:])
+                (keyname, keyprotocol, keyid) = basename.split('+', 2)
+
+    f = arsoft.inifile.IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False, keyIsWord=False)
+    if f.open(filename):
+        keyalgorithm_raw = f.get(None, 'Algorithm', None)
+        secret = f.get(None, 'Key', None)
+        if keyalgorithm_raw:
+            (keyprotocol_str, keyalgorithm) = keyalgorithm_raw.split(' ', 1)
+            keyprotocol = int(keyprotocol_str)
+        ret = {}
+        ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
+    else:
+        ret = None
+    return ret
+
+
+def read_key_file(filename, format=KeyFileFormat.Zone):
+    if format == KeyFileFormat.Zone:
+        return _read_key_file_zone(filename)
+    elif format == KeyFileFormat.TSIG:
+        return _read_key_file_tsig(filename)
+    elif format == KeyFileFormat.Private:
+        return _read_key_file_private(filename)
+    else:
+        return None
+
+def use_key_file(update_obj, keyfile, format=KeyFileFormat.Zone):
+    keys = read_key_file(keyfile, format)
     if keys:
         keyalgorithm = None
         first_keyname = None
