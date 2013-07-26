@@ -34,7 +34,7 @@ class dns_update_app(object):
 
     def __init__(self):
         self.verbose = False
-        self._updates = []
+        self._updates = {}
 
     @staticmethod
     def parse_name(Origin, Name):
@@ -55,18 +55,33 @@ class dns_update_app(object):
                 Name = None
             return Origin, Name
         
-    def _get_update_object(self, name, keyring):
-        Origin, Name = self.parse_name(Origin=None, Name=name)
-        if Origin is not None:
-            for update in self._updates:
-                if update.origin == Origin:
-                    return update
-            update = dns.update.Update(Origin, keyring=keyring)
-            self._updates.append(update)
-            return update
-        return None
+    def _get_update_object(self, name):
+        if name in self._updates:
+            ret = self._updates[name]
+        else:
+            ret = None
+            Origin, dummy = dns_update_app.parse_name(Origin=None, Name=name)
+            if Origin is not None:
+                for update in self._updates:
+                    if update.origin == Origin:
+                        return update
+                ret = dns.update.Update(Origin, keyring=self.keyring)
+                self._updates[name] = ret
+        return ret
     
-    
+    def _update_host(self, host, addr_list):
+        ret = True
+        update = self._get_update_object(host)
+        update.delete(host, self.rrtype)
+        for addr in addr_list:
+            update.add(host, self.ttl, self.rrtype, addr)
+            if self.rrtype == 'A' or self.rrtype == 'AAAA':
+                # delete reverse addr and re-add it afterwards
+                revaddrname = dns.reversename.from_address(addr)
+                update.delete(revaddrname, 'PTR')
+                update.add(revaddrname, self.ttl, 'PTR', addr)
+        return ret
+
     def _import_host(self, args):
         anotherserver = None
         hosts_to_import = []
@@ -82,23 +97,22 @@ class dns_update_app(object):
             ret = False
         else:
             ipv6 = True if self.rrtype == 'AAAA' else False
+            ret = True
             for host in hosts_to_import:
-                local_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=None)
-                if local_hostaddr is None:
-                    sys.stderr.write("Failed to retrieve host record %s from local DNS server.\n" % (host))
+                target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server)
+                if target_hostaddr is None:
+                    ret = False
+                    sys.stderr.write("Failed to retrieve host record %s from target DNS server.\n" % (host, self.server))
                     continue
                 anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver)
                 if anotherserver_hostaddr is None:
+                    ret = False
                     sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s.\n" % (host, anotherserver))
                     continue
-                if not _is_hostaddr_equal(local_hostaddr, anotherserver_hostaddr):
-                    update = self._get_update_object(host, self.keyring)
-                    update.delete(host, self.rrtype)
-                    for addr in anotherserver_hostaddr:
-                        update.add(host, self.ttl, self.rrtype, addr)
-                        # delete reverse addr and re-add it afterwards
-                        #echo "update delete $revaddr.in-addr.arpa." >> "$command_file"
-                        #echo "update add $revaddr.in-addr.arpa. $ttl PTR $host." >> "$command_file"
+                if not _is_hostaddr_equal(target_hostaddr, anotherserver_hostaddr):
+                    if not self._update_host(host, anotherserver_hostaddr):
+                        sys.stderr.write("Failed to update host record %s on target DNS server\n" % (host, self.server))
+                        ret = False
                 else:
                     print("Host record %s up-to-date %s<>%s." % (host, local_hostaddr, anotherserver_hostaddr))
 
@@ -107,7 +121,7 @@ class dns_update_app(object):
         # process command line
         #=============================================================================================
         parser = argparse.ArgumentParser(description='update the DNS information')
-        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('--noop', dest='noop', action='store_true', help='no not actual update anything, just show what would be done.')
         parser.add_argument('--available', dest='available', action='store_true', help='checks if EFI is available on this machine.')
         parser.add_argument('--server', dest='server', default=self.DEFAULT_SERVER, help='name of the DNS server for updates')
@@ -118,59 +132,59 @@ class dns_update_app(object):
         parser.add_argument('-a', '--add', dest='add', nargs=2, help='adds the given DNS A record')
         parser.add_argument('-d', '--delete', dest='delete', nargs='+', help='deletes the specified DNS record')
         parser.add_argument('-u', '--update', dest='update', nargs=2, help='updates the specified DNS record')
-        parser.add_argument('--update-host', dest='update_host', nargs=argparse.REMAINDER, help='updates the given host for the specified address.')
+        parser.add_argument('--update-host', dest='update_host', nargs=2, help='updates the given host for the specified address.')
         parser.add_argument('--import-host', dest='import_host', nargs=argparse.REMAINDER, help='import the result from the specified DNS server and update the local DNS server.')
 
         args = parser.parse_args()
 
         self.verbose = args.verbose
+        self.noop = args.noop
         self.ttl = args.ttl
         self.rrtype = args.rrtype
+        self.server = args.server
         
         if args.keyfile:
             self.keyring = arsoft.dnsutils.read_key_file(args.keyfile)
         else:
             self.keyring = None
 
+        perform_update = True
 
         if args.add:
             (name, payload) = args.add
-            update = self._get_update_object(name, self.keyring)
+            update = self._get_update_object(name)
             update.add(name, self.ttl, args.rrtype, payload)
         if args.delete:
             for name in args.delete:
-                update = self._get_update_object(name, self.keyring)
+                update = self._get_update_object(name)
                 update.delete(name, self.rrtype)
         if args.update:
             (name, payload) = args.update
-            update = self._get_update_object(name, self.keyring)
+            update = self._get_update_object(name)
             update.replace(name, self.ttl, self.rrtype, payload)
 
         if args.update_host:
-            '''
-            hostname="$2"
-            addr="$3"
-            revaddr=`reverse_ipv4 "$addr"`
-            echo "update delete $revaddr.in-addr.arpa." >> "$command_file"
-            echo "update delete $hostname." >> "$command_file"
-            echo "update add $hostname. $ttl IN A $addr" >> "$command_file"
-            echo "update add $revaddr.in-addr.arpa. $ttl PTR $hostname." >> "$command_file"
-            shift; shift;
-            ;;
-            '''
-            print(args.update_host)
+            (hostname, hostaddr) = args.update_host
+            if not self._update_host(hostname, [hostaddr]):
+                perform_update = False
 
         if args.import_host:
-            self._import_host(args.import_host)
+            if not self._import_host(args.import_host):
+                perform_update = False
 
-        if len(self._updates) == 0:
-            print('Nothing to do.')
-            ret = 0
+        if perform_update:
+            if len(self._updates) == 0:
+                print('Nothing to do.')
+                ret = 0
+            else:
+                for (host, update) in self._updates.iteritems():
+                    if self.verbose:
+                        print('update %s with %s' % (host, update))
+                    if not self.noop:
+                        response = dns.query.tcp(update, args.server)
+                ret = 0
         else:
-            for update in self._updates:
-                response = dns.query.tcp(update, args.server)
-            ret = 0
-        
+            ret = 1
         return ret
 
 if __name__ == "__main__":
