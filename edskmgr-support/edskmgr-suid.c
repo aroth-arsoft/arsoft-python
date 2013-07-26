@@ -4,8 +4,9 @@
 int main(int argc, char ** argv, char ** env)
 {
     const char * edskmgr = "/usr/bin/edskmgr";
+    int ret = 0;
     char * const edskmgr_argv[] = {
-		edskmgr,
+		(char *)edskmgr,
 #ifdef EDSKMGR_LOAD
 		"--load",
 #elif EDSKMGR_EJECT
@@ -20,7 +21,13 @@ int main(int argc, char ** argv, char ** env)
 	// without root permissions. Happens on Ubuntu 11.10.
 	// see 
 	// http://stackoverflow.com/questions/556194/calling-a-script-from-a-setuid-root-c-program-script-does-not-run-as-root
-	setuid(0);
-	// start the script with the parameters
-    return execve(edskmgr, edskmgr_argv, env);
+	ret = setuid(0);
+    if(!ret)
+    {
+        // start the script with the parameters
+        ret = execve(edskmgr, edskmgr_argv, env);
+    }
+    else
+        ret = -1;
+    return ret;
 }
