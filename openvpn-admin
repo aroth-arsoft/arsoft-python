@@ -32,7 +32,7 @@ class PrivateKeyPasswordFile(object):
     def __setitem__(self, key, value):
         ret = self._conf.set(section=None, key=key, value=value)
         if ret:
-            print('self.m_filename=%s' % (self._conf.m_filename))
+            #print('self.m_filename=%s' % (self._conf.m_filename))
             ret = self._conf.save()
             if ret:
                 os.chmod(self._conf.filename, 0600)
@@ -41,6 +41,7 @@ class OpenVPNAdmin(object):
     def __init__(self):
         self.verbose = False
         self._config = None
+        self._systemconfig = None
         self._private_key_passwords = None
 
     def version(self):
@@ -50,6 +51,10 @@ class OpenVPNAdmin(object):
     def _get_config(self):
         if self._config is None:
             self._config = arsoft.openvpn.Config()
+
+    def _get_systemconfig(self):
+        if self._systemconfig is None:
+            self._systemconfig = arsoft.openvpn.SystemConfig()
 
     def _init_private_key_passwords(self):
         if self._private_key_passwords is None:
@@ -95,6 +100,7 @@ class OpenVPNAdmin(object):
 
     def action_status(self, selected_vpns):
         self._get_config()
+        self._get_systemconfig()
         all_vpn_names = self._config.names
         if len(selected_vpns) == 0:
             selected_vpns = all_vpn_names
@@ -119,11 +125,13 @@ class OpenVPNAdmin(object):
                     else:
                         is_running = self._config.is_running(vpnname)
                         status_file = arsoft.openvpn.StatusFile(config_file=config_file)
+                        autostart = True if vpnname in self._systemconfig.autostart else False
                         print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
                         if config_file.name != vpnname:
                             print('  Configured name mismatch %s != %s' % (vpnname, config_file.name) )
 
                         print('  Running: %s' % is_running)
+                        print('  Autostart: %s' % autostart)
                         print('  State: %s' % status_file.state.long_state)
                         print('  Last updated: %s' % status_file.last_update)
                         self._print_cert('Certificate file', config_file.cert_file)
@@ -156,13 +164,13 @@ class OpenVPNAdmin(object):
                                 for (clientname, clientinfo) in status_file.connected_clients.iteritems():
                                     print('    %s' % (clientinfo))
                         if len(config_file.routes):
-                            print('    Routes:')
+                            print('  Routes:')
                             for (network, netmask) in config_file.routes:
-                                print('      %s/%s' % (network, netmask))
+                                print('    %s/%s' % (network, netmask))
                         if len(config_file.push_options):
-                            print('    Pushed options:')
+                            print('  Pushed options:')
                             for (option, value) in config_file.push_options:
-                                print('      %s %s' % (option, value))
+                                print('    %s %s' % (option, value))
                         if status_file.routing_table:
                             print('  Routing table:')
                             for (address, entry) in status_file.routing_table.iteritems():
