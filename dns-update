@@ -37,30 +37,26 @@ class dns_update_app(object):
         self._updates = {}
 
     @staticmethod
-    def parse_name(Origin, Name):
-        try:
-            n = dns.name.from_text(Name)
-        except:
-            return None, None
-        if Origin is None:
-            Origin = dns.resolver.zone_for_name(n)
-            Name = n.relativize(Origin)
-            return Origin, Name
+    def _split_arg(arg):
+        if '=' in arg:
+            (key, value) = arg.split('=', 1)
+            return (key, value)
         else:
-            try:
-                Origin = dns.name.from_text(Origin)
-                Name = n - Origin
-            except:
-                Origin = None
-                Name = None
-            return Origin, Name
-        
+            return (arg, None)
+
+    @staticmethod
+    def _split_args(args):
+        ret = []
+        for arg in args:
+            ret.append(dns_update_app._split_arg(arg))
+        return ret
+
     def _get_update_object(self, name):
         if name in self._updates:
             ret = self._updates[name]
         else:
             ret = None
-            Origin, dummy = dns_update_app.parse_name(Origin=None, Name=name)
+            Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(name)
             if Origin is not None:
                 for update in self._updates:
                     if update.origin == Origin:
@@ -69,28 +65,50 @@ class dns_update_app(object):
                 self._updates[name] = ret
         return ret
     
-    def _update_host(self, host, addr_list):
+    def _add_record(self, args):
+        for (name, payload) in args:
+            update = self._get_update_object(name)
+            update.add(name, self.ttl, self.rrtype, payload)
+        return True
+
+    def _delete_record(self, args):
+        for (name, payload) in args:
+            update = self._get_update_object(name)
+            update.delete(name, self.rrtype)
+        return True
+
+    def _update_record(self, args):
+        for (name, payload) in args:
+            update = self._get_update_object(name)
+            update.replace(name, self.ttl, self.rrtype, payload)
+        return True
+
+    def _update_host(self, args):
         ret = True
-        update = self._get_update_object(host)
-        update.delete(host, self.rrtype)
-        for addr in addr_list:
-            update.add(host, self.ttl, self.rrtype, addr)
-            if self.rrtype == 'A' or self.rrtype == 'AAAA':
-                # delete reverse addr and re-add it afterwards
-                revaddrname = dns.reversename.from_address(addr)
-                update.delete(revaddrname, 'PTR')
-                update.add(revaddrname, self.ttl, 'PTR', addr)
+        for (host, payload) in args:
+            addr_list = payload.split(',')
+
+            update = self._get_update_object(host)
+            update.delete(host, self.rrtype)
+            
+            for addr in addr_list:
+                update.add(host, self.ttl, self.rrtype, addr)
+                if self.rrtype == 'A' or self.rrtype == 'AAAA':
+                    # delete reverse addr and re-add it afterwards
+                    revaddrname = dns.reversename.from_address(addr)
+                    update.delete(revaddrname, 'PTR')
+                    update.add(revaddrname, self.ttl, 'PTR', addr)
         return ret
 
     def _import_host(self, args):
         anotherserver = None
         hosts_to_import = []
-        
-        for arg in args:
-            if arg[0] == '@':
-                anotherserver = arg[1:]
+
+        for (host, payload) in args:
+            if host[0] == '@':
+                anotherserver = host[1:]
             else:
-                hosts_to_import.append(arg)
+                hosts_to_import.append(host)
 
         if anotherserver is None:
             sys.stderr.write("No DNS server to query specified.\n")
@@ -128,12 +146,12 @@ class dns_update_app(object):
         parser.add_argument('--rrtype', dest='rrtype', default=self.DEFAULT_RRTYPE, help='specify the RR type for the next operation')
         parser.add_argument('--ttl', dest='ttl', default=self.DEFAULT_TTL, help='specify the TTL for the records')
         parser.add_argument('--key', dest='keyfile', default=self.DEFAULT_KEYFILE, help='key to use for the update')
-        
-        parser.add_argument('-a', '--add', dest='add', nargs=2, help='adds the given DNS A record')
+
+        parser.add_argument('-a', '--add', dest='add', nargs='+', help='adds the given DNS record; name value')
         parser.add_argument('-d', '--delete', dest='delete', nargs='+', help='deletes the specified DNS record')
-        parser.add_argument('-u', '--update', dest='update', nargs=2, help='updates the specified DNS record')
-        parser.add_argument('--update-host', dest='update_host', nargs=2, help='updates the given host for the specified address.')
-        parser.add_argument('--import-host', dest='import_host', nargs=argparse.REMAINDER, help='import the result from the specified DNS server and update the local DNS server.')
+        parser.add_argument('-u', '--update', dest='update', nargs='+', help='updates the specified DNS record')
+        parser.add_argument('--update-host', dest='update_host', nargs='+', help='updates the given host for the specified address.')
+        parser.add_argument('--import-host', dest='import_host', nargs='+', help='import the result from the specified DNS server and update the local DNS server.')
 
         args = parser.parse_args()
 
@@ -151,25 +169,21 @@ class dns_update_app(object):
         perform_update = True
 
         if args.add:
-            (name, payload) = args.add
-            update = self._get_update_object(name)
-            update.add(name, self.ttl, args.rrtype, payload)
+            if not self._add_record(dns_update_app._split_args(args.add)):
+                perform_update = False
         if args.delete:
-            for name in args.delete:
-                update = self._get_update_object(name)
-                update.delete(name, self.rrtype)
+            if not self._delete_record(dns_update_app._split_args(args.delete)):
+                perform_update = False
         if args.update:
-            (name, payload) = args.update
-            update = self._get_update_object(name)
-            update.replace(name, self.ttl, self.rrtype, payload)
+            if not self._update_record(dns_update_app._split_args(args.update)):
+                perform_update = False
 
         if args.update_host:
-            (hostname, hostaddr) = args.update_host
-            if not self._update_host(hostname, [hostaddr]):
+            if not self._update_host(dns_update_app._split_args(args.update_host)):
                 perform_update = False
 
         if args.import_host:
-            if not self._import_host(args.import_host):
+            if not self._import_host(dns_update_app._split_args(args.import_host)):
                 perform_update = False
 
         if perform_update:

@@ -291,6 +291,24 @@ def _get_resolver(dnsserver=None):
        ret = dns.resolver.Resolver()
     return ret
 
+def get_dns_zone_for_name(Name, Origin=None):
+    try:
+        n = dns.name.from_text(Name)
+    except:
+        return None, None
+    if Origin is None:
+        Origin = dns.resolver.zone_for_name(n)
+        Name = n.relativize(Origin)
+        return Origin, Name
+    else:
+        try:
+            Origin = dns.name.from_text(Origin)
+            Name = n - Origin
+        except:
+            Origin = None
+            Name = None
+        return Origin, Name
+
 def get_dns_srv_record(service, domain=None, default_value=None, tcp=True, dnsserver=None):
     if domain is None:
         domain = getdomainname()
