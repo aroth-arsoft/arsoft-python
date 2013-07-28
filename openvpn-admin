@@ -15,6 +15,7 @@ import arsoft.sshutils
 import shutil
 from arsoft.inifile import *
 from arsoft.timestamp import UTC
+from arsoft.utils import enum
 
 __version__ = '1.0'
 
@@ -38,6 +39,12 @@ class PrivateKeyPasswordFile(object):
                 os.chmod(self._conf.filename, 0600)
 
 class OpenVPNAdmin(object):
+
+    ExitCode = enum(Success=0, Failure=1, FileNotFound=2, ArgumentError=3, 
+                    NoOperation=4, AccessDenied=5, VPNNotFound=6, ConfigurationError=7,
+                    NotImplemented=8,
+                    AlreadyRunning=10, AlreadyStopped=11, NotRunning=12)
+
     def __init__(self):
         self.verbose = False
         self._config = None
@@ -104,16 +111,16 @@ class OpenVPNAdmin(object):
         all_vpn_names = self._config.names
         if len(selected_vpns) == 0:
             selected_vpns = all_vpn_names
-            ret = 0
+            ret = self.ExitCode.Success
         else:
             all_vpns_found = True
             for vpnname in selected_vpns:
                 if vpnname not in all_vpn_names:
                     sys.stderr.write('VPN %s not configured.\n' % (vpnname))
                     all_vpns_found = False
-            ret = 0 if all_vpns_found else 2
+            ret = self.ExitCode.Success if all_vpns_found else self.ExitCode.VPNNotFound
         
-        if ret == 0:
+        if ret == self.ExitCode.Success:
             if len(selected_vpns) == 0:
                 print('No VPNs configured.')
             else:
@@ -121,7 +128,7 @@ class OpenVPNAdmin(object):
                     config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
                     if not config_file.valid:
                         sys.stderr.write('Failed to open configuration for VPN %s; error %s\n' % (vpnname, config_file.last_error))
-                        ret += 1
+                        ret = self.ExitCode.ConfigurationError
                     else:
                         is_running = self._config.is_running(vpnname)
                         status_file = arsoft.openvpn.StatusFile(config_file=config_file)
@@ -182,7 +189,6 @@ class OpenVPNAdmin(object):
         return ret
     
     def action_zip_info(self, zipfile):
-        ret = 0
         if os.path.exists(zipfile):
             zipcfg = arsoft.openvpn.ZippedConfigFile(zipfile)
             if zipcfg.valid:
@@ -196,13 +202,13 @@ class OpenVPNAdmin(object):
                 print('Files in %s:' % (zipfile))
                 for f in iter(zipcfg):
                     print('  ' + f.name)
-                ret = 0
+                ret = self.ExitCode.Success
             else:
                 sys.stderr.write('ZIP file %s does not contain a valid VPN configuration.\n' % (zipfile))
-                ret = 1
+                ret = self.ExitCode.ConfigurationError
         else:
             sys.stderr.write('ZIP file %s does not exist.\n' % (zipfile))
-            ret = 2
+            ret = self.ExitCode.FileNotFound
         return ret
     
     def _compress_config(self, list_of_changed_zip_files, config_file, output_directory, parent_vpn_name=None):
@@ -210,8 +216,7 @@ class OpenVPNAdmin(object):
         vpn_display_name = '%s/%s' % (config_file.name, parent_vpn_name) if parent_vpn_name else config_file.name
         if config_file.valid:
             self._init_private_key_passwords()
-            
-            key_passphrase = 'blubb'
+
             if parent_vpn_name:
                 output_zip_file_basename = parent_vpn_name + '_' + config_file.suggested_zip_filename
             else:
@@ -248,35 +253,38 @@ class OpenVPNAdmin(object):
                     print('Compressed %s to %s' % (vpn_display_name, output_zip_file))
                 else:
                     print('Compressed %s to %s (unchanged)' % (vpn_display_name, output_zip_file))
+                ret = self.ExitCode.Success
             else:
+                ret = self.ExitCode.Failure
                 if zipcfg:
                     sys.stderr.write('Failed to compress VPN %s to %s. %s\n' % (vpn_display_name, output_zip_file, zipcfg.last_error))
                 else:
                     sys.stderr.write('Failed to compress VPN %s to %s (unspecified error).\n' % (vpn_display_name, output_zip_file))
         else:
+            ret = self.ExitCode.ConfigurationError
             sys.stderr.write('Configuration of VPN %s is invalid. %s\n' % (vpn_display_name, config_file.last_error))
-        return zip_ok
+        return ret
 
     def action_zip_compress(self, selected_vpns, output_directory):
         self._get_config()
         all_vpn_names = self._config.names
         if len(selected_vpns) == 0:
             selected_vpns = all_vpn_names
-            ret = 0
+            ret = self.ExitCode.Success
         else:
             all_vpns_found = True
             for vpnname in selected_vpns:
                 if vpnname not in all_vpn_names:
                     sys.stderr.write('VPN %s not configured.\n' % (vpnname))
                     all_vpns_found = False
-            ret = 0 if all_vpns_found else 2
+            ret = self.ExitCode.Success if all_vpns_found else self.ExitCode.VPNNotFound
         
-        if ret == 0:
+        if ret == self.ExitCode.Success:
             if len(selected_vpns) == 0:
                 print('No VPNs configured.')
             else:
                 list_of_changed_zip_files = []
-                ret = 0
+                ret = self.ExitCode.Success
                 for vpnname in selected_vpns:
                     config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
                     if config_file.valid:
@@ -286,13 +294,13 @@ class OpenVPNAdmin(object):
                                 # create a ZIP file for each client of the server
                                 for (clientname, ccdfile) in config_file.client_config_files.iteritems():
                                     client_cfgfile = config_file.client_config_file(ccdfile)
-                                    zip_ok = self._compress_config(list_of_changed_zip_files, client_cfgfile, output_directory, parent_vpn_name=vpnname)
-                                    if not zip_ok:
-                                       ret = 2
+                                    zip_result = self._compress_config(list_of_changed_zip_files, client_cfgfile, output_directory, parent_vpn_name=vpnname)
+                                    if zip_result != self.ExitCode.Success:
+                                       ret = zip_result
                         else:
-                            ret = 1
+                            ret = self.ExitCode.ConfigurationError
                     else:
-                        ret = 1
+                        ret = self.ExitCode.ConfigurationError
                 for zipcfg in list_of_changed_zip_files:
                     self._mail_config(zipcfg, self.notfication_recipient)
         return ret
@@ -379,7 +387,6 @@ to use the provided configuration.
         return True
 
     def action_install(self, filename, root_directory=None):
-        ret = 0
         conf_file_ok = False
         file_ok = False
         zip_ok = False
@@ -398,23 +405,22 @@ to use the provided configuration.
             if zip_ok:
                 zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
                 if zipcfg.install(root_directory=root_directory):
-                    ret = 0
+                    ret = self.ExitCode.Success
                 else:
                     sys.stderr.write('Failed to install OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
-                    ret = 1
+                    ret = self.ExitCode.ConfigurationError
             elif conf_file_ok:
                 print('use raw config file %s' % filename)
-                ret = 0
+                ret = self.ExitCode.NotImplemented
             else:
                 sys.stderr.write('Given file %s is neither a ZIP file nor a valid OpenVPN configuration.\n' % (filename))
-                ret = 1
+                ret = self.ExitCode.ConfigurationError
         else:
             sys.stderr.write('File %s does not exist.\n' % (filename))
-            ret = 2
+            ret = self.ExitCode.FileNotFound
         return ret
 
     def action_ssh_install(self, filename, sshurl):
-        ret = 0
         conf_file_ok = False
         file_ok = False
         zip_ok = False
@@ -434,23 +440,22 @@ to use the provided configuration.
                 url = arsoft.sshutils.SSHUrl(sshurl)
                 zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
                 if zipcfg.ssh_install(url.hostname, username=url.username):
-                    ret = 0
+                    ret = self.ExitCode.Success
                 else:
                     sys.stderr.write('Failed to install OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
-                    ret = 1
+                    ret = self.ExitCode.ConfigurationError
             elif conf_file_ok:
                 print('use raw config file %s' % filename)
-                ret = 0
+                ret = self.ExitCode.NotImplemented
             else:
                 sys.stderr.write('Given file %s is neither a ZIP file nor a valid OpenVPN configuration.\n' % (filename))
-                ret = 1
+                ret = self.ExitCode.ConfigurationError
         else:
             sys.stderr.write('File %s does not exist.\n' % (filename))
-            ret = 2
+            ret = self.ExitCode.FileNotFound
         return ret
 
     def action_zip_send(self, filename, recipient=None):
-        ret = 0
         conf_file_ok = False
         file_ok = False
         zip_ok = False
@@ -466,69 +471,90 @@ to use the provided configuration.
         if zip_ok:
             zipcfg = arsoft.openvpn.ZippedConfigFile(filename)
             if self._mail_config(zipcfg, recipient):
-                ret = 0
+                ret = self.ExitCode.Success
             else:
                 sys.stderr.write('Failed to send OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
-                ret = 1
+                ret = self.ExitCode.Failure
         else:
             sys.stderr.write('Given file %s is not a ZIP file with valid OpenVPN configuration.\n' % (filename))
-            ret = 1
+            ret = self.ExitCode.VPNNotFound
         return ret
 
     def action_start(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
             self._get_config()
-            if self._config.start(vpnname):
+            if self._config.is_running(vpnname):
+                # already started
                 print('Started %s' % vpnname)
-                ret = 0
+                ret = self.ExitCode.Success
             else:
-                sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, self._config.last_error))
+                if self._config.start(vpnname):
+                    print('Started %s' % vpnname)
+                    ret = self.ExitCode.Success
+                else:
+                    sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, self._config.last_error))
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
-            ret = 2
+            ret = self.ExitCode.VPNNotFound
         return ret
 
     def action_stop(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
             self._get_config()
-            if self._config.stop(vpnname):
-                print('Stopped %s' % vpnname)
-                ret = 0
+            if self._config.is_running(vpnname):
+                if self._config.stop(vpnname):
+                    ret = self.ExitCode.Success
+                    print('Stopped %s' % vpnname)
+                else:
+                    ret = self.ExitCode.Failure
+                    sys.stderr.write('Failed to stop VPN %s. %s\n' % (vpnname, self._config.last_error))
             else:
-                sys.stderr.write('Failed to stop VPN %s. %s\n' % (vpnname, self._config.last_error))
+                # VPN already stopped
+                ret = self.ExitCode.Success
+                print('Stopped %s' % vpnname)
         else:
+            ret = self.ExitCode.VPNNotFound
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
-            ret = 2
         return ret
 
     def action_restart(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
             self._get_config()
-            if self._config.restart(vpnname):
-                print('Restart %s' % vpnname)
-                ret = 0
+            if self._config.is_running(vpnname):
+                if self._config.restart(vpnname):
+                    ret = self.ExitCode.Success
+                    print('Restart %s' % vpnname)
+                else:
+                    ret = self.ExitCode.Failure
+                    sys.stderr.write('Failed to restart VPN %s. %s\n' % (vpnname, self._config.last_error))
             else:
-                sys.stderr.write('Failed to restart VPN %s. %s\n' % (vpnname, self._config.last_error))
+                ret = self.ExitCode.NotRunning
+                sys.stderr.write('VPN %s not running\n' % (vpnname))
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
-            ret = 2
+            ret = self.ExitCode.VPNNotFound
         return ret
 
     def action_reload(self, vpnname):
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
             self._get_config()
-            if self._config.reload(vpnname):
-                print('Reload %s' % vpnname)
-                ret = 0
+            if self._config.is_running(vpnname):
+                if self._config.reload(vpnname):
+                    print('Reload %s' % vpnname)
+                    ret = self.ExitCode.Success
+                else:
+                    ret = self.ExitCode.Failure
+                    sys.stderr.write('Failed to reload VPN %s. %s\n' % (vpnname, self._config.last_error))
             else:
-                sys.stderr.write('Failed to reload VPN %s. %s\n' % (vpnname, self._config.last_error))
+                ret = self.ExitCode.NotRunning
+                sys.stderr.write('Failed to reload VPN %s because VPN not running\n' % (vpnname))
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
-            ret = 2
+            ret = self.ExitCode.VPNNotFound
         return ret
 
     def action_add_ccd(self, vpnname, clients):
@@ -547,12 +573,12 @@ to use the provided configuration.
                 else:
                     ccd_ok = True
             if ccd_ok:
-                ret = 0
+                ret = self.ExitCode.Success
             else:
-                ret = 1
+                ret = self.ExitCode.Failure
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
-            ret = 2
+            ret = self.ExitCode.VPNNotFound
         return ret
 
     def action_remove_ccd(self, vpnname, clients):
@@ -571,12 +597,12 @@ to use the provided configuration.
                         sys.stderr.write('Failed to remove CCD of client %s on %s. %s\n' % (client, vpnname, str(e)))
                         ccd_removed = False
             if ccd_removed:
-                ret = 0
+                ret = self.ExitCode.Success
             else:
-                ret = 1
+                ret = self.ExitCode.Failure
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
-            ret = 2
+            ret = self.ExitCode.VPNNotFound
         return ret
 
     def main(self):
@@ -633,7 +659,7 @@ to use the provided configuration.
                 ret = self.action_ssh_install(args.action_ssh_install[0], args.action_ssh_install[1])
             else:
                 sys.stderr.write('Wrong number of arguments.\n')
-                ret = 1
+                ret = self.ExitCode.ArgumentError
         elif args.action_start is not None:
             ret = self.action_start(args.action_start)
         elif args.action_stop is not None:
@@ -647,16 +673,16 @@ to use the provided configuration.
                 ret = self.action_add_ccd(args.action_add_ccd[0], args.action_add_ccd[1:])
             else:
                 sys.stderr.write('No client to add.\n')
-                ret = 1
+                ret = self.ExitCode.ArgumentError
         elif args.action_remove_ccd:
             if len(args.action_remove_ccd) >= 2:
                 ret = self.action_remove_ccd(args.action_remove_ccd[0], args.action_remove_ccd[1:])
             else:
                 sys.stderr.write('No client to remove.\n')
-                ret = 1
+                ret = self.ExitCode.ArgumentError
         else:
             sys.stderr.write('No action selected.\n')
-            ret = 1
+            ret = self.ExitCode.NoOperation
         return ret
 
 if __name__ == "__main__":
