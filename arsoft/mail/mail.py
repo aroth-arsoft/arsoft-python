@@ -9,6 +9,7 @@ from email.mime.image import MIMEImage
 from email.mime.audio import MIMEAudio
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+import arsoft.utils
 import email.encoders
 import smtplib
 import os
@@ -18,7 +19,7 @@ class Mail(object):
     
     def __init__(self, sender=None, to=[], cc=[], bcc=[], subject=None, bodytext=None, multipart=True):
         if sender is None:
-            self._from = os.getlogin()
+            self._from = arsoft.utils.getlogin()
         else:
             self._from = sender
         self._to = to

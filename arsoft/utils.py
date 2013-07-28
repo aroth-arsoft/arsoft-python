@@ -286,3 +286,17 @@ def unquote_string(str):
 
 def quote_string(str, quote_char='\''):
     return quote_char + str + quote_char
+
+def getlogin():
+    """:return: string identifying the currently active system user as name@node
+    :note: user can be set with the 'USER' environment variable, usually set on windows
+    :note: on unix based systems you can use the password database
+    to get the login name of the effective process user"""
+    if os.name == "posix":
+        username = pwd.getpwuid(os.geteuid()).pw_name
+    else:
+        ukn = 'UNKNOWN'
+        username = os.environ.get('USER', os.environ.get('USERNAME', ukn))
+        if username == ukn and hasattr(os, 'getlogin'):
+            username = os.getlogin()
+    return username
