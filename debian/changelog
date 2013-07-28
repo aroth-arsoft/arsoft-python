@@ -1,3 +1,9 @@
+arsoft-python (1.83) raring; urgency=low
+
+  * fixed trouble in openvpn scripts
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 28 Jul 2013 19:52:35 +0200
+
 arsoft-python (1.82) raring; urgency=low
 
   * introduce first version of dns-update in python
