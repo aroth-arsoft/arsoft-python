@@ -40,6 +40,42 @@ def _check_certificate(prefix, perfdata_key, cert):
         exit_message = 'No %s available' % (prefix)
     return (exit_code, exit_message)
 
+def _check_crl(prefix, perfdata_key, crl):
+    exit_code = UNKNOWN
+    exit_message = None
+    if crl:
+        crl_file = crl.filename
+        now = datetime.utcnow().replace(tzinfo=UTC)
+        if crl.valid:
+            
+            min_expire_in = timedelta(days=100*365)
+            for crlitem in cert.crls:
+                if crlitem.next_update is not None:
+                    expire_in = crlitem.next_update - now
+                    if expire_in < min_expire_in:
+                        min_expire_in = expire_in
+                    if expire_in < threshold_critical:
+                        exit_code = CRITICAL
+                        exit_message = '%s expires in %s at %s' % (prefix, format_timedelta(expire_in), expire_date)
+                    elif expire_in < threshold_warning:
+                        exit_code = WARNING
+                        exit_message = '%s expires in %s at %s' % (prefix, format_timedelta(expire_in), expire_date)
+                    else:
+                        exit_code = OK
+                else:
+                    # TODO: remove this line when crl has a real next_update property
+                    exit_code = OK
+            np.set_value(perfdata_key, min_expire_in.days)
+        else:
+            np.exclude_value(perfdata_key)
+            exit_code = CRITICAL
+            exit_message = '%s CRL in %s is invalid' % (prefix, crl_file)
+    else:
+        np.exclude_value(perfdata_key)
+        exit_code = CRITICAL
+        exit_message = 'No %s available' % (prefix)
+    return (exit_code, exit_message)
+
 ## Create the plugin option
 np = NagiosPlugin(must_threshold=False, optional_threshold=True, has_host_argument=False)
 np.add_arg('n', 'name', 'name of the VPN configuration')
@@ -93,7 +129,7 @@ else:
 
         if exit_code == OK:
             if config_file.crl_file:
-                (exit_code, exit_message) = _check_certificate('CRL file', 'crl_days', config_file.crl_file)
+                (exit_code, exit_message) = _check_crl('CRL file', 'crl_days', config_file.crl_file)
             else:
                 np.exclude_value('crl_days')
         if exit_code == OK:

@@ -28,6 +28,18 @@ class CRL(PEMItem):
             for rev in self.crl.get_revoked():
                 self._rev_list.append(CRL.RevokeItem(rev))
         return self._rev_list
+    
+    @property
+    def next_update(self):
+        return None
+
+    @property
+    def last_update(self):
+        return None
+
+    @property
+    def issuer(self):
+        return None
 
     class RevokeItem(object):
         def __init__(self, rev):
@@ -124,6 +136,13 @@ class CRLFile(object):
         if self._impl:
             self._impl.close()
             self._impl = None
+
+    @property
+    def valid(self):
+        if self._impl:
+            return self._impl.valid
+        else:
+            return False
 
     @property
     def last_error(self):

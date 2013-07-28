@@ -9,7 +9,7 @@
 import sys
 import os
 from arsoft.inifile import *
-from arsoft.crypto import CertificateFile
+from arsoft.crypto import CertificateFile, CRLFile
 from arsoft.utils import replace_invalid_chars, is_quoted_string, unquote_string, quote_string
 import config
 from ccdfile import CCDFile
@@ -524,7 +524,7 @@ class ConfigFile(object):
     def crl_file(self):
         f = self.crl_filename
         if f is not None:
-            ret = CertificateFile(self.NestedFile(self, f)) if f else None
+            ret = CRLFile(self.NestedFile(self, f)) if f else None
         else:
             ret = None
         return ret

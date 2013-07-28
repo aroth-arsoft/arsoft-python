@@ -122,6 +122,10 @@ class PEMFile:
     def last_error(self):
         return self.m_last_error
 
+    @property
+    def valid(self):
+        return True if self.m_filename is not None and self.m_last_error is None else False
+
     def getBlocks(self, blocktype):
         ret = []
         for pemitem in self.m_blocks:
