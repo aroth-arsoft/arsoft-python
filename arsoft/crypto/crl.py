@@ -117,7 +117,6 @@ class CRLFile(object):
                 self.file_type = 'ASCII text'
             else:
                 self.file_type = detect_file_type(filename) if filename else None
-        print(self.file_type)
         if self.file_type == 'ASCII text':
             self._impl = CRLPEMFile(self.filename)
             ret = self._impl.open()
@@ -208,7 +207,6 @@ class CRLList:
     
     def addFile(self, filename):
         pemfile = CRLPEMFile(filename)
-        print('add file %s' % filename)
         if pemfile.open():
             for crl in pemfile.getCRLs():
                 crl_tuple = (filename, crl)

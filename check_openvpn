@@ -49,7 +49,7 @@ def _check_crl(prefix, perfdata_key, crl):
         if crl.valid:
             
             min_expire_in = timedelta(days=100*365)
-            for crlitem in cert.crls:
+            for crlitem in crl.crls:
                 if crlitem.next_update is not None:
                     expire_in = crlitem.next_update - now
                     if expire_in < min_expire_in:
