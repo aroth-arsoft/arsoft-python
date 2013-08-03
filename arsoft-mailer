@@ -35,6 +35,8 @@ class ARSoftMailer(object):
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debugging of this script.')
         parser.add_argument('-l', '--lmtp', dest='lmtp', action='store_true', help='use LMTP to send mail')
+        parser.add_argument('-T', '--starttls', dest='starttls', action='store_true', help='enable StartTLS.')
+        parser.add_argument('-S', '--submission', dest='submission', action='store_true', help='use submission (port 587 and StartTLS).')
         parser.add_argument('-f', '--from', dest='mail_sender', default=default_mail_sender, help='specifies the sender of the mail')
         parser.add_argument('-t', '--to', dest='mail_recipient_to', nargs='*', default=default_mail_recipient_to, help='specifies the recipient of the mail (To)')
         parser.add_argument('--cc', dest='mail_recipient_cc', nargs='*', help='specifies the recipient of the mail (CC)')
@@ -48,6 +50,8 @@ class ARSoftMailer(object):
         parser.add_argument('--server', dest='smtp_server', default=default_smtp_server, help='use the given mail server to send mail.')
         parser.add_argument('--port', dest='smtp_port', default=default_smtp_port, help='override the SMTP port')
         parser.add_argument('-a', '--attach', dest='mail_attachment', nargs='*', help='attach the given file to the mail')
+        parser.add_argument('-u', '--username', dest='username', help='specifies the username for SMTP authentication')
+        parser.add_argument('-p', '--password', dest='password', help='specifies the password for SMTP authentication')
 
         args = parser.parse_args()
 
@@ -56,8 +60,11 @@ class ARSoftMailer(object):
         self._debug = args.debug
         self._smtp_debuglevel = 1 if args.debug else 0
         self._smtp_server = args.smtp_server
-        self._smtp_port = args.smtp_port
-        
+        self._smtp_port = 587 if args.submission else args.smtp_port
+        self._smtp_starttls = args.starttls or args.submission
+        self._smtp_user = args.username
+        self._smtp_password = args.password
+
         if args.mail_attachment or args.html:
             multipart = True
         else:
@@ -87,11 +94,29 @@ class ARSoftMailer(object):
         if self._verbose:
             print(m)
 
-        if args.lmtp:
-            if not sendmail(m, lmtp=True, debuglevel=self._smtp_debuglevel):
+        if ret == 0:
+            try:
+                if args.lmtp:
+                    if not sendmail(m, lmtp=True, debuglevel=self._smtp_debuglevel):
+                        ret = 1
+                else:
+                    if not sendmail(m, server=self._smtp_server, port=self._smtp_port, user=self._smtp_user, password=self._smtp_password, starttls=self._smtp_starttls, debuglevel=self._smtp_debuglevel):
+                        ret = 1
+            except smtplib.SMTPSenderRefused as e:
+                sys.stderr.write('Mail server refused sender %s\n' % str(e))
                 ret = 1
-        else:
-            if not sendmail(m, server=self._smtp_server, port=self._smtp_port, debuglevel=self._smtp_debuglevel):
+            except smtplib.SMTPRecipientsRefused as e:
+                mail_server_errors = e[0]
+                for (recipient, error_desc) in mail_server_errors.items():
+                    (status_code, error_msg) = error_desc
+                    sys.stderr.write('Mail server refused recipients %s: %i %s\n' % (recipient, status_code, error_msg))
+                ret = 1
+            except smtplib.SMTPConnectError as e:
+                sys.stderr.write('Failed to establish connection to mail server %s: %s\n' % (self._smtp_server, str(e)))
+                ret = 1
+            except smtplib.SMTPAuthenticationError as e:
+                (status_code, error_msg) = e
+                sys.stderr.write('Authentication error on mail server %s: %i %s\n' % (self._smtp_server, status_code, error_msg))
                 ret = 1
 
         return ret
