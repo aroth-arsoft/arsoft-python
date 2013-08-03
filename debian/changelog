@@ -1,3 +1,9 @@
+arsoft-python (1.84) raring; urgency=low
+
+  * add arsoft-mailer script for simple mail sending
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 03 Aug 2013 13:13:34 +0200
+
 arsoft-python (1.83) raring; urgency=low
 
   * fixed trouble in openvpn scripts
