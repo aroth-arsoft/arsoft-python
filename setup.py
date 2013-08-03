@@ -46,6 +46,7 @@ setup(name='arsoft-python',
             'trac-manage',
             'trac-git-post-receive-hook',
             'arsoft-backup',
+            'arsoft-mailer',
             'edskmgr',
             'alog'
             ],

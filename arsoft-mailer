@@ -1,0 +1,101 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os, sys
+import argparse
+
+from arsoft.mail import *
+import arsoft.utils
+import arsoft.dnsutils
+from email.Utils import formatdate
+
+class ARSoftMailer(object):
+
+    def __init__(self):
+        self._verbose = False
+        self._script_name = os.path.basename(__file__)
+
+    def main(self, argv=None):
+        userlogin = arsoft.utils.getlogin()
+        (fqdn, hostname, domain) = arsoft.dnsutils.gethostname_tuple()
+
+        default_helo = fqdn
+        default_date = formatdate(localtime=True)
+        default_mail_sender = '%s@%s' % (userlogin, fqdn)
+        default_mail_recipient_to = ['postmaster@%s' % (fqdn)]
+        default_mail_subject = '%s: %s on %s' % (self._script_name, default_date, fqdn)
+        default_smtp_server = 'localhost'
+        default_smtp_port = 25
+        
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='send e-mail')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debugging of this script.')
+        parser.add_argument('-l', '--lmtp', dest='lmtp', action='store_true', help='use LMTP to send mail')
+        parser.add_argument('-f', '--from', dest='mail_sender', default=default_mail_sender, help='specifies the sender of the mail')
+        parser.add_argument('-t', '--to', dest='mail_recipient_to', nargs='*', default=default_mail_recipient_to, help='specifies the recipient of the mail (To)')
+        parser.add_argument('--cc', dest='mail_recipient_cc', nargs='*', help='specifies the recipient of the mail (CC)')
+        parser.add_argument('--bcc', dest='mail_recipient_bcc', nargs='*', help='specifies the recipient of the mail (BCC)')
+        parser.add_argument('-s', '--subject', dest='mail_subject', default=default_mail_subject, help='specifies the subject line of the mail')
+        parser.add_argument('-m', '--message', dest='mail_message', help='mail message')
+        parser.add_argument('-M', '--msgfile', dest='mail_message_file', help='read the mail message from the given file')
+        parser.add_argument('--helo', dest='helo', default=default_helo, help='override the HELO for the SMTP dialog')
+        parser.add_argument('--date', dest='mail_date', default=default_date, help='override the date/time in the mail')
+        parser.add_argument('--html', dest='html', action='store_true', help='send the given message as HTML.')
+        parser.add_argument('--server', dest='smtp_server', default=default_smtp_server, help='use the given mail server to send mail.')
+        parser.add_argument('--port', dest='smtp_port', default=default_smtp_port, help='override the SMTP port')
+        parser.add_argument('-a', '--attach', dest='mail_attachment', nargs='*', help='attach the given file to the mail')
+
+        args = parser.parse_args()
+
+        ret = 0
+        self._verbose = args.verbose
+        self._debug = args.debug
+        self._smtp_debuglevel = 1 if args.debug else 0
+        self._smtp_server = args.smtp_server
+        self._smtp_port = args.smtp_port
+        
+        if args.mail_attachment or args.html:
+            multipart = True
+        else:
+            multipart = False
+
+        m = Mail(sender=args.mail_sender, 
+                 to=args.mail_recipient_to, 
+                 cc=args.mail_recipient_cc,
+                 bcc=args.mail_recipient_bcc,
+                 subject=args.mail_subject,
+                 multipart=multipart)
+        
+        if args.mail_message_file:
+            try:
+                f = open(args.mail_message_file, 'r')
+                m.body = f.read()
+                f.close()
+            except IOError as e:
+                sys.stderr.write('Failed to read message file %s\n' % (args.mail_message_file))
+                ret = 1
+        elif args.mail_message:
+            m.body = args.mail_message
+        if args.mail_attachment:
+            for a in args.mail_attachment:
+                m.add_attachment(a)
+
+        if self._verbose:
+            print(m)
+
+        if args.lmtp:
+            if not sendmail(m, lmtp=True, debuglevel=self._smtp_debuglevel):
+                ret = 1
+        else:
+            if not sendmail(m, server=self._smtp_server, port=self._smtp_port, debuglevel=self._smtp_debuglevel):
+                ret = 1
+
+        return ret
+
+if __name__ == "__main__":
+    app = ARSoftMailer()
+    sys.exit(app.main(sys.argv))
