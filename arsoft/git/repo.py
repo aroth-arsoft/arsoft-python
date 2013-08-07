@@ -27,7 +27,7 @@ class GitRepository(object):
             self.magic_directory = os.path.join(self.root_directory, '.git')
             
     def __str__(self):
-        return '%s in %s' %(self.name, self.root_directory)
+        return 'GitRepository(%s in %s)' %(self.name, self.root_directory)
 
     @staticmethod
     def is_regular_repository(path):
@@ -50,6 +50,23 @@ class GitRepository(object):
             return True
         else:
             return False
+
+    @staticmethod
+    def find_repository_root(path):
+        while True:
+            if GitRepository.is_regular_repository(path):
+                return path
+            elif GitRepository.is_submodule_repository(path):
+                return path
+            elif GitRepository.is_bare_repository(path):
+                return path
+            else:
+                (head, tail) = os.path.split(path)
+                if head != path:
+                    path = head
+                else:
+                    break
+        return None
 
     @property
     def valid(self):
@@ -334,6 +351,13 @@ class GitRepository(object):
         args.append(tag)
         if force:
             args.append('-f')
+        args.append(object_or_commit)
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
+
+    def create_bundle(self, filename, all=True):
+        args = ['bundle', 'create', filename]
+        if all:
+            args.append('--all')
         args.append(object_or_commit)
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
 

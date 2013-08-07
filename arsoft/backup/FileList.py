@@ -71,11 +71,14 @@ class FileListItem(object):
 
     def empty(self):
         return True if len(self._items) == 0 else False
+    
+    def __str__(self):
+        return self._filename
 
     @property
     def filename(self):
         return self._filename
-    
+
     @property
     def items(self):
         return self._items
@@ -90,25 +93,29 @@ class FileListItem(object):
             else:
                 self._items = [value]
 
-    def __str__(self):
-        return str(self._items)
+    def __iter__(self):
+        return iter(self._items)
 
 class FileList(object):
     def __init__(self, filename=None):
         self._items = []
+        self._plain_list = None
         if filename is not None:
             self.open(filename)
 
     def clear(self):
         self._items = []
+        self._plain_list = None
         
+    def _build_plain_list(self):
+        if self._plain_list is None:
+            self._plain_list = []
+            for i in self._items:
+                self._plain_list.extend(i.items)
+
     def empty(self):
-        ret = True
-        for it in self._items:
-            if not it.empty():
-                ret = False
-                break
-        return ret
+        self._build_plain_list()
+        return True if self._plain_list else False
 
     def open(self, filename):
         self.clear()
@@ -133,6 +140,8 @@ class FileList(object):
             ret = newitem.open(filename)
             if ret:
                 self._items.append(newitem)
+        if ret:
+            self._plain_list = None
         return ret
 
     def save(self):
@@ -150,14 +159,19 @@ class FileList(object):
 
     @property
     def items(self):
-        ret = []
-        for i in self._items:
-            ret.extend(i.items)
-        return ret
+        self._build_plain_list()
+        return self._plain_list
+
+    def __iter__(self):
+        self._build_plain_list()
+        return self._plain_list.__iter__()
 
     def __str__(self):
-        return 'FileList(' + str(self.items) + ')'
-
+        ret = 'FileList('
+        for item in self._items:
+            ret += str(item.filename)
+        ret += ')'
+        return ret
 
 if __name__ == "__main__":
     import sys

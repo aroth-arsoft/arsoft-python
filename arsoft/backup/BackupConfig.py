@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+import os.path
 import datetime
 from arsoft.inifile import IniFile
 from FileList import *
@@ -9,6 +10,7 @@ from FileList import *
 class BackupConfigDefaults(object):
     CONFIG_DIR = '/etc/arsoft-backup'
     MAIN_CONF = 'main.conf'
+    REPOSITORY_LIST = 'repository_list.conf'
     INCLUDE_DIR = 'include.d'
     EXCLUDE_DIR = 'exclude.d'
     FILESYSTEM = 'ext4'
@@ -29,7 +31,8 @@ class BackupConfig(object):
                  eject_unused_backup_discs=BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS,
                  use_filesystem_snapshots=BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS,
                  filelist_include=None, 
-                 filelist_exclude=None):
+                 filelist_exclude=None,
+                 repository_list=BackupConfigDefaults.REPOSITORY_LIST):
         self.config_dir = config_dir
         self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
         self.filesystem = filesystem
@@ -41,6 +44,7 @@ class BackupConfig(object):
         self.filelist_exclude_dir = filelist_exclude_dir
         self.eject_unused_backup_discs = eject_unused_backup_discs
         self.use_filesystem_snapshots = use_filesystem_snapshots
+        self.repository_list = repository_list
 
     def clear(self):
         self.config_dir = BackupConfigDefaults.CONFIG_DIR
@@ -53,6 +57,7 @@ class BackupConfig(object):
         self.filelist_exclude_dir = BackupConfigDefaults.EXCLUDE_DIR
         self.eject_unused_backup_discs = BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS
         self.use_filesystem_snapshots = BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS
+        self.repository_list = BackupConfigDefaults.REPOSITORY_LIST
 
     @property
     def retention_time(self):
@@ -86,7 +91,8 @@ class BackupConfig(object):
             if isinstance(value, FileList):
                 self._filelist_include = value
             else:
-                self._filelist_include = FileList(value)
+                full_filename = os.path.normpath(os.path.join(self.config_dir, value))
+                self._filelist_include = FileList(full_filename)
         else:
             self._filelist_include = None
 
@@ -96,15 +102,33 @@ class BackupConfig(object):
             if isinstance(value, FileList):
                 self._filelist_exclude = value
             else:
-                self._filelist_exclude = FileList(value)
+                full_filename = os.path.normpath(os.path.join(self.config_dir, value))
+                self._filelist_exclude = FileList(full_filename)
         else:
             self._filelist_exclude = None
+
+    @property
+    def repository_list(self):
+        return self._repository_list
+
+    @repository_list.setter
+    def repository_list(self, value):
+        print('repository_list.setter %s' % value)
+        if value is not None:
+            if isinstance(value, FileList):
+                self._repository_list = value
+            else:
+                full_filename = os.path.normpath(os.path.join(self.config_dir, value))
+                self._repository_list = FileList(full_filename)
+        else:
+            self._repository_list = None
 
     def open(self, config_dir=None):
         if config_dir is None:
             config_dir = self.config_dir
         else:
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
+            self.config_dir = config_dir
 
         if not os.path.isdir(config_dir):
             try:
@@ -128,16 +152,10 @@ class BackupConfig(object):
             except OSError:
                 pass
 
-        self.filelist_include = FileList(filelist_path)
-
-        filelist_path = os.path.join(config_dir, self.filelist_exclude_dir)
-        if not os.path.isdir(filelist_path):
-            try:
-                os.mkdir(filelist_path)
-            except OSError:
-                pass
-
-        self.filelist_exclude = FileList(filelist_path)
+        # reload the file lists
+        self.filelist_include = self.filelist_exclude_dir
+        self.filelist_exclude = self.filelist_exclude_dir
+        self.repository_list = BackupConfigDefaults.REPOSITORY_LIST
 
         return ret
 
@@ -156,6 +174,10 @@ class BackupConfig(object):
         filelist_path = os.path.join(config_dir, self.filelist_exclude_dir)
         if self.filelist_exclude:
             self.filelist_exclude.save(filelist_path)
+
+        filelist_path = os.path.join(config_dir, BackupConfigDefaults.REPOSITORY_LIST)
+        if self._repository_list:
+            self._repository_list.save(filelist_path)
 
         return ret
     
@@ -198,4 +220,5 @@ class BackupConfig(object):
         ret = ret + 'exclude file list: ' + str(self._filelist_exclude) + '\n'
         ret = ret + 'eject unused backup discs: ' + str(self.eject_unused_backup_discs) + '\n'
         ret = ret + 'use filesystem snapshots: ' + str(self.use_filesystem_snapshots) + '\n'
+        ret = ret + 'repository list: ' + str(self._repository_list) + '\n'
         return ret
