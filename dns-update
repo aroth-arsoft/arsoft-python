@@ -132,7 +132,7 @@ class dns_update_app(object):
                         sys.stderr.write("Failed to update host record %s on target DNS server\n" % (host, self.server))
                         ret = False
                 else:
-                    print("Host record %s up-to-date %s<>%s." % (host, local_hostaddr, anotherserver_hostaddr))
+                    print("Host record %s up-to-date %s<>%s." % (host, target_hostaddr, anotherserver_hostaddr))
 
     def main(self):
         #=============================================================================================
