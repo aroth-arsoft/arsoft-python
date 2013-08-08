@@ -13,7 +13,7 @@ class GitRepository(object):
     SubmoduleStatus = enum(Invalid=-1, Ok=0, NotInitialized=1, CommitMismatch=2, MergeConflict=3)
     
     def __init__(self, directory, name=None, bare=False, verbose=False):
-        self.name = name
+        self._name = name
         self.root_directory = directory
         if os.path.isdir(directory):
             self.bare = self.is_bare_repository(directory)
@@ -27,7 +27,7 @@ class GitRepository(object):
             self.magic_directory = os.path.join(self.root_directory, '.git')
             
     def __str__(self):
-        return 'GitRepository(%s in %s)' %(self.name, self.root_directory)
+        return 'GitRepository(%s in %s)' %(self._name, self.root_directory)
 
     @staticmethod
     def is_regular_repository(path):
@@ -84,17 +84,24 @@ class GitRepository(object):
             self._last_error = 'invalid directory %s for GIT repository' % (self.root_directory)
         return ret
     @property
+    def name(self):
+        if self._name is None:
+            (bname, bext) = os.path.splitext(os.path.basename(self.root_directory))
+            self._name = bname
+        return self._name
+
+    @property
     def last_error(self):
         return self._last_error
 
     @property
     def path(self):
         return self.root_directory
-    
+
     @property
     def hook_directory(self):
         return os.path.join(self.magic_directory, 'hooks')
-    
+
     @property
     def exclude_file(self):
         return os.path.join(self.magic_directory, 'info', 'exclude')
@@ -354,11 +361,11 @@ class GitRepository(object):
         args.append(object_or_commit)
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
 
-    def create_bundle(self, filename, all=True):
+    def create_bundle(self, filename, rev_list=[], all=True):
         args = ['bundle', 'create', filename]
         if all:
             args.append('--all')
-        args.append(object_or_commit)
+        args.extend(rev_list)
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
 
     def update_config(self, configfile):

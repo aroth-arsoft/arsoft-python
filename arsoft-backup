@@ -35,6 +35,25 @@ class ARSoftBackupApp(object):
             ret = False
         print(self._config)
         return ret
+    
+    def _prepare_backup_dir(self):
+        ret = True
+        backup_dir = self._config.backup_directory
+        if backup_dir is None or len(backup_dir) == 0:
+            sys.stderr.write('No backup directory configured in %s\n' % (self._config.main_conf) )
+            ret = False
+        else:
+            if os.path.exists(backup_dir):
+                if not os.path.isdir(backup_dir):
+                    sys.stderr.write('Backup directory is not a directory %s\n' % (backup_dir) )
+                    ret = False
+            else:
+                try:
+                    os.makedirs(backup_dir)
+                except IOError as e:
+                    sys.stderr.write('Failed to create backup directory %s; error %s\n' % (backup_dir, str(e)) )
+                    ret = False
+        return ret
 
     def _on_system_startup(self):
         if self._config.eject_unused_backup_discs:
@@ -64,10 +83,21 @@ class ARSoftBackupApp(object):
     
     def _repo_backup(self):
         ret = True
+        backup_dir = self._config.backup_directory
         print(type(self._config.repository_list))
         for repo_path in self._config.repository_list:
             repo = RepositoryFactory.create(repo_path, verbose=True)
-            print('backup repo %s' % repo)
+            if repo:
+                bundle_file = os.path.join(backup_dir, repo.name + '.git_bundle')
+                print('backup %s to %s' % (repo_path, bundle_file))
+                (sts, stdout, stderr) = repo.create_bundle(bundle_file, all=True)
+                if sts == 0:
+                    print('backup %s to %s - OK' % (repo_path, bundle_file))
+                else:
+                    sys.stderr.write('Failed to create bundle for repository %s\n' % repo_path)
+            else:
+                sys.stderr.write('Failed to load repository %s\n' % repo_path)
+                ret = False
         return ret
     
     def _perform_backup(self):
@@ -86,6 +116,9 @@ class ARSoftBackupApp(object):
         else:
             disc_ready = True
         
+        if disc_ready:
+            disc_ready = self._prepare_backup_dir()
+            
         if disc_ready:
             ret = 0
             # backup disc is already mounted by DiskManager/edskmgr
