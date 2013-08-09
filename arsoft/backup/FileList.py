@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+import glob
 import os.path
 
 class FileListItem(object):
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, base_directory=None):
         self._filename = filename
-        self._items = []
+        self._base_directory = base_directory
+        self._items = set()
         if filename is not None:
             self.open(filename)
 
@@ -34,7 +36,8 @@ class FileListItem(object):
                     if line[0] == '#':
                         # skip comments
                         continue
-                    self._items.append(line)
+                    self.append(line)
+
                 fobj.close()
                 ret = True
             except IOError:
@@ -67,17 +70,29 @@ class FileListItem(object):
             ret = False
         return ret
     def clear(self):
-        self._items = []
+        self._items = set()
 
     def empty(self):
         return True if len(self._items) == 0 else False
     
     def __str__(self):
         return self._filename
+    
+    def append(self, item):
+        fullname = os.path.join(self._base_directory, item)
+        newitems = glob.glob(fullname)
+        if newitems:
+            self._items = self._items.union(newitems)
+        else:
+            self._items.add(item)
 
     @property
     def filename(self):
         return self._filename
+    
+    @property
+    def base_directory(self):
+        return self._base_directory
 
     @property
     def items(self):

@@ -23,17 +23,21 @@ class RepositoryFactory:
             return RepositoryFactory.Type.Invalid
 
     @staticmethod
-    def create(path, verbose=False):
+    def create(path, verbose=False, traverse_parent_dirs=False):
         ret = None
         if os.path.isdir(path):
             if ret is None:
                 if SubversionRepository.is_valid(path):
                     ret = SubversionRepository(path, verbose=verbose)
             if ret is None:
-                repo_path = arsoft.git.GitRepository.find_repository_root(path)
-                if repo_path is not None:
-                    ret = arsoft.git.GitRepository(repo_path, verbose=verbose)
-        print(ret)
+                if traverse_parent_dirs:
+                    repo_path = arsoft.git.GitRepository.find_repository_root(path)
+                    if repo_path is not None:
+                        ret = arsoft.git.GitRepository(repo_path, verbose=verbose)
+                else:
+                    if arsoft.git.GitRepository.is_git_repository(path):
+                        ret = arsoft.git.GitRepository(path, verbose=verbose)
+
         return ret
  
 if __name__ == "__main__":

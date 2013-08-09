@@ -52,13 +52,20 @@ class GitRepository(object):
             return False
 
     @staticmethod
+    def is_git_repository(path):
+        if GitRepository.is_regular_repository(path):
+            return True
+        elif GitRepository.is_submodule_repository(path):
+            return True
+        elif GitRepository.is_bare_repository(path):
+            return True
+        else:
+            return False
+
+    @staticmethod
     def find_repository_root(path):
         while True:
-            if GitRepository.is_regular_repository(path):
-                return path
-            elif GitRepository.is_submodule_repository(path):
-                return path
-            elif GitRepository.is_bare_repository(path):
+            if GitRepository.is_git_repository(path):
                 return path
             else:
                 (head, tail) = os.path.split(path)
@@ -366,7 +373,7 @@ class GitRepository(object):
         if all:
             args.append('--all')
         args.extend(rev_list)
-        return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
+        return self.git(args)
 
     def update_config(self, configfile):
         try:

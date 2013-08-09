@@ -84,8 +84,10 @@ class ARSoftBackupApp(object):
     def _repo_backup(self):
         ret = True
         backup_dir = self._config.backup_directory
-        print(type(self._config.repository_list))
+
         for repo_path in self._config.repository_list:
+            print(repo_path)
+
             repo = RepositoryFactory.create(repo_path, verbose=True)
             if repo:
                 bundle_file = os.path.join(backup_dir, repo.name + '.git_bundle')
