@@ -132,7 +132,9 @@ class dns_update_app(object):
                         sys.stderr.write("Failed to update host record %s on target DNS server\n" % (host, self.server))
                         ret = False
                 else:
-                    print("Host record %s up-to-date %s<>%s." % (host, target_hostaddr, anotherserver_hostaddr))
+                    if self.verbose:
+                        print("Host record %s up-to-date %s<>%s." % (host, target_hostaddr, anotherserver_hostaddr))
+        return ret
 
     def main(self):
         #=============================================================================================
@@ -188,7 +190,8 @@ class dns_update_app(object):
 
         if perform_update:
             if len(self._updates) == 0:
-                print('Nothing to do.')
+                if self.verbose:
+                    print('Nothing to do.')
                 ret = 0
             else:
                 for (host, update) in self._updates.iteritems():
