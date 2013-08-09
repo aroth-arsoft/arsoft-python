@@ -1,3 +1,10 @@
+arsoft-python (1.86) raring; urgency=low
+
+  * silence dns-update
+  * fixed trouble in heimdal-password-expire script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 09 Aug 2013 07:32:58 +0200
+
 arsoft-python (1.85) raring; urgency=low
 
   * fixed dns-update python errors
