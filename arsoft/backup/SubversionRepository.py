@@ -27,8 +27,19 @@ class SubversionRepository(BaseRepository):
         return True if os.path.isfile(os.path.join(path,'format')) else False
 
     @staticmethod
+    def is_svn_url(path):
+        if path.startswith('svn://'):
+            return True
+        elif path.startswith('svn+ssh://'):
+            return True
+        else:
+            return False
+
+    @staticmethod
     def is_valid(path):
         while True:
+            if SubversionRepository.is_svn_url(path):
+                return True
             if SubversionRepository.is_working_directory(path):
                 return True
             elif SubversionRepository.is_repository(path):

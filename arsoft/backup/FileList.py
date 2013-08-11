@@ -46,9 +46,11 @@ class FileListItem(object):
             ret = False
         return ret
 
-    def save(self, filename_or_fileobj=None):
+    def save(self, filename_or_fileobj=None, base_directory=None):
         if filename_or_fileobj is None:
             filename_or_fileobj = self._filename
+        if base_directory is None:
+            base_directory = self._base_directory
 
         if isinstance(filename_or_fileobj, str):
             try:
@@ -61,7 +63,8 @@ class FileListItem(object):
         if fobj:
             try:
                 for it in self._items:
-                    fobj.write(it + '\n')
+                    rel_item = os.path.relpath(it, base_directory)
+                    fobj.write(rel_item + '\n')
                 fobj.close()
                 ret = True
             except IOError:
@@ -73,11 +76,11 @@ class FileListItem(object):
         self._items = set()
 
     def empty(self):
-        return True if len(self._items) == 0 else False
-    
+        return False if self._items else True
+
     def __str__(self):
-        return self._filename
-    
+        return ','.join(self._items)
+
     def append(self, item):
         fullname = os.path.join(self._base_directory, item)
         newitems = glob.glob(fullname)
@@ -89,10 +92,17 @@ class FileListItem(object):
     @property
     def filename(self):
         return self._filename
-    
+
     @property
     def base_directory(self):
         return self._base_directory
+
+    @base_directory.setter
+    def base_directory(self, value):
+        self._base_directory = value
+
+    def __len__(self):
+        return len(self._items)
 
     @property
     def items(self):
@@ -112,16 +122,18 @@ class FileListItem(object):
         return iter(self._items)
 
 class FileList(object):
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, base_directory=None):
         self._items = []
         self._plain_list = None
+        self._base_directory = base_directory
         if filename is not None:
             self.open(filename)
 
     def clear(self):
         self._items = []
         self._plain_list = None
-        
+        self._base_directory = None
+
     def _build_plain_list(self):
         if self._plain_list is None:
             self._plain_list = []
@@ -130,31 +142,45 @@ class FileList(object):
 
     def empty(self):
         self._build_plain_list()
-        return True if self._plain_list else False
+        return False if self._plain_list else True
 
     def open(self, filename):
         self.clear()
         if isinstance(filename, list):
             for it in filename:
-                self._append(it)
+                self.append(it)
         else:
-            self._append(filename)
+            self.append(filename)
 
-    def _append(self, filename):
-        if os.path.isdir(filename):
+    def append(self, item):
+        if isinstance(item, FileListItem):
+            #print('append other filelistitem with %i items' % (len(item)))
+            self._items.append(item)
+            if self._base_directory is None:
+                self._base_directory = item.base_directory
             ret = True
-            for f in os.listdir(filename):
-                fullname = os.path.join(filename, f)
-                newitem = FileListItem()
-                if not newitem.open(fullname):
-                    ret = False
-                else:
-                    self._items.append(newitem)
+        elif isinstance(item, FileList):
+            #print('append other filelist with %i items' % (len(item._items)))
+            for other_item in item._items:
+                self._items.append(other_item)
+            if self._base_directory is None:
+                self._base_directory = item.base_directory
+            ret = True
         else:
-            newitem = FileListItem()
-            ret = newitem.open(filename)
-            if ret:
-                self._items.append(newitem)
+            if os.path.isdir(item):
+                ret = True
+                for f in os.listdir(item):
+                    fullname = os.path.join(item, f)
+                    newitem = FileListItem()
+                    if not newitem.open(fullname):
+                        ret = False
+                    else:
+                        self._items.append(newitem)
+            else:
+                newitem = FileListItem()
+                ret = newitem.open(item)
+                if ret:
+                    self._items.append(newitem)
         if ret:
             self._plain_list = None
         return ret
@@ -166,16 +192,29 @@ class FileList(object):
                 ret = False
                 break
         return ret
-    
-    def save(self, filename_or_fileobj):
+
+    def save(self, filename_or_fileobj, base_directory=None):
+        self._build_plain_list()
         newitem = FileListItem()
-        newitem.items = self.items
+        newitem.items = self._plain_list
+        if base_directory is None:
+            newitem.base_directory = self._base_directory
+        else:
+            newitem.base_directory = base_directory
         return newitem.save(filename_or_fileobj)
 
     @property
     def items(self):
         self._build_plain_list()
         return self._plain_list
+
+    @property
+    def base_directory(self):
+        return self._base_directory
+
+    @base_directory.setter
+    def base_directory(self, value):
+        self._base_directory = value
 
     def __iter__(self):
         self._build_plain_list()
@@ -184,7 +223,9 @@ class FileList(object):
     def __str__(self):
         ret = 'FileList('
         for item in self._items:
-            ret += str(item.filename)
+            ret += '['
+            ret += str(item)
+            ret += ']'
         ret += ')'
         return ret
 

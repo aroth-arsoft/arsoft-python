@@ -17,19 +17,27 @@ class BackupConfigDefaults(object):
     RETENTION_TIME_S = 86400 * 7
     BACKUP_DIR = None
     RESTORE_DIR = None
+    INTERMEDIATE_BACKUP_DIR = None
     EJECT_UNUSED_BACKUP_DISCS = True
     USE_FILESYSTEM_SNAPSHOTS = False
+    USE_SSH_FOR_RSYNC = True
+    USE_TIMESTAMP_FOR_BACKUP_DIR = True
+    TIMESTAMP_FORMAT_FOR_BACKUP_DIR = '%Y%m%d%H%M%S'
 
 class BackupConfig(object):
     def __init__(self, config_dir=BackupConfigDefaults.CONFIG_DIR, 
                  retention_time=BackupConfigDefaults.RETENTION_TIME_S, 
                  backup_directory=BackupConfigDefaults.BACKUP_DIR, 
                  restore_directory=BackupConfigDefaults.RESTORE_DIR, 
+                 intermediate_backup_directory=BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR, 
                  filesystem=BackupConfigDefaults.FILESYSTEM,
                  filelist_include_dir=BackupConfigDefaults.INCLUDE_DIR,
                  filelist_exclude_dir=BackupConfigDefaults.EXCLUDE_DIR,
                  eject_unused_backup_discs=BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS,
                  use_filesystem_snapshots=BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS,
+                 use_ssh_for_rsync=BackupConfigDefaults.USE_SSH_FOR_RSYNC,
+                 use_timestamp_for_backup_dir=BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR,
+                 timestamp_format_for_backup_dir=BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR,
                  filelist_include=None, 
                  filelist_exclude=None,
                  repository_list=BackupConfigDefaults.REPOSITORY_LIST):
@@ -38,12 +46,16 @@ class BackupConfig(object):
         self.filesystem = filesystem
         self.retention_time = retention_time
         self.backup_directory = backup_directory
+        self.intermediate_backup_directory = intermediate_backup_directory
         self.filelist_include = filelist_include
         self.filelist_exclude = filelist_exclude
         self.filelist_include_dir = filelist_include_dir
         self.filelist_exclude_dir = filelist_exclude_dir
         self.eject_unused_backup_discs = eject_unused_backup_discs
         self.use_filesystem_snapshots = use_filesystem_snapshots
+        self.use_ssh_for_rsync = use_ssh_for_rsync
+        self.use_timestamp_for_backup_dir = use_timestamp_for_backup_dir
+        self.timestamp_format_for_backup_dir = timestamp_format_for_backup_dir
         self.repository_list = repository_list
 
     def clear(self):
@@ -51,12 +63,16 @@ class BackupConfig(object):
         self.filesystem = BackupConfigDefaults.FILESYSTEM
         self.retention_time = BackupConfigDefaults.RETENTION_TIME_S
         self.backup_directory = BackupConfigDefaults.BACKUP_DIR
+        self.intermediate_backup_directory = BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR
         self.filelist_include = None
         self.filelist_exclude = None
         self.filelist_include_dir = BackupConfigDefaults.INCLUDE_DIR
         self.filelist_exclude_dir = BackupConfigDefaults.EXCLUDE_DIR
         self.eject_unused_backup_discs = BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS
         self.use_filesystem_snapshots = BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS
+        self.use_ssh_for_rsync = BackupConfigDefaults.USE_SSH_FOR_RSYNC
+        self.use_timestamp_for_backup_dir = BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR
+        self.timestamp_format_for_backup_dir = BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR
         self.repository_list = BackupConfigDefaults.REPOSITORY_LIST
 
     @property
@@ -113,7 +129,6 @@ class BackupConfig(object):
 
     @repository_list.setter
     def repository_list(self, value):
-        print('repository_list.setter %s' % value)
         if value is not None:
             if isinstance(value, FileList):
                 self._repository_list = value
@@ -188,8 +203,12 @@ class BackupConfig(object):
         self.retention_time = datetime.timedelta(seconds=float(inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)))
         self.backup_directory = inifile.get(None, 'BackupDirectory', BackupConfigDefaults.BACKUP_DIR)
         self.restore_directory = inifile.get(None, 'RestoreDirectory', BackupConfigDefaults.RESTORE_DIR)
+        self.intermediate_backup_directory = inifile.get(None, 'IntermediateBackupDirectory', BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR)
         self.eject_unused_backup_discs = inifile.getAsBoolean(None, 'EjectUnusedBackupDiscs', BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS)
         self.use_filesystem_snapshots = inifile.getAsBoolean(None, 'UseFilesystemSnapshots', BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS)
+        self.use_ssh_for_rsync = inifile.getAsBoolean(None, 'UseSSHForRsync', BackupConfigDefaults.USE_SSH_FOR_RSYNC)
+        self.use_timestamp_for_backup_dir = inifile.getAsBoolean(None, 'UseTimestampForBackupDir', BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR)
+        self.timestamp_format_for_backup_dir = inifile.get(None, 'TimestampFormatForBackupDir', BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR)
         self.filelist_include_dir = inifile.get(None, 'FileListIncludeDirectory', BackupConfigDefaults.INCLUDE_DIR)
         self.filelist_exclude_dir = inifile.get(None, 'FileListExcludeDirectory', BackupConfigDefaults.EXCLUDE_DIR)
         return ret
@@ -203,8 +222,12 @@ class BackupConfig(object):
         inifile.set(None, 'RetentionTime', self.retention_time.total_seconds())
         inifile.set(None, 'BackupDirectory', self.backup_directory)
         inifile.set(None, 'RestoreDirectory', self.restore_directory)
+        inifile.set(None, 'IntermediateBackupDirectory', self.intermediate_backup_directory)
         inifile.setAsBoolean(None, 'EjectUnusedBackupDiscs', self.eject_unused_backup_discs)
         inifile.setAsBoolean(None, 'UseFilesystemSnapshots', self.use_filesystem_snapshots)
+        inifile.setAsBoolean(None, 'UseSSHForRsync', self.use_ssh_for_rsync)
+        inifile.setAsBoolean(None, 'UseTimestampForBackupDir', self.use_timestamp_for_backup_dir)
+        inifile.set(None, 'TimestampFormatForBackupDir', self.timestamp_format_for_backup_dir)
         inifile.set(None, 'FileListIncludeDirectory', self.filelist_include_dir)
         inifile.set(None, 'FileListExcludeDirectory', self.filelist_exclude_dir)
 
@@ -215,10 +238,14 @@ class BackupConfig(object):
         ret = ''
         ret = ret + 'filesystem: ' + str(self.filesystem) + '\n'
         ret = ret + 'backup directory: ' + str(self.backup_directory) + '\n'
+        ret = ret + 'restore directory: ' + str(self.restore_directory) + '\n'
+        ret = ret + 'intermediate backup directory: ' + str(self.intermediate_backup_directory) + '\n'
         ret = ret + 'retention time: ' + str(self._retention_time) + '\n'
         ret = ret + 'include file list: ' + str(self._filelist_include) + '\n'
         ret = ret + 'exclude file list: ' + str(self._filelist_exclude) + '\n'
         ret = ret + 'eject unused backup discs: ' + str(self.eject_unused_backup_discs) + '\n'
         ret = ret + 'use filesystem snapshots: ' + str(self.use_filesystem_snapshots) + '\n'
+        ret = ret + 'use timestamp for backup dirs: ' + str(self.use_timestamp_for_backup_dir) + '\n'
+        ret = ret + 'timestamp format for backup dirs: ' + str(self.timestamp_format_for_backup_dir) + '\n'
         ret = ret + 'repository list: ' + str(self._repository_list) + '\n'
         return ret

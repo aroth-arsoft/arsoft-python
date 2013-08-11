@@ -1,3 +1,9 @@
+arsoft-python (1.87) raring; urgency=low
+
+  * advances in backup script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 11 Aug 2013 18:35:10 +0200
+
 arsoft-python (1.86) raring; urgency=low
 
   * silence dns-update

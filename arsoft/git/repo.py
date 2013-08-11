@@ -7,6 +7,8 @@ import sys
 from arsoft.utils import runcmdAndGetData, to_uid, to_gid, enum
 from arsoft.inifile import IniFile
 from .base import GIT_EXECUTABLE, GIT_HOOKS
+from .bundle import GitBundle
+from .error import *
 
 class GitRepository(object):
 
@@ -52,8 +54,17 @@ class GitRepository(object):
             return False
 
     @staticmethod
+    def is_git_url(path):
+        if path.startswith('git://'):
+            return True
+        else:
+            return False
+
+    @staticmethod
     def is_git_repository(path):
-        if GitRepository.is_regular_repository(path):
+        if GitRepository.is_git_url(path):
+            return True
+        elif GitRepository.is_regular_repository(path):
             return True
         elif GitRepository.is_submodule_repository(path):
             return True
@@ -89,7 +100,12 @@ class GitRepository(object):
         else:
             ret = False
             self._last_error = 'invalid directory %s for GIT repository' % (self.root_directory)
+        if ret:
+            args = ['show-ref', '--head']
+            (sts, stdoutdata, stderrdata) = self.git(args)
+            ret = True if sts == 0 else False
         return ret
+
     @property
     def name(self):
         if self._name is None:
@@ -340,6 +356,24 @@ class GitRepository(object):
             ret = None
         return ret
     
+    def list_heads(self, remotes=True):
+        args = ['show-ref', '--head']
+        (sts, stdoutdata, stderrdata) = self.git(args)
+        if sts == 0:
+            ret = {}
+            stdoutdata = stdoutdata.decode("utf-8")
+            for line in stdoutdata.splitlines():
+                (sha1, name) = line.split(' ', 1)
+                if remotes:
+                    add_head = True
+                else:
+                    add_head = False if name.startswith('refs/remotes/') else True
+                if add_head:
+                    ret[name] = sha1
+        else:
+            raise GitRepositoryError(self, sts, stdoutdata, stderrdata)
+        return ret
+
     def checkout(self, branch, remote='origin'):
         if branch != self.current_branch:
             args = ['checkout']
@@ -373,7 +407,11 @@ class GitRepository(object):
         if all:
             args.append('--all')
         args.extend(rev_list)
-        return self.git(args)
+        (sts, stdout, stderr) = self.git(args)
+        if sts == 0:
+            return GitBundle(filename, repository=self)
+        else:
+            raise GitRepositoryError(self, sts, stdout, stderr)
 
     def update_config(self, configfile):
         try:

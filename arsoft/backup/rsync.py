@@ -4,7 +4,8 @@
 
 import tempfile
 from FileList import *
-from arsoft.utils import runcmd
+from arsoft.utils import runcmdAndGetData
+import urlparse
 import subprocess
 import sys
 
@@ -51,7 +52,6 @@ class Rsync(object):
         self._exclude = exclude
 
     def execute(self):
-
         if self._source is None or \
             (isinstance(self._source, str) and len(self._source) == 0) or \
             (isinstance(self._source, FileList) and self._source.empty()):
@@ -65,7 +65,7 @@ class Rsync(object):
         if self._rsync_bin is None or len(self._rsync_bin) == 0:
             raise ValueError('Invalid rsync executeable %s specified'%(str(self._rsync_bin)))
 
-        args = [self._rsync_bin]
+        args = []
         if self.verbose:
             args.append('--verbose')
         if self.recursive:
@@ -103,6 +103,7 @@ class Rsync(object):
         if self.rsh:
             args.append('--rsh=' + str(self.rsh))
         elif self.use_ssh:
+            # use ssh with disable X11 forwarding
             rsh = '/usr/bin/ssh -x'
             if self.ssh_key:
                 rsh = rsh + ' -i ' + self.ssh_key
@@ -114,59 +115,79 @@ class Rsync(object):
         tmp_exclude = None
         tmp_source = None
         if self._include:
-            tmp_include = tempfile.NamedTemporaryFile()
-            if not self._include.save(tmp_include):
+            tmp_fd, tmp_include = tempfile.mkstemp()
+            tmp_fobj = os.fdopen(tmp_fd, 'w')
+            if not self._include.save(tmp_fobj):
                 raise IOError
-            args.append('--include-from=' + tmp_include.name)
+            tmp_fobj.close()
+            args.append('--include-from=' + tmp_include)
+            if self.verbose:
+                print(self._include)
 
         if self._exclude:
-            tmp_exclude = tempfile.NamedTemporaryFile()
-            if not self._exclude.save(tmp_exclude):
+            tmp_fd, tmp_exclude = tempfile.mkstemp()
+            tmp_fobj = os.fdopen(tmp_fd, 'w')
+            if not self._exclude.save(tmp_fobj):
                 raise IOError
-            args.append('--exclude-from=' + tmp_exclude.name)
+            tmp_fobj.close()
+            args.append('--exclude-from=' + tmp_exclude)
+            if self.verbose:
+                print(self._exclude)
 
         if isinstance(self._source, FileList):
-            tmp_source = tempfile.NamedTemporaryFile()
-            if not self._source.save(tmp_source):
+            tmp_fd, tmp_source = tempfile.mkstemp()
+            tmp_fobj = os.fdopen(tmp_fd, 'w')
+            if not self._source.save(tmp_fobj):
                 raise IOError
-            args.append('--files-from=' + tmp_source.name)
+            tmp_fobj.close()
+            args.append('--files-from=' + tmp_source)
+            if self._source.base_directory:
+                args.append(self._source.base_directory)
+            else:
+                args.append('/')
+            if self.verbose:
+                print(self._source)
         else:
             args.append(self._source)
-        args.append(self._dest)
+        args.append(self._normalize_url(self._dest))
 
         if self.verbose:
             print("runcmd " + ' '.join(args))
 
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, shell=False)
-        if p:
-            (stdoutdata, stderrdata) = p.communicate()
-            if stdoutdata is not None:
-                if int(python_major) < 3: # check for version < 3
-                    sys.stdout.write(stdoutdata)
-                    sys.stdout.flush()
-                else:
-                    sys.stdout.buffer.write(stdoutdata)
-                    sys.stdout.buffer.flush()
-            if stderrdata is not None:
-                if int(python_major) < 3: # check for version < 3
-                    sys.stderr.write(stderrdata)
-                    sys.stderr.flush()
-                else:
-                    sys.stderr.buffer.write(stderrdata)
-                    sys.stderr.buffer.flush()
-            status_code = p.returncode
-            ret = True if status_code == 0 else False
-        else:
-            status_code = -1
-            ret = False
+        (status_code, stdout, stderr) = runcmdAndGetData(self._rsync_bin, args)
+        ret = True if status_code == 0 else False
+        if not ret or self.verbose:
+            sys.stdout.write(stdout)
+            sys.stderr.write(stderr)
+            sys.stdout.flush()
+            sys.stderr.flush()
 
-        if tmp_include:
-            tmp_include.close()
-        if tmp_exclude:
-            tmp_exclude.close()
-        if tmp_source:
-            tmp_source.close()
+        #if tmp_include:
+            #os.remove(tmp_include)
+        #if tmp_exclude:
+            #os.remove(tmp_exclude)
+        #if tmp_source:
+            #os.remove(tmp_source)
         return ret
+
+    @staticmethod
+    def _normalize_url(url):
+        o = urlparse.urlparse(url)
+        if o.scheme == 'rsync':
+            if o.username:
+                ret += o.username
+                ret += '@'
+            ret = o.hostname
+            ret += ':'
+            ret += o.path
+        else:
+            ret = url
+        return ret
+    
+    @staticmethod
+    def is_rsync_url(url):
+        o = urlparse.urlparse(url)
+        return True if o.scheme == 'rsync' else False
 
 if __name__ == "__main__":
     app = Rsync(sys.argv[1], sys.argv[2])
