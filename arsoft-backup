@@ -6,6 +6,7 @@ import sys
 import argparse
 from datetime import datetime
 import os.path
+from arsoft.backup.BackupApp import BackupApp
 from arsoft.backup.BackupConfig import BackupConfig
 from arsoft.backup.DiskManager import DiskManager
 from arsoft.backup.FileList import FileList, FileListItem
@@ -14,32 +15,28 @@ from arsoft.backup.rsync import Rsync
 from arsoft.git.bundle import GitBundle
 from arsoft.git.error import *
 
-class ARSoftBackupApp(object):
+class ARSoftBackupApp(BackupApp):
 
     def __init__(self):
+        BackupApp.__init__(self, 'arsoft-backup')
         self._verbose = False
         self._dryrun = False
-        self._config = None
         self._diskmgr = None
-        self._intermediate_filelist = FileList()
         
-    def _load_config(self, configdir):
-        cfg = BackupConfig(configdir)
-        cfg.open()
+    def load_config(self, configdir):
+        BackupApp.load_config(self, configdir)
         # in any case continue with the config we got
-        self._config = cfg
         self._diskmgr = DiskManager()
-        ret = True
-        return ret
+        return True
     
     def _check_config(self):
         ret = True
-        backup_dir = self._config.backup_directory
+        backup_dir = self.config.backup_directory
         if backup_dir is None or len(backup_dir) == 0:
-            sys.stderr.write('No backup directory configured in %s\n' % (self._config.main_conf) )
+            sys.stderr.write('No backup directory configured in %s\n' % (self.config.main_conf) )
             ret = False
         if self._verbose:
-            print(self._config)
+            print(self.config)
         return ret
     
     def _mkdir(self, dir):
@@ -58,9 +55,9 @@ class ARSoftBackupApp(object):
 
     def _prepare_backup_dir(self):
         ret = True
-        backup_dir = self._config.backup_directory
+        backup_dir = self.config.backup_directory
         if backup_dir is None or len(backup_dir) == 0:
-            sys.stderr.write('No backup directory configured in %s\n' % (self._config.main_conf) )
+            sys.stderr.write('No backup directory configured in %s\n' % (self.config.main_conf) )
             ret = False
         else:
             if Rsync.is_rsync_url(backup_dir):
@@ -70,13 +67,13 @@ class ARSoftBackupApp(object):
                 if not self._mkdir(backup_dir):
                     ret = False
             if ret:
-                if self._config.intermediate_backup_directory:
-                    if not self._mkdir(self._config.intermediate_backup_directory):
+                if self.config.intermediate_backup_directory:
+                    if not self._mkdir(self.config.intermediate_backup_directory):
                         ret = False
         return ret
 
     def _on_system_startup(self):
-        if self._config.eject_unused_backup_discs:
+        if self.config.eject_unused_backup_discs:
             print('eject unused discs')
             if self._diskmgr.eject():
                 ret = 0
@@ -88,24 +85,25 @@ class ARSoftBackupApp(object):
         return ret
     
     def _do_rsync(self):
-        backup_dir = self._config.backup_directory
-        if not self._config.use_filesystem_snapshots and self._config.use_timestamp_for_backup_dir:
+        backup_dir = self.config.backup_directory
+        if not self.config.use_filesystem_snapshots and self.config.use_timestamp_for_backup_dir:
             now = datetime.utcnow()
-            nowstr = now.strftime(self._config.timestamp_format_for_backup_dir)
+            nowstr = now.strftime(self.config.timestamp_format_for_backup_dir)
             backup_dir = os.path.join(backup_dir, nowstr)
         if backup_dir[-1] != '/':
             backup_dir += '/'
 
         # build the final filelist
         source_filelist = FileList()
-        if self._config.filelist_include:
-            source_filelist.append(self._config.filelist_include)
-        source_filelist.append(self._intermediate_filelist)
+        if self.config.filelist_include:
+            source_filelist.append(self.config.filelist_include)
+        source_filelist.append(self.intermediate_filelist)
         #print(source_filelist)
 
         if not source_filelist.empty():
             inst = Rsync(source=source_filelist, dest=backup_dir, delete=True, deleteExcluded=True, 
-                         use_ssh=self._config.use_ssh_for_rsync, dryrun=self._dryrun, verbose=self._verbose)
+                         use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
+                         dryrun=self._dryrun, verbose=self._verbose)
             ret = inst.execute()
         else:
             # everything OK since there is nothing to do
@@ -137,9 +135,9 @@ class ARSoftBackupApp(object):
 
     def _git_backup(self):
         ret = True
-        backup_dir = self._config.intermediate_backup_directory
+        backup_dir = self.config.intermediate_backup_directory
         if backup_dir is None:
-            backup_dir = self._config.backup_directory
+            backup_dir = self.config.backup_directory
 
         base_directory = backup_dir
         backup_dir = os.path.join(backup_dir, 'git')
@@ -147,7 +145,7 @@ class ARSoftBackupApp(object):
             ret = False
         if ret:
             repo_backup_filelist = FileListItem(base_directory=base_directory)
-            for repo_path in self._config.repository_list:
+            for repo_path in self.config.repository_list:
                 repo = RepositoryFactory.create(repo_path, verbose=self._verbose)
                 if repo:
                     if repo.valid:
@@ -165,8 +163,8 @@ class ARSoftBackupApp(object):
                     sys.stderr.write('Failed to load repository %s\n' % repo_path)
                     ret = False
             #print(repo_backup_filelist)
-            self._intermediate_filelist.append(repo_backup_filelist)
-            #print(self._intermediate_filelist)
+            self.intermediate_filelist.append(repo_backup_filelist)
+            #print(self.intermediate_filelist)
         return ret
     
     def _perform_backup(self):
@@ -226,12 +224,12 @@ class ARSoftBackupApp(object):
         self._verbose = args.verbose
         self._dryrun = args.dryrun
 
-        if not self._load_config(args.configdir):
+        if not self.load_config(args.configdir):
             sys.stderr.write('Failed to load configuration from %s.\n' % (args.configdir)) 
             ret = 1
         else:
             if self._verbose:
-                print(self._config)
+                print(self.config)
             if args.system_startup:
                 ret = self._on_system_startup()
             elif args.perform_backup:
