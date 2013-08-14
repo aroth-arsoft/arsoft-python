@@ -21,7 +21,7 @@ nsswitch_ldap_modify() {
 			--set shadow files ldap \
 			--set aliases files ldap \
 			--set automount ldap \
-			--set sudoers ldap
+			--set sudoers files ldap
 		RES=$?
 	fi
 	if [ $RES -ne 0 ]; then
