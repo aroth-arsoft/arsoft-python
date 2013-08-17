@@ -10,10 +10,7 @@ from arsoft.backup.BackupApp import BackupApp
 from arsoft.backup.BackupConfig import BackupConfig
 from arsoft.backup.DiskManager import DiskManager
 from arsoft.backup.FileList import FileList, FileListItem
-from arsoft.backup.RepositoryFactory import RepositoryFactory
 from arsoft.backup.rsync import Rsync
-from arsoft.git.bundle import GitBundle
-from arsoft.git.error import *
 
 class ARSoftBackupApp(BackupApp):
 
@@ -110,98 +107,49 @@ class ARSoftBackupApp(BackupApp):
             ret = True
         return ret
     
-    def _git_backup_to_bundle(self, repository, bundle_file):
-        ret = False
-        if GitBundle.is_bundle(bundle_file):
-            bundle = GitBundle(bundle_file, repository=repository, verbose=self._verbose)
-            try:
-                ret = bundle.update()
-                if ret:
-                    if self._verbose:
-                        print('backup %s to %s - Updated' % (repository.root_directory, bundle.filename))
-                else:
-                    sys.stderr.write('backup %s to %s - Failed\n' % (repository.root_directory, bundle.filename))
-            except (GitRepositoryError, GitBundleError) as e:
-                sys.stderr.write('Failed to update bundle from repository %s; error %s\n' % (repository.root_directory, str(e)))
-        else:
-            try:
-                bundle = repository.create_bundle(bundle_file, all=True)
-                if self._verbose:
-                    print('backup %s to %s - Created' % (repository.root_directory, bundle.filename))
-                ret = True
-            except (GitRepositoryError, GitBundleError) as e:
-                sys.stderr.write('Failed to create bundle from repository %s; error %s\n' % (repository.root_directory, str(e)))
-        return ret
-
-    def _git_backup(self):
-        ret = True
-        backup_dir = self.config.intermediate_backup_directory
-        if backup_dir is None:
-            backup_dir = self.config.backup_directory
-
-        base_directory = backup_dir
-        backup_dir = os.path.join(backup_dir, 'git')
-        if not self._mkdir(backup_dir):
-            ret = False
-        if ret:
-            repo_backup_filelist = FileListItem(base_directory=base_directory)
-            for repo_path in self.config.repository_list:
-                repo = RepositoryFactory.create(repo_path, verbose=self._verbose)
-                if repo:
-                    if repo.valid:
-                        bundle_file = os.path.join(backup_dir, repo.name + '.git_bundle')
-                        if self._verbose:
-                            print('backup %s to %s' % (repo_path, bundle_file))
-                        if not self._git_backup_to_bundle(repo, bundle_file):
-                            ret = False
-                        else:
-                            repo_backup_filelist.append(bundle_file)
-                    else:
-                        sys.stderr.write('Repository %s is invalid\n' % repo_path)
-                        ret = False
-                else:
-                    sys.stderr.write('Failed to load repository %s\n' % repo_path)
-                    ret = False
-            #print(repo_backup_filelist)
-            self.intermediate_filelist.append(repo_backup_filelist)
-            #print(self.intermediate_filelist)
-        return ret
-    
     def _perform_backup(self):
         if not self._check_config():
             return 1
-        disc_loaded = False
-        disc_ready = False
+        disk_loaded = False
+        disk_ready = False
         # load all available external discs
-        if not self._diskmgr.is_disc_ready():
+        if not self._diskmgr.is_disk_ready():
             if not self._diskmgr.load():
                 sys.stderr.write('Failed to load external discs\n')
                 ret = 1
             else:
-                disc_loaded = True
-                disc_ready = True
+                disk_loaded = True
+                disk_ready = True
         else:
-            disc_ready = True
+            disk_ready = True
         
-        if disc_ready:
-            disc_ready = self._prepare_backup_dir()
+        if disk_ready:
+            disk_ready = self._prepare_backup_dir()
             
-        if disc_ready:
+        if disk_ready:
             ret = 0
-            # backup disc is already mounted by DiskManager/edskmgr
-            # backup all repos first
-            if not self._git_backup():
-                sys.stderr.write('GIT backup with errors; continue\n')
-                ret = 1
+            # notify all plugin about the ready disk
+            self.plugin_notify_disk_ready()
+
+            self.plugin_notify_start_backup()
+            self.plugin_notify_perform_backup()
+            self.plugin_notify_backup_complete()
+
+            self.plugin_notify_start_rsync()
 
             # rsync to backup destination/backup_dir
             if not self._do_rsync():
                 sys.stderr.write('rsync failed\n')
                 ret = 1
+
+            self.plugin_notify_rsync_complete()
+
             # create new snapshot of the disc
             # remove old snapshot from the disc
 
-        if disc_loaded:
+        if disk_loaded:
+            self.plugin_notify_disk_eject()
+            
             if not self._diskmgr.eject():
                 sys.stderr.write('Failed to eject external discs\n')
                 ret = 1
