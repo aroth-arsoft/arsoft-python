@@ -1,3 +1,9 @@
+arsoft-python (1.89) raring; urgency=low
+
+  * fixed trouble with CRL file in openvpn-status
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 17 Aug 2013 18:55:06 +0200
+
 arsoft-python (1.88) raring; urgency=low
 
   * enable sudo files along with ldap lookup
