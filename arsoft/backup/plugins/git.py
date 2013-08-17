@@ -13,7 +13,6 @@ class GitBackupPluginConfig(BackupPluginConfig):
     def __init__(self, parent):
         BackupPluginConfig.__init__(self, parent, 'git')
         self._repository_list = None
-        self._repositories_config = None
 
     @property
     def repository_list(self):

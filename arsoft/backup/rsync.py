@@ -16,7 +16,7 @@ class RsyncDefaults(object):
 
 class Rsync(object):
     def __init__(self, source, dest, include=None, exclude=None, 
-                 recursive=True, 
+                 recursive=True, relative=False,
                  preservePermissions=True, preserveOwner=True, preserveGroup=True, preserveTimes=True, 
                  preserveDevices=True, preserveSpecials=True, perserveACL=False, preserveXAttrs=False,
                  verbose=False, compress=True, links=True, dryrun=False,
@@ -29,6 +29,7 @@ class Rsync(object):
         self._dest = dest
         self.verbose = verbose
         self.recursive = recursive
+        self.relative = relative
         self.links = links
         self.compress = compress
         self.preservePermissions = preservePermissions
@@ -70,6 +71,8 @@ class Rsync(object):
             args.append('--verbose')
         if self.recursive:
             args.append('--recursive')
+        if self.relative:
+            args.append('--relative')
         if self.links:
             args.append('--links')
         if self.preservePermissions:
@@ -188,6 +191,25 @@ class Rsync(object):
     def is_rsync_url(url):
         o = urlparse.urlparse(url)
         return True if o.scheme == 'rsync' else False
+
+    @staticmethod
+    def sync_directories(source_dir, target_dir, recursive=True, relative=True):
+        r = Rsync(source=source_dir, dest=target_dir, recursive=recursive, relative=relative)
+        return r.execute()
+
+    @staticmethod
+    def sync_file(source_file, target_file, relative=True):
+        # first we must create the target directory
+        target_dir = os.path.dirname(target_file)
+        if target_dir[-1] != '/':
+            target_dir += '/'
+        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False)
+        if rdir.execute():
+            # when the directory exists we can copy the file
+            r = Rsync(source=source_file, dest=target_file, recursive=False, relative=False)
+            return r.execute()
+        else:
+            return False
 
 if __name__ == "__main__":
     app = Rsync(sys.argv[1], sys.argv[2])

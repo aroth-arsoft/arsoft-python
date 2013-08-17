@@ -24,7 +24,7 @@ class BackupApp(object):
     def load_config(self, configdir=None):
         self.config.open(configdir)
         
-        plugins_to_load = ['git']
+        plugins_to_load = self.config.active_plugins
         for plugin in plugins_to_load:
             if not self._load_plugin(plugin):
                 sys.stderr.write('Failed to log plugin %s\n' % plugin)

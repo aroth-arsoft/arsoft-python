@@ -24,6 +24,7 @@ class BackupConfigDefaults(object):
     SSH_IDENTITY_FILE = None
     USE_TIMESTAMP_FOR_BACKUP_DIR = True
     TIMESTAMP_FORMAT_FOR_BACKUP_DIR = '%Y%m%d%H%M%S'
+    ACTIVE_PLUGINS = ['git', 'dir']
 
 class BackupConfig(object):
     def __init__(self, config_dir=BackupConfigDefaults.CONFIG_DIR, 
@@ -40,6 +41,7 @@ class BackupConfig(object):
                  ssh_identity_file=BackupConfigDefaults.SSH_IDENTITY_FILE,
                  use_timestamp_for_backup_dir=BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR,
                  timestamp_format_for_backup_dir=BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR,
+                 active_plugins=BackupConfigDefaults.ACTIVE_PLUGINS,
                  filelist_include=None, 
                  filelist_exclude=None):
         self.config_dir = config_dir
@@ -58,6 +60,7 @@ class BackupConfig(object):
         self.ssh_identity_file = ssh_identity_file
         self.use_timestamp_for_backup_dir = use_timestamp_for_backup_dir
         self.timestamp_format_for_backup_dir = timestamp_format_for_backup_dir
+        self.active_plugins = active_plugins
 
     def clear(self):
         self.config_dir = BackupConfigDefaults.CONFIG_DIR
@@ -75,6 +78,7 @@ class BackupConfig(object):
         self.ssh_identity_file = BackupConfigDefaults.SSH_IDENTITY_FILE
         self.use_timestamp_for_backup_dir = BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR
         self.timestamp_format_for_backup_dir = BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR
+        self.active_plugins = BackupConfigDefaults.ACTIVE_PLUGINS
 
     @property
     def retention_time(self):
@@ -199,6 +203,7 @@ class BackupConfig(object):
         self.timestamp_format_for_backup_dir = inifile.get(None, 'TimestampFormatForBackupDir', BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR)
         self.filelist_include_dir = inifile.get(None, 'FileListIncludeDirectory', BackupConfigDefaults.INCLUDE_DIR)
         self.filelist_exclude_dir = inifile.get(None, 'FileListExcludeDirectory', BackupConfigDefaults.EXCLUDE_DIR)
+        self.active_plugins = inifile.getAsArray(None, 'ActivePlugins', BackupConfigDefaults.ACTIVE_PLUGINS)
         return ret
         
     def _write_main_conf(self, filename):
@@ -219,6 +224,7 @@ class BackupConfig(object):
         inifile.set(None, 'TimestampFormatForBackupDir', self.timestamp_format_for_backup_dir)
         inifile.set(None, 'FileListIncludeDirectory', self.filelist_include_dir)
         inifile.set(None, 'FileListExcludeDirectory', self.filelist_exclude_dir)
+        inifile.set(None, 'ActivePlugins', self.active_plugins)
 
         ret = inifile.save(filename)
         return ret
@@ -238,6 +244,7 @@ class BackupConfig(object):
         ret = ret + 'ssh identity file: ' + str(self.ssh_identity_file) + '\n'
         ret = ret + 'use timestamp for backup dirs: ' + str(self.use_timestamp_for_backup_dir) + '\n'
         ret = ret + 'timestamp format for backup dirs: ' + str(self.timestamp_format_for_backup_dir) + '\n'
+        ret = ret + 'active plugins: ' + str(self.active_plugins) + '\n'
         return ret
 
 class BackupPluginConfig(object):
