@@ -11,7 +11,6 @@ class BackupConfigDefaults(object):
     CONFIG_DIR = '/etc/arsoft-backup'
     MAIN_CONF = 'main.conf'
     CONFIG_FILE_EXTENSTION = '.conf'
-    REPOSITORY_LIST = 'repository_list.conf'
     INCLUDE_DIR = 'include.d'
     EXCLUDE_DIR = 'exclude.d'
     FILESYSTEM = 'ext4'
@@ -42,8 +41,7 @@ class BackupConfig(object):
                  use_timestamp_for_backup_dir=BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR,
                  timestamp_format_for_backup_dir=BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR,
                  filelist_include=None, 
-                 filelist_exclude=None,
-                 repository_list=BackupConfigDefaults.REPOSITORY_LIST):
+                 filelist_exclude=None):
         self.config_dir = config_dir
         self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
         self.filesystem = filesystem
@@ -60,7 +58,6 @@ class BackupConfig(object):
         self.ssh_identity_file = ssh_identity_file
         self.use_timestamp_for_backup_dir = use_timestamp_for_backup_dir
         self.timestamp_format_for_backup_dir = timestamp_format_for_backup_dir
-        self.repository_list = repository_list
 
     def clear(self):
         self.config_dir = BackupConfigDefaults.CONFIG_DIR
@@ -78,7 +75,6 @@ class BackupConfig(object):
         self.ssh_identity_file = BackupConfigDefaults.SSH_IDENTITY_FILE
         self.use_timestamp_for_backup_dir = BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR
         self.timestamp_format_for_backup_dir = BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR
-        self.repository_list = BackupConfigDefaults.REPOSITORY_LIST
 
     @property
     def retention_time(self):
@@ -128,21 +124,6 @@ class BackupConfig(object):
         else:
             self._filelist_exclude = None
 
-    @property
-    def repository_list(self):
-        return self._repository_list
-
-    @repository_list.setter
-    def repository_list(self, value):
-        if value is not None:
-            if isinstance(value, FileList):
-                self._repository_list = value
-            else:
-                full_filename = os.path.normpath(os.path.join(self.config_dir, value))
-                self._repository_list = FileList(full_filename)
-        else:
-            self._repository_list = None
-
     def open(self, config_dir=None):
         if config_dir is None:
             config_dir = self.config_dir
@@ -175,7 +156,6 @@ class BackupConfig(object):
         # reload the file lists
         self.filelist_include = self.filelist_exclude_dir
         self.filelist_exclude = self.filelist_exclude_dir
-        self.repository_list = BackupConfigDefaults.REPOSITORY_LIST
 
         return ret
 
@@ -195,14 +175,10 @@ class BackupConfig(object):
         if self.filelist_exclude:
             self.filelist_exclude.save(filelist_path)
 
-        filelist_path = os.path.join(config_dir, BackupConfigDefaults.REPOSITORY_LIST)
-        if self._repository_list:
-            self._repository_list.save(filelist_path)
-
         return ret
 
     def get_plugin_config_file(self, plugin_name):
-        return os.path.join(config_dir, plugin_name + BackupConfigDefaults.CONFIG_FILE_EXTENSTION)
+        return os.path.join(self.config_dir, plugin_name + BackupConfigDefaults.CONFIG_FILE_EXTENSTION)
 
     def get_plugin_config(self, plugin_name):
         return BackupPluginConfig(self, plugin_name=plugin_name)
@@ -262,16 +238,16 @@ class BackupConfig(object):
         ret = ret + 'ssh identity file: ' + str(self.ssh_identity_file) + '\n'
         ret = ret + 'use timestamp for backup dirs: ' + str(self.use_timestamp_for_backup_dir) + '\n'
         ret = ret + 'timestamp format for backup dirs: ' + str(self.timestamp_format_for_backup_dir) + '\n'
-        ret = ret + 'repository list: ' + str(self._repository_list) + '\n'
         return ret
 
 class BackupPluginConfig(object):
     def __init__(self, 
-                 parent, 
+                 backup_app, 
                  plugin_name=None,
                  retention_time=None 
                  ):
-        self.parent = parent
+        self.backup_app = backup_app
+        self.parent = backup_app.config
         self.plugin_name = plugin_name
         self._retention_time = retention_time
 
@@ -296,20 +272,43 @@ class BackupPluginConfig(object):
         else:
             self._retention_time = None
 
-    def _read_conf(self):
+    @property
+    def intermediate_backup_directory(self):
+        ret = self.parent.intermediate_backup_directory
+        if ret is None:
+            ret = self.parent.backup_directory
+        ret = os.path.join(ret, self.plugin_name)
+        return ret
+    
+    @property
+    def base_directory(self):
+        ret = self.parent.intermediate_backup_directory
+        if ret is None:
+            ret = self.parent.backup_directory
+        return ret
+    
+    def _read_conf(self, inifile):
+        return True
+    
+    def _write_conf(self, inifile):
+        return True
+
+    def load(self):
         filename = self.parent.get_plugin_config_file(self.plugin_name)
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(filename)
         self.retention_time = datetime.timedelta(seconds=float(inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)))
+        ret = self._read_conf(inifile)
         return ret
         
-    def _write_conf(self):
+    def save(self):
         filename = self.parent.get_plugin_config_file(self.plugin_name)
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         # read existing file
         inifile.open(filename)
         # and modify it according to current config
         inifile.set(None, 'RetentionTime', self.retention_time.total_seconds())
+        ret = self._write_conf(inifile)
         ret = inifile.save(filename)
         return ret
 

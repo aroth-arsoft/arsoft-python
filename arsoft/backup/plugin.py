@@ -8,5 +8,11 @@ class BackupPlugin(object):
     def __init__(self, backup_app, name):
         self.name = name
         self.backup_app = backup_app
-        self.config = BackupPluginConfig(parent=backup_app.config, plugin_name=self.name)
+        if not hasattr(self, 'config'):
+            self.config = BackupPluginConfig(backup_app=backup_app.config, plugin_name=self.name)
+        # load the configuration of this plugin on start
+        self.config.load()
 
+    def _mkdir(self, dirname):
+        # forward request to app
+        return self.backup_app._mkdir(dirname)

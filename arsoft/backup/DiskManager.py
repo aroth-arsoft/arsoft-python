@@ -16,7 +16,7 @@ class DiskManager(object):
     def load(self):
         return self._mgr.rescan_empty_scsi_hosts()
     
-    def is_disc_ready(self):
+    def is_disk_ready(self):
         return True
  
 if __name__ == "__main__":

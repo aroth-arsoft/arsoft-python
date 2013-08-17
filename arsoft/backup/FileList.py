@@ -88,6 +88,10 @@ class FileListItem(object):
             self._items = self._items.union(newitems)
         else:
             self._items.add(item)
+            
+    def extend(self, list):
+        for item in list:
+            self.append(item)
 
     @property
     def filename(self):
@@ -128,6 +132,14 @@ class FileList(object):
         self._base_directory = base_directory
         if filename is not None:
             self.open(filename)
+            
+    @staticmethod
+    def from_list(list, base_directory=None):
+        ret = FileList(filename=None, base_directory=base_directory)
+        item = FileListItem(filename=None, base_directory=base_directory)
+        item.extend(list)
+        ret.append(item)
+        return ret
 
     def clear(self):
         self._items = []
