@@ -105,6 +105,23 @@ class OpenVPNAdmin(object):
         else:
             print('  %s: none' % (prefix))
 
+    def _print_crl(self, prefix, crl):
+        if crl:
+            crl_file = str(crl.filename)
+            if os.path.isfile(crl_file):
+                if not crl.valid:
+                    print('  %s: %s (invalid)' % (prefix, crl_file))
+                else:
+                    num_revoked = len(crl.revoked)
+                    if num_revoked == 0:
+                        print('  %s: %s (empty)' % (prefix, crl_file))
+                    else:
+                        print('  %s: %s (%i revoked)' % (prefix, crl_file, num_revoked))
+            else:
+                print('  %s: %s (does not exist)' % (prefix, crl_file))
+        else:
+            print('  %s: none' % (prefix))
+
     def action_status(self, selected_vpns):
         self._get_config()
         self._get_systemconfig()
@@ -144,7 +161,7 @@ class OpenVPNAdmin(object):
                         self._print_cert('Certificate file', config_file.cert_file)
                         print('  Key file: %s' % config_file.key_file)
                         self._print_cert('CA file', config_file.ca_file)
-                        self._print_cert('CRL file', config_file.crl_file)
+                        self._print_crl('CRL file', config_file.crl_file)
                         print('  DH file: %s' % config_file.dh_file)
                         
                         if config_file.server:
