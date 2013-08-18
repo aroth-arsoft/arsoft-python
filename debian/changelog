@@ -1,3 +1,9 @@
+arsoft-python (1.90) raring; urgency=low
+
+  * add arsoft-onkyo package
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 18 Aug 2013 09:53:37 +0200
+
 arsoft-python (1.89) raring; urgency=low
 
   * fixed trouble with CRL file in openvpn-status
