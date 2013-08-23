@@ -3,24 +3,18 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.utils import isRoot
-from .disk import Disk, Disks, RegisteredDiskList
+from .disk import Disk, Disks
 from .scsi import Scsi
+from .edskmgr_config import *
 import syslog
 import sys
 
-class ExternalDiskManagerDefaults(object):
-    CONF_DIR = '/etc/edskmgr/conf.d'
-
 class ExternalDiskManager(object):
 
-    def __init__(self, config_dir=None):
+    def __init__(self):
         self._verbose = False
         self._noop = False
-        if config_dir:
-            self._config_dir = config_dir
-        else:
-            self._config_dir = ExternalDiskManagerDefaults.CONF_DIR
-        self._config = None
+        self.config = ExternalDiskManagerConfig()
         self._udev_devtype = None
         self._udev_devname = None
         self._udev_action = None
@@ -37,10 +31,14 @@ class ExternalDiskManager(object):
     def err(self, msg):
         sys.stderr.write(msg)
         syslog.syslog(syslog.LOG_ERR, msg)
-        
+
+    @property
+    def hook_dir(self):
+        return self.config.hook_dir
+
     @property
     def config_dir(self):
-        return self._config_dir
+        return self.config.config_dir
 
     def checkRoot(self):
         if isRoot():
@@ -52,37 +50,23 @@ class ExternalDiskManager(object):
             ret = True
         return ret
 
-    def read_config(self, config_dir=None):
-        if config_dir is None:
-            config_dir = self._config_dir
+    def load_config(self, configdir=None):
+        self.config.open(configdir)
 
-        self._config_internal_disks = RegisteredDiskList(config_dir, 'INTERNAL_DISKS')
-        self._config_internal_disks.load()
-        self._config_external_disks = RegisteredDiskList(config_dir, 'EXTERNAL_DISKS')
-        self._config_external_disks.load()
-        ret = True
-        return ret
-    
     def write_config(self, config_dir=None):
-        if config_dir is None:
-            config_dir = self._config_dir
-
-        self._config_internal_disks.save()
-        self._config_external_disks.save()
-        ret = True
-        return ret
+        return self.config.save(config_dir)
 
     def is_internal_disk(self, diskobj):
         ret = False
         found = False
         if not found:
-            for pattern in self._config_internal_disks.disks:
+            for pattern in self.config.internal_disks.disks:
                 if diskobj.match(pattern):
                     ret = True
                     found = True
                     break
         if not found:
-            for pattern in self._config_external_disks.disks:
+            for pattern in self.config.external_disks.disks:
                 if diskobj.match(pattern):
                     ret = False
                     found = True
@@ -100,24 +84,31 @@ class ExternalDiskManager(object):
 
     @property
     def internal_disks(self):
-        return self._config_internal_disks.disks
+        return self.config.internal_disks.disks
 
     @property
     def external_disks(self):
-        return self._config_external_disks.disks
+        return self.config.external_disks.disks
 
     def show_status(self):
         print('Internal disks:')
-        for disk in self._config_internal_disks.disks:
+        for disk in self.config.internal_disks.disks:
             print('  ' + disk)
         print('External disks:')
-        for disk in self._config_external_disks.disks:
+        for disk in self.config.external_disks.disks:
             print('  ' + disk)
-        print('Available disks:')
         e = Disks()
+
+        print('root partition:')
+        print(e.root_partition)
+
+        print('system drive:')
+        print(e.system_disk)
+        print('Available disks:')
         for disk_obj in e.disks:
             print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
+            print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
             print('    Internal:    %s'%('yes' if self.is_internal_disk(disk_obj) else 'no'))
 
     def load_udev_partition(self, devname):
@@ -173,6 +164,18 @@ class ExternalDiskManager(object):
                 self.log('skip internal disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
         return ret
 
+    def reset_config(self):
+        ret = True
+        disk_mgr = Disks()
+        for disk_obj in disk_mgr.disks:
+            print(disk_obj.match_pattern)
+            if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=False):
+                self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+                ret = False
+            else:
+                self.log('register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+        return ret
+
     def register_disk(self, devices, external=True):
         ret = True
         disk_mgr = Disks()
@@ -180,21 +183,21 @@ class ExternalDiskManager(object):
             disk_obj = disk_mgr.find_disk_from_user_input(devname)
             if disk_obj:
                 print(disk_obj.match_pattern)
-                if not self._config.register_disk(disk_obj.disk_name, disk_obj.match_pattern):
+                if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external):
                     self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                     ret = False
                 else:
                     self.log('register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
         return ret
 
-    def unregister_disk(self, devices):
+    def unregister_disk(self, devices, external=True):
         ret = True
         disk_mgr = Disks()
         for devname in devices:
             disk_obj = disk_mgr.find_disk_from_user_input(devname)
             if disk_obj:
                 print(disk_obj.match_pattern)
-                if not self._config.unregister_disk(disk_obj.disk_name, disk_obj.match_pattern):
+                if not self.config.unregister_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external):
                     self.err('failed to unregister disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                     ret = False
                 else:
