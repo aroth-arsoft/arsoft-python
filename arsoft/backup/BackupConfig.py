@@ -5,7 +5,7 @@
 import os.path
 import datetime
 from arsoft.inifile import IniFile
-from FileList import *
+from arsoft.filelist import *
 
 class BackupConfigDefaults(object):
     CONFIG_DIR = '/etc/arsoft-backup'

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from .FileList import *
+from arsoft.filelist import *
 from .BackupConfig import *
 from .plugin import *
 import sys

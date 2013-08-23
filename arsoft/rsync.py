@@ -3,8 +3,8 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import tempfile
-from FileList import *
-from arsoft.utils import runcmdAndGetData
+from .filelist import *
+from .utils import runcmdAndGetData
 import urlparse
 import sys
 
