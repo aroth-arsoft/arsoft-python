@@ -6,10 +6,7 @@ import tempfile
 from FileList import *
 from arsoft.utils import runcmdAndGetData
 import urlparse
-import subprocess
 import sys
-
-(python_major, python_minor, python_micro, python_releaselevel, python_serial) = sys.version_info
 
 class RsyncDefaults(object):
     RSYNC_BIN = '/usr/bin/rsync'
