@@ -109,7 +109,6 @@ def initialize_settings(settings_module, setttings_file):
 
     # Python dotted path to the WSGI application used by Django's runserver.
     settings_obj.WSGI_APPLICATION = appname + '.wsgi.application'
-    
 
     settings_obj.SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 
@@ -130,32 +129,36 @@ def initialize_settings(settings_module, setttings_file):
             settings_obj.STATICFILES_DIRS = [ app_static_dir ]
         else:
             settings_obj.STATICFILES_DIRS = []
-        settings_obj.STATICFILES_FINDERS = [ 'django.contrib.staticfiles.finders.FileSystemFinder', 'django.contrib.staticfiles.finders.AppDirectoriesFinder' ]
     else:
         settings_obj.STATICFILES_DIRS = [ os.path.join(app_etc_dir, 'static') ]
-        settings_obj.STATICFILES_FINDERS = [ 'django.contrib.staticfiles.finders.FileSystemFinder' ]
+    settings_obj.STATICFILES_FINDERS = [ 'django.contrib.staticfiles.finders.FileSystemFinder', 'django.contrib.staticfiles.finders.AppDirectoriesFinder' ]
 
+    # set up the template directories and loaders
     if in_devserver:
         app_template_dir = os.path.join(appdir, 'templates')
         if os.path.exists(app_template_dir):
             settings_obj.TEMPLATE_DIRS = [ app_template_dir ]
         else:
             settings_obj.TEMPLATE_DIRS = []
-        settings_obj.TEMPLATE_LOADERS = [ 'django.template.loaders.filesystem.Loader', 'django.template.loaders.app_directories.Loader' ]
     else:
         settings_obj.TEMPLATE_DIRS = [ os.path.join(app_etc_dir, 'templates') ]
-        settings_obj.TEMPLATE_LOADERS = [ 'django.template.loaders.filesystem.Loader' ]
+    # always include the app_directories loader to get templates from various applications
+    # working (e.g. admin)
+    settings_obj.TEMPLATE_LOADERS = [ 'django.template.loaders.filesystem.Loader', 'django.template.loaders.app_directories.Loader' ]
 
+    # set config directory
     if in_devserver:
         settings_obj.CONFIG_DIR = os.path.join(appdir, 'config')
     else:
         settings_obj.CONFIG_DIR = os.path.join(app_etc_dir, 'config')
 
+    # set application data directory
     if in_devserver:
         settings_obj.APP_DATA_DIR = os.path.join(appdir, 'data')
     else:
         settings_obj.APP_DATA_DIR = app_data_dir
 
+    # and finally set up the list of installed applications
     settings_obj.INSTALLED_APPS = [
             'django.contrib.auth',
             'django.contrib.contenttypes',
@@ -201,17 +204,30 @@ def initialize_settings(settings_module, setttings_file):
                 'mail_admins': {
                     'level': 'ERROR',
                     'filters': ['require_debug_false'],
-                    'class': 'django.utils.log.AdminEmailHandler'
-                }
+                    'class': 'django.utils.log.AdminEmailHandler',
+                    # But the emails are plain text by default - HTML is nicer
+                    'include_html': True,
+                },
+                # Log to a text file that can be rotated by logrotate
+                'logfile': {
+                    'class': 'logging.handlers.WatchedFileHandler',
+                    'filename': '/var/log/django/' + appname + '.log'
+                },
             },
             'loggers': {
                 'django.request': {
-                    'handlers': ['mail_admins'],
+                    'handlers': ['mail_admins', 'logfile'],
+                    'level': 'ERROR',
+                    'propagate': True,
+                },
+                # Might as well log any errors anywhere else in Django
+                'django': {
+                    'handlers': ['logfile'],
                     'level': 'ERROR',
                     'propagate': True,
                 },
                 appname: {
-                    'handlers': ['console'],
+                    'handlers': ['console', 'logfile'],
                     'level': 'DEBUG',
                     'propagate': True,
                 },
