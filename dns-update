@@ -147,7 +147,7 @@ class dns_update_app(object):
         parser.add_argument('--server', dest='server', default=self.DEFAULT_SERVER, help='name of the DNS server for updates')
         parser.add_argument('--rrtype', dest='rrtype', default=self.DEFAULT_RRTYPE, help='specify the RR type for the next operation')
         parser.add_argument('--ttl', dest='ttl', default=self.DEFAULT_TTL, help='specify the TTL for the records')
-        parser.add_argument('--key', dest='keyfile', default=self.DEFAULT_KEYFILE, help='key to use for the update')
+        parser.add_argument('-k', '--key', dest='keyfile', default=self.DEFAULT_KEYFILE, help='key to use for the update')
 
         parser.add_argument('-a', '--add', dest='add', nargs='+', help='adds the given DNS record; name value')
         parser.add_argument('-d', '--delete', dest='delete', nargs='+', help='deletes the specified DNS record')
