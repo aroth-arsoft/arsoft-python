@@ -124,6 +124,7 @@ def _read_key_file_tsig(filename):
             key_data = m.group(2)
             keyalgorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
             secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
+            secret = base64.decodestring(secret)
         except AttributeError:
             keyname = None
             raise
@@ -164,6 +165,7 @@ def _read_key_data_tsig(data):
         key_data = m.group(2)
         keyalgorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
         secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
+        secret = base64.decodestring(secret)
     except AttributeError:
         keyname = None
         raise
@@ -229,16 +231,22 @@ def use_key_file(update_obj, keyfile, format=KeyFileFormat.Zone):
     keys = read_key_file(keyfile, format)
     if keys:
         keyalgorithm = None
+        keyprotocol = None
         first_keyname = None
         keyring = {}
         for (keyname, keydata) in keys.iteritems():
             if keyalgorithm is None:
                 keyalgorithm = keydata['algorithm']
+            if keyprotocol is None:
+                keyprotocol = keydata['protocol']
             if first_keyname  is None:
                 first_keyname = keyname
             keyring[keyname] = keydata['secret']
-            
-        update_obj.keyalgorithm = keyalgorithm
+
+        if keyprotocol:
+            update_obj.keyalgorithm = get_algorithm_for_number(keyprotocol)
+        else:
+            update_obj.keyalgorithm = keyalgorithm
         update_obj.keyname = first_keyname
         update_obj.keyring = keyring
         ret = True

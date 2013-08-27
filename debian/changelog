@@ -1,3 +1,9 @@
+arsoft-python (1.92) raring; urgency=low
+
+  * fixed in DNS key loading
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 27 Aug 2013 19:41:40 +0200
+
 arsoft-python (1.91) raring; urgency=low
 
   * various update and minor improvements
