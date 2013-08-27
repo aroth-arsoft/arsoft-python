@@ -90,11 +90,14 @@ def _read_key_file_zone(filename):
             keyline = line.strip()
             #print('keyline %s' % keyline)
             keyline_elems = keyline.rsplit(' ')
-            keyprotocol = int(keyline_elems[4])
-            keyalgorithm = get_algorithm_for_number(int(keyline_elems[5]))
-            keyname = dns.name.from_text(keyline_elems[0])
-            secret = base64.decodestring(''.join(keyline_elems[6:]))
-            ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
+            try:
+                keyprotocol = int(keyline_elems[4])
+                keyalgorithm = get_algorithm_for_number(int(keyline_elems[5]))
+                keyname = dns.name.from_text(keyline_elems[0])
+                secret = base64.decodestring(''.join(keyline_elems[6:]))
+                ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
+            except IndexError:
+                ret = None
         f.close()
     except IOError:
         ret = None
@@ -105,20 +108,22 @@ def _read_key_file_tsig(filename):
     Return a keyring object with the key name and TSIG secret."""
 
     if hasattr(filename, 'read'):
-        key_struct = filename.read()
+        data = filename.read()
     else:
         try:
             f = open(filename, 'r')
-            key_struct = f.read()
+            data = f.read()
             f.close()
         except IOError:
-            key_struct = None
+            data = None
 
-    if key_struct:
+    if data:
         try:
-            key_data = re.search(r"key \"%s\" \{(.*?)\}\;" % key_name, key_struct, re.DOTALL).group(1)
-            algorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
-            tsig_secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
+            m = re.search(r"key \"([a-zA-Z0-9_-]+?)\" \{(.*?)\}\;", data, re.DOTALL)
+            keyname = dns.name.from_text(m.group(1))
+            key_data = m.group(2)
+            keyalgorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
+            secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
         except AttributeError:
             keyname = None
             raise
@@ -155,7 +160,7 @@ def _read_key_data_tsig(data):
     Return a keyring object with the key name and TSIG secret."""
     try:
         m = re.search(r"key \"([a-zA-Z0-9_-]+?)\" \{(.*?)\}\;", data, re.DOTALL)
-        keyname = m.group(1)
+        keyname = dns.name.from_text(m.group(1))
         key_data = m.group(2)
         keyalgorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
         secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
@@ -177,7 +182,8 @@ def _read_key_file_private(filename, keyname=None):
             basename = os.path.basename(filename)
             if basename[0] == 'K':
                 (basename, ext) = os.path.splitext(basename[1:])
-                (keyname, keyprotocol, keyid) = basename.split('+', 2)
+                (keyname_text, keyprotocol, keyid) = basename.split('+', 2)
+                keyname = dns.name.from_text(keyname_text)
 
     f = arsoft.inifile.IniFile(commentPrefix='#', keyValueSeperator=' ', disabled_values=False, keyIsWord=False)
     if f.open(filename):
