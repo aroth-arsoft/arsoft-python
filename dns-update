@@ -61,7 +61,8 @@ class dns_update_app(object):
                 for update in self._updates:
                     if update.origin == Origin:
                         return update
-                ret = dns.update.Update(Origin, keyring=self.keyring)
+                ret = dns.update.Update(Origin)
+                arsoft.dnsutils.use_key_file(ret, self.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic)
                 self._updates[name] = ret
         return ret
     
@@ -162,11 +163,7 @@ class dns_update_app(object):
         self.ttl = args.ttl
         self.rrtype = args.rrtype
         self.server = args.server
-        
-        if args.keyfile:
-            self.keyring = arsoft.dnsutils.read_key_file(args.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic)
-        else:
-            self.keyring = None
+        self.keyfile = args.keyfile
 
         perform_update = True
 
