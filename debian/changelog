@@ -1,3 +1,9 @@
+arsoft-python (1.93) raring; urgency=low
+
+  * fixed dns-update when using a keyfile
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 28 Aug 2013 10:39:53 +0200
+
 arsoft-python (1.92) raring; urgency=low
 
   * fixed in DNS key loading
