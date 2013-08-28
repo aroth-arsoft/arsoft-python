@@ -169,7 +169,10 @@ def initialize_settings(settings_module, setttings_file):
             'arsoft.web',
             appname
             ]
-
+    if in_devserver:
+        settings_obj.LOG_DIR = os.path.join(appdir, 'data')
+    else:
+        settings_obj.LOG_DIR = '/var/log/django'
     # A sample logging configuration. The only tangible logging
     # performed by this configuration is to send an email to
     # the site admins on every HTTP 500 error when DEBUG=False.
@@ -211,7 +214,7 @@ def initialize_settings(settings_module, setttings_file):
                 # Log to a text file that can be rotated by logrotate
                 'logfile': {
                     'class': 'logging.handlers.WatchedFileHandler',
-                    'filename': '/var/log/django/' + appname + '.log'
+                    'filename': os.path.join(settings_obj.LOG_DIR, appname + '.log')
                 },
             },
             'loggers': {
