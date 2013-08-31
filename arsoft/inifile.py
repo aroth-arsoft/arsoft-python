@@ -3,6 +3,8 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import re
+import datetime
+from .timestamp import timestamp_from_datetime
 
 class IniSection(object):
     inifile = None
@@ -532,6 +534,35 @@ class IniFile(object):
             ret = section_obj.getAsArray(key, default)
         return ret
 
+    def getAsDateTime(self, section, key, default=None, date_format='%a, %d %b %Y %H:%M:%S %z'):
+        value = self.get(section, key, default)
+        if value is not None:
+            if isinstance(value, datetime.datetime):
+                ret = value
+            else:
+                try:
+                    ret = datetime.datetime.strptime(value)
+                except ValueError:
+                    ret = default
+        else:
+            ret = default
+        return ret
+
+    def getAsTimestamp(self, section, key, default=None):
+        value = self.get(section, key, default)
+        if value is not None:
+            if isinstance(value, datetime.datetime):
+                ret = value
+            else:
+                try:
+                    num = float(value)
+                    ret = datetime.datetime.fromtimestamp(num)
+                except ValueError:
+                    ret = default
+        else:
+            ret = default
+        return ret
+
     def set(self, section, key, value, comment=None):
         section_obj = self._getSection(section)
         if section_obj is None:
@@ -542,6 +573,37 @@ class IniFile(object):
     def setAsBoolean(self, section, key, value, comment=None):
         if value is not None:
             real_value = 'true' if value else 'false'
+        else:
+            real_value = None
+        return self.set(section, key, real_value, comment)
+
+    def setAsDateTime(self, section, key, value, comment=None, date_format='%a, %d %b %Y %H:%M:%S %z'):
+        if value is not None:
+            if isinstance(value, datetime.datetime):
+                real_value = value.strftime(date_format)
+            elif isinstance(value, datetime.date):
+                tmp_value = datetime.datetime.combine(value, datetime.time.min)
+                real_value = tmp_value.strftime(date_format)
+            elif isinstance(value, datetime.time):
+                tmp_value = datetime.datetime.combine(datetime.date.min, value)
+                real_value = tmp_value.strftime(date_format)
+            else:
+                raise ValueError
+        else:
+            real_value = None
+        return self.set(section, key, real_value, comment)
+
+    def setAsTimestamp(self, section, key, value, comment=None):
+        if value is not None:
+            if isinstance(value, datetime.datetime):
+                real_value = timestamp_from_datetime(value)
+            elif isinstance(value, datetime.date):
+                tmp_value = datetime.datetime.combine(value, time.min)
+                real_value = timestamp_from_datetime(tmp_value)
+            elif isinstance(value, datetime.time):
+                real_value = value.time()
+            else:
+                raise ValueError
         else:
             real_value = None
         return self.set(section, key, real_value, comment)
