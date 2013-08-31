@@ -135,3 +135,14 @@ def format_timedelta(delta):
     else:
         ret = '%i seconds' % (secs)
     return ret
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+def timestamp_from_datetime(datetime_obj):
+    "Return POSIX timestamp as float"
+    if datetime_obj.tzinfo is None:
+        return time.mktime((datetime_obj.year, datetime_obj.month, datetime_obj.day,
+                                datetime_obj.hour, datetime_obj.minute, datetime_obj.second,
+                                -1, -1, -1)) + datetime_obj.microsecond / 1e6
+    else:
+        return (datetime_obj - _EPOCH).total_seconds()
