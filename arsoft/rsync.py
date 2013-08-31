@@ -12,7 +12,7 @@ class RsyncDefaults(object):
     RSYNC_BIN = '/usr/bin/rsync'
 
 class Rsync(object):
-    def __init__(self, source, dest, include=None, exclude=None, 
+    def __init__(self, source, dest, include=None, exclude=None, linkDest=None,
                  recursive=True, relative=False,
                  preservePermissions=True, preserveOwner=True, preserveGroup=True, preserveTimes=True, 
                  preserveDevices=True, preserveSpecials=True, perserveACL=False, preserveXAttrs=False,
@@ -24,6 +24,7 @@ class Rsync(object):
         self._rsync_bin = rsync_bin
         self._source = source
         self._dest = dest
+        self.linkDest = linkDest
         self.verbose = verbose
         self.recursive = recursive
         self.relative = relative
@@ -133,6 +134,9 @@ class Rsync(object):
             args.append('--exclude-from=' + tmp_exclude)
             if self.verbose:
                 print(self._exclude)
+
+        if self.linkDest:
+            args.append('--link-dest=' + self.linkDest)
 
         if isinstance(self._source, FileList):
             tmp_fd, tmp_source = tempfile.mkstemp()
