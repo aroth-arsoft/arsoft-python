@@ -168,6 +168,7 @@ class BackupConfig(object):
             config_dir = self.config_dir
         else:
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
+            self.config_dir = config_dir
 
         ret = self._write_main_conf(self.main_conf)
 
