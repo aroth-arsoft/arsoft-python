@@ -176,7 +176,9 @@ class Disk(Device):
         return ret
 
     def __str__(self):
-        ret = 'vendor=' + str(self.vendor) + ' model=' + str(self.model) +\
+        ret = Device.__str__(self) +\
+            ' vendor=' + str(self.vendor) + \
+            ' model=' + str(self.model) +\
             ' serial=' + str(self.serial) +\
             ' mounted=' + ','.join(self.mountpath) +\
             ''
@@ -235,7 +237,7 @@ class Partition(Device):
         return ret
 
     def __str__(self):
-        ret = 'nativepath=' + str(self.nativepath) +\
+        ret = Device.__str__(self) +\
             ' uuid=' + str(self.uuid) +\
             ' label=' + str(self.label) +\
             ''
@@ -292,7 +294,7 @@ class Lvm2PV(Partition):
         return Disks._get_device_property(self._device_props, "LinuxLvm2PVUuid")
 
     def __str__(self):
-        ret = 'nativepath=' + str(self.nativepath) +\
+        ret = Partition.__str__(self) +\
             ' uuid=' + str(self.uuid) +\
             ' groupUuid=' + str(self.group_uuid) +\
             ' groupName=' + str(self.group_name) +\
@@ -329,7 +331,7 @@ class Lvm2LV(Device):
         self._device_if.LinuxLvm2LVStop(options)
 
     def __str__(self):
-        ret = 'nativepath=' + str(self.nativepath) +\
+        ret = Device.__str__(self) +\
             ' uuid=' + str(self.uuid) +\
             ' name=' + str(self.name) +\
             ' groupUuid=' + str(self.group_uuid) +\
@@ -423,7 +425,7 @@ class Disks(object):
                 ret.append(dev)
         return ret
 
-    def find_disk(self, devfile):
+    def find_device(self, devfile):
         if not Disks._dbus_connect():
             return None
         path = Disks._udisks_manager.FindDeviceByDeviceFile(devfile)
@@ -438,7 +440,9 @@ class Disks(object):
             # given argument might be a device file
             s = os.stat(devname)
             if stat.S_ISBLK(s.st_mode):
-                ret = self.find_disk(devname)
+                ret = self.find_device(devname)
+                if ret:
+                    ret = self.find_disk_for_device(ret)
             else:
                 ret = None
         else:
@@ -450,7 +454,7 @@ class Disks(object):
             ret = devobj.slave
         elif isinstance(devobj, Lvm2LV):
             ret = []
-            print('got group devices=' + str(devobj.group_devices))
+            #print('got group devices=' + str(devobj.group_devices))
             for dev in devobj.group_devices:
                 if isinstance(dev, Partition):
                     ret.append(dev.slave)
