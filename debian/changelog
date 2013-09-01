@@ -1,3 +1,9 @@
+arsoft-python (1.94) raring; urgency=low
+
+  * more advanced in edskmgr 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 01 Sep 2013 18:06:31 +0200
+
 arsoft-python (1.93) raring; urgency=low
 
   * fixed dns-update when using a keyfile
