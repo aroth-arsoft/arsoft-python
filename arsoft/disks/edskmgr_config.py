@@ -21,11 +21,27 @@ class RegisteredDiskList(object):
         self._last_error = None
         self._dirty = False
 
+    def reset(self):
+        ret = True
+        # remove all items to make sure the config is clean
+        for (filename, item) in self._config_items.iteritems():
+            if os.path.exists(filename):
+                try:
+                    os.remove(filename)
+                except OSError as e:
+                    self._last_error = str(e)
+                    ret = False
+            else:
+                # file is already gone, which is fine
+                pass
+        self.clear()
+        return ret
+
     @property
     def disks(self):
         ret = []
         for item in self._config_items.itervalues():
-            value = item.get(section, self._key, default=None)
+            value = item.get(None, self._key, default=None)
             if value:
                 ret.append( value )
         return ret
@@ -67,11 +83,15 @@ class RegisteredDiskList(object):
             # only save the config when it's marked as dirty
             for (filename, item) in self._config_items.iteritems():
                 if item.empty:
-                    try:
-                        os.remove(filename)
-                    except OSError as e:
-                        self._last_error = str(e)
-                        ret = False
+                    if os.path.exists(filename):
+                        try:
+                            os.remove(filename)
+                        except OSError as e:
+                            self._last_error = str(e)
+                            ret = False
+                    else:
+                        # file is already gone, which is fine
+                        pass
                 elif not item.save():
                     ret = False
         return ret
@@ -85,25 +105,25 @@ class RegisteredDiskList(object):
                 found_in_file = item
         if not found_in_file:
             # create new config item
-            filename = re.sub(r'[ ]', '_', name)
+            filename = re.sub(r'[\s]', '_', name)
             fullpath = os.path.join(self.path, filename + '.conf')
             item = IniFile(filename=fullpath, commentPrefix='#', keyValueSeperator='=', disabled_values=False)
             item.set(None, self._key, pattern)
             self._config_items[fullpath] = item
             self._dirty = True
         return True
-        
+
     def unregister_disk(self, name, pattern):
-        print('unregister_disk %s, %s' %(name, pattern))
+        #print('unregister_disk %s, %s' %(name, pattern))
         # first check if the pattern already exists
         ret = False
         for item in self._config_items.itervalues():
             value = item.get(None, self._key, default=None)
             if value and value == pattern:
-                print('remove ' + self._key)
+                #print('remove ' + self._key)
                 ret = item.remove(None, self._key)
                 if ret:
-                    print('ini=' + item.asString())
+                    #print('ini=' + item.asString())
                     self._dirty = True
                 break
         return ret
@@ -228,11 +248,21 @@ class ExternalDiskManagerConfig(object):
         ret = inifile.save(filename)
         return ret
     
+    def reset(self):
+        self._external_disks.reset()
+        self._internal_disks.reset()
+        return True
 
     def register_disk(self, name, pattern, external=True):
         if external:
+            # when register a external disk remove the same disk from the internal lists
+            if self._internal_disks.unregister_disk(name, pattern):
+                self._internal_disks.save()
             ret = self._external_disks.register_disk(name, pattern)
         else:
+            # when register a internal disk remove the same disk from the external lists
+            if self._external_disks.unregister_disk(name, pattern):
+                self._external_disks.save()
             ret = self._internal_disks.register_disk(name, pattern)
         return True
         
