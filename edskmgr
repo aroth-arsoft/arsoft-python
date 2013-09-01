@@ -47,12 +47,18 @@ class ExternalDiskManagerApp(object):
                 ret = 1
         elif args.load:
             if self._mgr.checkRoot():
-                ret = self._mgr.rescan_empty_scsi_hosts()
+                if not self._mgr.rescan_empty_scsi_hosts():
+                    ret = 1
+                else:
+                    ret = 0
             else:
                 ret = 1
         elif args.eject:
             if self._mgr.checkRoot():
-                ret = self._mgr.remove_external_disks()
+                if not self._mgr.remove_external_disks():
+                    ret = 1
+                else:
+                    ret = 0
             else:
                 ret = 1
         elif args.udev_disk is not None:
@@ -68,21 +74,15 @@ class ExternalDiskManagerApp(object):
             else:
                 ret = 1
         elif args.register is not None:
-            if self._mgr.checkRoot():
-                if self._mgr.register_disk(args.register):
-                    self._mgr.write_config()
-                    ret = 0
-                else:
-                    ret = 1
+            if self._mgr.register_disk(args.register):
+                self._mgr.write_config()
+                ret = 0
             else:
                 ret = 1
         elif args.unregister is not None:
-            if self._mgr.checkRoot():
-                if self._mgr.unregister_disk(args.unregister):
-                    self._mgr.write_config()
-                    ret = 0
-                else:
-                    ret = 1
+            if self._mgr.unregister_disk(args.unregister):
+                self._mgr.write_config()
+                ret = 0
             else:
                 ret = 1
         elif args.status:
