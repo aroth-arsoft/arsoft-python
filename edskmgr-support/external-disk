@@ -2,15 +2,13 @@
 
 case "$DEVTYPE" in
 	"partition")
-		/usr/bin/edskmgr --verbose --udev-partition $@
+		/usr/bin/edskmgr --udev-partition $@
 		;;
 	"disk")
-		/usr/bin/edskmgr --verbose --udev-disk $@
+		/usr/bin/edskmgr --udev-disk $@
 		;;
 	*)
 		echo "$0: unhandled device type $DEVTYPE"
 		false
 		;;
 esac
-
-
