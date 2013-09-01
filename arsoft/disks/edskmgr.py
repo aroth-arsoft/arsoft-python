@@ -97,13 +97,8 @@ class ExternalDiskManager(object):
         print('External disks:')
         for disk in self.config.external_disks.disks:
             print('  ' + disk)
+
         e = Disks()
-
-        print('root partition:')
-        print(e.root_partition)
-
-        print('system drive:')
-        print(e.system_disk)
         print('Available disks:')
         for disk_obj in e.disks:
             print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
@@ -115,13 +110,15 @@ class ExternalDiskManager(object):
         if devname is None or len(devname) == 0:
             devname = self._udev_devname
         self.log('loadUDevPartition ' + str(devname))
-        self._loadExternalPartition(devname)
+        #self._loadExternalPartition(devname)
+        return False
 
     def load_udev_disk(self, devname):
         if devname is None or len(devname) == 0:
             devname = self._udev_devname
         self.log('loadUDevDisk ' + str(devname) + ' - do nothing')
-        
+        return True
+
     def rescan_empty_scsi_hosts(self):
         if self._noop:
             ret = True
@@ -165,15 +162,15 @@ class ExternalDiskManager(object):
         return ret
 
     def reset_config(self):
-        ret = True
-        disk_mgr = Disks()
-        for disk_obj in disk_mgr.disks:
-            print(disk_obj.match_pattern)
-            if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=False):
-                self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
-                ret = False
-            else:
-                self.log('register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+        ret = self.config.reset()
+        if ret:
+            disk_mgr = Disks()
+            for disk_obj in disk_mgr.disks:
+                if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=False):
+                    self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+                    ret = False
+                else:
+                    self.log('register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
         return ret
 
     def register_disk(self, devices, external=True):
@@ -182,12 +179,13 @@ class ExternalDiskManager(object):
         for devname in devices:
             disk_obj = disk_mgr.find_disk_from_user_input(devname)
             if disk_obj:
-                print(disk_obj.match_pattern)
                 if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external):
                     self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                     ret = False
                 else:
                     self.log('register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+            else:
+                self.err('Given device name %s is not a valid block device.\n'%(devname))
         return ret
 
     def unregister_disk(self, devices, external=True):
@@ -196,10 +194,11 @@ class ExternalDiskManager(object):
         for devname in devices:
             disk_obj = disk_mgr.find_disk_from_user_input(devname)
             if disk_obj:
-                print(disk_obj.match_pattern)
                 if not self.config.unregister_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external):
                     self.err('failed to unregister disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                     ret = False
                 else:
                     self.log('unregister disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+            else:
+                self.err('Given device name %s is not a valid block device.\n'%(devname))
         return ret
