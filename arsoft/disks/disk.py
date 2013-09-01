@@ -92,7 +92,9 @@ class Device(object):
         return str(type(self)) + '[' + self._path + ']'
 
     def __str__(self):
-        ret = 'nativepath=' + str(self.nativepath) +\
+        ret = '' +\
+            'path=' + str(self.path) +\
+            ' nativepath=' + str(self.nativepath) +\
             ''
         return ret
     
@@ -417,6 +419,14 @@ class Disks(object):
         if ret is None:
             ret = Disks._create_device(self, path)
         return ret
+    
+    def _get_device_by_devpath(self, devpath):
+        ret = None
+        sys_devpath = os.path.join('/sys', devpath)
+        for dev in self._list:
+            if dev.nativepath == sys_devpath:
+                ret = dev
+        return ret
 
     def _get_devices_by_lvm2_lvgroup_uuid(self, group_uuid):
         ret = []
@@ -425,22 +435,34 @@ class Disks(object):
                 ret.append(dev)
         return ret
 
-    def find_device(self, devfile):
+    def find_device(self, devfile=None, devpath=None):
         if not Disks._dbus_connect():
             return None
-        path = Disks._udisks_manager.FindDeviceByDeviceFile(devfile)
-        if path:
-            ret = self._get_device_by_udisks_path(path)
+        if devfile is not None:
+            path = Disks._udisks_manager.FindDeviceByDeviceFile(devfile)
+            if path:
+                ret = self._get_device_by_udisks_path(path)
+            else:
+                ret = None
+        elif devpath is not None:
+            ret = self._get_device_by_devpath(devpath)
         else:
             ret = None
         return ret
     
+    def find_disk_from_devpath(self, devpath):
+        ret = self.find_device(devpath=devpath)
+        if ret:
+            if not isinstance(ret, Disk):
+                ret = self.find_disk_for_device(ret)
+        return ret
+
     def find_disk_from_user_input(self, devname):
         if os.path.exists(devname):
             # given argument might be a device file
             s = os.stat(devname)
             if stat.S_ISBLK(s.st_mode):
-                ret = self.find_device(devname)
+                ret = self.find_device(devfile=devname)
                 if ret:
                     if not isinstance(ret, Disk):
                         ret = self.find_disk_for_device(ret)
