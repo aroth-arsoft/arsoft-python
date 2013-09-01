@@ -22,20 +22,20 @@ class ExternalDiskManagerApp(object):
         parser.add_argument('--noop', dest='noop', action='store_true', help='just tests and shows what would be done.')
         parser.add_argument('--load', dest='load', action='store_true', help='rescans all empty host interfaces.')
         parser.add_argument('--reset-config', dest='reset_config', action='store_true', help='reset configuration and treat all disks as internal ones.')
-        parser.add_argument('--eject', dest='eject', action='store_true', help='removes the given external disks or all present external disks.')
-        parser.add_argument('--udev-disk', dest='udev_disk', nargs=1, metavar='DISK', help='handles disk event within udev.')
-        parser.add_argument('--udev-partition', dest='udev_partition', nargs=1, metavar='PART', help='handles partition event within udev.')
+        parser.add_argument('--eject', dest='eject', nargs='*', help='removes the given external disks or all present external disks.')
+        parser.add_argument('--udev-disk', dest='udev_disk', action='store_true', help='handles disk event within udev.')
+        parser.add_argument('--udev-partition', dest='udev_partition', action='store_true', help='handles partition event within udev.')
         parser.add_argument('--register', dest='register', nargs='+', metavar='DISK', help='registers the given disk as external HDD to the system.')
         parser.add_argument('--unregister', dest='unregister', nargs='+', metavar='DISK', help='unregisters the given disk from the known external HDDs of the system.')
         parser.add_argument('--status', dest='status', action='store_true', help='shows the status of all external disks.')
 
         args = parser.parse_args()
 
-        self._verbose = args.verbose
-        self._noop = args.noop
+        self._mgr.verbose = args.verbose
+        self._mgr.noop = args.noop
 
         self._mgr.load_config(args.configdir)
-        
+
         if args.reset_config:
             if self._mgr.reset_config():
                 if not self._mgr.write_config():
@@ -53,24 +53,26 @@ class ExternalDiskManagerApp(object):
                     ret = 0
             else:
                 ret = 1
-        elif args.eject:
+        elif args.eject is not None:
             if self._mgr.checkRoot():
-                if not self._mgr.remove_external_disks():
+                if len(args.eject) == 0:
+                    if not self._mgr.remove_external_disks():
+                        ret = 1
+                    else:
+                        ret = 0
+                else:
+                    if not self._mgr.remove_disks(args.eject):
+                        ret = 1
+                    else:
+                        ret = 0
+            else:
+                ret = 1
+        elif args.udev_disk or args.udev_partition:
+            if self._mgr.checkRoot():
+                if not self._mgr.udev_action():
                     ret = 1
                 else:
                     ret = 0
-            else:
-                ret = 1
-        elif args.udev_disk is not None:
-            if self._mgr.checkRoot():
-                self._load_udev_env()
-                ret = self._mgr.load_udev_disk(args.udev_disk)
-            else:
-                ret = 1
-        elif args.udev_partition is not None:
-            if self._mgr.checkRoot():
-                self._load_udev_env()
-                ret = self._mgr.load_udev_partition(args.udev_partition)
             else:
                 ret = 1
         elif args.register is not None:
