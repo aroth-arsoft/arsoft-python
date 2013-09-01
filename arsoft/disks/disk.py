@@ -442,7 +442,8 @@ class Disks(object):
             if stat.S_ISBLK(s.st_mode):
                 ret = self.find_device(devname)
                 if ret:
-                    ret = self.find_disk_for_device(ret)
+                    if not isinstance(ret, Disk):
+                        ret = self.find_disk_for_device(ret)
             else:
                 ret = None
         else:
