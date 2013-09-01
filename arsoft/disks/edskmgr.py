@@ -2,35 +2,37 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from arsoft.utils import isRoot
+from arsoft.utils import isRoot, runcmdAndGetData
 from .disk import Disk, Disks
 from .scsi import Scsi
 from .edskmgr_config import *
 import syslog
 import sys
+import os
 
 class ExternalDiskManager(object):
 
     def __init__(self):
-        self._verbose = False
-        self._noop = False
+        self.verbose = False
+        self.noop = False
         self.config = ExternalDiskManagerConfig()
-        self._udev_devtype = None
-        self._udev_devname = None
-        self._udev_action = None
-        self._udev_fs_label = None
-        self._udev_fs_uuid = None
 
         syslog.openlog('edskmgr', logoption=syslog.LOG_PID, facility=syslog.LOG_MAIL)
 
     def log(self, msg):
-        if self._verbose:
+        if self.verbose:
             sys.stdout.write(msg)
         syslog.syslog(syslog.LOG_DEBUG, msg)
 
     def err(self, msg):
         sys.stderr.write(msg)
         syslog.syslog(syslog.LOG_ERR, msg)
+
+    def _get_udev_env(self):
+        ret = {}
+        for envvar in ['DEVTYPE', 'DEVPATH', 'DEVNAME', 'ACTION', 'ID_FS_LABEL', 'ID_FS_UUID']:
+            ret[envvar] = os.environ[envvar] if envvar in os.environ else None
+        return ret
 
     @property
     def hook_dir(self):
@@ -43,7 +45,7 @@ class ExternalDiskManager(object):
     def checkRoot(self):
         if isRoot():
             ret = True
-        elif self._noop:
+        elif self.noop:
             ret = True
         else:
             sys.stderr.write("Warning: Not running as root. Currently running as user %s. Some operations may fail.\n" % (os.getlogin()))
@@ -102,25 +104,24 @@ class ExternalDiskManager(object):
         print('Available disks:')
         for disk_obj in e.disks:
             print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+            if self.verbose:
+                print('    Path:        %s'%(disk_obj.path))
+                print('    Native path: %s'%(disk_obj.nativepath))
             print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
             print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
             print('    Internal:    %s'%('yes' if self.is_internal_disk(disk_obj) else 'no'))
 
     def load_udev_partition(self, devname):
-        if devname is None or len(devname) == 0:
-            devname = self._udev_devname
         self.log('loadUDevPartition ' + str(devname))
         #self._loadExternalPartition(devname)
         return False
 
     def load_udev_disk(self, devname):
-        if devname is None or len(devname) == 0:
-            devname = self._udev_devname
         self.log('loadUDevDisk ' + str(devname) + ' - do nothing')
         return True
 
     def rescan_empty_scsi_hosts(self):
-        if self._noop:
+        if self.noop:
             ret = True
             self.log('rescan empty SCSI hosts successful (noop)\n')
         else:
@@ -132,33 +133,55 @@ class ExternalDiskManager(object):
                 self.err('rescan empty SCSI hosts failed, error %s\n' % (scsi_mgr.last_error))
         return ret
     
+    def _remove_disk_impl(self, disk_mgr, scsi_mgr, disk_obj):
+        if self.is_external_disk(disk_obj):
+            ret = True
+            self.log('ejecting disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+            for child_obj in disk_obj.childs:
+                self.log('  eject child %s\n'%(str(child_obj.nativepath)))
+                if child_obj.is_mounted:
+                    if self.noop:
+                        self.log('  unmount %s skipped (noop)\n'%(str(child_obj.nativepath)))
+                    elif not child_obj.unmount():
+                        self.err('  failed to unmount %s\n'%(str(child_obj.nativepath)))
+                        ret = False
+                        break
+            if ret:
+                devices = scsi_mgr.find_device(disk_obj.nativepath)
+                if devices:
+                    for scsi_disk_obj in devices:
+                        if self.noop:
+                            self.log('  delete scsi device  %s %s (%s) skipped (noop)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
+                        elif not scsi_disk_obj.delete():
+                            self.err('  failed to delete scsi device %s %s (%s), error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
+                            ret = False
+                        else:
+                            self.log('  delete scsi %s %s (%s)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
+        else:
+            self.log('skip internal disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+            ret = True
+        return ret
+
     def remove_external_disks(self):
         ret = True
         disk_mgr = Disks()
         scsi_mgr = Scsi()
         for disk_obj in disk_mgr.disks:
-            if self.is_external_disk(disk_obj):
-                ret = True
-                self.log('ejecting disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
-                for child_obj in disk_obj.childs:
-                    self.log('  eject child %s\n'%(str(child_obj.nativepath)))
-                    if child_obj.is_mounted:
-                        if not child_obj.unmount():
-                            self.err('  failed to unmount %s\n'%(str(child_obj.nativepath)))
-                            ret = False
-                            break
-                if ret:
-                    devices = scsi_mgr.find_device(disk_obj.nativepath)
-                    if devices:
-                        for scsi_disk_obj in devices:
-                            if scsi_disk_obj:
-                                if not scsi_disk_obj.delete():
-                                    self.err('  failed to delete scsi device %s %s (%s), error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
-                                    ret = False
-                                else:
-                                    self.log('  delete scsi %s %s (%s)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
+            if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
+                ret = False
+        return ret
+
+    def remove_disks(self, devices):
+        ret = True
+        disk_mgr = Disks()
+        scsi_mgr = Scsi()
+        for devname in devices:
+            disk_obj = disk_mgr.find_disk_from_user_input(devname)
+            if disk_obj:
+                if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
+                    ret = False
             else:
-                self.log('skip internal disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+                self.err('Given device name %s is not a valid block device.\n'%(devname))
         return ret
 
     def reset_config(self):
@@ -201,4 +224,43 @@ class ExternalDiskManager(object):
                     self.log('unregister disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             else:
                 self.err('Given device name %s is not a valid block device.\n'%(devname))
+        return ret
+
+    def run_hooks(self, command, args):
+        ret = True
+        hook_args = [ command ]
+        hook_args.extend(args)
+        for item in os.listdir(self.hook_dir):
+            fullpath = os.path.abspath(os.path.join(self.hook_dir, item))
+            if os.path.isfile(fullpath) and os.access(fullpath, os.X_OK):
+                (sts, stdoutdata, stderrdata) = runcmdAndGetData(fullpath, hook_args)
+                if sts != 0:
+                    self.err('Script %s failed with %i: %s\n'%(item, sts, stderrdata))
+                    ret = False
+                else:
+                    self.log('Hook %s ok: %s\n'%(item, stdoutdata))
+            else:
+                self.err('Ignore hook %s because not executable\n'%(item))
+        return ret
+
+    def udev_action(self):
+        udev_env = self._get_udev_env()
+        action = udev_env['ACTION']
+        devpath = udev_env['DEVPATH']
+        devtype = udev_env['DEVTYPE']
+        if action == 'add' or action == 'remove':
+            disk_mgr = Disks()
+            disk_obj = disk_mgr.find_disk_from_devpath(devpath=devpath)
+            if disk_obj:
+                is_external = self.is_external_disk(disk_obj)
+                if action == 'add':
+                    cmd = 'disk-loaded'
+                else:
+                    cmd = 'disk-ejected'
+                ret = self.run_hooks(cmd, [disk_obj.nativepath])
+            else:
+                ret = False
+        else:
+            self.err('Unhandled udev action %s for %s (%s)\n'%(action, devpath, devtype))
+            ret = False
         return ret
