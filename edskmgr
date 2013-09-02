@@ -25,6 +25,7 @@ class ExternalDiskManagerApp(object):
         parser.add_argument('--eject', dest='eject', nargs='*', help='removes the given external disks or all present external disks.')
         parser.add_argument('--udev-disk', dest='udev_disk', action='store_true', help='handles disk event within udev.')
         parser.add_argument('--udev-partition', dest='udev_partition', action='store_true', help='handles partition event within udev.')
+        parser.add_argument('--trigger', dest='trigger', help='specifies the name of the action; use by other scripts.')
         parser.add_argument('--register', dest='register', nargs='+', metavar='DISK', help='registers the given disk as external HDD to the system.')
         parser.add_argument('--unregister', dest='unregister', nargs='+', metavar='DISK', help='unregisters the given disk from the known external HDDs of the system.')
         parser.add_argument('--status', dest='status', action='store_true', help='shows the status of all external disks.')
@@ -33,6 +34,7 @@ class ExternalDiskManagerApp(object):
 
         self._mgr.verbose = args.verbose
         self._mgr.noop = args.noop
+        self._mgr.trigger = args.trigger
 
         self._mgr.load_config(args.configdir)
 
@@ -92,6 +94,7 @@ class ExternalDiskManagerApp(object):
         else:
             sys.stderr.write("no operation specified.\n")
             ret = 1
+        self._mgr.cleanup()
         return ret
 
 

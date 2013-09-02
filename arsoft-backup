@@ -20,6 +20,9 @@ class ARSoftBackupApp(BackupApp):
         self._dryrun = False
         self._diskmgr = None
         
+    def _cleanup(self):
+        self._diskmgr.cleanup()
+        
     def load_config(self, configdir):
         BackupApp.load_config(self, configdir)
         # in any case continue with the config we got
@@ -185,7 +188,7 @@ class ARSoftBackupApp(BackupApp):
             else:
                 sys.stderr.write('No operation specified.\n')
                 ret = 1
-
+        self._cleanup()
         return ret
 
 

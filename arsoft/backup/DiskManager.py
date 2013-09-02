@@ -5,11 +5,13 @@
 from arsoft.disks.edskmgr import ExternalDiskManager
 
 class DiskManager(object):
-    
     def __init__(self):
         self._mgr = ExternalDiskManager()
         self._mgr.read_config()
-    
+
+    def cleanup(self):
+        self._mgr.cleanup()
+
     def eject(self):
         return self._mgr.remove_external_disks()
 

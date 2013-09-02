@@ -3,12 +3,14 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.utils import isRoot, runcmdAndGetData
+from arsoft.inifile import IniFile
 from .disk import Disk, Disks
 from .scsi import Scsi
 from .edskmgr_config import *
 import syslog
 import sys
 import os
+import tempfile
 
 class ExternalDiskManager(object):
 
@@ -16,8 +18,15 @@ class ExternalDiskManager(object):
         self.verbose = False
         self.noop = False
         self.config = ExternalDiskManagerConfig()
+        self._trigger = None
+        self._private_operation_data = None
 
         syslog.openlog('edskmgr', logoption=syslog.LOG_PID, facility=syslog.LOG_MAIL)
+        
+    def cleanup(self):
+        if self._private_operation_data is not None:
+            # only remove the private operation data if we created/own it
+            self._remove_private_operation_data()
 
     def log(self, msg):
         if self.verbose:
@@ -41,6 +50,16 @@ class ExternalDiskManager(object):
     @property
     def config_dir(self):
         return self.config.config_dir
+    
+    @property
+    def trigger(self):
+        return self._trigger
+    
+    @trigger.setter
+    def trigger(self, value):
+        if value is not None:
+            self._trigger = value
+            self._save_private_operation_data()
 
     def checkRoot(self):
         if isRoot():
@@ -51,9 +70,48 @@ class ExternalDiskManager(object):
             sys.stderr.write("Warning: Not running as root. Currently running as user %s. Some operations may fail.\n" % (os.getlogin()))
             ret = True
         return ret
+    
+    def _load_private_operation_data(self):
+        ret = True
+        tempdir = tempfile.gettempdir()
+        trigger_file = os.path.join(tempdir, 'edskmgr_operation.private')
+        if os.path.exists(trigger_file):
+            inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+            inifile.open(trigger_file)
+            self._trigger = inifile.get(None, 'Trigger', None)
+        else:
+            self._trigger = None
+            self._private_operation_data = None
+        return ret
+    
+    def _save_private_operation_data(self):
+        ret = True
+        tempdir = tempfile.gettempdir()
+        trigger_file = os.path.join(tempdir, 'edskmgr_operation.private')
+        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        inifile.open(trigger_file)
+        self._private_operation_data = self
+        inifile.set(None, 'Trigger', self._trigger)
+        ret = inifile.save(trigger_file)
+        return ret
+    
+    def _remove_private_operation_data(self):
+        tempdir = tempfile.gettempdir()
+        trigger_file = os.path.join(tempdir, 'edskmgr_operation.private')
+        if os.path.exists(trigger_file):
+            try:
+                os.remove(trigger_file)
+                ret = True
+            except IOError:
+                ret = False
+        else:
+            ret = True
+        return ret
 
     def load_config(self, configdir=None):
-        self.config.open(configdir)
+        ret = self.config.open(configdir)
+        self._load_private_operation_data()
+        return ret
 
     def write_config(self, config_dir=None):
         return self.config.save(config_dir)
@@ -230,10 +288,13 @@ class ExternalDiskManager(object):
         ret = True
         hook_args = [ command ]
         hook_args.extend(args)
+        hook_env = os.environ
+        if self._trigger:
+            hook_env['EDSKMGR_TRIGGER'] = str(self._trigger)
         for item in os.listdir(self.hook_dir):
             fullpath = os.path.abspath(os.path.join(self.hook_dir, item))
             if os.path.isfile(fullpath) and os.access(fullpath, os.X_OK):
-                (sts, stdoutdata, stderrdata) = runcmdAndGetData(fullpath, hook_args)
+                (sts, stdoutdata, stderrdata) = runcmdAndGetData(fullpath, hook_args, env=hook_env)
                 if sts != 0:
                     self.err('Script %s failed with %i: %s\n'%(item, sts, stderrdata))
                     ret = False
