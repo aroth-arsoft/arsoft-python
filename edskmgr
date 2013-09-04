@@ -6,11 +6,31 @@ import sys
 import os
 import argparse
 from arsoft.disks.edskmgr import ExternalDiskManager
+from arsoft.disks.disk import Disk, Disks
 
 class ExternalDiskManagerApp(object):
 
     def __init__(self):
         self._mgr = ExternalDiskManager()
+
+    def show_status(self):
+        print('Internal disks:')
+        for disk in self._mgr.internal_disks:
+            print('  ' + disk)
+        print('External disks:')
+        for disk in self._mgr.external_disks:
+            print('  ' + disk)
+
+        e = Disks()
+        print('Available disks:')
+        for disk_obj in e.disks:
+            print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+            if self._mgr.verbose:
+                print('    Native path: %s'%(disk_obj.nativepath))
+            print('    Path:        %s'%(disk_obj.path))
+            print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
+            print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
+            print('    Internal:    %s'%('yes' if self._mgr.is_internal_disk(disk_obj) else 'no'))
 
     def main(self, argv=None):
         #=============================================================================================
@@ -90,7 +110,7 @@ class ExternalDiskManagerApp(object):
             else:
                 ret = 1
         elif args.status:
-            ret = self._mgr.show_status()
+            ret = self.show_status()
         else:
             sys.stderr.write("no operation specified.\n")
             ret = 1

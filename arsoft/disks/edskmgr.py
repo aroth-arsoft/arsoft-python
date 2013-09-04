@@ -150,25 +150,6 @@ class ExternalDiskManager(object):
     def external_disks(self):
         return self.config.external_disks.disks
 
-    def show_status(self):
-        print('Internal disks:')
-        for disk in self.config.internal_disks.disks:
-            print('  ' + disk)
-        print('External disks:')
-        for disk in self.config.external_disks.disks:
-            print('  ' + disk)
-
-        e = Disks()
-        print('Available disks:')
-        for disk_obj in e.disks:
-            print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
-            if self.verbose:
-                print('    Path:        %s'%(disk_obj.path))
-                print('    Native path: %s'%(disk_obj.nativepath))
-            print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
-            print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
-            print('    Internal:    %s'%('yes' if self.is_internal_disk(disk_obj) else 'no'))
-
     def load_udev_partition(self, devname):
         self.log('loadUDevPartition ' + str(devname))
         #self._loadExternalPartition(devname)

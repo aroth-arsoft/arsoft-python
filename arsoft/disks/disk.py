@@ -422,9 +422,13 @@ class Disks(object):
     
     def _get_device_by_devpath(self, devpath):
         ret = None
-        sys_devpath = os.path.join('/sys', devpath)
+        if devpath[0] != '/':
+            devpath = os.path.join('/sys', devpath)
+        elif devpath.startswith('/devices/'):
+            devpath = '/sys' + devpath
         for dev in self._list:
-            if dev.nativepath == sys_devpath:
+            #print('compare %s<>%s' % (dev.nativepath, devpath))
+            if dev.nativepath == devpath:
                 ret = dev
         return ret
 
@@ -463,13 +467,17 @@ class Disks(object):
             s = os.stat(devname)
             if stat.S_ISBLK(s.st_mode):
                 ret = self.find_device(devfile=devname)
-                if ret:
-                    if not isinstance(ret, Disk):
-                        ret = self.find_disk_for_device(ret)
+            elif stat.S_ISDIR(s.st_mode):
+                ret = self.find_device(devpath=devname)
             else:
                 ret = None
+        elif devname.startswith('/sys/') or devname.startswith('/devices/'):
+            ret = self.find_device(devpath=devname)
         else:
             ret = None
+        if ret:
+            if not isinstance(ret, Disk):
+                ret = self.find_disk_for_device(ret)
         return ret
     
     def find_disk_for_device(self, devobj):
