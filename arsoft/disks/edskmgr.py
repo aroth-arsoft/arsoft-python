@@ -159,7 +159,7 @@ class ExternalDiskManager(object):
         self.log('loadUDevDisk ' + str(devname) + ' - do nothing')
         return True
 
-    def rescan_empty_scsi_hosts(self, only_empty=False):
+    def rescan_empty_scsi_hosts(self, only_empty=True):
         if self.noop:
             ret = True
             self.log('rescan empty SCSI hosts successful (noop)\n')
