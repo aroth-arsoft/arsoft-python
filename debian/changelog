@@ -1,3 +1,9 @@
+arsoft-python (1.97) raring; urgency=low
+
+  * fixing suid trouble
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 05 Sep 2013 10:43:13 +0200
+
 arsoft-python (1.96) raring; urgency=low
 
   * use hdparm in edskmgr to send disks to standby

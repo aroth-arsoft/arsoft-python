@@ -48,8 +48,8 @@ override_dh_auto_build: edskeject edskload trac-admin-suid
 override_dh_auto_install:
 	dh_auto_install -O--buildsystem=python_distutils
 	install -d $(CURDIR)/debian/tmp/usr/bin
-	install -o root -g root -m 04755 -s edskload $(CURDIR)/debian/tmp/usr/bin/edskload
-	install -o root -g root -m 04755 -s edskeject $(CURDIR)/debian/tmp/usr/bin/edskeject
+	install -o root -g root -m 0755 -s edskload $(CURDIR)/debian/tmp/usr/bin/edskload
+	install -o root -g root -m 0755 -s edskeject $(CURDIR)/debian/tmp/usr/bin/edskeject
 	install -d $(CURDIR)/debian/tmp/usr/lib/arsoft-python
 	install -o root -g root -m 0755 -s trac-admin-suid $(CURDIR)/debian/tmp/usr/lib/arsoft-python/trac-admin-suid
 	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr
@@ -58,9 +58,9 @@ override_dh_auto_install:
 
 override_dh_fixperms:
 	dh_fixperms -O--buildsystem=python_distutils
-	chmod 04755 $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
 	chown root.root $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
-	chown root.root $(CURDIR)/debian/tmp/etc/jabber-daemon.conf
+	chmod 4755 $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
+	#chown root.root $(CURDIR)/debian/tmp/etc/jabber-daemon.conf
 	chmod 0600 $(CURDIR)/debian/tmp/etc/jabber-daemon.conf
 
 override_dh_gencontrol:
