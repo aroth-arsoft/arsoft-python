@@ -191,11 +191,14 @@ class ExternalDiskManager(object):
                     for scsi_disk_obj in devices:
                         if self.noop:
                             self.log('  delete scsi device  %s %s (%s) skipped (noop)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
-                        elif not scsi_disk_obj.delete():
-                            self.err('  failed to delete scsi device %s %s (%s), error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
-                            ret = False
                         else:
-                            self.log('  delete scsi %s %s (%s)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
+                            if not scsi_disk_obj.standby():
+                                self.err('  failed to set scsi device %s %s (%s) on standby, error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
+                            if not scsi_disk_obj.delete():
+                                self.err('  failed to delete scsi device %s %s (%s), error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
+                                ret = False
+                            else:
+                                self.log('  delete scsi %s %s (%s)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
         else:
             self.log('skip internal disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             ret = True

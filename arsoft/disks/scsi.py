@@ -5,6 +5,7 @@
 import re
 import os
 import stat
+from .hdparm import HdParm
 
 class ScsiDevice(object):
     def __init__(self, mgr=None, host=0, channel=0, target=0, lun=0,
@@ -50,6 +51,9 @@ class ScsiDevice(object):
 
     def delete(self):
         return self._mgr._delete_device(self.addr)
+
+    def standby(self):
+        return self._mgr._standby_device(self.devfile)
 
 class Scsi(object):
 
@@ -228,6 +232,13 @@ class Scsi(object):
                     ret = False
         else:
             ret = False
+        return ret
+    
+    def _standby_device(self, devfile):
+        hdop = HdParm(devfile)
+        ret = hdop.standby()
+        if not ret:
+            self._last_error = hdop.stderr
         return ret
 
     def rescan_hosts(self, only_empty=False):
