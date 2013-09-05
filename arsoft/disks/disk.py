@@ -97,7 +97,7 @@ class Device(object):
             ' nativepath=' + str(self.nativepath) +\
             ''
         return ret
-    
+
 class Disk(Device):
     def __init__(self, mgr, path, device_obj, device_props, device_if):
         super(Disk, self).__init__(mgr, path, device_obj, device_props, device_if)
@@ -144,6 +144,73 @@ class Disk(Device):
     def detach(self, options=[]):
         self._device_if.DriveDetach(options)
         
+    def _match_pattern_element(self, pattern_element):
+        # check for valid pattern
+        if ':' in pattern_element:
+            key, value = pattern_element.split(':')
+        else:
+            # no valid pattern, so treat it like a serial number
+            key = 'serial'
+            value = pattern_element
+        if key == 'serial':
+            ret = True if self.serial == value else False
+        elif key == 'vendor':
+            ret = True if self.vendor == value else False
+        elif key == 'model':
+            ret = True if self.model == value else False
+        elif key == 'devicefile':
+            ret = True if self.devicefile == value else False
+        else:
+            ret = False
+        return ret
+
+    def match(self, pattern):
+        elements = pattern.split(',')
+        if len(elements) == 0:
+            ret = False
+        else:
+            ret = True
+            for e in elements:
+                if not self._match_pattern_element(e):
+                    ret = False
+                    break
+        #print('match this=' + str(self) + ' pa=' + pattern + ' ret='+str(ret))
+        return ret
+
+    def __str__(self):
+        ret = Device.__str__(self) +\
+            ' vendor=' + str(self.vendor) + \
+            ' model=' + str(self.model) +\
+            ' serial=' + str(self.serial) +\
+            ' mounted=' + ','.join(self.mountpath) +\
+            ''
+        return ret
+
+class Floppy(Device):
+    def __init__(self, mgr, path, device_obj, device_props, device_if):
+        super(Floppy, self).__init__(mgr, path, device_obj, device_props, device_if)
+
+    @property
+    def vendor(self):
+        return Disks._get_device_property(self._device_props, "DriveVendor")
+
+    @property
+    def model(self):
+        return Disks._get_device_property(self._device_props, "DriveModel")
+
+    @property
+    def serial(self):
+        return Disks._get_device_property(self._device_props, "DriveSerial")
+
+    @property
+    def disk_name(self):
+        s = '%s_%s_%s'%(self.vendor,self.model,self.serial)
+        return re.sub('[^\w\-_\. ]', '_', s)
+
+    @property
+    def match_pattern(self):
+        return 'vendor:%s,model:%s,serial:%s'%(self.vendor,self.model,self.serial)
+
     def _match_pattern_element(self, pattern_element):
         # check for valid pattern
         if ':' in pattern_element:
@@ -384,8 +451,13 @@ class Disks(object):
             is_lvm2lv = Disks._get_device_property(device_props, "DeviceIsLinuxLvm2LV")
             is_lvm2pv = Disks._get_device_property(device_props, "DeviceIsLinuxLvm2PV")
             if is_drive:
-                #print('create disk %s' % (path))
-                ret = Disk(mgr, path, device_obj, device_props, device_if)
+                media_compatibility = Disks._get_device_property(device_props, "DriveMediaCompatibility")
+                #print('media_compatibility=%s' % media_compatibility)
+                if 'floppy' in media_compatibility:
+                    ret = Floppy(mgr, path, device_obj, device_props, device_if)
+                else:
+                    #print('create disk %s' % (path))
+                    ret = Disk(mgr, path, device_obj, device_props, device_if)
             elif is_lvm2pv:
                 #print('create Lvm2PV %s' % (path))
                 ret = Lvm2PV(mgr, path, device_obj, device_props, device_if)
