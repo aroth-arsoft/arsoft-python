@@ -7,7 +7,8 @@ from arsoft.disks.edskmgr import ExternalDiskManager
 class DiskManager(object):
     def __init__(self):
         self._mgr = ExternalDiskManager()
-        self._mgr.read_config()
+        self._mgr.load_config()
+        self._mgr.trigger = __name__
 
     def cleanup(self):
         self._mgr.cleanup()
@@ -23,4 +24,3 @@ class DiskManager(object):
  
 if __name__ == "__main__":
     dm = DiskManager()
-    
