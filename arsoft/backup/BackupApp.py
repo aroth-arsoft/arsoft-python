@@ -5,6 +5,8 @@
 from arsoft.filelist import *
 from .BackupConfig import *
 from .plugin import *
+from .state import *
+from .diskmgr import *
 import sys
 
 class BackupApp(object):
@@ -19,16 +21,27 @@ class BackupApp(object):
         self.name = name
         self.intermediate_filelist = FileList()
         self.config = BackupConfig()
+        self.job_state = BackupJobState()
         self.plugins = []
+        self._diskmgr = None
 
-    def load_config(self, configdir=None):
+    def cleanup(self):
+        if self._diskmgr:
+            self._diskmgr.cleanup()
+
+    def reinitialize(self, configdir=None, statedir=None):
         self.config.open(configdir)
-        
+        self.job_state.open(statedir)
+
+        # in any case continue with the config we got
+        self._diskmgr = DiskManager()
+
         plugins_to_load = self.config.active_plugins
         for plugin in plugins_to_load:
             if not self._load_plugin(plugin):
-                sys.stderr.write('Failed to log plugin %s\n' % plugin)
+                sys.stderr.write('Failed to load plugin %s\n' % plugin)
         return True
+    
 
     def _load_plugin(self, plugin_name):
         plugin_module_name = "arsoft.backup.plugins." + plugin_name

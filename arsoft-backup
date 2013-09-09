@@ -9,8 +9,8 @@ import os.path
 from arsoft.backup.BackupApp import BackupApp
 from arsoft.backup.BackupConfig import BackupConfig
 from arsoft.backup.DiskManager import DiskManager
-from arsoft.backup.FileList import FileList, FileListItem
-from arsoft.backup.rsync import Rsync
+from arsoft.filelist import FileList, FileListItem
+from arsoft.rsync import Rsync
 
 class ARSoftBackupApp(BackupApp):
 
@@ -18,17 +18,7 @@ class ARSoftBackupApp(BackupApp):
         BackupApp.__init__(self, 'arsoft-backup')
         self._verbose = False
         self._dryrun = False
-        self._diskmgr = None
-        
-    def _cleanup(self):
-        self._diskmgr.cleanup()
-        
-    def load_config(self, configdir):
-        BackupApp.load_config(self, configdir)
-        # in any case continue with the config we got
-        self._diskmgr = DiskManager()
-        return True
-    
+
     def _check_config(self):
         ret = True
         backup_dir = self.config.backup_directory
@@ -166,7 +156,9 @@ class ARSoftBackupApp(BackupApp):
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-n', '--dry-run', dest='dryrun', action='store_true', help='Don\'t actually run any commands; just print them.')
 
+        parser.add_argument('-R', '--root-directory', dest='rootdir', default='/', help='specifies the root directory for operations.')
         parser.add_argument('-C', '--config-directory', dest='configdir', default='/etc/arsoft-backup', help='name of the directory containing the backup configuration.')
+        parser.add_argument('-S', '--state-directory', dest='statedir', default='/var/lib/arsoft-backup', help='name of the directory containing the state of all backup jobs.')
         parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
         parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
 
@@ -174,21 +166,30 @@ class ARSoftBackupApp(BackupApp):
 
         self._verbose = args.verbose
         self._dryrun = args.dryrun
-
-        if not self.load_config(args.configdir):
-            sys.stderr.write('Failed to load configuration from %s.\n' % (args.configdir)) 
-            ret = 1
+        
+        rootdir = os.path.abspath(args.rootdir)
+        if not os.path.isdir(rootdir):
+            sys.stderr.write('Given root directory %s does not exist.\n' % (rootdir))
+            ret = 2
         else:
-            if self._verbose:
-                print(self.config)
-            if args.system_startup:
-                ret = self._on_system_startup()
-            elif args.perform_backup:
-                ret = self._perform_backup()
-            else:
-                sys.stderr.write('No operation specified.\n')
+            configdir = rootdir + args.configdir
+            statedir = rootdir + args.statedir
+
+            if not self.reinitialize(configdir, statedir):
+                sys.stderr.write('Failed to load configuration from %s.\n' % (args.configdir)) 
                 ret = 1
-        self._cleanup()
+            else:
+                if self._verbose:
+                    print(self.config)
+                if args.system_startup:
+                    ret = self._on_system_startup()
+                elif args.perform_backup:
+                    ret = self._perform_backup()
+                else:
+                    sys.stderr.write('No operation specified.\n')
+                    parser.print_help()
+                    ret = 1
+        self.cleanup()
         return ret
 
 
