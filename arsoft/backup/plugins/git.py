@@ -3,7 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from ..plugin import *
-from ..FileList import *
+from arsoft.filelist import *
 
 from arsoft.git.repo import *
 from arsoft.git.bundle import GitBundle

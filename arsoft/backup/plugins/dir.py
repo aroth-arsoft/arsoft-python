@@ -3,8 +3,8 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from ..plugin import *
-from ..FileList import *
-from ..rsync import Rsync
+from arsoft.filelist import *
+from arsoft.rsync import Rsync
 
 class DirectoryBackupPluginConfig(BackupPluginConfig):
     def __init__(self, parent):
