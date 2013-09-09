@@ -19,6 +19,7 @@ class BackupJobHistoryItem(object):
         history_date_str = self.basename[len(BackupStateDefaults.HISTORY_FILE_PREFIX):]
         self.date = datetime.datetime.strptime(history_date_str, BackupStateDefaults.TIMESTAMP_FORMAT)
         self.timestamp = timestamp_from_datetime(self.date)
+        self.enddate = None
 
     @staticmethod
     def create(state_dir):
@@ -27,6 +28,10 @@ class BackupJobHistoryItem(object):
         fullpath = os.path.join(state_dir, itemname)
         item = BackupJobHistoryItem(fullpath)
         return item
+
+    def finish(self):
+        now = datetime.datetime.utcnow()
+        self.enddate = now
 
     def __str__(self):
         return str(self.date)

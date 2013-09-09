@@ -26,6 +26,8 @@ class BackupApp(object):
         self._diskmgr = None
 
     def cleanup(self):
+        self.job_state.save()
+
         if self._diskmgr:
             self._diskmgr.cleanup()
 
@@ -41,7 +43,6 @@ class BackupApp(object):
             if not self._load_plugin(plugin):
                 sys.stderr.write('Failed to load plugin %s\n' % plugin)
         return True
-    
 
     def _load_plugin(self, plugin_name):
         plugin_module_name = "arsoft.backup.plugins." + plugin_name
@@ -77,6 +78,14 @@ class BackupApp(object):
             self.plugins.append(plugin)
             ret = True
         return ret
+    
+    def start_session(self):
+        self.session = self.job_state.start_new_session()
+        self.plugin_notify_start_session()
+
+    def finish_session(self):
+        self.plugin_notify_finish_session()
+        self.session.finish()
 
     def _call_plugins(self, cmd, **kwargs):
         for plugin in self.plugins:
@@ -87,6 +96,12 @@ class BackupApp(object):
 
     def append_intermediate_filelist(self, filelist_item):
         self.intermediate_filelist.append(filelist_item)
+
+    def plugin_notify_start_session(self):
+        self._call_plugins('start_session')
+
+    def plugin_notify_finish_session(self):
+        self._call_plugins('finish_session')
 
     def plugin_notify_disk_ready(self):
         self._call_plugins('disk_ready')

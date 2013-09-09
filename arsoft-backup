@@ -105,6 +105,9 @@ class ARSoftBackupApp(BackupApp):
             return 1
         disk_loaded = False
         disk_ready = False
+
+        BackupApp.start_session(self)
+
         # load all available external discs
         if not self._diskmgr.is_disk_ready():
             if not self._diskmgr.load():
@@ -146,6 +149,9 @@ class ARSoftBackupApp(BackupApp):
             if not self._diskmgr.eject():
                 sys.stderr.write('Failed to eject external discs\n')
                 ret = 1
+
+        BackupApp.finish_session(self)
+
         return ret
 
     def main(self, argv=None):
