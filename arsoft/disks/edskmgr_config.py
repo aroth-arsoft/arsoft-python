@@ -138,6 +138,7 @@ class ExternalDiskManagerConfig(object):
     def __init__(self, config_dir=ExternalDiskManagerDefaults.CONFIG_DIR, 
                  hook_dir=ExternalDiskManagerDefaults.HOOK_DIR):
         self.config_dir = config_dir
+        self.main_conf = os.path.join(config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
         self.hook_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
         self.additional_config_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
         self._internal_disks = RegisteredDiskList(self.additional_config_dir, 'INTERNAL_DISKS')
@@ -163,8 +164,8 @@ class ExternalDiskManagerConfig(object):
         if config_dir is None:
             config_dir = self.config_dir
         else:
-            self.main_conf = os.path.join(config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
             self.config_dir = config_dir
+            self.main_conf = os.path.join(config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
             self.hook_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
             self.additional_config_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
 
