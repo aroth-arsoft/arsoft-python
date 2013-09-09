@@ -63,7 +63,10 @@ class BackupJobHistory(object):
 class BackupJobState(object):
     def __init__(self, state_dir=None):
         self.state_dir = state_dir
-        self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
+        if state_dir:
+            self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
+        else:
+            self.job_state_conf = None
         self.history = BackupJobHistory(state_dir)
         self.clear()
 
