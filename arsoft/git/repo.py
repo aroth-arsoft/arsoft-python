@@ -13,7 +13,7 @@ from .error import *
 class GitRepository(object):
 
     SubmoduleStatus = enum(Invalid=-1, Ok=0, NotInitialized=1, CommitMismatch=2, MergeConflict=3)
-    
+
     def __init__(self, directory, name=None, bare=False, verbose=False):
         self._name = name
         self.root_directory = directory
@@ -27,7 +27,7 @@ class GitRepository(object):
             self.magic_directory = self.root_directory
         else:
             self.magic_directory = os.path.join(self.root_directory, '.git')
-            
+
     def __str__(self):
         return 'GitRepository(%s in %s)' %(self._name, self.root_directory)
 

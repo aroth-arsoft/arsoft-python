@@ -1,3 +1,9 @@
+arsoft-python (1.99) raring; urgency=low
+
+  * correcting git init for bare repos
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 10 Sep 2013 19:07:42 +0200
+
 arsoft-python (1.98) raring; urgency=low
 
   * bring back missing git init function
