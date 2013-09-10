@@ -231,6 +231,10 @@ class GitRepository(object):
                                 outputStdErr=outputStdErr, outputStdOut=outputStdErr,
                                 stdin=stdin, stdout=stdout, stderr=stderr)
 
+    def init(self):
+        args = ['init', self.root_directory]
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr, use_root_for_cwd=False)
+
     def clone(self, url, dest_dir=None, recursive=True, branch=None, origin=None, outputStdErr=True, outputStdOut=True):
         args = ['clone']
         if recursive:
