@@ -8,7 +8,6 @@ from datetime import datetime
 import os.path
 from arsoft.backup.BackupApp import BackupApp
 from arsoft.backup.BackupConfig import BackupConfig
-from arsoft.backup.DiskManager import DiskManager
 from arsoft.filelist import FileList, FileListItem
 from arsoft.rsync import Rsync
 

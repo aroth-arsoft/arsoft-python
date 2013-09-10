@@ -10,28 +10,80 @@ from arsoft.timestamp import timestamp_from_datetime
 class BackupStateDefaults(object):
     JOB_STATE_CONF = 'backup_job.state'
     HISTORY_FILE_PREFIX = 'backup_run_'
+    HISTORY_FILE_EXTENSION = '.state'
+    LOG_FILE_EXTENSION = '.log'
     TIMESTAMP_FORMAT = '%Y%m%d%H%M%S'
-    
+
 class BackupJobHistoryItem(object):
     def __init__(self, filename):
         self.filename = filename
-        (self.basename, self.extension) = os.path.splitext(os.path.basename(self.filename))
+        (self.state_dir, basename) = os.path.split(self.filename)
+        (self.basename, self.extension) = os.path.splitext(basename)
         history_date_str = self.basename[len(BackupStateDefaults.HISTORY_FILE_PREFIX):]
         self.date = datetime.datetime.strptime(history_date_str, BackupStateDefaults.TIMESTAMP_FORMAT)
         self.timestamp = timestamp_from_datetime(self.date)
+        self.logfile = os.path.join(self.state_dir, self.basename + BackupStateDefaults.LOG_FILE_EXTENSION)
+        self.success = False
+        self.failure_message = None
+        self.startdate = None
         self.enddate = None
+        self.logfile_fobj = None
 
     @staticmethod
     def create(state_dir):
         now = datetime.datetime.utcnow()
-        itemname = BackupStateDefaults.HISTORY_FILE_PREFIX + now.strftime(BackupStateDefaults.TIMESTAMP_FORMAT)
+        itemname = BackupStateDefaults.HISTORY_FILE_PREFIX + now.strftime(BackupStateDefaults.TIMESTAMP_FORMAT) + BackupStateDefaults.HISTORY_FILE_EXTENSION
         fullpath = os.path.join(state_dir, itemname)
         item = BackupJobHistoryItem(fullpath)
+        item._write_state()
         return item
 
+    @staticmethod
+    def is_history_item(filename):
+        (basename, extension) = os.path.splitext(os.path.basename(filename))
+        if basename.startswith(BackupStateDefaults.HISTORY_FILE_PREFIX) and extension.lower() == BackupStateDefaults.HISTORY_FILE_EXTENSION:
+            ret = True
+        else:
+            ret = False
+        return ret
+
+    def _read_state(self):
+        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        ret = inifile.open(self.filename)
+        self.success = inifile.getAsBoolean(None, 'Success', False)
+        self.failure_message = inifile.get(None, 'FailureMessage', None)
+        self.startdate = inifile.getAsTimestamp(None, 'Start', None)
+        self.enddate = inifile.getAsTimestamp(None, 'End', None)
+        return ret
+
+    def _write_state(self):
+        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        # read existing file
+        inifile.open(self.filename)
+        inifile.setAsBoolean(None, 'Success', self.success)
+        inifile.set(None, 'FailureMessage', self.failure_message)
+        inifile.setAsTimestamp(None, 'Start', self.startdate)
+        inifile.setAsTimestamp(None, 'End', self.enddate)
+        ret = inifile.save(self.filename)
+        return ret
+
+    def closelog(self):
+        if self.logfile_fobj is not None:
+            self.logfile_fobj.close()
+
+    def openlog(self):
+        if self.logfile_fobj is None:
+            if os.path.isfile(self.logfile):
+                self.logfile_fobj = open(self.logfile, 'w')
+            else:
+                self.logfile_fobj = None
+        return self.logfile_fobj
+
     def finish(self):
+        self.closelog()
         now = datetime.datetime.utcnow()
         self.enddate = now
+        self._write_state()
 
     def __str__(self):
         return str(self.date)
@@ -45,12 +97,17 @@ class BackupJobHistory(object):
         if self._items is None:
             tmp_items = []
             for itemname in os.listdir(self.state_dir):
-                if itemname.startswith(BackupStateDefaults.HISTORY_FILE_PREFIX):
-                    fullpath = os.path.join(self.state_dir, itemname)
+                fullpath = os.path.join(self.state_dir, itemname)
+                print('found %s' % fullpath)
+                if BackupJobHistoryItem.is_history_item(fullpath):
                     item = BackupJobHistoryItem(fullpath)
                     tmp_items.append(item)
             self._items = sorted(tmp_items, key=lambda item: item.timestamp)
-            
+
+    def save(self):
+        for item in self._items:
+            item.save()
+
     def create_new_item(self):
         self.load()
         item = BackupJobHistoryItem.create(self.state_dir)
