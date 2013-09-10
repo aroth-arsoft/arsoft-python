@@ -1,3 +1,9 @@
+arsoft-python (1.98) raring; urgency=low
+
+  * bring back missing git init function
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 10 Sep 2013 08:13:34 +0200
+
 arsoft-python (1.97) raring; urgency=low
 
   * fixing suid trouble
