@@ -101,9 +101,10 @@ class GitRepository(object):
             ret = False
             self._last_error = 'invalid directory %s for GIT repository' % (self.root_directory)
         if ret:
-            args = ['show-ref', '--head']
-            (sts, stdoutdata, stderrdata) = self.git(args)
-            ret = True if sts == 0 else False
+            #args = ['show-ref', '--head']
+            #(sts, stdoutdata, stderrdata) = self.git(args)
+            #ret = True if sts == 0 else False
+            pass
         return ret
 
     @property
@@ -232,7 +233,10 @@ class GitRepository(object):
                                 stdin=stdin, stdout=stdout, stderr=stderr)
 
     def init(self):
-        args = ['init', self.root_directory]
+        args = ['init']
+        if self.bare:
+            args.append('--bare')
+        args.append(self.root_directory)
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr, use_root_for_cwd=False)
 
     def clone(self, url, dest_dir=None, recursive=True, branch=None, origin=None, outputStdErr=True, outputStdOut=True):
