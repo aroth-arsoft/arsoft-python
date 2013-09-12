@@ -20,7 +20,7 @@ class nsswitch_config:
         parser.add_argument('--set', dest='set', action='append', help='list of values for the specified service', metavar='set', nargs='*')
         parser.add_argument('--get', dest='get', action='append', help='returns the values of specified services', nargs='*')
         parser.add_argument('--configfile', help='alternatice configuration file', metavar='configfile', nargs='?')
-        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('--no-nscd-reload', dest='nscd_reload', default=True, action='store_false', help='do not reload the nscd.')
 
         args = parser.parse_args()
@@ -41,6 +41,8 @@ class nsswitch_config:
                     else:
                         service = set_line[0]
                         values = set_line[1:]
+                        if self._verbose:
+                            print('Set service %s to %s' % (service, ','.join(values)))
                         config_changed = switchfile.setService(service, values)
                 if config_changed:
                     if not switchfile.save():
