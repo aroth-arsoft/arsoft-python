@@ -3,6 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.filelist import *
+from arsoft.rsync import Rsync
 from .BackupConfig import *
 from .plugin import *
 from .state import *
@@ -16,6 +17,11 @@ class BackupApp(object):
             self.name = plugin_name
             self.module = plugin_module
             self.impl = plugin_impl
+            
+    class PreviousBackupDirectory(object):
+        def __init__(self, fullpath, timestamp):
+            self.fullpath = fullpath
+            self.timestamp = timestamp
     
     def __init__(self, name=None):
         self.name = name
@@ -24,6 +30,8 @@ class BackupApp(object):
         self.job_state = BackupJobState()
         self.plugins = []
         self._diskmgr = None
+        self.disk_loaded = False
+        self._last_full_backup = None
 
     def cleanup(self):
         self.job_state.save()
@@ -77,6 +85,88 @@ class BackupApp(object):
             plugin = BackupApp.LoadedPlugin(plugin_name, mod, inst)
             self.plugins.append(plugin)
             ret = True
+        return ret
+        
+    def _mkdir(self, dir):
+        ret = True
+        if os.path.exists(dir):
+            if not os.path.isdir(dir):
+                sys.stderr.write('%s is not a directory\n' % (dir) )
+                ret = False
+        else:
+            try:
+                os.makedirs(dir)
+            except IOError as e:
+                sys.stderr.write('Failed to create directory %s; error %s\n' % (dir, str(e)) )
+                ret = False
+        return ret
+
+    def _prepare_backup_dir(self):
+        ret = True
+        backup_dir = self.config.backup_directory
+        if backup_dir is None or len(backup_dir) == 0:
+            sys.stderr.write('No backup directory configured in %s\n' % (self.config.main_conf) )
+            ret = False
+        else:
+            if Rsync.is_rsync_url(backup_dir):
+                # assume the given URL is good
+                pass
+            else:
+                if not self._mkdir(backup_dir):
+                    ret = False
+            if ret:
+                if self.config.intermediate_backup_directory:
+                    if not self._mkdir(self.config.intermediate_backup_directory):
+                        ret = False
+        return ret
+    
+    def load_previous(self):
+        ret = True
+        if Rsync.is_rsync_url(self.config.backup_directory):
+            pass
+        else:
+            if os.path.isdir(self.config.backup_directory):
+                found_backup_dirs = []
+                for item in os.listdir(self.config.backup_directory):
+                    fullpath = os.path.join(self.config.backup_directory, item)
+                    if os.path.isdir(fullpath):
+                        (ret, timestamp) = self.config.is_backup_item(fullpath)
+                        if ret:
+                            bak = BackupApp.PreviousBackupDirectory(fullpath, timestamp)
+                            found_backup_dirs.append( bak )
+                self._previous_backups = sorted(found_backup_dirs, key=lambda item: bak.timestamp)
+                if self._previous_backups:
+                    # remember the last backup
+                    self._last_full_backup = self._previous_backups[-1]
+
+        return ret
+
+    def prepare_destination(self):
+        # load all available external discs
+        if not self._diskmgr.is_disk_ready():
+            if not self._diskmgr.load():
+                sys.stderr.write('Failed to load external discs\n')
+                ret = 1
+            else:
+                self.plugin_notify_disk_ready()
+                disk_loaded = True
+                disk_ready = True
+        else:
+            disk_ready = True
+
+        if disk_ready:
+            ret = self._prepare_backup_dir()
+        else:
+            ret = False
+        return ret
+
+    def shutdown_destination(self):
+        ret = True
+        if self.disk_loaded:
+            self.plugin_notify_disk_eject()
+
+            if not self._diskmgr.eject():
+                ret = False
         return ret
     
     def start_session(self):

@@ -27,39 +27,6 @@ class ARSoftBackupApp(BackupApp):
         if self._verbose:
             print(self.config)
         return ret
-    
-    def _mkdir(self, dir):
-        ret = True
-        if os.path.exists(dir):
-            if not os.path.isdir(dir):
-                sys.stderr.write('%s is not a directory\n' % (dir) )
-                ret = False
-        else:
-            try:
-                os.makedirs(dir)
-            except IOError as e:
-                sys.stderr.write('Failed to create directory %s; error %s\n' % (dir, str(e)) )
-                ret = False
-        return ret
-
-    def _prepare_backup_dir(self):
-        ret = True
-        backup_dir = self.config.backup_directory
-        if backup_dir is None or len(backup_dir) == 0:
-            sys.stderr.write('No backup directory configured in %s\n' % (self.config.main_conf) )
-            ret = False
-        else:
-            if Rsync.is_rsync_url(backup_dir):
-                # assume the given URL is good
-                pass
-            else:
-                if not self._mkdir(backup_dir):
-                    ret = False
-            if ret:
-                if self.config.intermediate_backup_directory:
-                    if not self._mkdir(self.config.intermediate_backup_directory):
-                        ret = False
-        return ret
 
     def _on_system_startup(self):
         if self.config.eject_unused_backup_discs:
@@ -102,30 +69,16 @@ class ARSoftBackupApp(BackupApp):
     def _perform_backup(self):
         if not self._check_config():
             return 1
-        disk_loaded = False
-        disk_ready = False
+        
+        self.load_previous()
 
         BackupApp.start_session(self)
 
-        # load all available external discs
-        if not self._diskmgr.is_disk_ready():
-            if not self._diskmgr.load():
-                sys.stderr.write('Failed to load external discs\n')
-                ret = 1
-            else:
-                disk_loaded = True
-                disk_ready = True
+        if not BackupApp.prepare_destination(self):
+            sys.stderr.write('Failed to prepare backup\n')
+            ret = 1
         else:
-            disk_ready = True
-        
-        if disk_ready:
-            disk_ready = self._prepare_backup_dir()
-            
-        if disk_ready:
             ret = 0
-            # notify all plugin about the ready disk
-            self.plugin_notify_disk_ready()
-
             self.plugin_notify_start_backup()
             self.plugin_notify_perform_backup()
             self.plugin_notify_backup_complete()
@@ -142,14 +95,41 @@ class ARSoftBackupApp(BackupApp):
             # create new snapshot of the disc
             # remove old snapshot from the disc
 
-        if disk_loaded:
-            self.plugin_notify_disk_eject()
-            
-            if not self._diskmgr.eject():
-                sys.stderr.write('Failed to eject external discs\n')
-                ret = 1
+        if not BackupApp.shutdown_destination(self):
+            sys.stderr.write('Failed to shut down backup correctly.\n')
+            ret = 1
 
         BackupApp.finish_session(self)
+
+        return ret
+    
+    def _show_status(self):
+        if not self._check_config():
+            return 1
+
+        self.load_previous()
+        
+        for bak in self._previous_backups:
+            print('%s' % (bak.timestamp))
+        
+        if self._last_full_backup:
+            print('Last backup: %s in %s' % (self._last_full_backup.timestamp, self._last_full_backup.fullpath))
+        else:
+            print('Last backup: None')
+
+        ret = 0
+        return ret
+    
+    def _show_log(self):
+        ret = 0
+        
+        print('Last success: %s' % (self.job_state.last_success))
+        print('Last failure: %s' % (self.job_state.last_failure))
+        for item in self.job_state.history:
+            print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))
+            print('  Log file: %s' % (item.logfile))
+            print('  Start:    %s ' % (item.startdate))
+            print('  End:      %s ' % (item.enddate))
 
         return ret
 
@@ -166,6 +146,8 @@ class ARSoftBackupApp(BackupApp):
         parser.add_argument('-S', '--state-directory', dest='statedir', default='/var/lib/arsoft-backup', help='name of the directory containing the state of all backup jobs.')
         parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
         parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
+        parser.add_argument('--status', dest='show_status', action='store_true', help='shows the status of the backup.')
+        parser.add_argument('--log', dest='show_log', action='store_true', help='shows the log/history of the backup.')
 
         args = parser.parse_args()
 
@@ -190,6 +172,10 @@ class ARSoftBackupApp(BackupApp):
                     ret = self._on_system_startup()
                 elif args.perform_backup:
                     ret = self._perform_backup()
+                elif args.show_status:
+                    ret = self._show_status()
+                elif args.show_log:
+                    ret = self._show_log()
                 else:
                     sys.stderr.write('No operation specified.\n')
                     parser.print_help()

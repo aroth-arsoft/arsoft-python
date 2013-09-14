@@ -23,11 +23,12 @@ class BackupJobHistoryItem(object):
         self.date = datetime.datetime.strptime(history_date_str, BackupStateDefaults.TIMESTAMP_FORMAT)
         self.timestamp = timestamp_from_datetime(self.date)
         self.logfile = os.path.join(self.state_dir, self.basename + BackupStateDefaults.LOG_FILE_EXTENSION)
-        self.success = False
-        self.failure_message = None
-        self.startdate = None
-        self.enddate = None
-        self.logfile_fobj = None
+        self._success = False
+        self._failure_message = None
+        self._startdate = None
+        self._enddate = None
+        self._logfile_fobj = None
+        self._require_read = True
 
     @staticmethod
     def create(state_dir):
@@ -47,24 +48,51 @@ class BackupJobHistoryItem(object):
             ret = False
         return ret
 
+    @property
+    def success(self):
+        if self._require_read:
+            self._read_state()
+        return self._success
+
+    @property
+    def failure_message(self):
+        if self._require_read:
+            self._read_state()
+        return self._failure_message
+
+    @property
+    def startdate(self):
+        if self._require_read:
+            self._read_state()
+        return self._startdate
+
+    @property
+    def enddate(self):
+        if self._require_read:
+            self._read_state()
+        return self._enddate
+
     def _read_state(self):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(self.filename)
-        self.success = inifile.getAsBoolean(None, 'Success', False)
-        self.failure_message = inifile.get(None, 'FailureMessage', None)
-        self.startdate = inifile.getAsTimestamp(None, 'Start', None)
-        self.enddate = inifile.getAsTimestamp(None, 'End', None)
+        self._success = inifile.getAsBoolean(None, 'Success', False)
+        self._failure_message = inifile.get(None, 'FailureMessage', None)
+        self._startdate = inifile.getAsTimestamp(None, 'Start', None)
+        self._enddate = inifile.getAsTimestamp(None, 'End', None)
+        self._require_read = False
         return ret
 
     def _write_state(self):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         # read existing file
         inifile.open(self.filename)
-        inifile.setAsBoolean(None, 'Success', self.success)
-        inifile.set(None, 'FailureMessage', self.failure_message)
-        inifile.setAsTimestamp(None, 'Start', self.startdate)
-        inifile.setAsTimestamp(None, 'End', self.enddate)
+        inifile.setAsBoolean(None, 'Success', self._success)
+        inifile.set(None, 'FailureMessage', self._failure_message)
+        inifile.setAsTimestamp(None, 'Start', self._startdate)
+        inifile.setAsTimestamp(None, 'End', self._enddate)
         ret = inifile.save(self.filename)
+        if ret:
+            self._require_read = False
         return ret
 
     def closelog(self):
@@ -96,12 +124,13 @@ class BackupJobHistory(object):
     def load(self):
         if self._items is None:
             tmp_items = []
-            for itemname in os.listdir(self.state_dir):
-                fullpath = os.path.join(self.state_dir, itemname)
-                print('found %s' % fullpath)
-                if BackupJobHistoryItem.is_history_item(fullpath):
-                    item = BackupJobHistoryItem(fullpath)
-                    tmp_items.append(item)
+            if os.path.isdir(self.state_dir):
+                for itemname in os.listdir(self.state_dir):
+                    fullpath = os.path.join(self.state_dir, itemname)
+                    #print('found %s' % fullpath)
+                    if BackupJobHistoryItem.is_history_item(fullpath):
+                        item = BackupJobHistoryItem(fullpath)
+                        tmp_items.append(item)
             self._items = sorted(tmp_items, key=lambda item: item.timestamp)
 
     def save(self):
@@ -117,6 +146,9 @@ class BackupJobHistory(object):
     def reload(self):
         self._items = None
         self.load()
+        
+    def __iter__(self):
+        return iter(self._items)
 
     def __str__(self):
         self.load()
@@ -133,6 +165,7 @@ class BackupJobState(object):
         self.clear()
 
     def clear(self):
+        self.oldest_entry = None
         self.last_success = None
         self.last_failure = None
 

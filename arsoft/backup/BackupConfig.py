@@ -188,6 +188,19 @@ class BackupConfig(object):
     def get_plugin_config(self, plugin_name):
         return BackupPluginConfig(self, plugin_name=plugin_name)
 
+    def is_backup_item(self, filename):
+        timestamp = None
+        if self.use_timestamp_for_backup_dir:
+            (basename, extension) = os.path.splitext(os.path.basename(filename))
+            try:
+                timestamp = datetime.datetime.strptime(basename, self.timestamp_format_for_backup_dir)
+                ret = True
+            except ValueError:
+                ret = False
+        else:
+            ret = False
+        return (ret, timestamp)
+
     def _read_main_conf(self, filename):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(filename)
