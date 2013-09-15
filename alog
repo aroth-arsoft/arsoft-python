@@ -34,12 +34,18 @@ class alog_application(object):
             'timestamp':'short', 'logfile_names':['syslog', 'mail.log', 'mail.err', 'mail.warn'],
             'output_format':'time,ident,pid,host,msg'
             },
+        'log4cplus': { 
+            'line_re':r'^(?P<timestamp>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}\:[0-9]{2}\:[0-9]{2}[,\.][0-9]{3})\s+(?P<pid>[0-9]+)\s+(?P<ident>[A-Za-z0-9\.]+)\s+(?P<loglevel>[A-Z]+)\s+(?P<filename>[A-Za-z0-9_\./\\]+)\:(?P<lineno>[0-9]+)\s+(?P<message>.*)$',
+            'timestamp':'full',
+            'output_format':'time,ident,level,msg'
+            },
         }
     
     FIELD_ALIAS = {
         'time':'timestamp',
         'machine':'host',
-        'msg':'message'
+        'msg':'message',
+        'level':'loglevel'
         }
     
     DEFAULT_OUTPUT_FORMAT = 'timestamp,message'
@@ -187,6 +193,8 @@ class alog_application(object):
                 ret = datetime.strptime(timestamp, '%b %d %H:%M:%S')
                 if ret:
                     ret = ret.replace(year= datetime.now().year)
+            elif format == 'full':
+                ret = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S,%f")
             else:
                 ret = datetime.strptime(timestamp, format)
         return ret
