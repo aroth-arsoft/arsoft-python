@@ -20,6 +20,7 @@ class BackupConfigDefaults(object):
     INTERMEDIATE_BACKUP_DIR = None
     EJECT_UNUSED_BACKUP_DISCS = True
     USE_FILESYSTEM_SNAPSHOTS = False
+    USE_FILESYSTEM_HARDLINKS = True
     USE_SSH_FOR_RSYNC = True
     SSH_IDENTITY_FILE = None
     USE_TIMESTAMP_FOR_BACKUP_DIR = True
@@ -37,6 +38,7 @@ class BackupConfig(object):
                  filelist_exclude_dir=BackupConfigDefaults.EXCLUDE_DIR,
                  eject_unused_backup_discs=BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS,
                  use_filesystem_snapshots=BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS,
+                 use_filesystem_hardlinks=BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS,
                  use_ssh_for_rsync=BackupConfigDefaults.USE_SSH_FOR_RSYNC,
                  ssh_identity_file=BackupConfigDefaults.SSH_IDENTITY_FILE,
                  use_timestamp_for_backup_dir=BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR,
@@ -56,6 +58,7 @@ class BackupConfig(object):
         self.filelist_exclude_dir = filelist_exclude_dir
         self.eject_unused_backup_discs = eject_unused_backup_discs
         self.use_filesystem_snapshots = use_filesystem_snapshots
+        self.use_filesystem_hardlinks = use_filesystem_hardlinks
         self.use_ssh_for_rsync = use_ssh_for_rsync
         self.ssh_identity_file = ssh_identity_file
         self.use_timestamp_for_backup_dir = use_timestamp_for_backup_dir
@@ -74,6 +77,7 @@ class BackupConfig(object):
         self.filelist_exclude_dir = BackupConfigDefaults.EXCLUDE_DIR
         self.eject_unused_backup_discs = BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS
         self.use_filesystem_snapshots = BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS
+        self.use_filesystem_hardlinks = BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS
         self.use_ssh_for_rsync = BackupConfigDefaults.USE_SSH_FOR_RSYNC
         self.ssh_identity_file = BackupConfigDefaults.SSH_IDENTITY_FILE
         self.use_timestamp_for_backup_dir = BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR
@@ -211,6 +215,7 @@ class BackupConfig(object):
         self.intermediate_backup_directory = inifile.get(None, 'IntermediateBackupDirectory', BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR)
         self.eject_unused_backup_discs = inifile.getAsBoolean(None, 'EjectUnusedBackupDiscs', BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS)
         self.use_filesystem_snapshots = inifile.getAsBoolean(None, 'UseFilesystemSnapshots', BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS)
+        self.use_filesystem_hardlinks = inifile.getAsBoolean(None, 'UseFilesystemHardlinks', BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS)
         self.use_ssh_for_rsync = inifile.getAsBoolean(None, 'UseSSHForRsync', BackupConfigDefaults.USE_SSH_FOR_RSYNC)
         self.ssh_identity_file = inifile.get(None, 'SSHIdentityFile', BackupConfigDefaults.SSH_IDENTITY_FILE)
         self.use_timestamp_for_backup_dir = inifile.getAsBoolean(None, 'UseTimestampForBackupDir', BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR)
@@ -232,6 +237,7 @@ class BackupConfig(object):
         inifile.set(None, 'IntermediateBackupDirectory', self.intermediate_backup_directory)
         inifile.setAsBoolean(None, 'EjectUnusedBackupDiscs', self.eject_unused_backup_discs)
         inifile.setAsBoolean(None, 'UseFilesystemSnapshots', self.use_filesystem_snapshots)
+        inifile.setAsBoolean(None, 'UseFilesystemHardlinks', self.use_filesystem_hardlinks)
         inifile.setAsBoolean(None, 'UseSSHForRsync', self.use_ssh_for_rsync)
         inifile.set(None, 'SSHIdentityFile', self.ssh_identity_file)
         inifile.setAsBoolean(None, 'UseTimestampForBackupDir', self.use_timestamp_for_backup_dir)
@@ -254,6 +260,7 @@ class BackupConfig(object):
         ret = ret + 'exclude file list: ' + str(self._filelist_exclude) + '\n'
         ret = ret + 'eject unused backup discs: ' + str(self.eject_unused_backup_discs) + '\n'
         ret = ret + 'use filesystem snapshots: ' + str(self.use_filesystem_snapshots) + '\n'
+        ret = ret + 'use filesystem hardlinks: ' + str(self.use_filesystem_hardlinks) + '\n'
         ret = ret + 'use ssh for rsync: ' + str(self.use_ssh_for_rsync) + '\n'
         ret = ret + 'ssh identity file: ' + str(self.ssh_identity_file) + '\n'
         ret = ret + 'use timestamp for backup dirs: ' + str(self.use_timestamp_for_backup_dir) + '\n'
