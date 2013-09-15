@@ -37,7 +37,7 @@ class alog_application(object):
         'log4cplus': { 
             'line_re':r'^(?P<timestamp>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}\:[0-9]{2}\:[0-9]{2}[,\.][0-9]{3})\s+(?P<pid>[0-9]+)\s+(?P<ident>[A-Za-z0-9\.]+)\s+(?P<loglevel>[A-Z]+)\s+(?P<filename>[A-Za-z0-9_\./\\]+)\:(?P<lineno>[0-9]+)\s+(?P<message>.*)$',
             'timestamp':'full',
-            'output_format':'time,ident,level,msg'
+            'output_format':'time,ident,level,filename,lineno,msg'
             },
         }
     
@@ -45,19 +45,22 @@ class alog_application(object):
         'time':'timestamp',
         'machine':'host',
         'msg':'message',
-        'level':'loglevel'
+        'level':'loglevel',
+        'line':'lineno'
         }
     
     DEFAULT_OUTPUT_FORMAT = 'timestamp,message'
 
     class MessageObject(object):
-        def __init__(self, message=None, timestamp=None, severity=None, loglevel=None, host=None, ident=None, pid=None, filtered=False):
+        def __init__(self, message=None, timestamp=None, severity=None, loglevel=None, host=None, ident=None, pid=None, filename=None, lineno=0, filtered=False):
             self.timestamp = timestamp
             self.severity = severity
             self.loglevel = loglevel
             self.host = host
             self.ident = ident
             self.pid = pid
+            self.filename = filename
+            self.lineno = lineno
             self.filtered = filtered
             self._message = [message] if message else []
 
@@ -74,6 +77,8 @@ class alog_application(object):
                 'host':self.host,
                 'ident':self.ident,
                 'pid':self.pid,
+                'lineno':self.lineno,
+                'filename':self.filename,
                 'filtered':self.filtered
                 }
             return ret
@@ -211,17 +216,38 @@ class alog_application(object):
             host = mo.group('host') if 'host' in mogrp else None
             ident = mo.group('ident') if 'ident' in mogrp else None
             pid = mo.group('pid') if 'pid' in mogrp else None
+            lineno = mo.group('lineno') if 'lineno' in mogrp else None
+            filename = mo.group('filename') if 'filename' in mogrp else None
 
             if find_re:
-                filtered = False if find_re.match(message_text) is not None else True
+                filtered = True
+                if message_text is not None:
+                    if find_re.match(message_text):
+                        filtered = False
+                if ident is not None:
+                    if find_re.match(ident):
+                        filtered = False
+                if filename is not None:
+                    if find_re.match(filename):
+                        filtered = False
             else:
                 filtered = False
+
             ret = self.MessageObject(message=message_text, timestamp=timestamp, 
                                             severity=severity, loglevel=loglevel, 
                                             host=host, ident=ident, pid=pid,
+                                            lineno=lineno, filename=filename,
                                             filtered=filtered)
 
         return ret
+    
+    def _continue_process_line(self, msg_obj, line_re, find_re, line):
+        message_text = line.rstrip()
+        if find_re:
+            if message_text is not None:
+                if find_re.match(message_text):
+                    msg_obj.filtered = False
+        msg_obj.append_message(message_text)
     
     def _output_msg(self, msg_obj, ignore_filtered=False):
         if ignore_filtered:
@@ -244,8 +270,8 @@ class alog_application(object):
         parser.add_argument('-r', '--rfind', dest='find_regex', help='output only message which match the given pattern as regex.')
         parser.add_argument('-o', '--output', dest='output_format', help='specifies the fields to print; separated by comma')
         parser.add_argument('-n', '--limit', dest='limit', default=-1, type=int, help='limit the number of log outputs.')
+        parser.add_argument('-L', '--level', dest='output_level', help='specifies the minimum log level to print')
         parser.add_argument('logfile', default='-', nargs='?', help='log file to parse')
-        
 
         args = parser.parse_args()
 
@@ -253,7 +279,7 @@ class alog_application(object):
         self._logfile = args.logfile
         self._output_format = args.output_format
         self._first_line = None
-        
+
         if self._logfile == '-':
             self._logfile = 'stdin'
             self._logfile_obj = sys.stdin
@@ -322,19 +348,12 @@ class alog_application(object):
                                 break
                         last_msg_obj = msg_obj
                     elif last_msg_obj:
-                        #print('was message ' + last_msg_obj.message)
-                        message_text = line.rstrip()
-                        if find_re:
-                            if find_re.match(message_text):
-                                last_msg_obj.filtered = False
-                        last_msg_obj.append_message(message_text)
-                        #print('new message ' + last_msg_obj.message)
+                        self._continue_process_line(last_msg_obj, line_re, find_re, line)
                 if last_msg_obj:
                     self._output_msg(last_msg_obj)
                     num_outputs += 1
 
                 ret = 0
-                
 
         return ret
 
