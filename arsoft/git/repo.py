@@ -108,6 +108,15 @@ class GitRepository(object):
         return ret
 
     @property
+    def empty(self):
+        ret = self.valid
+        if ret:
+            args = ['show-ref', '--head']
+            (sts, stdoutdata, stderrdata) = self.git(args)
+            ret = True if sts != 0 else False
+        return ret
+
+    @property
     def name(self):
         if self._name is None:
             (bname, bext) = os.path.splitext(os.path.basename(self.root_directory))

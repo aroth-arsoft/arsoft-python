@@ -81,13 +81,17 @@ class GitBackupPlugin(BackupPlugin):
                 repo = GitRepository(repo_path, verbose=self.backup_app._verbose)
                 if repo:
                     if repo.valid:
-                        bundle_file = os.path.join(backup_dir, repo.name + '.git_bundle')
-                        if self.backup_app._verbose:
-                            print('backup %s to %s' % (repo_path, bundle_file))
-                        if not self._git_backup_to_bundle(repo, bundle_file):
+                        if repo.empty:
+                            sys.stderr.write('Repository %s is empty. Skip\n' % repo_path)
                             ret = False
                         else:
-                            repo_backup_filelist.append(bundle_file)
+                            bundle_file = os.path.join(backup_dir, repo.name + '.git_bundle')
+                            if self.backup_app._verbose:
+                                print('backup %s to %s' % (repo_path, bundle_file))
+                            if not self._git_backup_to_bundle(repo, bundle_file):
+                                ret = False
+                            else:
+                                repo_backup_filelist.append(bundle_file)
                     else:
                         sys.stderr.write('Repository %s is invalid\n' % repo_path)
                         ret = False
