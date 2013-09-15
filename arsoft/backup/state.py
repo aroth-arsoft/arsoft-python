@@ -15,7 +15,8 @@ class BackupStateDefaults(object):
     TIMESTAMP_FORMAT = '%Y%m%d%H%M%S'
 
 class BackupJobHistoryItem(object):
-    def __init__(self, filename):
+    def __init__(self, parent, filename):
+        self.parent = parent
         self.filename = filename
         (self.state_dir, basename) = os.path.split(self.filename)
         (self.basename, self.extension) = os.path.splitext(basename)
@@ -31,11 +32,11 @@ class BackupJobHistoryItem(object):
         self._require_read = True
 
     @staticmethod
-    def create(state_dir):
+    def create(parent, state_dir):
         now = datetime.datetime.utcnow()
         itemname = BackupStateDefaults.HISTORY_FILE_PREFIX + now.strftime(BackupStateDefaults.TIMESTAMP_FORMAT) + BackupStateDefaults.HISTORY_FILE_EXTENSION
         fullpath = os.path.join(state_dir, itemname)
-        item = BackupJobHistoryItem(fullpath)
+        item = BackupJobHistoryItem(parent, fullpath)
         item._write_state()
         return item
 
@@ -92,32 +93,34 @@ class BackupJobHistoryItem(object):
         inifile.setAsTimestamp(None, 'End', self._enddate)
         ret = inifile.save(self.filename)
         if ret:
+            self.parent._item_changed(self)
             self._require_read = False
         return ret
 
     def closelog(self):
-        if self.logfile_fobj is not None:
-            self.logfile_fobj.close()
+        if self._logfile_fobj is not None:
+            self._logfile_fobj.close()
 
     def openlog(self):
-        if self.logfile_fobj is None:
+        if self._logfile_fobj is None:
             if os.path.isfile(self.logfile):
-                self.logfile_fobj = open(self.logfile, 'w')
+                self._logfile_fobj = open(self.logfile, 'w')
             else:
-                self.logfile_fobj = None
-        return self.logfile_fobj
+                self._logfile_fobj = None
+        return self._logfile_fobj
 
     def finish(self):
         self.closelog()
         now = datetime.datetime.utcnow()
-        self.enddate = now
+        self._enddate = now
         self._write_state()
 
     def __str__(self):
         return str(self.date)
 
 class BackupJobHistory(object):
-    def __init__(self, state_dir):
+    def __init__(self, job_state, state_dir):
+        self.job_state = job_state
         self.state_dir = state_dir
         self._items = None
 
@@ -129,7 +132,7 @@ class BackupJobHistory(object):
                     fullpath = os.path.join(self.state_dir, itemname)
                     #print('found %s' % fullpath)
                     if BackupJobHistoryItem.is_history_item(fullpath):
-                        item = BackupJobHistoryItem(fullpath)
+                        item = BackupJobHistoryItem(self, fullpath)
                         tmp_items.append(item)
             self._items = sorted(tmp_items, key=lambda item: item.timestamp)
 
@@ -139,14 +142,17 @@ class BackupJobHistory(object):
 
     def create_new_item(self):
         self.load()
-        item = BackupJobHistoryItem.create(self.state_dir)
+        item = BackupJobHistoryItem.create(self, self.state_dir)
         self._items.append(item)
         return item
 
     def reload(self):
         self._items = None
         self.load()
-        
+
+    def _item_changed(self, item):
+        self.job_state._item_changed(item)
+
     def __iter__(self):
         return iter(self._items)
 
@@ -161,7 +167,7 @@ class BackupJobState(object):
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
         else:
             self.job_state_conf = None
-        self.history = BackupJobHistory(state_dir)
+        self.history = BackupJobHistory(self, state_dir)
         self.clear()
 
     def clear(self):
@@ -174,7 +180,7 @@ class BackupJobState(object):
             state_dir = self.state_dir
         else:
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
-            self.history = BackupJobHistory(state_dir)
+            self.history = BackupJobHistory(self, state_dir)
             self.state_dir = state_dir
 
         if not os.path.isfile(self.job_state_conf):
@@ -196,7 +202,7 @@ class BackupJobState(object):
         else:
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
             self.state_dir = state_dir
-            self.history = BackupJobHistory(state_dir)
+            self.history = BackupJobHistory(self, state_dir)
 
         ret = self._write_state_conf(self.job_state_conf)
         return ret
@@ -221,6 +227,15 @@ class BackupJobState(object):
     
     def start_new_session(self):
         return self.history.create_new_item()
+    
+    def _item_changed(self, item):
+        if item.success:
+            if item.date > self.last_success:
+                self.last_success = item.date
+        else:
+            if item.date > self.last_failure:
+                self.last_failure = item.date
+        self.save()
 
     def __str__(self):
         ret = ''
