@@ -202,3 +202,28 @@ class SSHUrl(object):
 
 def ssh_parse_url(url):
     return SSHUrl(url)
+
+
+def ssh_listdir(server, directory, keyfile=None, username=None, password=None, verbose=False):
+    import pickle
+    
+    python_script = '''import os, os.path, sys, pickle
+directory = sys.argv[-1]
+if os.path.isdir(directory):
+    items = {}
+    for d in os.listdir(directory):
+        fullpath = os.path.join(directory, d)
+        d_s = os.stat(fullpath)
+        items[d] = d_s
+else:
+    items = None
+print(pickle.dumps(items))'''
+
+    commandline = '/usr/bin/python -c \'' + python_script + '\' \'' + directory + '\''
+
+    (sts, stdoutdata, stderrdata) = ssh_runcmdAndGetData(server, commandline, keyfile=keyfile, username=username, password=password, verbose=verbose)
+    if sts == 0:
+        ret = pickle.loads(stdoutdata)
+    else:
+        ret = None
+    return ret
