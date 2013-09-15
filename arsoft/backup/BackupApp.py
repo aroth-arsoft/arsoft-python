@@ -4,11 +4,12 @@
 
 from arsoft.filelist import *
 from arsoft.rsync import Rsync
+from arsoft.sshutils import *
 from .BackupConfig import *
 from .plugin import *
 from .state import *
 from .diskmgr import *
-import sys
+import sys, stat
 
 class BackupApp(object):
     
@@ -122,23 +123,47 @@ class BackupApp(object):
     
     def load_previous(self):
         ret = True
+        local_backup_dir = None
+        ssh_remote_backup_dir = None
         if Rsync.is_rsync_url(self.config.backup_directory):
-            pass
+            url = Rsync.parse_url(self.config.backup_directory)
+            if url is not None:
+                if not self.config.use_ssh_for_rsync:
+                    local_backup_dir = url.path
+                else:
+                    ssh_remote_backup_dir = url
         else:
-            if os.path.isdir(self.config.backup_directory):
+            local_backup_dir = None
+        if local_backup_dir is not None:
+            if os.path.isdir(local_backup_dir):
                 found_backup_dirs = []
-                for item in os.listdir(self.config.backup_directory):
-                    fullpath = os.path.join(self.config.backup_directory, item)
+                for item in os.listdir(local_backup_dir):
+                    fullpath = os.path.join(local_backup_dir, item)
                     if os.path.isdir(fullpath):
                         (ret, timestamp) = self.config.is_backup_item(fullpath)
                         if ret:
                             bak = BackupApp.PreviousBackupDirectory(fullpath, timestamp)
                             found_backup_dirs.append( bak )
                 self._previous_backups = sorted(found_backup_dirs, key=lambda item: bak.timestamp)
-                if self._previous_backups:
-                    # remember the last backup
-                    self._last_full_backup = self._previous_backups[-1]
 
+        elif ssh_remote_backup_dir is not None:
+            remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
+                        username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password, 
+                        keyfile=self.config.ssh_identity_file)
+            if remote_items:
+                found_backup_dirs = []
+                for item, item_stat in remote_items.iteritems():
+                    if stat.S_ISDIR(item_stat.st_mode):
+                        fullpath = os.path.join(ssh_remote_backup_dir.path, item)
+                        (ret, timestamp) = self.config.is_backup_item(fullpath)
+                        if ret:
+                            bak = BackupApp.PreviousBackupDirectory(fullpath, timestamp)
+                            found_backup_dirs.append( bak )
+                self._previous_backups = sorted(found_backup_dirs, key=lambda item: bak.timestamp)
+                
+        if self._previous_backups:
+            # pick the latest/last backup from the list
+            self._last_full_backup = self._previous_backups[-1]
         return ret
 
     def prepare_destination(self):
