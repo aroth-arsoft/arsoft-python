@@ -204,6 +204,13 @@ class alog_application(object):
                 ret = datetime.strptime(timestamp, format)
         return ret
     
+    def _is_filtered_by_loglevel(self, level):
+        if self._loglevel:
+            ret = True
+        else:
+            ret = False
+        return ret
+
     def _process_line(self, line_re, find_re, timestamp_format, line):
         ret = None
         mo = line_re.match(line)
@@ -279,6 +286,7 @@ class alog_application(object):
         self._logfile = args.logfile
         self._output_format = args.output_format
         self._first_line = None
+        self._loglevel = args.output_level
 
         if self._logfile == '-':
             self._logfile = 'stdin'
