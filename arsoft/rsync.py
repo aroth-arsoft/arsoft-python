@@ -187,11 +187,19 @@ class Rsync(object):
         else:
             ret = url
         return ret
-    
+
     @staticmethod
     def is_rsync_url(url):
         o = urlparse.urlparse(url)
         return True if o.scheme == 'rsync' else False
+
+    @staticmethod
+    def parse_url(url):
+        o = urlparse.urlparse(url)
+        if o.scheme == 'rsync':
+            return o
+        else:
+            return None
 
     @staticmethod
     def sync_directories(source_dir, target_dir, recursive=True, relative=True):
