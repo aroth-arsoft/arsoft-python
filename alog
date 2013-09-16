@@ -50,6 +50,15 @@ class alog_application(object):
         }
     
     DEFAULT_OUTPUT_FORMAT = 'timestamp,message'
+    
+    LOGLEVEL_NAMES = [
+            'DEBUG',
+            'INFO',
+            'NOTICE',
+            'WARN',
+            'ERROR',
+            'FATAL'
+        ]
 
     class MessageObject(object):
         def __init__(self, message=None, timestamp=None, severity=None, loglevel=None, host=None, ident=None, pid=None, filename=None, lineno=0, filtered=False):
@@ -203,13 +212,6 @@ class alog_application(object):
             else:
                 ret = datetime.strptime(timestamp, format)
         return ret
-    
-    def _is_filtered_by_loglevel(self, level):
-        if self._loglevel:
-            ret = True
-        else:
-            ret = False
-        return ret
 
     def _process_line(self, line_re, find_re, timestamp_format, line):
         ret = None
@@ -219,7 +221,7 @@ class alog_application(object):
             timestamp = self._parse_timestamp(mo.group('timestamp'), timestamp_format) if 'timestamp' in mogrp else None
             message_text = mo.group('message') if 'message' in mogrp else None
             severity = mo.group('severity') if 'severity' in mogrp else None
-            loglevel = mo.group('loglevel') if 'loglevel' in mogrp else None
+            loglevel = mo.group('loglevel').upper() if 'loglevel' in mogrp else None
             host = mo.group('host') if 'host' in mogrp else None
             ident = mo.group('ident') if 'ident' in mogrp else None
             pid = mo.group('pid') if 'pid' in mogrp else None
@@ -239,6 +241,12 @@ class alog_application(object):
                         filtered = False
             else:
                 filtered = False
+
+            if not filtered:
+                if self._loglevel:
+                    filtered = False if loglevel in self._loglevel else True
+                else:
+                    filtered = False
 
             ret = self.MessageObject(message=message_text, timestamp=timestamp, 
                                             severity=severity, loglevel=loglevel, 
@@ -277,7 +285,7 @@ class alog_application(object):
         parser.add_argument('-r', '--rfind', dest='find_regex', help='output only message which match the given pattern as regex.')
         parser.add_argument('-o', '--output', dest='output_format', help='specifies the fields to print; separated by comma')
         parser.add_argument('-n', '--limit', dest='limit', default=-1, type=int, help='limit the number of log outputs.')
-        parser.add_argument('-L', '--level', dest='output_level', help='specifies the minimum log level to print')
+        parser.add_argument('-L', '--level', dest='output_level', action='append', help='specifies the minimum log level to print')
         parser.add_argument('logfile', default='-', nargs='?', help='log file to parse')
 
         args = parser.parse_args()
@@ -286,7 +294,32 @@ class alog_application(object):
         self._logfile = args.logfile
         self._output_format = args.output_format
         self._first_line = None
-        self._loglevel = args.output_level
+        self._loglevel = None
+        if args.output_level:
+            self._loglevel = []
+            for filter in args.output_level:
+                if filter[0] == '=':
+                    filter = filter[1:].upper()
+                    if filter in alog_application.LOGLEVEL_NAMES:
+                        self._loglevel.append(filter.upper())
+                    else:
+                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        return 1
+                else:
+                    filter = filter.upper()
+                    i = 0
+                    found = False
+                    while i < len(alog_application.LOGLEVEL_NAMES):
+                        if found:
+                            self._loglevel.append(alog_application.LOGLEVEL_NAMES[i])
+                        else:
+                            if alog_application.LOGLEVEL_NAMES[i] == filter:
+                                self._loglevel.append(alog_application.LOGLEVEL_NAMES[i])
+                                found = True
+                        i = i + 1
+                    if not found:
+                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        return 1
 
         if self._logfile == '-':
             self._logfile = 'stdin'
