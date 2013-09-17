@@ -120,13 +120,13 @@ class ExternalDiskManager(object):
         ret = False
         found = False
         if not found:
-            for pattern in self.config.internal_disks.disks:
+            for pattern in self.config.internal_disks:
                 if diskobj.match(pattern):
                     ret = True
                     found = True
                     break
         if not found:
-            for pattern in self.config.external_disks.disks:
+            for pattern in self.config.external_disks:
                 if diskobj.match(pattern):
                     ret = False
                     found = True
@@ -144,11 +144,11 @@ class ExternalDiskManager(object):
 
     @property
     def internal_disks(self):
-        return self.config.internal_disks.disks
+        return self.config.internal_disks
 
     @property
     def external_disks(self):
-        return self.config.external_disks.disks
+        return self.config.external_disks
 
     def load_udev_partition(self, devname):
         self.log('loadUDevPartition ' + str(devname))

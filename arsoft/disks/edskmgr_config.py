@@ -133,41 +133,83 @@ class ExternalDiskManagerDefaults(object):
     MAIN_CONF = 'main.conf'
     HOOK_DIR = 'hook.d'
     ADDITIONAL_CONFIG_DIR = 'conf.d'
+    
+class ExternalDiskManagerConfigItem(object):
+    def __init__(self, filename=None):
+        self.filename = filename
+        self.pattern = None
+        self.external = False
+        self.tags = []
+        if self.filename is not None:
+            self._read_conf()
+
+    def _read_conf(self):
+        inifile = IniFile(filename=self.filename, commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        self.pattern = inifile.get(None, 'Pattern', None)
+        self.tags = inifile.getAsArray(None, 'Tags', [])
+        self.external = inifile.getAsBoolean(None, 'External', False)
+
+    def _write_conf(self, filename=None):
+        if filename is None:
+            filename = self.filename
+        inifile = IniFile(filename=filename, commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        inifile.set(None, 'Pattern', self.pattern)
+        inifile.set(None, 'Tags', self.tags)
+        inifile.setAsBoolean(None, 'External', self.external)
+        return inifile.save()
+        
+    def save(self, filename=None):
+        return self._write_conf(filename)
+
+    def remove(self):
+        try:
+            print('remove %s' %self.filename)
+            os.remove(self.filename)
+            ret = True
+        except (OSError, IOError) as e:
+            print(e)
+            ret = False
+        return ret
 
 class ExternalDiskManagerConfig(object):
     def __init__(self, config_dir=ExternalDiskManagerDefaults.CONFIG_DIR, 
                  hook_dir=ExternalDiskManagerDefaults.HOOK_DIR):
-        self.config_dir = config_dir
-        self.main_conf = os.path.join(config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
-        self.hook_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
-        self.additional_config_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
-        self._internal_disks = RegisteredDiskList(self.additional_config_dir, 'INTERNAL_DISKS')
-        self._external_disks = RegisteredDiskList(self.additional_config_dir, 'EXTERNAL_DISKS')
+        self.config_dir = os.path.abspath(config_dir)
+        self.main_conf = os.path.join(self.config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
+        self.hook_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
+        self.additional_config_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
+        self._items = []
 
     def clear(self):
         self.config_dir = ExternalDiskManagerDefaults.CONFIG_DIR
-        self.hook_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
-        self.additional_config_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
-
-        self._config_internal_disks.load()
-        self._external_disks.load()
+        self.hook_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
+        self.additional_config_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
+        self._items = []
 
     @property
     def internal_disks(self):
-        return self._internal_disks
+        ret = []
+        for item in self._items:
+            if not item.external:
+                ret.append(item.pattern)
+        return ret
 
     @property
     def external_disks(self):
-        return self._external_disks
+        ret = []
+        for item in self._items:
+            if item.external:
+                ret.append(item.pattern)
+        return ret
 
     def open(self, config_dir=None):
         if config_dir is None:
             config_dir = self.config_dir
         else:
-            self.config_dir = config_dir
-            self.main_conf = os.path.join(config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
-            self.hook_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
-            self.additional_config_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
+            self.config_dir = os.path.abspath(config_dir)
+            self.main_conf = os.path.join(self.config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
+            self.hook_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
+            self.additional_config_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
 
         if not os.path.isdir(config_dir):
             try:
@@ -184,9 +226,20 @@ class ExternalDiskManagerConfig(object):
         if save_config_file:
             ret = self._write_main_conf(self.main_conf)
 
-        # load the disk lists
-        self._internal_disks.open(self.additional_config_dir)
-        self._external_disks.open(self.additional_config_dir)
+        # load the addition config files
+        try:
+            self._items = []
+            ret = True
+            files = os.listdir(self.additional_config_dir)
+            for f in files:
+                (basename, ext) = os.path.splitext(f)
+                if ext == '.conf':
+                    fullpath = os.path.join(self.additional_config_dir, f)
+                    item = ExternalDiskManagerConfigItem(fullpath)
+                    self._items.append(item)
+        except (IOError, OSError) as e:
+            self._last_error = str(e)
+            ret = False
 
         return ret
 
@@ -226,12 +279,9 @@ class ExternalDiskManagerConfig(object):
         if not self._write_main_conf(self.main_conf):
             ret = False
 
-        if not self._internal_disks.save():
-            print(self._internal_disks.last_error)
-            ret = False
-        if not self._external_disks.save():
-            print(self._external_disks.last_error)
-            ret = False
+        for item in self._items:
+            if not item.save():
+                ret = False
 
         return ret
 
@@ -250,29 +300,42 @@ class ExternalDiskManagerConfig(object):
         return ret
     
     def reset(self):
-        self._external_disks.reset()
-        self._internal_disks.reset()
-        return True
+        ret = True
+        for item in iter(self._items):
+            if not item.remove():
+                ret = False
+            del item
+        return ret
 
     def register_disk(self, name, pattern, external=True):
-        if external:
-            # when register a external disk remove the same disk from the internal lists
-            if self._internal_disks.unregister_disk(name, pattern):
-                self._internal_disks.save()
-            ret = self._external_disks.register_disk(name, pattern)
-        else:
-            # when register a internal disk remove the same disk from the external lists
-            if self._external_disks.unregister_disk(name, pattern):
-                self._external_disks.save()
-            ret = self._internal_disks.register_disk(name, pattern)
+        found = False
+        for item in self._items:
+            if item.pattern == pattern:
+                item.external = external
+                found = True
+                break
+        if not found:
+            # create new config item
+            newitem = ExternalDiskManagerConfigItem()
+            newitem.external = external
+            newitem.pattern = pattern
+
+            filename = re.sub(r'[\s]', '_', name)
+            fullpath = os.path.join(self.additional_config_dir, filename + '.conf')
+            newitem.save(fullpath)
         return True
-        
+
     def unregister_disk(self, name, pattern, external=True):
-        if external:
-            ret = self._external_disks.unregister_disk(name, pattern)
-        else:
-            ret = self._internal_disks.unregister_disk(name, pattern)
-        return True
+        ret = True
+        found = False
+        for item in iter(self._items):
+            if item.pattern == pattern and item.external == external:
+                found = True
+                if not item.remove():
+                    ret = False
+                del item
+                break
+        return ret
 
     def __str__(self):
         ret = ''
