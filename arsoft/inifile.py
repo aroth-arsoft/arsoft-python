@@ -7,12 +7,6 @@ import datetime
 from .timestamp import timestamp_from_datetime
 
 class IniSection(object):
-    inifile = None
-    name = None
-    lineno = -1
-    original = None
-    values = []
-    comment = ''
 
     def __init__(self, inifile, name, lineno=-1, original=None, comment=''):
         self.inifile = inifile
@@ -101,39 +95,38 @@ class IniSection(object):
         return ret
 
     def set(self, key, value, comment='', disabled=False):
-        if type(value) == type([]):
+        if type(value) == list:
             idx = 0
             found = 0
             last = -1
-            #print 'set ' + key + ' ' + str(value)
-            for i in range(0, len(self.values) - 1):
-                v = self.values[i]
+            num_values = len(value)
+            i = 0
+            for v in iter(self.values):
                 if v.key == key:
-                    if idx < len(value):
-                        #print 'set value ' + str(idx) + ' ' + value[idx]
+                    if idx < num_values:
                         v.value = value[idx]
-                        if type(comment) == type([]):
+                        if type(comment) == list:
                             v.comment = comment[idx]
                         else:
                             v.comment = comment
-                        if type(disabled) == type([]):
+                        if type(disabled) == list:
                             v.disabled = disabled[idx]
                         else:
                             v.disabled = disabled
+                        v.original = None
                         idx += 1
                         found += 1
                         last = i
                     else:
-                        del(v)
-            #print 'found ' + str(found)
-            if found < len(value):
-                for idx in range(found, len(value) - 1):
-                    #print 'add ' + str(idx) + ' ' + value[idx]
-                    if type(comment) == type([]):
+                        self.values.remove(v)
+                i += 1
+            if found < num_values:
+                for idx in range(found, num_values):
+                    if type(comment) == list:
                         c = comment[idx]
                     else:
                         c = comment
-                    if type(disabled) == type([]):
+                    if type(disabled) == list:
                         d = disabled[idx]
                     else:
                         d = disabled
