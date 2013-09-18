@@ -238,13 +238,13 @@ class ExternalDiskManager(object):
                     self.log('register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
         return ret
 
-    def register_disk(self, devices, external=True):
+    def register_disk(self, devices, external=True, tags=[]):
         ret = True
         disk_mgr = Disks()
         for devname in devices:
             disk_obj = disk_mgr.find_disk_from_user_input(devname)
             if disk_obj:
-                if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external):
+                if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external, tags=tags):
                     self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                     ret = False
                 else:

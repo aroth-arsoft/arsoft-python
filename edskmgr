@@ -48,6 +48,7 @@ class ExternalDiskManagerApp(object):
         parser.add_argument('--trigger', dest='trigger', help='specifies the name of the action; use by other scripts.')
         parser.add_argument('--register', dest='register', nargs='+', metavar='DISK', help='registers the given disk as external HDD to the system.')
         parser.add_argument('--unregister', dest='unregister', nargs='+', metavar='DISK', help='unregisters the given disk from the known external HDDs of the system.')
+        parser.add_argument('--tag', dest='tags', action='append', help='sets the tags for the disk to register.')
         parser.add_argument('--status', dest='status', action='store_true', help='shows the status of all external disks.')
 
         args = parser.parse_args()
@@ -98,13 +99,15 @@ class ExternalDiskManagerApp(object):
             else:
                 ret = 1
         elif args.register is not None:
-            if self._mgr.register_disk(args.register):
+            if self._mgr.register_disk(args.register, external=True, tags=args.tags):
                 self._mgr.write_config()
                 ret = 0
             else:
                 ret = 1
         elif args.unregister is not None:
-            if self._mgr.unregister_disk(args.unregister):
+            # do not really unregister the whole disk, just register it as
+            # internal and remove all tags
+            if self._mgr.register_disk(args.unregister, external=False, tags=[]):
                 self._mgr.write_config()
                 ret = 0
             else:

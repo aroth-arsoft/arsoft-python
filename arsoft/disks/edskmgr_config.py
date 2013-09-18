@@ -163,12 +163,15 @@ class ExternalDiskManagerConfigItem(object):
 
     def remove(self):
         try:
-            print('remove %s' %self.filename)
             os.remove(self.filename)
             ret = True
         except (OSError, IOError) as e:
             print(e)
             ret = False
+        return ret
+
+    def __str__(self):
+        ret = 'ExternalDiskManagerConfigItem(%s; pattern=%s; ext=%s; tags=%s)' % (self.filename, self.pattern, self.external, ','.join(self.tags))
         return ret
 
 class ExternalDiskManagerConfig(object):
@@ -307,11 +310,12 @@ class ExternalDiskManagerConfig(object):
             del item
         return ret
 
-    def register_disk(self, name, pattern, external=True):
+    def register_disk(self, name, pattern, external=True, tags=[]):
         found = False
         for item in self._items:
             if item.pattern == pattern:
                 item.external = external
+                item.tags = tags
                 found = True
                 break
         if not found:
@@ -319,10 +323,13 @@ class ExternalDiskManagerConfig(object):
             newitem = ExternalDiskManagerConfigItem()
             newitem.external = external
             newitem.pattern = pattern
+            newitem.tags = tags
 
             filename = re.sub(r'[\s]', '_', name)
             fullpath = os.path.join(self.additional_config_dir, filename + '.conf')
-            newitem.save(fullpath)
+            newitem.filename = fullpath
+            self._items.append(newitem)
+            #newitem.save(fullpath)
         return True
 
     def unregister_disk(self, name, pattern, external=True):
