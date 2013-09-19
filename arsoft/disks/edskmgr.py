@@ -4,6 +4,7 @@
 
 from arsoft.utils import isRoot, runcmdAndGetData
 from arsoft.inifile import IniFile
+from arsoft.timestamp import timestamp_from_datetime
 from .disk import Disk, Disks
 from .scsi import Scsi
 from .edskmgr_config import *
@@ -11,6 +12,7 @@ import syslog
 import sys
 import os
 import tempfile
+import datetime, time
 
 class ExternalDiskManager(object):
 
@@ -309,3 +311,42 @@ class ExternalDiskManager(object):
             self.err('Unhandled udev action %s for %s (%s)\n'%(action, devpath, devtype))
             ret = False
         return ret
+    
+    def get_disk_patterns_for_tag(self, tag):
+        return self.config.get_disks_by_tag(tag)
+
+    def get_tags_for_disk(self, diskobj):
+        return self.config.get_tags_for_disk(diskobj.match_pattern)
+
+    def wait_for_disk(self, pattern=None, tag=None, timeout=None, wait_interval=1.0):
+        abs_timeout = None
+        if not pattern:
+            if isinstance(tag, list):
+                pattern = []
+                for t in tag:
+                    patterns_for_tag = self.get_disk_patterns_for_tag(t)
+                    pattern.extend(patterns_for_tag)
+            else:
+                pattern = self.get_disk_patterns_for_tag(tag)
+        if pattern is None or len(pattern) == 0:
+            raise ValueError
+        if timeout is not None:
+            if isinstance(timeout, int) or isinstance(timeout, float):
+                abs_timeout = time.time()+float(timeout)
+            elif isinstance(timeout, datetime.datetime):
+                abs_timeout = timestamp_from_datetime(timeout)
+            elif isinstance(timeout, datetime.timedelta):
+                abs_timeout = time.time()+timeout.total_seconds()
+            else:
+                raise ValueError
+
+        disk_mgr = Disks()
+        diskobj = disk_mgr.find_disk_by_pattern(pattern)
+        if not diskobj:
+            while time.time() < abs_timeout:
+                time.sleep(wait_interval)
+                disk_mgr.rescan()
+                diskobj = disk_mgr.find_disk_by_pattern(pattern)
+                if diskobj:
+                    break
+        return diskobj

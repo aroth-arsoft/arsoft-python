@@ -417,7 +417,7 @@ class Disks(object):
     DEVICE_CLASS = 'org.freedesktop.UDisks.Device'
 
     def __init__(self):
-        self._rescan()
+        self.rescan()
         
     @staticmethod
     def _dbus_get_device(path):
@@ -474,7 +474,7 @@ class Disks(object):
             ret = None
         return ret
 
-    def _rescan(self):
+    def rescan(self):
         self._list = []
         if not Disks._dbus_connect():
             return False
@@ -563,6 +563,23 @@ class Disks(object):
                     ret.append(dev.slave)
         else:
             ret = None
+        return ret
+    
+    def find_disk_by_pattern(self, pattern):
+        ret = None
+        for devobj in self._list:
+            if isinstance(devobj, Disk):
+                if isinstance(pattern, list):
+                    for p in pattern:
+                        if devobj.match(p):
+                            ret = devobj
+                            break
+                    if ret:
+                        break
+                else:
+                    if devobj.match(pattern):
+                        ret = devobj
+                        break
         return ret
 
     def __str__(self):

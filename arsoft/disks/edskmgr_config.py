@@ -204,6 +204,13 @@ class ExternalDiskManagerConfig(object):
             if item.external:
                 ret.append(item.pattern)
         return ret
+    
+    @property
+    def disks(self):
+        ret = []
+        for item in self._items:
+            ret.append(item.pattern)
+        return ret
 
     def open(self, config_dir=None):
         if config_dir is None:
@@ -342,6 +349,20 @@ class ExternalDiskManagerConfig(object):
                     ret = False
                 del item
                 break
+        return ret
+
+    def get_disks_by_tag(self, tag):
+        ret = []
+        for item in iter(self._items):
+            if tag in item.tags:
+                ret.append(item.pattern)
+        return ret
+    
+    def get_tags_for_disk(self, pattern):
+        ret = None
+        for item in iter(self._items):
+            if item.pattern == pattern:
+                ret = item.tags
         return ret
 
     def __str__(self):

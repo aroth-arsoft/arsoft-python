@@ -31,6 +31,12 @@ class ExternalDiskManagerApp(object):
             print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
             print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
             print('    Internal:    %s'%('yes' if self._mgr.is_internal_disk(disk_obj) else 'no'))
+            disk_tags = self._mgr.get_tags_for_disk(disk_obj)
+            if disk_tags:
+                print('    Tags:        %s'%(','.join(disk_tags)))
+            else:
+                print('    Tags:        None')
+
 
     def main(self, argv=None):
         #=============================================================================================
@@ -50,6 +56,7 @@ class ExternalDiskManagerApp(object):
         parser.add_argument('--unregister', dest='unregister', nargs='+', metavar='DISK', help='unregisters the given disk from the known external HDDs of the system.')
         parser.add_argument('--tag', dest='tags', action='append', help='sets the tags for the disk to register.')
         parser.add_argument('--status', dest='status', action='store_true', help='shows the status of all external disks.')
+        parser.add_argument('--wait', dest='wait_for_disk', nargs='*', help='waits for the specified disk to become ready.')
 
         args = parser.parse_args()
 
@@ -114,6 +121,21 @@ class ExternalDiskManagerApp(object):
                 ret = 1
         elif args.status:
             ret = self.show_status()
+        elif args.wait_for_disk is not None:
+            try:
+                disk_obj = self._mgr.wait_for_disk(pattern=args.wait_for_disk, tag=args.tags, timeout=10)
+                if disk_obj:
+                    ret = 0
+                else:
+                    ret = 1
+            except ValueError:
+                if args.wait_for_disk:
+                    sys.stderr.write("no disk found for the given pattern %s.\n" % (','.join(args.wait_for_disk)))
+                elif args.tags:
+                    sys.stderr.write("no disk found for the given tags %s.\n" % (','.join(args.tags)))
+                else:
+                    sys.stderr.write("no pattern or tag given to identify disk.\n")
+                ret = 2
         else:
             sys.stderr.write("no operation specified.\n")
             ret = 1
