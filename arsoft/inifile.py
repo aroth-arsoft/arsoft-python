@@ -4,6 +4,7 @@
 
 import re
 import datetime
+import os
 from .timestamp import timestamp_from_datetime
 
 class IniSection(object):
@@ -633,6 +634,7 @@ class IniFile(object):
         for section_obj in self.m_sections:
             if not section_obj.empty:
                 ret = False
+                break
         return ret
 
     @property
@@ -721,3 +723,87 @@ class IniFile(object):
             if not ret:
                 break
         return ret
+
+
+class IniFileDirectory(object):
+
+    def __init__(self, directory=None, config_extension=None, 
+                 commentPrefix=None, keyValueSeperator=None, disabled_values=True, keyIsWord=True, autoQuoteStrings=False):
+        self.directory = directory
+        self.config_extension = config_extension
+        self.commentPrefix = commentPrefix
+        self.keyValueSeperator = keyValueSeperator
+        self.disabled_values = disabled_values
+        self.keyIsWord = keyIsWord
+        self.autoQuoteStrings = autoQuoteStrings
+        if self.directory is not None:
+            self._load()
+        else:
+            self._items = []
+
+    def _load(self):
+        # load the the config files in the directory
+        try:
+            self._items = []
+            ret = True
+            files = os.listdir(self.directory)
+            for f in files:
+                if self.config_extension is None:
+                    load_file = True
+                else:
+                    (basename, ext) = os.path.splitext(f)
+                    load_file = True if ext == self.config_extension else False
+                if load_file:
+                    fullpath = os.path.join(self.directory, f)
+                    item = IniFile(fullpath, 
+                                   commentPrefix=self.commentPrefix, 
+                                   keyValueSeperator=self.keyValueSeperator, 
+                                   disabled_values=self.disabled_values, 
+                                   keyIsWord=self.keyIsWord, 
+                                   autoQuoteStrings=self.autoQuoteStrings)
+                    self._items.append(item)
+        except (IOError, OSError) as e:
+            self._last_error = str(e)
+            ret = False
+
+        return ret
+
+    @property
+    def empty(self):
+        ret = True
+        for item in self._items:
+            if not item.empty:
+                ret = False
+                break
+        return ret
+
+    @property
+    def sections(self):
+        ret = []
+        for item in self._items:
+            ret.extend(item.sections)
+        return ret
+
+    @property
+    def comments(self):
+        ret = []
+        for item in self._items:
+            ret.extend(item.comments)
+        return ret
+
+    @property
+    def items(self):
+        return self._items
+
+    def getAsArray(self, section, key, default=[]):
+        ret = []
+        got_one_value = False
+        for item in self._items:
+            item_ret = item.getAsArray(section, key, None)
+            if item_ret:
+                got_one_value = True
+                ret.extend(item_ret)
+        if got_one_value:
+            return ret
+        else:
+            return default
