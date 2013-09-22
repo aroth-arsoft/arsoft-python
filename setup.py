@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.99',
+		version='1.100',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -56,6 +56,8 @@ setup(name='arsoft-python',
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients']),
 			('/etc/init', ['upstart/jabber-daemon.conf']),
 			('/etc', ['config/jabber-daemon.conf']),
+			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
+                           'config/default_pattern.conf', 'config/default_shortcuts.conf']),
 			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg', 'nagios/openvpn.cfg', 'nagios/kernel_modules.cfg', 'nagios/xmpp_notify.cfg', 'nagios/puppet_agent.cfg', 'nagios/weather.cfg', 'nagios/ipp.cfg']),
 			('/usr/sbin', ['svnbackup', 
                   'cups-admin', 

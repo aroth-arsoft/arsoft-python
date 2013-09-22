@@ -1,3 +1,10 @@
+arsoft-python (1.100) raring; urgency=low
+
+  * add configuration for alog script
+  * add shortcuts to alog script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 22 Sep 2013 19:11:02 +0200
+
 arsoft-python (1.99) raring; urgency=low
 
   * correcting git init for bare repos

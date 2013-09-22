@@ -8,57 +8,89 @@ import re
 import os.path
 import logging
 from datetime import datetime, timedelta
+from arsoft.inifile import IniFileDirectory
+
+class alog_known_pattern(object):
+    def __init__(self, name=None, line_re=None, timestamp=None, logfile_names=[], output_format=None):
+        self.name = name
+        self.line_re = line_re
+        self.timestamp = timestamp
+        self.logfile_names = logfile_names
+        self.output_format = output_format
+        
+    def __str__(self):
+        ret = ''
+        for (key, value) in self.__dict__.iteritems():
+            ret = ret + key + '=' + str(value) + ' ' + str(type(value)) + '\n'
+        return ret
+
+class alog_config(object):
+    def __init__(self, config_dir='/etc/arsoft/alog.d'):
+        self.config_dir = config_dir
+        self._ini_files_dir = IniFileDirectory(config_dir, config_extension='.conf', commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+
+    @property
+    def known_patterns(self):
+        ret = {}
+        for item in self._ini_files_dir.items:
+            for section in item.sections:
+                line_re = item.get(section, 'LineRegex', None)
+                if line_re:
+                    timestamp = item.get(section, 'Timestamp', None)
+                    logfile_names = item.getAsArray(section, 'LogfileName', [])
+                    output_format = item.get(section, 'OutputFormat', None)
+
+                    pattern = alog_known_pattern(name=section, line_re=line_re, timestamp=timestamp, logfile_names=logfile_names, output_format=output_format)
+                    ret[section] = pattern
+        return ret
+
+    @property
+    def field_alias(self):
+        ret = {}
+        for alias in self._ini_files_dir.getAsArray(None, 'FieldAlias', []):
+            if ':' in alias:
+                key, value = alias.split(':', 1)
+                ret[key] = value
+        return ret
+
+    @property
+    def loglevel_names(self):
+        all_loglevels = []
+        for loglevel in self._ini_files_dir.getAsArray(None, 'LogLevel', []):
+            if ':' in loglevel:
+                name, order = loglevel.split(':', 1)
+            else:
+                name = loglevel
+            all_loglevels.append( (order, name) )
+        all_loglevels_sorted = sorted(all_loglevels, key=lambda item: item[0])
+        ret = []
+        for (order, name) in all_loglevels_sorted:
+            ret.append(name)
+        return ret
+
+    @property
+    def default_output_format(self):
+        ret = self._ini_files_dir.getAsArray(None, 'DefaultOutputFormat', [])
+        num_ret = len(ret)
+        if num_ret > 1:
+            sys.stderr.write('WARNING: more than one DefaultOutputFormat value found in configuration. Use the first one.\n')
+            ret = ret[0]
+        elif num_ret == 1:
+            ret = ret[0]
+        else:
+            ret = 'timestamp,message'
+        return ret
+
+    @property
+    def shortcuts(self):
+        ret = {}
+        for shortcut in self._ini_files_dir.getAsArray(None, 'Shortcut', []):
+            if ':' in shortcut:
+                key, value = shortcut.split(':', 1)
+                ret[key] = value
+        return ret
 
 class alog_application(object):
-    
-    KNOWN_PATTERNS = {
-        'plain': { 'line_re':r'^(?P<message>.*)$' },
-        'icinga': { 'line_re':r'^\[(?P<timestamp>[0-9]+)\] (?P<message>.*)$', 'timestamp':'time_t', 'logfile_names':['icinga.log'] },
-        'icinga-debug': { 'line_re':r'^\[(?P<timestamp>[0-9]+\.[0-9]+)\] (?P<message>.*)$', 'timestamp':'time_t', 'logfile_names':['icinga.debug'] },
-        'kernel': { 
-            'line_re':r'^\[\s*(?P<timestamp>[0-9]+\.[0-9]+)\] (?P<message>.*)$', 
-            'timestamp':'uptime'
-            },
-        'kernel-time': { 
-            'line_re':r'^\[\s*(?P<timestamp>[A-Za-z \:0-9]+)\] (?P<message>.*)$', 
-            'timestamp':'ctime' 
-            },
-        'apt-cacher-ng': { 
-            'line_re':r'^(?P<timestamp>[0-9]+)\|(?P<input_output>[IO])\|(?P<length>[0-9]+)\|(?P<host>[0-9\.]+)\|(?P<message>.*)$', 
-            'timestamp':'time_t', 
-            'logfile_names':['apt-cacher-ng.log', 'apt-cacher.log'],
-            'output_format':'time,host,msg'
-            },
-        'syslog': { 
-            'line_re':r'^(?P<timestamp>[A-Za-z]{2,3} [0-9]{1,2} [0-9]{2}\:[0-9]{2}\:[0-9]{2}) (?P<host>[A-Za-z0-9]+) (?P<ident>[A-Za-z0-9/]+)\[(?P<pid>[0-9]+)\]\: (?P<message>.*)$', 
-            'timestamp':'short', 'logfile_names':['syslog', 'mail.log', 'mail.err', 'mail.warn'],
-            'output_format':'time,ident,pid,host,msg'
-            },
-        'log4cplus': { 
-            'line_re':r'^(?P<timestamp>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}\:[0-9]{2}\:[0-9]{2}[,\.][0-9]{3})\s+(?P<pid>[0-9]+)\s+(?P<ident>[A-Za-z0-9\.]+)\s+(?P<loglevel>[A-Z]+)\s+(?P<filename>[A-Za-z0-9_\./\\]+)\:(?P<lineno>[0-9]+)\s+(?P<message>.*)$',
-            'timestamp':'full',
-            'output_format':'time,ident,level,filename,lineno,msg'
-            },
-        }
-    
-    FIELD_ALIAS = {
-        'time':'timestamp',
-        'machine':'host',
-        'msg':'message',
-        'level':'loglevel',
-        'line':'lineno'
-        }
-    
-    DEFAULT_OUTPUT_FORMAT = 'timestamp,message'
-    
-    LOGLEVEL_NAMES = [
-            'DEBUG',
-            'INFO',
-            'NOTICE',
-            'WARN',
-            'ERROR',
-            'FATAL'
-        ]
 
     class MessageObject(object):
         def __init__(self, message=None, timestamp=None, severity=None, loglevel=None, host=None, ident=None, pid=None, filename=None, lineno=0, filtered=False):
@@ -104,6 +136,7 @@ class alog_application(object):
 
     def __init__(self):
         self._verbose = False
+        self._config = alog_config()
         self._logfile = None
         self._logfile_obj = None
         self._boottime = None
@@ -130,12 +163,11 @@ class alog_application(object):
         if line is not None:
             #print('line=%s' % line)
             pattern_score = {}
-            for (pattern_name, pattern_dict) in alog_application.KNOWN_PATTERNS.iteritems():
+            for (pattern_name, pattern_obj) in self._config.known_patterns.iteritems():
                 score = 0
-                if 'logfile_names' in pattern_dict:
-                    if logfile_basename in pattern_dict['logfile_names']:
-                        score = score + 1000
-                line_re = re.compile(pattern_dict['line_re'])
+                if logfile_basename in pattern_obj.logfile_names:
+                    score = score + 1000
+                line_re = re.compile(pattern_obj.line_re)
                 mo = line_re.match(line)
                 if mo:
                     num_groups = len(mo.groups())
@@ -153,8 +185,8 @@ class alog_application(object):
         return best_pattern
 
     def _compile_pattern_re(self, pattern):
-        if pattern in alog_application.KNOWN_PATTERNS:
-            line_re = alog_application.KNOWN_PATTERNS[pattern]['line_re']
+        if pattern in self._config.known_patterns:
+            line_re = self._config.known_patterns[pattern].line_re
             ret = re.compile(line_re)
         else:
             ret = None
@@ -162,25 +194,25 @@ class alog_application(object):
     
     def _prepare_output_format(self, pattern, format):
         if format is None:
-            if pattern in alog_application.KNOWN_PATTERNS:
-                pattern_dict = alog_application.KNOWN_PATTERNS[pattern]
-                if 'output_format' in pattern_dict:
-                    format = pattern_dict['output_format']
+            if pattern in self._config.known_patterns:
+                pattern_obj = self._config.known_patterns[pattern]
+                if pattern_obj.output_format:
+                    format = pattern_obj.output_format
             if format is None:
-                format = self.DEFAULT_OUTPUT_FORMAT
+                format = self._config.default_output_format
         ret = ''
         for field in format.split(','):
             if len(ret) > 0:
                 ret += ' '
-            if field in self.FIELD_ALIAS:
-                field = self.FIELD_ALIAS[field]
+            if field in self._config.field_alias:
+                field = self._config.field_alias[field]
             ret += '%(' + field + ')s'
         return ret
     
     def _timestamp_format(self, pattern):
-        if pattern in alog_application.KNOWN_PATTERNS:
-            pattern_dict = alog_application.KNOWN_PATTERNS[pattern]
-            ret = pattern_dict['timestamp'] if 'timestamp' in pattern_dict else None
+        if pattern in self._config.known_patterns:
+            pattern_obj = self._config.known_patterns[pattern]
+            ret = pattern_obj.timestamp
         else:
             ret = None
         return ret
@@ -278,7 +310,8 @@ class alog_application(object):
         #=============================================================================================
         parser = argparse.ArgumentParser(description='parses a log file and displays the information')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
-        parser.add_argument('--pattern', dest='pattern', choices=alog_application.KNOWN_PATTERNS.keys().append('auto'), default='auto', help='named pattern for the log file.')
+        parser.add_argument('-C', '--config-directory', dest='config_dir', default=self._config.config_dir, help='name of the directory containing the alog configuration.')
+        parser.add_argument('--pattern', dest='pattern', default='auto', help='named pattern for the log file.')
         parser.add_argument('-f', '--find', dest='find', help='output only message which contain the given string.')
         parser.add_argument('--wfind', dest='wfind', help='output only message which contain the given word.')
         parser.add_argument('--ifind', dest='ifind', help='output only message which contain the given string (case-insensitive).')
@@ -291,16 +324,24 @@ class alog_application(object):
         args = parser.parse_args()
 
         self._verbose = args.verbose
-        self._logfile = args.logfile
         self._output_format = args.output_format
         self._first_line = None
         self._loglevel = None
+        
+        if args.config_dir:
+            self._config = alog_config(args.config_dir)
+            
+        if args.logfile in self._config.shortcuts:
+            self._logfile = self._config.shortcuts[args.logfile]
+        else:
+            self._logfile = args.logfile
+
         if args.output_level:
             self._loglevel = []
             for filter in args.output_level:
                 if filter[0] == '=':
                     filter = filter[1:].upper()
-                    if filter in alog_application.LOGLEVEL_NAMES:
+                    if filter in self._confog.loglevel_names:
                         self._loglevel.append(filter.upper())
                     else:
                         sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
@@ -309,17 +350,23 @@ class alog_application(object):
                     filter = filter.upper()
                     i = 0
                     found = False
-                    while i < len(alog_application.LOGLEVEL_NAMES):
+                    while i < len(self._confog.loglevel_names):
                         if found:
-                            self._loglevel.append(alog_application.LOGLEVEL_NAMES[i])
+                            self._loglevel.append(self._confog.loglevel_names[i])
                         else:
-                            if alog_application.LOGLEVEL_NAMES[i] == filter:
-                                self._loglevel.append(alog_application.LOGLEVEL_NAMES[i])
+                            if self._confog.loglevel_names[i] == filter:
+                                self._loglevel.append(self._confog.loglevel_names[i])
                                 found = True
                         i = i + 1
                     if not found:
                         sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
                         return 1
+                    
+        if args.pattern != 'auto':
+            if args.pattern not in self._config.known_patterns:
+                sys.stdout.write('Given pattern %s is invalid.\n' % (args.pattern))
+                return 1
+                
 
         if self._logfile == '-':
             self._logfile = 'stdin'

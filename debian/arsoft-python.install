@@ -1,4 +1,5 @@
 etc/jabber-daemon.conf
+etc/arsoft
 etc/init/jabber-daemon.conf
 usr/lib/python*/dist-packages/arsoft/*.py
 usr/lib/python*/dist-packages/arsoft/backup/*.py
