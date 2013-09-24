@@ -10,14 +10,6 @@ TRAC_ADMIN_SUID_SOURCES = trac/trac-admin-suid.c
 TARGET_DISTRIBUTION := $(shell dpkg-parsechangelog  | awk '/Distribution/ { print $$2}')
 SUBSTVARS=
 
-ifeq ($(TARGET_DISTRIBUTION),lucid)
-	SUBSTVARS += -Vdhcpclient:Depends="dhcp3-client"
-	SUBSTVARS += -Vdhcpserver:Depends="dhcp3-server"
-else
-	SUBSTVARS += -Vdhcpclient:Depends="isc-dhcp-client"
-	SUBSTVARS += -Vdhcpserver:Depends="isc-dhcp-server"
-endif
-
 CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
 CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
 CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
@@ -58,10 +50,11 @@ override_dh_auto_install:
 
 override_dh_fixperms:
 	dh_fixperms -O--buildsystem=python_distutils
-	chown root.root $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
-	chmod 4755 $(CURDIR)/debian/tmp/usr/bin/edskload $(CURDIR)/debian/tmp/usr/bin/edskeject
-	#chown root.root $(CURDIR)/debian/tmp/etc/jabber-daemon.conf
-	chmod 0600 $(CURDIR)/debian/tmp/etc/jabber-daemon.conf
+	chown root.root $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
+	chmod 4755 $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
+	ls -la $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
+	chown root.root $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf
+	chmod 0600 $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf
 
 override_dh_gencontrol:
-	dh_gencontrol -- $(SUBSTVARS)
+	dh_gencontrol -O--buildsystem=python_distutils -- $(SUBSTVARS)
