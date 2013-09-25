@@ -1,3 +1,9 @@
+arsoft-python (1.102) raring; urgency=low
+
+  * fixed jabber-daemon.conf trouble
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 25 Sep 2013 08:42:26 +0200
+
 arsoft-python (1.101) raring; urgency=low
 
   * fixed package trouble with suid binaries
