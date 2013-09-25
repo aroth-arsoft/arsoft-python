@@ -241,6 +241,11 @@ class alog_application(object):
                     ret = ret.replace(year= datetime.now().year)
             elif format == 'full':
                 ret = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S,%f")
+            elif format == 'daytime':
+                ret = datetime.strptime(timestamp, '%H:%M:%S')
+                if ret:
+                    now = datetime.now()
+                    ret = ret.replace(year=now.year, month=now.month, day=now.day)
             else:
                 ret = datetime.strptime(timestamp, format)
         return ret
@@ -253,12 +258,18 @@ class alog_application(object):
             timestamp = self._parse_timestamp(mo.group('timestamp'), timestamp_format) if 'timestamp' in mogrp else None
             message_text = mo.group('message') if 'message' in mogrp else None
             severity = mo.group('severity') if 'severity' in mogrp else None
-            loglevel = mo.group('loglevel').upper() if 'loglevel' in mogrp else None
+            loglevel = mo.group('loglevel') if 'loglevel' in mogrp else None
             host = mo.group('host') if 'host' in mogrp else None
             ident = mo.group('ident') if 'ident' in mogrp else None
             pid = mo.group('pid') if 'pid' in mogrp else None
             lineno = mo.group('lineno') if 'lineno' in mogrp else None
             filename = mo.group('filename') if 'filename' in mogrp else None
+            
+            if loglevel:
+                loglevel = loglevel.upper()
+            else:
+                if self._last_msg_obj is not None and self._last_msg_obj.loglevel is not None:
+                    loglevel = self._last_msg_obj.loglevel
 
             if find_re:
                 filtered = True
@@ -279,6 +290,10 @@ class alog_application(object):
                     filtered = False if loglevel in self._loglevel else True
                 else:
                     filtered = False
+
+            if not filtered:
+                if not message_text:
+                    filtered = True
 
             ret = self.MessageObject(message=message_text, timestamp=timestamp, 
                                             severity=severity, loglevel=loglevel, 
@@ -414,31 +429,31 @@ class alog_application(object):
                     find_re = re.compile(r'.*' + re.escape(args.ifind) + r'.*', re.IGNORECASE)
                 else:
                     find_re = None
-                last_msg_obj = None
+                self._last_msg_obj = None
                 max_outputs = args.limit
                 if self._first_line:
                     msg_obj = self._process_line(line_re, find_re, timestamp_format, self._first_line)
                     if msg_obj:
-                        if last_msg_obj:
-                            self._output_msg(last_msg_obj)
-                        last_msg_obj = msg_obj
-                    elif last_msg_obj:
-                        last_msg_obj.append_message(self._first_line.rstrip())
+                        if self._last_msg_obj:
+                            self._output_msg(self._last_msg_obj)
+                        self._last_msg_obj = msg_obj
+                    elif self._last_msg_obj:
+                        self._last_msg_obj.append_message(self._first_line.rstrip())
                 num_outputs = 0
                 for line in self._logfile_obj:
                     msg_obj = self._process_line(line_re, find_re, timestamp_format, line)
                     if msg_obj:
-                        if last_msg_obj:
-                            self._output_msg(last_msg_obj)
+                        if self._last_msg_obj:
+                            self._output_msg(self._last_msg_obj)
                             num_outputs += 1
                             if max_outputs > 0 and num_outputs >= max_outputs:
-                                last_msg_obj = None
+                                self._last_msg_obj = None
                                 break
-                        last_msg_obj = msg_obj
-                    elif last_msg_obj:
-                        self._continue_process_line(last_msg_obj, line_re, find_re, line)
-                if last_msg_obj:
-                    self._output_msg(last_msg_obj)
+                        self._last_msg_obj = msg_obj
+                    elif self._last_msg_obj:
+                        self._continue_process_line(self._last_msg_obj, line_re, find_re, line)
+                if self._last_msg_obj:
+                    self._output_msg(self._last_msg_obj)
                     num_outputs += 1
 
                 ret = 0
