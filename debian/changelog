@@ -1,3 +1,15 @@
+arsoft-python (1.104) raring; urgency=low
+
+  * fix build errors 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 26 Sep 2013 07:34:08 +0200
+
+arsoft-python (1.103) raring; urgency=low
+
+  * analyze the log file from rkhunter in check_rkhunter
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 26 Sep 2013 07:27:15 +0200
+
 arsoft-python (1.102) raring; urgency=low
 
   * fixed jabber-daemon.conf trouble

@@ -73,14 +73,14 @@ class pynagPlugin:
             self.parser.add_argument("-c", "--critical", dest="critical", help="Critical Threshhold", required=self.must_threshold, metavar="CRITICAL")
             self.parser.add_argument("-w", "--warning", dest="warning", help="Warn Threshhold", required=self.must_threshold, metavar="WARNING")
 
-    def add_arg(self, spec_abbr, spec, help_text, required=1, action="store"):
+    def add_arg(self, spec_abbr, spec, help_text, required=1, action="store", default=None):
         """
         Add an argument to be handled by the option parser.  By default, the arg is not required.
         
         required = optional parameter
         action = [store, append, store_true]
         """
-        self.parser.add_argument("-%s" % spec_abbr, "--%s" % spec, dest="%s" % spec, help=help_text, metavar="%s" % spec.upper(), required=required, action=action)
+        self.parser.add_argument("-%s" % spec_abbr, "--%s" % spec, dest="%s" % spec, help=help_text, metavar="%s" % spec.upper(), required=required, action=action, default=default)
 
     def activate(self):
         """
