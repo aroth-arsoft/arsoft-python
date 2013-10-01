@@ -118,16 +118,27 @@ class dns_update_app(object):
             ipv6 = True if self.rrtype == 'AAAA' else False
             ret = True
             for host in hosts_to_import:
-                target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server)
+                try:
+                    target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server)
+                except dns.resolver.NoAnswer as e:
+                    sys.stderr.write("Failed to retrieve host record %s from target DNS server - no answer.\n" % (host, self.server))
+                    target_hostaddr = None
+
                 if target_hostaddr is None:
                     ret = False
                     sys.stderr.write("Failed to retrieve host record %s from target DNS server.\n" % (host, self.server))
                     continue
-                anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver)
+
+                try:
+                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver)
+                except dns.resolver.NoAnswer as e:
+                    sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s - no answer.\n" % (host, anotherserver))
+                    anotherserver_hostaddr = None
                 if anotherserver_hostaddr is None:
                     ret = False
                     sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s.\n" % (host, anotherserver))
                     continue
+
                 if not _is_hostaddr_equal(target_hostaddr, anotherserver_hostaddr):
                     if not self._update_host(host, anotherserver_hostaddr):
                         sys.stderr.write("Failed to update host record %s on target DNS server\n" % (host, self.server))
