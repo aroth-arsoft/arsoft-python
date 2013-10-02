@@ -1,3 +1,10 @@
+arsoft-python (1.105) raring; urgency=low
+
+  * improve DNS script to handle CNAME records
+  * more DNS error handling
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 02 Oct 2013 08:18:06 +0200
+
 arsoft-python (1.104) raring; urgency=low
 
   * fix build errors 
