@@ -41,16 +41,11 @@ class ARSoftBackupApp(BackupApp):
         return ret
     
     def _do_rsync(self):
-        backup_dir = self.config.backup_directory
+        backup_dir = self.session.backup_dir
         previous_backup_dir = None
-        if not self.config.use_filesystem_snapshots:
-            if self.config.use_timestamp_for_backup_dir:
-                now = datetime.utcnow()
-                nowstr = now.strftime(self.config.timestamp_format_for_backup_dir)
-                backup_dir = os.path.join(backup_dir, nowstr)
-            if self.config.use_filesystem_hardlinks:
-                if self._last_full_backup:
-                    previous_backup_dir = self._last_full_backup.fullpath
+        if self.config.use_filesystem_hardlinks:
+            if self._last_full_backup:
+                previous_backup_dir = self._last_full_backup.fullpath
 
         if backup_dir[-1] != '/':
             backup_dir += '/'
@@ -63,6 +58,10 @@ class ARSoftBackupApp(BackupApp):
         #print(source_filelist)
 
         if not source_filelist.empty():
+            if Rsync.is_link_dest_valid(backup_dir, previous_backup_dir):
+                linkDest = previous_backup_dir
+            else:
+                linkDest = None
             inst = Rsync(source=source_filelist, dest=backup_dir, linkDest=previous_backup_dir, delete=True, deleteExcluded=True, 
                          use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
                          dryrun=self._dryrun, verbose=self._verbose)
@@ -76,13 +75,15 @@ class ARSoftBackupApp(BackupApp):
         if not self._check_config():
             return 1
         
+        success = True
+        failure_message = None
         self.load_previous()
 
         BackupApp.start_session(self)
 
         if not BackupApp.prepare_destination(self):
-            sys.stderr.write('Failed to prepare backup\n')
-            ret = 1
+            success = False
+            failure_message = 'Failed to prepare backup'
         else:
             ret = 0
             self.plugin_notify_start_backup()
@@ -93,8 +94,8 @@ class ARSoftBackupApp(BackupApp):
 
             # rsync to backup destination/backup_dir
             if not self._do_rsync():
-                sys.stderr.write('rsync failed\n')
-                ret = 1
+                success = False
+                failure_message = 'rsync failure'
 
             self.plugin_notify_rsync_complete()
 
@@ -102,21 +103,40 @@ class ARSoftBackupApp(BackupApp):
             # remove old snapshot from the disc
 
         if not BackupApp.shutdown_destination(self):
-            sys.stderr.write('Failed to shut down backup correctly.\n')
-            ret = 1
+            success = False
+            failure_message = 'Failed to shut down backup correctly'
 
-        BackupApp.finish_session(self)
-
+        BackupApp.finish_session(self, success, failure_message)
+        
+        if success:
+            ret = 0
+        else:
+            ret = -1
         return ret
     
     def _show_status(self):
         if not self._check_config():
             return 1
 
-        self.load_previous()
-        
+        print('Active Plugins:   %s' % (','.join(self.config.active_plugins)))
+        print('Backup directory: %s' % (self.config.backup_directory))
+        print('Retention time:   %s' % (self.config.retention_time))
+
+        if not self.load_previous():
+            return 1
+
+        print('Last success: %s' % (self.job_state.last_success))
+        print('Last failure: %s' % (self.job_state.last_failure))
+        for item in self.job_state.history:
+            print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))
+            print('  Log file:  %s' % (item.logfile))
+            print('  Start:     %s ' % (item.startdate))
+            print('  End:       %s ' % (item.enddate))
+            print('  Directory: %s' % (item.backup_dir))
+
+        print('Previous backups:')
         for bak in self._previous_backups:
-            print('%s' % (bak.timestamp))
+            print('  %s in %s' % (bak.timestamp, bak.fullpath))
         
         if self._last_full_backup:
             print('Last backup: %s in %s' % (self._last_full_backup.timestamp, self._last_full_backup.fullpath))
@@ -133,9 +153,10 @@ class ARSoftBackupApp(BackupApp):
         print('Last failure: %s' % (self.job_state.last_failure))
         for item in self.job_state.history:
             print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))
-            print('  Log file: %s' % (item.logfile))
-            print('  Start:    %s ' % (item.startdate))
-            print('  End:      %s ' % (item.enddate))
+            print('  Log file:  %s' % (item.logfile))
+            print('  Start:     %s ' % (item.startdate))
+            print('  End:       %s ' % (item.enddate))
+            print('  Directory: %s' % (item.backup_dir))
 
         return ret
 

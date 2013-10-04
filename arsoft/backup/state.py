@@ -30,6 +30,7 @@ class BackupJobHistoryItem(object):
         self._enddate = None
         self._logfile_fobj = None
         self._require_read = True
+        self._backup_dir = None
 
     @staticmethod
     def create(parent, state_dir):
@@ -73,6 +74,16 @@ class BackupJobHistoryItem(object):
             self._read_state()
         return self._enddate
 
+    @property
+    def backup_dir(self):
+        if self._require_read:
+            self._read_state()
+        return self._backup_dir
+
+    @backup_dir.setter
+    def backup_dir(self, value):
+        self._backup_dir = value
+
     def _read_state(self):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(self.filename)
@@ -80,6 +91,7 @@ class BackupJobHistoryItem(object):
         self._failure_message = inifile.get(None, 'FailureMessage', None)
         self._startdate = inifile.getAsTimestamp(None, 'Start', None)
         self._enddate = inifile.getAsTimestamp(None, 'End', None)
+        self._backup_dir = inifile.get(None, 'BackupDir', None)
         self._require_read = False
         return ret
 
@@ -91,6 +103,7 @@ class BackupJobHistoryItem(object):
         inifile.set(None, 'FailureMessage', self._failure_message)
         inifile.setAsTimestamp(None, 'Start', self._startdate)
         inifile.setAsTimestamp(None, 'End', self._enddate)
+        inifile.set(None, 'BackupDir', self._backup_dir)
         ret = inifile.save(self.filename)
         if ret:
             self.parent._item_changed(self)
@@ -109,7 +122,9 @@ class BackupJobHistoryItem(object):
                 self._logfile_fobj = None
         return self._logfile_fobj
 
-    def finish(self):
+    def finish(self, success=True, failure_message=None):
+        self._success = success
+        self._failure_message = failure_message
         self.closelog()
         now = datetime.datetime.utcnow()
         self._enddate = now
@@ -230,10 +245,10 @@ class BackupJobState(object):
     
     def _item_changed(self, item):
         if item.success:
-            if item.date > self.last_success:
+            if self.last_success is None or item.date > self.last_success:
                 self.last_success = item.date
         else:
-            if item.date > self.last_failure:
+            if self.last_failure is None or item.date > self.last_failure:
                 self.last_failure = item.date
         self.save()
 

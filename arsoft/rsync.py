@@ -136,7 +136,11 @@ class Rsync(object):
                 print(self._exclude)
 
         if self.linkDest:
-            args.append('--link-dest=' + self.linkDest)
+            linkDest_url = Rsync.parse_url(self.linkDest)
+            if linkDest_url:
+                args.append('--link-dest=' + linkDest_url.path)
+            else:
+                args.append('--link-dest=' + self.linkDest)
 
         if isinstance(self._source, FileList):
             tmp_fd, tmp_source = tempfile.mkstemp()
@@ -178,10 +182,11 @@ class Rsync(object):
     def _normalize_url(url):
         o = urlparse.urlparse(url)
         if o.scheme == 'rsync':
+            ret = ''
             if o.username:
                 ret += o.username
                 ret += '@'
-            ret = o.hostname
+            ret += o.hostname
             ret += ':'
             ret += o.path
         else:
@@ -200,6 +205,43 @@ class Rsync(object):
             return o
         else:
             return None
+
+    @staticmethod
+    def join_url(base, url):
+        if isinstance(base, tuple):
+            ret = ''
+            if base.scheme == 'rsync':
+                ret = 'rsync://'
+                if base.username:
+                    ret += base.username
+                    if base.password:
+                        ret += ':' + base.password
+                    ret += '@'
+                ret += base.hostname
+                ret += os.path.join(base.path, url)
+            return ret
+        else:
+            return urlparse.urljoin(base, url)
+        
+    @staticmethod
+    def is_link_dest_valid(destination, link_dest_dir):
+        if '://' in destination:
+            url_destination = urlparse.urlparse(destination)
+        else:
+            url_destination = None
+        if '://' in link_dest_dir:
+            url_link_dest = urlparse.urlparse(link_dest_dir)
+        else:
+            url_link_dest = None
+        if url_destination and url_link_dest:
+            if url_destination.scheme == 'rsync' and url_link_dest.scheme == 'rsync' and \
+                url_destination.hostname == url_link_dest.hostname:
+                    ret = True
+            else:
+                ret = False
+        else:
+            ret = True
+        return ret
 
     @staticmethod
     def sync_directories(source_dir, target_dir, recursive=True, relative=True):

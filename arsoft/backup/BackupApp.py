@@ -109,6 +109,12 @@ class BackupApp(object):
             sys.stderr.write('No backup directory configured in %s\n' % (self.config.main_conf) )
             ret = False
         else:
+            if not self.config.use_filesystem_snapshots:
+                if self.config.use_timestamp_for_backup_dir:
+                    now = datetime.datetime.utcnow()
+                    nowstr = now.strftime(self.config.timestamp_format_for_backup_dir)
+                    backup_dir = os.path.join(backup_dir, nowstr)
+
             if Rsync.is_rsync_url(backup_dir):
                 # assume the given URL is good
                 pass
@@ -116,11 +122,12 @@ class BackupApp(object):
                 if not self._mkdir(backup_dir):
                     ret = False
             if ret:
+                self.session.backup_dir = backup_dir
                 if self.config.intermediate_backup_directory:
                     if not self._mkdir(self.config.intermediate_backup_directory):
                         ret = False
         return ret
-    
+
     def load_previous(self):
         ret = True
         local_backup_dir = None
@@ -140,12 +147,13 @@ class BackupApp(object):
                 for item in os.listdir(local_backup_dir):
                     fullpath = os.path.join(local_backup_dir, item)
                     if os.path.isdir(fullpath):
-                        (ret, timestamp) = self.config.is_backup_item(fullpath)
-                        if ret:
+                        (backup_ok, timestamp) = self.config.is_backup_item(item)
+                        if backup_ok:
                             bak = BackupApp.PreviousBackupDirectory(fullpath, timestamp)
                             found_backup_dirs.append( bak )
                 self._previous_backups = sorted(found_backup_dirs, key=lambda item: bak.timestamp)
-
+            else:
+                ret = False
         elif ssh_remote_backup_dir is not None:
             remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
                         username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password, 
@@ -154,16 +162,18 @@ class BackupApp(object):
                 found_backup_dirs = []
                 for item, item_stat in remote_items.iteritems():
                     if stat.S_ISDIR(item_stat.st_mode):
-                        fullpath = os.path.join(ssh_remote_backup_dir.path, item)
-                        (ret, timestamp) = self.config.is_backup_item(fullpath)
-                        if ret:
+                        fullpath = Rsync.join_url(ssh_remote_backup_dir, item)
+                        (backup_ok, timestamp) = self.config.is_backup_item(item)
+                        if backup_ok:
                             bak = BackupApp.PreviousBackupDirectory(fullpath, timestamp)
                             found_backup_dirs.append( bak )
                 self._previous_backups = sorted(found_backup_dirs, key=lambda item: bak.timestamp)
-                
-        if self._previous_backups:
-            # pick the latest/last backup from the list
-            self._last_full_backup = self._previous_backups[-1]
+            else:
+                if remote_items is None:
+                    ret = False 
+
+        # pick the latest/last backup from the list
+        self._last_full_backup = self._previous_backups[-1] if self._previous_backups else None
         return ret
 
     def prepare_destination(self):
@@ -198,9 +208,9 @@ class BackupApp(object):
         self.session = self.job_state.start_new_session()
         self.plugin_notify_start_session()
 
-    def finish_session(self):
-        self.plugin_notify_finish_session()
-        self.session.finish()
+    def finish_session(self, success=True, failure_message=None):
+        self.plugin_notify_finish_session(success=success, failure_message=failure_message)
+        self.session.finish(success, failure_message)
 
     def _call_plugins(self, cmd, **kwargs):
         for plugin in self.plugins:
@@ -215,8 +225,8 @@ class BackupApp(object):
     def plugin_notify_start_session(self):
         self._call_plugins('start_session')
 
-    def plugin_notify_finish_session(self):
-        self._call_plugins('finish_session')
+    def plugin_notify_finish_session(self, **kwargs):
+        self._call_plugins('finish_session', **kwargs)
 
     def plugin_notify_disk_ready(self):
         self._call_plugins('disk_ready')
