@@ -146,7 +146,8 @@ class BackupApp(object):
     
     def __init__(self, name=None):
         self.name = name
-        self.intermediate_filelist = FileList()
+        self.filelist_include = FileList()
+        self.filelist_exclude = FileList()
         self.config = BackupConfig()
         self.job_state = BackupJobState()
         self.previous_backups = BackupList(self)
@@ -302,8 +303,11 @@ class BackupApp(object):
                 if func:
                     func(**kwargs)
 
-    def append_intermediate_filelist(self, filelist_item):
-        self.intermediate_filelist.append(filelist_item)
+    def append_to_filelist(self, filelist_item, exclude=False):
+        if exclude:
+            self.filelist_exclude.append(filelist_item)
+        else:
+            self.filelist_include.append(filelist_item)
 
     def plugin_notify_start_session(self):
         self._call_plugins('start_session')

@@ -99,7 +99,7 @@ class GitBackupPlugin(BackupPlugin):
                     sys.stderr.write('Failed to load repository %s\n' % repo_path)
                     ret = False
             #print(repo_backup_filelist)
-            self.backup_app.append_intermediate_filelist(repo_backup_filelist)
+            self.backup_app.append_to_filelist(repo_backup_filelist)
             #print(self.intermediate_filelist)
         return ret
  

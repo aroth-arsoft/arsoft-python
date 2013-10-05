@@ -94,7 +94,7 @@ class DirectoryBackupPlugin(BackupPlugin):
                             dir_backup_filelist.append(backup_dest_dir)
                     else:
                         sys.stderr.write('Refuse to back up %s because it is not a file or directory.\n' % source_dir)
-            self.backup_app.append_intermediate_filelist(dir_backup_filelist)
+            self.backup_app.append_to_filelist(dir_backup_filelist)
 
         return ret
 

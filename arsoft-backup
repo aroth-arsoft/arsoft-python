@@ -50,19 +50,24 @@ class ARSoftBackupApp(BackupApp):
         if backup_dir[-1] != '/':
             backup_dir += '/'
 
-        # build the final filelist
-        source_filelist = FileList()
+        # build the final filelist (include and exclude)
+        source_filelist_include = FileList()
         if self.config.filelist_include:
-            source_filelist.append(self.config.filelist_include)
-        source_filelist.append(self.intermediate_filelist)
-        #print(source_filelist)
+            source_filelist_include.append(self.config.filelist_include)
+        source_filelist_include.append(self.filelist_include)
+        
+        source_filelist_exclude = FileList()
+        if self.config.filelist_exclude:
+            source_filelist_exclude.append(self.config.filelist_exclude)
+        source_filelist_exclude.append(self.filelist_exclude)
 
-        if not source_filelist.empty():
+        if not source_filelist_include.empty():
             if Rsync.is_link_dest_valid(backup_dir, previous_backup_dir):
                 linkDest = previous_backup_dir
             else:
                 linkDest = None
-            inst = Rsync(source=source_filelist, dest=backup_dir, linkDest=previous_backup_dir, delete=True, deleteExcluded=True, 
+            inst = Rsync(source=source_filelist_include, dest=backup_dir, linkDest=previous_backup_dir, exclude=source_filelist_exclude,
+                         delete=True, deleteExcluded=True, 
                          use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
                          dryrun=self._dryrun, verbose=self._verbose)
             ret = inst.execute()
