@@ -123,7 +123,7 @@ class Rsync(object):
             tmp_fobj.close()
             args.append('--include-from=' + tmp_include)
             if self.verbose:
-                print(self._include)
+                print('Include=[%s]' % self._include)
 
         if self._exclude:
             tmp_fd, tmp_exclude = tempfile.mkstemp()
@@ -133,7 +133,7 @@ class Rsync(object):
             tmp_fobj.close()
             args.append('--exclude-from=' + tmp_exclude)
             if self.verbose:
-                print(self._exclude)
+                print('Exclude=[%s]' % self._exclude)
 
         if self.linkDest:
             linkDest_url = Rsync.parse_url(self.linkDest)
@@ -154,7 +154,7 @@ class Rsync(object):
             else:
                 args.append('/')
             if self.verbose:
-                print(self._source)
+                print('Source=[%s]' % self._source)
         else:
             args.append(self._source)
         args.append(self._normalize_url(self._dest))
