@@ -121,6 +121,7 @@ class ARSoftBackupApp(BackupApp):
         print('Active Plugins:   %s' % (','.join(self.config.active_plugins)))
         print('Backup directory: %s' % (self.config.backup_directory))
         print('Retention time:   %s' % (self.config.retention_time))
+        print('Retention count:   %s' % (self.config.retention_count))
 
         if not self.load_previous():
             return 1
@@ -135,11 +136,14 @@ class ARSoftBackupApp(BackupApp):
             print('  Directory: %s' % (item.backup_dir))
 
         print('Previous backups:')
-        for bak in self._previous_backups:
-            print('  %s in %s' % (bak.timestamp, bak.fullpath))
+        for bak in self.previous_backups:
+            if bak.session is None:
+                print('  %s in %s' % (bak.timestamp, bak.fullpath))
+            else:
+                print('  %s in %s (got session)' % (bak.timestamp, bak.fullpath))
         
-        if self._last_full_backup:
-            print('Last backup: %s in %s' % (self._last_full_backup.timestamp, self._last_full_backup.fullpath))
+        if self.previous_backups.last_full_backup:
+            print('Last backup: %s in %s' % (self.previous_backups.last_full_backup.timestamp, self.previous_backups.last_full_backup.fullpath))
         else:
             print('Last backup: None')
 
@@ -159,6 +163,19 @@ class ARSoftBackupApp(BackupApp):
             print('  Directory: %s' % (item.backup_dir))
 
         return ret
+    
+    def _cleanup(self):
+        if not self._check_config():
+            return 1
+
+        print('Backup directory: %s' % (self.config.backup_directory))
+        print('Retention time:   %s' % (self.config.retention_time))
+        print('Retention count:   %s' % (self.config.retention_count))
+
+        if not self.load_previous():
+            return 1
+        self.manage_retention()
+        return 0
 
     def main(self, argv=None):
         #=============================================================================================
@@ -174,6 +191,7 @@ class ARSoftBackupApp(BackupApp):
         parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
         parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
         parser.add_argument('--status', dest='show_status', action='store_true', help='shows the status of the backup.')
+        parser.add_argument('--cleanup', dest='cleanup', action='store_true', help='clean up the backups')
         parser.add_argument('--log', dest='show_log', action='store_true', help='shows the log/history of the backup.')
 
         args = parser.parse_args()
@@ -203,6 +221,8 @@ class ARSoftBackupApp(BackupApp):
                     ret = self._show_status()
                 elif args.show_log:
                     ret = self._show_log()
+                elif args.cleanup:
+                    ret = self._cleanup()
                 else:
                     sys.stderr.write('No operation specified.\n')
                     parser.print_help()
