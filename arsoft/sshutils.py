@@ -227,3 +227,20 @@ print(pickle.dumps(items))'''
     else:
         ret = None
     return ret
+
+def ssh_mkdir(server, directory, recursive=False, keyfile=None, username=None, password=None, verbose=False):
+    if recursive:
+        commandline = 'mkdir -p \'%s\'' % (directory)
+    else:
+        commandline = 'mkdir \'%s\'' % (directory)
+    (sts, stdoutdata, stderrdata) = ssh_runcmdAndGetData(server, commandline, keyfile=keyfile, username=username, password=password, verbose=verbose)
+    return True if sts == 0 else False
+
+def ssh_rmdir(server, directory, recursive=False, keyfile=None, username=None, password=None, verbose=False):
+    if recursive:
+        commandline = 'rm -rf \'%s\'' % (directory)
+    else:
+        commandline = 'rm -f \'%s\'' % (directory)
+    (sts, stdoutdata, stderrdata) = ssh_runcmdAndGetData(server, commandline, keyfile=keyfile, username=username, password=password, verbose=verbose)
+    return True if sts == 0 else False
+
