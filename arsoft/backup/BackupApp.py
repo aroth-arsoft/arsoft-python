@@ -5,11 +5,136 @@
 from arsoft.filelist import *
 from arsoft.rsync import Rsync
 from arsoft.sshutils import *
+from arsoft.utils import rmtree
 from .BackupConfig import *
 from .plugin import *
 from .state import *
 from .diskmgr import *
 import sys, stat
+
+    
+class BackupList(object):
+
+    class BackupItem(object):
+        def __init__(self, fullpath, timestamp, session=None):
+            self.fullpath = fullpath
+            self.timestamp = timestamp
+            self.session = session
+    
+    def __init__(self, app):
+        self.app = app
+        self.config = app.config
+        self._items = []
+        self._last_full = None
+
+    def load(self):
+        ret = True
+        local_backup_dir = None
+        ssh_remote_backup_dir = None
+        if Rsync.is_rsync_url(self.config.backup_directory):
+            url = Rsync.parse_url(self.config.backup_directory)
+            if url is not None:
+                if not self.config.use_ssh_for_rsync:
+                    local_backup_dir = url.path
+                else:
+                    ssh_remote_backup_dir = url
+        else:
+            local_backup_dir = None
+        if local_backup_dir is not None:
+            if os.path.isdir(local_backup_dir):
+                found_backup_dirs = []
+                for item in os.listdir(local_backup_dir):
+                    fullpath = os.path.join(local_backup_dir, item)
+                    if os.path.isdir(fullpath):
+                        (backup_ok, timestamp) = self.config.is_backup_item(item)
+                        if backup_ok:
+                            session = self.app.job_state.find_session(timestamp, fullpath)
+                            bak = BackupList.BackupItem(fullpath, timestamp, session)
+                            found_backup_dirs.append( bak )
+                self._items = sorted(found_backup_dirs, key=lambda bak: bak.timestamp)
+            else:
+                ret = False
+        elif ssh_remote_backup_dir is not None:
+            remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
+                        username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password, 
+                        keyfile=self.config.ssh_identity_file)
+            if remote_items:
+                found_backup_dirs = []
+                for item, item_stat in remote_items.iteritems():
+                    if stat.S_ISDIR(item_stat.st_mode):
+                        fullpath = Rsync.join_url(ssh_remote_backup_dir, item)
+                        (backup_ok, timestamp) = self.config.is_backup_item(item)
+                        if backup_ok:
+                            session = self.app.job_state.find_session(timestamp, fullpath)
+                            bak = BackupList.BackupItem(fullpath, timestamp, session)
+                            found_backup_dirs.append( bak )
+                self._items = sorted(found_backup_dirs, key=lambda bak: bak.timestamp)
+            else:
+                if remote_items is None:
+                    ret = False 
+
+        # pick the latest/last backup from the list
+        self._last_full = self._items[-1] if self._items else None
+        return ret
+    
+    def remove_old_backups(self, max_age, min_count=0, max_count=50):
+
+        if min_count > max_count:
+            raise ValueError('min_count=%i must be greater than max_count=%i' % (min_count, max_count))
+
+        print('hist=%i min_count=%i max_count=%i' % (len(self._items), min_count, max_count))
+        if len(self._items) > max_count:
+            num_to_delete = len(self._items) - max_count
+            print('numbers to delete %i' % num_to_delete)
+            for i in range(0, num_to_delete):
+                print('delete num %i=%s' % (i, self._items[0]))
+                self.__delitem__(0)
+
+        if isinstance(max_age, datetime.datetime):
+            max_rentention_time = max_age
+        elif isinstance(max_age, datetime.timedelta):
+            now = datetime.datetime.utcnow()
+            max_rentention_time = now - max_age
+        elif isinstance(max_age, float) or isinstance(max_age, int):
+            now = datetime.datetime.utcnow()
+            max_rentention_time = now - datetime.timedelta(seconds=max_age)
+
+        while len(self._items) > 0 and len(self._items) <= min_count:
+            if self._items[0].timestamp < max_rentention_time:
+                print('remove old item %s' % (self._items[i]))
+                self.__delitem__(0)
+            else:
+                break
+        return True
+
+    def __iter__(self):
+        return iter(self._items)
+    
+    def __len__(self):
+        return len(self._items)
+    
+    def __getitem__(self, index):
+        return self._items[index]
+
+    def __delitem__(self, index):
+        print('delitem %i' % index)
+        item = self._items[index]
+        if Rsync.is_rsync_url(item.fullpath):
+            url = Rsync.parse_url(item.fullpath)
+            ssh_rmdir(server=url.hostname, directory=url.path, recursive=True,
+                        username=url.username, password=url.password,
+                        keyfile=self.config.ssh_identity_file)
+        else:
+            rmtree(item.fullpath)
+        del self._items[index]
+
+    @property
+    def last_full_backup(self):
+        return self._last_full
+
+    def __str__(self):
+        self.load()
+        return '[' + ','.join([str(item) for item in self._items]) + ']'
 
 class BackupApp(object):
     
@@ -18,21 +143,16 @@ class BackupApp(object):
             self.name = plugin_name
             self.module = plugin_module
             self.impl = plugin_impl
-            
-    class PreviousBackupDirectory(object):
-        def __init__(self, fullpath, timestamp):
-            self.fullpath = fullpath
-            self.timestamp = timestamp
     
     def __init__(self, name=None):
         self.name = name
         self.intermediate_filelist = FileList()
         self.config = BackupConfig()
         self.job_state = BackupJobState()
+        self.previous_backups = BackupList(self)
         self.plugins = []
         self._diskmgr = None
         self.disk_loaded = False
-        self._last_full_backup = None
 
     def cleanup(self):
         self.job_state.save()
@@ -129,52 +249,7 @@ class BackupApp(object):
         return ret
 
     def load_previous(self):
-        ret = True
-        local_backup_dir = None
-        ssh_remote_backup_dir = None
-        if Rsync.is_rsync_url(self.config.backup_directory):
-            url = Rsync.parse_url(self.config.backup_directory)
-            if url is not None:
-                if not self.config.use_ssh_for_rsync:
-                    local_backup_dir = url.path
-                else:
-                    ssh_remote_backup_dir = url
-        else:
-            local_backup_dir = None
-        if local_backup_dir is not None:
-            if os.path.isdir(local_backup_dir):
-                found_backup_dirs = []
-                for item in os.listdir(local_backup_dir):
-                    fullpath = os.path.join(local_backup_dir, item)
-                    if os.path.isdir(fullpath):
-                        (backup_ok, timestamp) = self.config.is_backup_item(item)
-                        if backup_ok:
-                            bak = BackupApp.PreviousBackupDirectory(fullpath, timestamp)
-                            found_backup_dirs.append( bak )
-                self._previous_backups = sorted(found_backup_dirs, key=lambda item: bak.timestamp)
-            else:
-                ret = False
-        elif ssh_remote_backup_dir is not None:
-            remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
-                        username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password, 
-                        keyfile=self.config.ssh_identity_file)
-            if remote_items:
-                found_backup_dirs = []
-                for item, item_stat in remote_items.iteritems():
-                    if stat.S_ISDIR(item_stat.st_mode):
-                        fullpath = Rsync.join_url(ssh_remote_backup_dir, item)
-                        (backup_ok, timestamp) = self.config.is_backup_item(item)
-                        if backup_ok:
-                            bak = BackupApp.PreviousBackupDirectory(fullpath, timestamp)
-                            found_backup_dirs.append( bak )
-                self._previous_backups = sorted(found_backup_dirs, key=lambda item: bak.timestamp)
-            else:
-                if remote_items is None:
-                    ret = False 
-
-        # pick the latest/last backup from the list
-        self._last_full_backup = self._previous_backups[-1] if self._previous_backups else None
-        return ret
+        return self.previous_backups.load()
 
     def prepare_destination(self):
         # load all available external discs
@@ -194,6 +269,15 @@ class BackupApp(object):
         else:
             ret = False
         return ret
+    
+    def manage_retention(self):
+        print(self.config.retention_time)
+        self.previous_backups.remove_old_backups(max_age=self.config.retention_time, 
+                                        min_count=self.config.retention_count,
+                                        max_count=self.config.retention_count)
+        self.job_state.remove_old_items(max_age=self.config.retention_time, 
+                                        min_count=self.config.retention_count,
+                                        max_count=self.config.retention_count)
 
     def shutdown_destination(self):
         ret = True

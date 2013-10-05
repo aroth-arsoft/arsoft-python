@@ -170,6 +170,17 @@ class BackupJobHistory(object):
 
     def __iter__(self):
         return iter(self._items)
+    
+    def __len__(self):
+        return len(self._items)
+    
+    def __getitem__(self, index):
+        return self._items[index]
+
+    def __delitem__(self, index):
+        item = self._items[index]
+        os.unlink(item.filename)
+        del self._items[index]
 
     def __str__(self):
         self.load()
@@ -242,6 +253,43 @@ class BackupJobState(object):
     
     def start_new_session(self):
         return self.history.create_new_item()
+    
+    def remove_old_items(self, max_age, min_count=0, max_count=50):
+        
+        if min_count > max_count:
+            raise ValueError('min_count=%i must be greater than max_count=%i' % (min_count, max_count))
+        
+        print('hist=%i min_count=%i max_count=%i' % (len(self.history), min_count, max_count))
+        if len(self.history) > max_count:
+            num_to_delete = len(self.history) - max_count
+            print('numbers to delete %i' % num_to_delete)
+            for i in range(0, num_to_delete):
+                print('delete num %i=%s' % (i, self.history[0]))
+                del self.history[0]
+
+        if isinstance(max_age, datetime.datetime):
+            max_rentention_time = max_age
+        elif isinstance(max_age, datetime.timedelta):
+            now = datetime.datetime.utcnow()
+            max_rentention_time = now - max_age
+        elif isinstance(max_age, float) or isinstance(max_age, int):
+            now = datetime.datetime.utcnow()
+            max_rentention_time = now - datetime.timedelta(seconds=max_age)
+
+        while len(self.history) > 0 and len(self.history) <= min_count:
+            if self.history[0].date < max_rentention_time:
+                print('remove old item %s' % (self.history[i]))
+                del self.history[0]
+            else:
+                break
+
+        return True
+
+    def find_session(self, timestamp, backup_dir):
+        for item in self.history:
+            if item.date == timestamp and item.backup_dir == backup_dir:
+                return item
+        return None
     
     def _item_changed(self, item):
         if item.success:
