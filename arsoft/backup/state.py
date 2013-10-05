@@ -259,12 +259,12 @@ class BackupJobState(object):
         if min_count > max_count:
             raise ValueError('min_count=%i must be greater than max_count=%i' % (min_count, max_count))
         
-        print('hist=%i min_count=%i max_count=%i' % (len(self.history), min_count, max_count))
+        #print('hist=%i min_count=%i max_count=%i' % (len(self.history), min_count, max_count))
         if len(self.history) > max_count:
             num_to_delete = len(self.history) - max_count
-            print('numbers to delete %i' % num_to_delete)
+            #print('numbers to delete %i' % num_to_delete)
             for i in range(0, num_to_delete):
-                print('delete num %i=%s' % (i, self.history[0]))
+                #print('delete num %i=%s' % (i, self.history[0]))
                 del self.history[0]
 
         if isinstance(max_age, datetime.datetime):
@@ -278,7 +278,7 @@ class BackupJobState(object):
 
         while len(self.history) > 0 and len(self.history) <= min_count:
             if self.history[0].date < max_rentention_time:
-                print('remove old item %s' % (self.history[i]))
+                #print('remove old item %s' % (self.history[i]))
                 del self.history[0]
             else:
                 break

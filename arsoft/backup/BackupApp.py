@@ -82,12 +82,12 @@ class BackupList(object):
         if min_count > max_count:
             raise ValueError('min_count=%i must be greater than max_count=%i' % (min_count, max_count))
 
-        print('hist=%i min_count=%i max_count=%i' % (len(self._items), min_count, max_count))
+        #print('hist=%i min_count=%i max_count=%i' % (len(self._items), min_count, max_count))
         if len(self._items) > max_count:
             num_to_delete = len(self._items) - max_count
-            print('numbers to delete %i' % num_to_delete)
+            #print('numbers to delete %i' % num_to_delete)
             for i in range(0, num_to_delete):
-                print('delete num %i=%s' % (i, self._items[0]))
+                #print('delete num %i=%s' % (i, self._items[0]))
                 self.__delitem__(0)
 
         if isinstance(max_age, datetime.datetime):
@@ -101,7 +101,7 @@ class BackupList(object):
 
         while len(self._items) > 0 and len(self._items) <= min_count:
             if self._items[0].timestamp < max_rentention_time:
-                print('remove old item %s' % (self._items[i]))
+                #print('remove old item %s' % (self._items[i]))
                 self.__delitem__(0)
             else:
                 break
@@ -117,7 +117,7 @@ class BackupList(object):
         return self._items[index]
 
     def __delitem__(self, index):
-        print('delitem %i' % index)
+        #print('delitem %i' % index)
         item = self._items[index]
         if Rsync.is_rsync_url(item.fullpath):
             url = Rsync.parse_url(item.fullpath)
