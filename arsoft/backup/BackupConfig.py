@@ -15,6 +15,7 @@ class BackupConfigDefaults(object):
     EXCLUDE_DIR = 'exclude.d'
     FILESYSTEM = 'ext4'
     RETENTION_TIME_S = 86400 * 7
+    RETENTION_COUNT = 7
     BACKUP_DIR = None
     RESTORE_DIR = None
     INTERMEDIATE_BACKUP_DIR = None
@@ -30,6 +31,7 @@ class BackupConfigDefaults(object):
 class BackupConfig(object):
     def __init__(self, config_dir=BackupConfigDefaults.CONFIG_DIR, 
                  retention_time=BackupConfigDefaults.RETENTION_TIME_S, 
+                 retention_count=BackupConfigDefaults.RETENTION_COUNT,
                  backup_directory=BackupConfigDefaults.BACKUP_DIR, 
                  restore_directory=BackupConfigDefaults.RESTORE_DIR, 
                  intermediate_backup_directory=BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR, 
@@ -50,6 +52,7 @@ class BackupConfig(object):
         self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
         self.filesystem = filesystem
         self.retention_time = retention_time
+        self.retention_count = retention_count
         self.backup_directory = backup_directory
         self.intermediate_backup_directory = intermediate_backup_directory
         self.filelist_include = filelist_include
@@ -69,6 +72,7 @@ class BackupConfig(object):
         self.config_dir = BackupConfigDefaults.CONFIG_DIR
         self.filesystem = BackupConfigDefaults.FILESYSTEM
         self.retention_time = BackupConfigDefaults.RETENTION_TIME_S
+        self.retention_count = BackupConfigDefaults.RETENTION_COUNT
         self.backup_directory = BackupConfigDefaults.BACKUP_DIR
         self.intermediate_backup_directory = BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR
         self.filelist_include = None
@@ -210,6 +214,7 @@ class BackupConfig(object):
         ret = inifile.open(filename)
         self.filesystem = inifile.get(None, 'Filesystem', BackupConfigDefaults.FILESYSTEM)
         self.retention_time = datetime.timedelta(seconds=float(inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)))
+        self.retention_count = int(inifile.get(None, 'RetentionCount', BackupConfigDefaults.RETENTION_COUNT))
         self.backup_directory = inifile.get(None, 'BackupDirectory', BackupConfigDefaults.BACKUP_DIR)
         self.restore_directory = inifile.get(None, 'RestoreDirectory', BackupConfigDefaults.RESTORE_DIR)
         self.intermediate_backup_directory = inifile.get(None, 'IntermediateBackupDirectory', BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR)
@@ -232,6 +237,7 @@ class BackupConfig(object):
         # and modify it according to current config
         inifile.set(None, 'Filesystem', self.filesystem)
         inifile.set(None, 'RetentionTime', self.retention_time.total_seconds())
+        inifile.set(None, 'RetentionCount', self.retention_count)
         inifile.set(None, 'BackupDirectory', self.backup_directory)
         inifile.set(None, 'RestoreDirectory', self.restore_directory)
         inifile.set(None, 'IntermediateBackupDirectory', self.intermediate_backup_directory)
@@ -256,6 +262,7 @@ class BackupConfig(object):
         ret = ret + 'restore directory: ' + str(self.restore_directory) + '\n'
         ret = ret + 'intermediate backup directory: ' + str(self.intermediate_backup_directory) + '\n'
         ret = ret + 'retention time: ' + str(self._retention_time) + '\n'
+        ret = ret + 'retention count: ' + str(self.retention_count) + '\n'
         ret = ret + 'include file list: ' + str(self._filelist_include) + '\n'
         ret = ret + 'exclude file list: ' + str(self._filelist_exclude) + '\n'
         ret = ret + 'eject unused backup discs: ' + str(self.eject_unused_backup_discs) + '\n'
@@ -272,12 +279,14 @@ class BackupPluginConfig(object):
     def __init__(self, 
                  backup_app, 
                  plugin_name=None,
-                 retention_time=None 
+                 retention_time=None,
+                 retention_count=None
                  ):
         self.backup_app = backup_app
         self.parent = backup_app.config
         self.plugin_name = plugin_name
         self._retention_time = retention_time
+        self._retention_count= retention_count
 
     @property
     def retention_time(self):
@@ -299,6 +308,20 @@ class BackupPluginConfig(object):
                 raise ValueError('retention_time %s is invalid.' %(str(value)))
         else:
             self._retention_time = None
+
+    @property
+    def retention_count(self):
+        if self._retention_count is None:
+            return self.parent.retention_count
+        else:
+            return self._retention_count
+
+    @retention_count.setter
+    def retention_count(self, value):
+        if value is not None:
+            self._retention_count = int(value)
+        else:
+            self._retention_count = None
 
     @property
     def intermediate_backup_directory(self):
@@ -325,7 +348,8 @@ class BackupPluginConfig(object):
         filename = self.parent.get_plugin_config_file(self.plugin_name)
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(filename)
-        self.retention_time = datetime.timedelta(seconds=float(inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)))
+        self.retention_time = inifile.get(None, 'RetentionTime', None)
+        self.retention_count = inifile.get(None, 'RetentionCount', None)
         ret = self._read_conf(inifile)
         return ret
         
@@ -335,7 +359,14 @@ class BackupPluginConfig(object):
         # read existing file
         inifile.open(filename)
         # and modify it according to current config
-        inifile.set(None, 'RetentionTime', self.retention_time.total_seconds())
+        if self._retention_time is None:
+            inifile.remove(None, 'RetentionTime')
+        else:
+            inifile.set(None, 'RetentionTime', self._retention_time.total_seconds())
+        if self._retention_count is None:
+            inifile.remove(None, 'RetentionCount')
+        else:
+            inifile.set(None, 'RetentionCount', self.retention_count)
         ret = self._write_conf(inifile)
         ret = inifile.save(filename)
         return ret
@@ -344,4 +375,5 @@ class BackupPluginConfig(object):
         ret = ''
         ret = ret + 'plugin name: ' + str(self.plugin_name) + '\n'
         ret = ret + 'retention time: ' + str(self._retention_time) + '\n'
+        ret = ret + 'retention count: ' + str(self._retention_count) + '\n'
         return ret
