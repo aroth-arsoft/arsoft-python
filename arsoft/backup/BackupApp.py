@@ -271,7 +271,6 @@ class BackupApp(object):
         return ret
     
     def manage_retention(self):
-        print(self.config.retention_time)
         self.previous_backups.remove_old_backups(max_age=self.config.retention_time, 
                                         min_count=self.config.retention_count,
                                         max_count=self.config.retention_count)

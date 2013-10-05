@@ -44,8 +44,8 @@ class ARSoftBackupApp(BackupApp):
         backup_dir = self.session.backup_dir
         previous_backup_dir = None
         if self.config.use_filesystem_hardlinks:
-            if self._last_full_backup:
-                previous_backup_dir = self._last_full_backup.fullpath
+            if self.previous_backups.last_full_backup:
+                previous_backup_dir = self.previous_backups.last_full_backup.fullpath
 
         if backup_dir[-1] != '/':
             backup_dir += '/'
@@ -99,8 +99,8 @@ class ARSoftBackupApp(BackupApp):
 
             self.plugin_notify_rsync_complete()
 
-            # create new snapshot of the disc
-            # remove old snapshot from the disc
+            # remove old data and state
+            self.manage_retention()
 
         if not BackupApp.shutdown_destination(self):
             success = False
