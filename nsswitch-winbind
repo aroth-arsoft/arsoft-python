@@ -2,25 +2,19 @@
 verbose=0
 action=''
 
-nsswitch_ldap_modify() {
+nsswitch_winbind_modify() {
 	local enable="$1"
 	if [ $enable -eq 0 ]; then
 		/usr/sbin/nsswitch-config \
 			--set passwd files \
 			--set group files \
-			--set shadow files \
-			--set aliases files \
-			--set automount files \
-			--set sudoers files
+			--set shadow files
 		RES=$?
 	else
 		/usr/sbin/nsswitch-config \
-			--set passwd files ldap \
-			--set group files ldap \
-			--set shadow files ldap \
-			--set aliases files ldap \
-			--set automount ldap \
-			--set sudoers files ldap
+			--set passwd files winbind \
+			--set group files winbind \
+			--set shadow files
 		RES=$?
 	fi
 	if [ $RES -ne 0 ]; then
@@ -30,11 +24,11 @@ nsswitch_ldap_modify() {
 
 function usage()
 {
-	echo "nsswitch-ldap [OPTIONS] <enable|disable>"
+	echo "nsswitch-winbind [OPTIONS] <enable|disable>"
 	echo "    -h, --help      shows this help screen"
 	echo "    -v,--verbose    verbose output"
-	echo "    enable          enables the nss-ldap lookup"
-	echo "    disable         disables the nss-ldap lookup"
+	echo "    enable          enables the nss-winbind lookup"
+	echo "    disable         disables the nss-winbind lookup"
 	exit 0
 }
 
@@ -56,7 +50,7 @@ if [ -z "$action" ]; then
 	exit 1
 else
 	case "$action" in
-		'enable') nsswitch_ldap_modify 1; ;;
-		'disable') nsswitch_ldap_modify 0; ;;
+		'enable') nsswitch_winbind_modify 1; ;;
+		'disable') nsswitch_winbind_modify 0; ;;
 	esac
 fi

@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.105',
+		version='1.106',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -72,7 +72,7 @@ setup(name='arsoft-python',
                   'slapd-config', 
                   'pxeconfig', 
                   'efiinfo', 
-                  'nsswitch-config', 'nsswitch-ldap', 
+                  'nsswitch-config', 'nsswitch-ldap', 'nsswitch-winbind',
                   'autofs-ldap-auth', 
                   'managehosts', 
                   'openvpn-admin', 'openvpn-status',

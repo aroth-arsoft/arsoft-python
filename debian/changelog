@@ -1,3 +1,10 @@
+arsoft-python (1.106) raring; urgency=low
+
+  * add nsswitch-winbind script
+  * improved error messages for check_puppet_agent
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 12 Oct 2013 13:11:18 +0200
+
 arsoft-python (1.105) raring; urgency=low
 
   * improve DNS script to handle CNAME records
