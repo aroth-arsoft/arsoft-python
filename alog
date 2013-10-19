@@ -1,0 +1,465 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import re
+import os.path
+import logging
+from datetime import datetime, timedelta
+from arsoft.inifile import IniFileDirectory
+
+class alog_known_pattern(object):
+    def __init__(self, name=None, line_re=None, timestamp=None, logfile_names=[], output_format=None):
+        self.name = name
+        self.line_re = line_re
+        self.timestamp = timestamp
+        self.logfile_names = logfile_names
+        self.output_format = output_format
+        
+    def __str__(self):
+        ret = ''
+        for (key, value) in self.__dict__.iteritems():
+            ret = ret + key + '=' + str(value) + ' ' + str(type(value)) + '\n'
+        return ret
+
+class alog_config(object):
+    def __init__(self, config_dir='/etc/arsoft/alog.d'):
+        self.config_dir = config_dir
+        self._ini_files_dir = IniFileDirectory(config_dir, config_extension='.conf', commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+
+    @property
+    def known_patterns(self):
+        ret = {}
+        for item in self._ini_files_dir.items:
+            for section in item.sections:
+                line_re = item.get(section, 'LineRegex', None)
+                if line_re:
+                    timestamp = item.get(section, 'Timestamp', None)
+                    logfile_names = item.getAsArray(section, 'LogfileName', [])
+                    output_format = item.get(section, 'OutputFormat', None)
+
+                    pattern = alog_known_pattern(name=section, line_re=line_re, timestamp=timestamp, logfile_names=logfile_names, output_format=output_format)
+                    ret[section] = pattern
+        return ret
+
+    @property
+    def field_alias(self):
+        ret = {}
+        for alias in self._ini_files_dir.getAsArray(None, 'FieldAlias', []):
+            if ':' in alias:
+                key, value = alias.split(':', 1)
+                ret[key] = value
+        return ret
+
+    @property
+    def loglevel_names(self):
+        all_loglevels = []
+        for loglevel in self._ini_files_dir.getAsArray(None, 'LogLevel', []):
+            if ':' in loglevel:
+                name, order = loglevel.split(':', 1)
+            else:
+                name = loglevel
+            all_loglevels.append( (order, name) )
+        all_loglevels_sorted = sorted(all_loglevels, key=lambda item: item[0])
+        ret = []
+        for (order, name) in all_loglevels_sorted:
+            ret.append(name)
+        return ret
+
+    @property
+    def default_output_format(self):
+        ret = self._ini_files_dir.getAsArray(None, 'DefaultOutputFormat', [])
+        num_ret = len(ret)
+        if num_ret > 1:
+            sys.stderr.write('WARNING: more than one DefaultOutputFormat value found in configuration. Use the first one.\n')
+            ret = ret[0]
+        elif num_ret == 1:
+            ret = ret[0]
+        else:
+            ret = 'timestamp,message'
+        return ret
+
+    @property
+    def shortcuts(self):
+        ret = {}
+        for shortcut in self._ini_files_dir.getAsArray(None, 'Shortcut', []):
+            if ':' in shortcut:
+                key, value = shortcut.split(':', 1)
+                ret[key] = value
+        return ret
+
+class alog_application(object):
+
+    class MessageObject(object):
+        def __init__(self, message=None, timestamp=None, severity=None, loglevel=None, host=None, ident=None, pid=None, filename=None, lineno=0, filtered=False):
+            self.timestamp = timestamp
+            self.severity = severity
+            self.loglevel = loglevel
+            self.host = host
+            self.ident = ident
+            self.pid = pid
+            self.filename = filename
+            self.lineno = lineno
+            self.filtered = filtered
+            self._message = [message] if message else []
+
+        def append_message(self, message):
+            self._message.append(message)
+
+        @property
+        def __dict__(self):
+            ret = {
+                'timestamp':self.timestamp,
+                'message':self.message,
+                'severity':self.severity,
+                'loglevel':self.loglevel,
+                'host':self.host,
+                'ident':self.ident,
+                'pid':self.pid,
+                'lineno':self.lineno,
+                'filename':self.filename,
+                'filtered':self.filtered
+                }
+            return ret
+
+        @property
+        def message(self):
+            num_msg = len(self._message)
+            if num_msg == 0:
+                return None
+            elif num_msg == 1:
+                return self._message[0]
+            else:
+                return '\n'.join(self._message)
+
+    def __init__(self):
+        self._verbose = False
+        self._config = alog_config()
+        self._logfile = None
+        self._logfile_obj = None
+        self._boottime = None
+        
+    def _get_boottime(self):
+        if self._boottime is None:
+            uptime = 0
+            with open('/proc/uptime', 'r') as f:
+                uptime = float(f.readline().split()[0])
+            self._boottime = datetime.now() - timedelta(seconds = uptime)
+        return self._boottime
+
+    def _select_pattern(self, pattern):
+        if pattern == 'auto':
+            logfile_basename = os.path.basename(self._logfile)
+            ret = self._detect_pattern_for_line(logfile_basename, self._first_line)
+            #print('select pattern %s=%s from %s' % (pattern, ret, self._first_line))
+        else:
+            ret = pattern
+        return ret
+
+    def _detect_pattern_for_line(self, logfile_basename, line):
+        best_pattern = None
+        if line is not None:
+            #print('line=%s' % line)
+            pattern_score = {}
+            for (pattern_name, pattern_obj) in self._config.known_patterns.iteritems():
+                score = 0
+                if logfile_basename in pattern_obj.logfile_names:
+                    score = score + 1000
+                line_re = re.compile(pattern_obj.line_re)
+                mo = line_re.match(line)
+                if mo:
+                    num_groups = len(mo.groups())
+                    #print('got match for %s=%s' % (pattern_name, mo))
+                    score = score + (num_groups * 100)
+                else:
+                    score = score - 100
+                pattern_score[pattern_name] = score
+            #print('pattern_score=%s' % pattern_score)
+            best_score = -1
+            for (pattern_name, score) in pattern_score.iteritems():
+                if score > best_score:
+                    best_pattern = pattern_name
+                    best_score = score
+        return best_pattern
+
+    def _compile_pattern_re(self, pattern):
+        if pattern in self._config.known_patterns:
+            line_re = self._config.known_patterns[pattern].line_re
+            ret = re.compile(line_re)
+        else:
+            ret = None
+        return ret
+    
+    def _prepare_output_format(self, pattern, format):
+        if format is None:
+            if pattern in self._config.known_patterns:
+                pattern_obj = self._config.known_patterns[pattern]
+                if pattern_obj.output_format:
+                    format = pattern_obj.output_format
+            if format is None:
+                format = self._config.default_output_format
+        ret = ''
+        for field in format.split(','):
+            if len(ret) > 0:
+                ret += ' '
+            if field in self._config.field_alias:
+                field = self._config.field_alias[field]
+            ret += '%(' + field + ')s'
+        return ret
+    
+    def _timestamp_format(self, pattern):
+        if pattern in self._config.known_patterns:
+            pattern_obj = self._config.known_patterns[pattern]
+            ret = pattern_obj.timestamp
+        else:
+            ret = None
+        return ret
+
+    def _parse_timestamp(self, timestamp, format):
+        if timestamp is None:
+            ret = None
+        else:
+            if format is None:
+                ret = timestamp
+            elif format == 'time_t':
+                try:
+                    ret = datetime.fromtimestamp(float(timestamp))
+                except ValueError:
+                    ret = None
+            elif format == 'uptime':
+                try:
+                    ret = self._get_boottime() + timedelta(seconds = float(timestamp))
+                except ValueError:
+                    ret = None
+            elif format == 'ctime':
+                ret = datetime.strptime(timestamp, "%a %b %d %H:%M:%S %Y")
+            elif format == 'short':
+                ret = datetime.strptime(timestamp, '%b %d %H:%M:%S')
+                if ret:
+                    ret = ret.replace(year= datetime.now().year)
+            elif format == 'full':
+                ret = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S,%f")
+            elif format == 'daytime':
+                ret = datetime.strptime(timestamp, '%H:%M:%S')
+                if ret:
+                    now = datetime.now()
+                    ret = ret.replace(year=now.year, month=now.month, day=now.day)
+            else:
+                ret = datetime.strptime(timestamp, format)
+        return ret
+
+    def _process_line(self, line_re, find_re, timestamp_format, line):
+        ret = None
+        mo = line_re.match(line)
+        if mo:
+            mogrp = mo.groupdict()
+            timestamp = self._parse_timestamp(mo.group('timestamp'), timestamp_format) if 'timestamp' in mogrp else None
+            message_text = mo.group('message') if 'message' in mogrp else None
+            severity = mo.group('severity') if 'severity' in mogrp else None
+            loglevel = mo.group('loglevel') if 'loglevel' in mogrp else None
+            host = mo.group('host') if 'host' in mogrp else None
+            ident = mo.group('ident') if 'ident' in mogrp else None
+            pid = mo.group('pid') if 'pid' in mogrp else None
+            lineno = mo.group('lineno') if 'lineno' in mogrp else None
+            filename = mo.group('filename') if 'filename' in mogrp else None
+            
+            if loglevel:
+                loglevel = loglevel.upper()
+            else:
+                if self._last_msg_obj is not None and self._last_msg_obj.loglevel is not None:
+                    loglevel = self._last_msg_obj.loglevel
+
+            if find_re:
+                filtered = True
+                if message_text is not None:
+                    if find_re.match(message_text):
+                        filtered = False
+                if ident is not None:
+                    if find_re.match(ident):
+                        filtered = False
+                if filename is not None:
+                    if find_re.match(filename):
+                        filtered = False
+            else:
+                filtered = False
+
+            if not filtered:
+                if self._loglevel:
+                    filtered = False if loglevel in self._loglevel else True
+                else:
+                    filtered = False
+
+            if not filtered:
+                if not message_text:
+                    filtered = True
+
+            ret = self.MessageObject(message=message_text, timestamp=timestamp, 
+                                            severity=severity, loglevel=loglevel, 
+                                            host=host, ident=ident, pid=pid,
+                                            lineno=lineno, filename=filename,
+                                            filtered=filtered)
+
+        return ret
+    
+    def _continue_process_line(self, msg_obj, line_re, find_re, line):
+        message_text = line.rstrip()
+        if find_re:
+            if message_text is not None:
+                if find_re.match(message_text):
+                    msg_obj.filtered = False
+        msg_obj.append_message(message_text)
+    
+    def _output_msg(self, msg_obj, ignore_filtered=False):
+        if ignore_filtered:
+            output = True
+        else:
+            output = True if not msg_obj.filtered else False
+        if output:
+            print( self._output_format % msg_obj.__dict__)
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='parses a log file and displays the information')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-C', '--config-directory', dest='config_dir', default=self._config.config_dir, help='name of the directory containing the alog configuration.')
+        parser.add_argument('--pattern', dest='pattern', default='auto', help='named pattern for the log file.')
+        parser.add_argument('-f', '--find', dest='find', help='output only message which contain the given string.')
+        parser.add_argument('--wfind', dest='wfind', help='output only message which contain the given word.')
+        parser.add_argument('--ifind', dest='ifind', help='output only message which contain the given string (case-insensitive).')
+        parser.add_argument('-r', '--rfind', dest='find_regex', help='output only message which match the given pattern as regex.')
+        parser.add_argument('-o', '--output', dest='output_format', help='specifies the fields to print; separated by comma')
+        parser.add_argument('-n', '--limit', dest='limit', default=-1, type=int, help='limit the number of log outputs.')
+        parser.add_argument('-L', '--level', dest='output_level', action='append', help='specifies the minimum log level to print')
+        parser.add_argument('logfile', default='-', nargs='?', help='log file to parse')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        self._output_format = args.output_format
+        self._first_line = None
+        self._loglevel = None
+        
+        if args.config_dir:
+            self._config = alog_config(args.config_dir)
+            
+        if args.logfile in self._config.shortcuts:
+            self._logfile = self._config.shortcuts[args.logfile]
+        else:
+            self._logfile = args.logfile
+
+        if args.output_level:
+            self._loglevel = []
+            for filter in args.output_level:
+                if filter[0] == '=':
+                    filter = filter[1:].upper()
+                    if filter in self._confog.loglevel_names:
+                        self._loglevel.append(filter.upper())
+                    else:
+                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        return 1
+                else:
+                    filter = filter.upper()
+                    i = 0
+                    found = False
+                    while i < len(self._confog.loglevel_names):
+                        if found:
+                            self._loglevel.append(self._confog.loglevel_names[i])
+                        else:
+                            if self._confog.loglevel_names[i] == filter:
+                                self._loglevel.append(self._confog.loglevel_names[i])
+                                found = True
+                        i = i + 1
+                    if not found:
+                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        return 1
+                    
+        if args.pattern != 'auto':
+            if args.pattern not in self._config.known_patterns:
+                sys.stdout.write('Given pattern %s is invalid.\n' % (args.pattern))
+                return 1
+                
+
+        if self._logfile == '-':
+            self._logfile = 'stdin'
+            self._logfile_obj = sys.stdin
+        else:
+            self._logfile_obj = None
+            try:
+                self._logfile_obj = open(self._logfile, 'r')
+            except IOError as e:
+                self._last_error = str(e)
+            except OSError as e:
+                self._last_error = str(e)
+
+        if self._logfile_obj is not None:
+            try:
+                for line in self._logfile_obj:
+                    if len(line.strip()) != 0:
+                        self._first_line = line
+                        break
+            except IOError as e:
+                self._last_error = str(e)
+            except OSError as e:
+                self._last_error = str(e)
+
+        self._pattern = self._select_pattern(args.pattern)
+
+        if self._logfile_obj is None:
+            sys.stdout.write('Unable to open log file %s\n' % (self._logfile))
+            ret = 1
+        else:
+            timestamp_format = self._timestamp_format(self._pattern)
+            line_re = self._compile_pattern_re(self._pattern)
+            self._output_format = self._prepare_output_format(self._pattern, self._output_format)
+            if not line_re:
+                sys.stdout.write('Unable to determine log pattern for log file %s\n' % (self._logfile))
+                ret = 1
+            else:
+                if args.find_regex:
+                    find_re = re.compile(args.find_regex)
+                elif args.find:
+                    find_re = re.compile(r'.*' + re.escape(args.find) + r'.*')
+                elif args.wfind:
+                    find_re = re.compile(re.escape(args.wfind) + r'\b')
+                elif args.ifind:
+                    find_re = re.compile(r'.*' + re.escape(args.ifind) + r'.*', re.IGNORECASE)
+                else:
+                    find_re = None
+                self._last_msg_obj = None
+                max_outputs = args.limit
+                if self._first_line:
+                    msg_obj = self._process_line(line_re, find_re, timestamp_format, self._first_line)
+                    if msg_obj:
+                        if self._last_msg_obj:
+                            self._output_msg(self._last_msg_obj)
+                        self._last_msg_obj = msg_obj
+                    elif self._last_msg_obj:
+                        self._last_msg_obj.append_message(self._first_line.rstrip())
+                num_outputs = 0
+                for line in self._logfile_obj:
+                    msg_obj = self._process_line(line_re, find_re, timestamp_format, line)
+                    if msg_obj:
+                        if self._last_msg_obj:
+                            self._output_msg(self._last_msg_obj)
+                            num_outputs += 1
+                            if max_outputs > 0 and num_outputs >= max_outputs:
+                                self._last_msg_obj = None
+                                break
+                        self._last_msg_obj = msg_obj
+                    elif self._last_msg_obj:
+                        self._continue_process_line(self._last_msg_obj, line_re, find_re, line)
+                if self._last_msg_obj:
+                    self._output_msg(self._last_msg_obj)
+                    num_outputs += 1
+
+                ret = 0
+
+        return ret
+
+if __name__ == "__main__":
+    app =  alog_application()
+    sys.exit(app.main())

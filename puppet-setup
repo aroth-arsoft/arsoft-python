@@ -1,0 +1,302 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import os.path
+import argparse
+import sys
+import tempfile
+import socket
+from arsoft.dnsutils import get_dns_srv_record, gethostname
+from arsoft.utils import rmtree
+from arsoft.sshutils import *
+import arsoft.openvpn
+
+__version__ = '1.0'
+
+class PuppetSetupApp(object):
+    def __init__(self):
+        self.verbose = False
+        self._config = None
+        self._apt_update_required = False
+        self._temp_directory = None
+        self._private_keyfile = None
+        self._public_keyfile = None
+        self._public_key_comment = None
+        self.puppet_server = None
+        self.puppet_server_ip = None
+        self.puppet_server_port = 8140
+
+    def __del__(self):
+        if self._temp_directory:
+            rmtree(self._temp_directory)
+
+    def version(self):
+        print('Version: %s' % str(__version__))
+        print('SSH: %s' % str(SSH_EXECUTABLE))
+        print('SSH keygen: %s' % str(SSH_KEYGEN_EXECUTABLE))
+        print('SSH copy id: %s' % str(SSH_COPY_ID_EXECUTABLE))
+        print('SCP: %s' % str(SCP_EXECUTABLE))
+        return 0
+    
+    def _generate_key(self):
+        if self.keyfile is None:
+            self._temp_directory = tempfile.mkdtemp()
+            keyfile = os.path.join(self._temp_directory, 'puppet-setup')
+            comment = 'puppet-setup@%s' % gethostname()
+            
+            (private_keyfile, public_keyfile) = ssh_keygen(keyfile, comment=comment, verbose=self.verbose)
+            if private_keyfile and public_keyfile:
+                if ssh_copy_id(public_keyfile, self.target_hostname, username=self.username, verbose=self.verbose):
+                    self._public_key_comment = comment
+                    self._private_keyfile = private_keyfile
+                    self._public_keyfile = public_keyfile
+                    self.keyfile = self._private_keyfile
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            return True
+
+    def _remove_key(self):
+        if self._public_key_comment:
+            if self.verbose:
+                print('remove key %s' % self._public_key_comment)
+            script = """
+sed '/%(public_key_comment)s/d' -i.old ~/.ssh/authorized_keys
+""" % { 'public_key_comment':self._public_key_comment }
+            ret = self._runssh(script)
+        else:
+            ret = True
+        return ret
+            
+
+
+    def _runssh(self, script, commandline=None, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
+
+        return ssh_runcmdAndGetData(self.target_hostname, commandline=commandline, script=script, 
+                                                     outputStdErr=outputStdErr, outputStdOut=outputStdOut, stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
+                                                     allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
+                                                     keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+
+    def _runssh_with_inputfile(self, commandline, inputfile, outputStdErr=False, outputStdOut=False, stdout=None, stderr=None, allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
+        return ssh_runcmdAndGetData(self.target_hostname, commandline=commandline, script=None, 
+                                                     outputStdErr=outputStdErr, outputStdOut=outputStdOut, stdin=inputfile, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
+                                                     allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
+                                                     keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+    
+    def _add_apt_source(self, sourcename, url, distcode=None, components=['main'], has_source=True):
+        distro_cs="`lsb_release -cs`" if distcode is None else ("'%s'" %distcode)
+        components_str = ' '.join(components)
+        sourcefilename = os.path.join('/etc/apt/sources.list.d', sourcename + '.list')
+        script = """
+distro_cs=%(distro_cs)s
+tmpfile=`mktemp`
+echo "# Automatically generate source file for APT" > "$tmpfile"
+echo "deb %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
+echo "deb-src %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
+if ! /usr/bin/diff -q "$tmpfile" "%(sourcefilename)s" > /dev/null; then
+    %(sudo_command)smv "$tmpfile" "%(sourcefilename)s"; RES=$?
+else
+    rm -f "$tmpfile"
+    RES=3
+fi
+exit $RES
+""" % { 'sudo_command': self.sudo_command,
+       'distro_cs':distro_cs, 'url':url, 
+       'components_str':components_str, 
+       'sourcename':sourcename,
+       'sourcefilename':sourcefilename }
+        (sts, stdout, stderr) = self._runssh(script)
+        if sts == 0:
+            self._apt_update_required = True
+            ret = True
+        elif sts == 3:
+            # source already present, no update required
+            ret = True
+        else:
+            ret = False
+        return ret
+    
+    def _apt_update(self):
+        if self._apt_update_required:
+            script = "%(sudo_command)sapt-get -qq update" % {'sudo_command': self.sudo_command }
+            (sts, stdout, stderr) = self._runssh(script)
+            ret = True if sts == 0 else False
+        else:
+            ret = True
+        return ret
+    
+    def _apt_install(self, packages):
+        self._apt_update()
+        packages_str = ' '.join(packages)
+        script = """
+%(sudo_command)sapt-get install -q -y %(packages_str)s
+""" % { 'sudo_command': self.sudo_command, 'packages_str':packages_str }
+        (sts, stdout, stderr) = self._runssh(script)
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('Failed to install packages %s. %s\n' % (packages_str, stderr))
+        return ret
+    
+    def _get_local_puppet_server(self):
+        puppet_servers = get_dns_srv_record('puppet')
+        if len(puppet_servers) > 0:
+            return puppet_servers[0]
+        else:
+            return (None, None)
+
+    def _rename_host(self, new_hostname):
+        script = """
+%(sudo_command)smanagehosts --set-hostname "%(new_hostname)s"
+""" % { 'sudo_command': self.sudo_command, 
+       'new_hostname':new_hostname }
+        (sts, stdout, stderr) = self._runssh(script)
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('Failed to rename host to %s. %s\n' % (new_hostname, stderr))
+        return ret
+
+    def _add_puppet_server_host_entry(self):
+        script = """
+%(sudo_command)smanagehosts --add "%(hostname)s" "%(addr)s"
+""" % { 'sudo_command': self.sudo_command, 
+       'hostname':self.puppet_server,
+       'addr':self.puppet_server_ip}
+        (sts, stdout, stderr) = self._runssh(script)
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('Failed to add puppet server %s as %s. %s\n' % (self.puppet_server, self.puppet_server_ip, stderr))
+        return ret
+
+    def _install_openvpn_config(self, config_file):
+        if not arsoft.openvpn.ZippedConfigFile.is_zip_config_file(config_file):
+            sys.stderr.write('The given file %s is not a valid OpenVPN configuration.\n' % (config_file))
+            ret = False
+        else:
+            zipcfg = arsoft.openvpn.ZippedConfigFile(config_file)
+            ret = zipcfg.ssh_install(self.target_hostname, keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+            if not ret:
+                sys.stderr.write('Failed install openvpn config file %s. %s\n' % (config_file, stderr))
+            else:
+                vpnname, ext = os.path.splitext(zipcfg.config_file.suggested_filename)
+                script = """
+%(sudo_command)sopenvpn-admin --start "%(vpnname)s"
+""" % { 'sudo_command': self.sudo_command, 
+       'vpnname':vpnname }
+                (sts, stdout, stderr) = self._runssh(script)
+                ret = True if sts == 0 else False
+                if not ret:
+                    sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, stderr))
+        return ret
+
+    def _puppet_agent_run(self, screen_session='puppet-setup'):
+        commandline = "screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent -tv --waitforcert 30 --server %(puppet_server)s 2>&1 | tee /tmp/puppet-setup.log\"" % { 
+                'sudo_command': self.sudo_command, 
+                'screen_session': screen_session,
+                'puppet_server': self.puppet_server }
+        (sts, stdout, stderr) = self._runssh(script=None, commandline=commandline, allocateTerminal=True, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('puppet run failed (%i)\n' % (sts))
+        # next step retrieve the log file
+        script="""
+cat /tmp/puppet-setup.log
+rm /tmp/puppet-setup.log
+"""
+        (sts, stdout, stderr) = self._runssh(script=script, outputStdOut=True)
+        if sts != 0:
+            sys.stderr.write('Failed get log file.\n')
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='set up puppet on a host')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
+        parser.add_argument('-u', '--username', dest='username', default='root', help='username to connect to the remote machine.')
+        parser.add_argument('-k', '--keyfile', dest='keyfile', help='keyfile to connect to the remote machine.')
+        parser.add_argument('-p', '--password', dest='password', help='password to access the remote machine.')
+        parser.add_argument('--openvpn', dest='openvpn_zipfile', metavar='ZIPFILE', help='path to the OpenVPN configuration zip.')
+        parser.add_argument('--rename-host', dest='rename_host', metavar='HOSTNAME', help='path to the OpenVPN configuration zip.')
+        parser.add_argument('--puppet-server', dest='puppet_server', metavar='HOSTNAME', help='hostname of the puppet server')
+        parser.add_argument('--sudo', dest='use_sudo', action='store_true', help='use sudo to run command to remote machine')
+        parser.add_argument('hostname', help='name of the host to setup')
+
+        args = parser.parse_args()
+        self.verbose = args.verbose
+        self.target_hostname = args.hostname
+        self.username = args.username
+        self.password = args.password
+        self.keyfile = args.keyfile
+        self.puppet_server = args.puppet_server
+        self.use_sudo = args.use_sudo
+
+        if args.version:
+            return self.version()
+
+        if self.puppet_server is None:
+            self.puppet_server, self.puppet_server_port = self._get_local_puppet_server()
+        if self.puppet_server:
+            self.puppet_server_ip = socket.gethostbyname(self.puppet_server)
+
+        if self.use_sudo:
+            self.sudo_command = 'sudo '
+        else:
+            self.sudo_command = ''
+
+        packages_to_install = []
+        packages_to_install.append('arsoft-base')
+        packages_to_install.append('arsoft-python')
+        packages_to_install.append('puppet')
+        
+        if args.openvpn_zipfile:
+            packages_to_install.append('openvpn')
+            packages_to_install.append('arsoft-python-openvpn')
+
+        ret = True
+        if ret:
+            ret = self._generate_key()
+            if not ret:
+                sys.stderr.write('Failed to generate SSH key\n')
+
+        if ret:
+            ret = self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu')
+            if not ret:
+                sys.stderr.write('Failed to add PPA aroth\n')
+
+        if ret:
+            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', components=['main', 'dependencies'])
+            if not ret:
+                sys.stderr.write('Failed to add PuppetLabs APT repository\n')
+
+        if ret:
+            ret = self._apt_install(packages_to_install)
+        
+        if ret:
+            if args.rename_host:
+                ret = self._rename_host(args.rename_host)
+
+        if ret:
+            if args.openvpn_zipfile:
+                ret = self._install_openvpn_config(args.openvpn_zipfile)
+                if ret:
+                    ret = self._add_puppet_server_host_entry()
+
+        if ret:
+            ret = self._puppet_agent_run()
+
+        # in any case remove the newly install SSH key
+        self._remove_key()
+
+        return 0 if ret else 1
+
+if __name__ == "__main__":
+    app =  PuppetSetupApp()
+    sys.exit(app.main())
+ 

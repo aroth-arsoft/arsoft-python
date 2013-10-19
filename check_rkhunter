@@ -1,0 +1,169 @@
+#!/usr/bin/python
+import os,sys
+import re
+import datetime
+
+from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
+
+## Create the plugin option
+np = NagiosPlugin(must_threshold=False, has_host_argument=False, optional_threshold=True)
+
+np.add_arg('L', 'logfile', 'logfile to analyze', default='/var/log/rkhunter.log')
+np.add_value('checktime', 'number of seconds for the check', guitext='check time', uom='s', warning=False, has_argument=False)
+np.add_value('infects', 'number of infections', guitext='infections', warning=False, has_argument=False)
+np.add_value('errors', 'number of errors', guitext='errors', warning=False, has_argument=False)
+np.add_value('warnings', 'number of warnings', guitext='warnings', warning=False, has_argument=False)
+
+## This starts the actual plugin activation
+np.activate()
+
+script_dir = os.path.dirname(os.path.realpath(__file__))
+test_file_dir = os.path.join(script_dir, 'test_data')
+
+LINE_PATTERN = r'^\[\s*(?P<timestamp>[0-9]{2}\:[0-9]{2}\:[0-9]{2})\]\s((?P<loglevel>[A-Z][a-z]+)\:\s+)?(?P<message>.*)$'
+START_END_DATE_PATTERN = r'^(Start|End) date is (?P<timestamp>.*)$'
+
+logfile = np['logfile']
+line_re = re.compile(LINE_PATTERN)
+start_end_date_re = re.compile(START_END_DATE_PATTERN)
+
+def _parse_timestamp(timestamp, ref_timestamp):
+    ret = datetime.datetime.strptime(timestamp, '%H:%M:%S')
+    if ret:
+        if not ref_timestamp:
+            ref_timestamp = datetime.datetime.now()
+        ret = ret.replace(year=ref_timestamp.year, month=ref_timestamp.month, day=ref_timestamp.day)
+    return ret
+
+
+start_date = None
+end_date = None
+num_infects = 0
+num_criticals = 0
+num_errors = 0
+num_warnings = 0
+num_infos = 0
+num_file_properties_changed = 0
+changed_file_properties = []
+
+class MessageObject(object):
+    def __init__(self, timestamp=None, loglevel=None, message=None):
+        self.timestamp = timestamp
+        if loglevel is not None:
+            self.loglevel = loglevel.upper()
+        else:
+            self.loglevel = None
+        self.message = message
+        
+def _process_message(msgobj):
+    if msgobj.loglevel == 'WARNING':
+        global num_warnings
+        global num_file_properties_changed
+        if 'The file properties have changed:' in msgobj.message:
+            num_file_properties_changed += 1
+            f_start = msgobj.message.find('File:')
+            if f_start > 0:
+                f_start += 6
+                f_end = msgobj.message.find('\n', f_start)
+                f_name = msgobj.message[f_start:f_end]
+                changed_file_properties.append(f_name)
+        num_warnings += 1
+    elif msgobj.loglevel == 'ERROR':
+        global num_errors
+        num_errors += 1
+    elif msgobj.loglevel == 'INFO':
+        global num_infos
+        num_infos += 1
+
+current_message = None
+
+if os.path.isfile(logfile):
+    try:
+        f = open(logfile, 'r')
+        for line in f:
+            mo = line_re.match(line)
+            if mo:
+                mogrp = mo.groupdict()
+                message_text = mo.group('message')
+                loglevel = mo.group('loglevel') if 'loglevel' in mogrp else None
+
+                if start_date is None:
+                    modate = start_end_date_re.match(message_text)
+                    if modate:
+                        start_date = datetime.datetime.strptime(modate.group('timestamp'), "%a %b %d %H:%M:%S %Z %Y")
+                elif end_date is None:
+                    modate = start_end_date_re.match(message_text)
+                    if modate:
+                        end_date = datetime.datetime.strptime(modate.group('timestamp'), "%a %b %d %H:%M:%S %Z %Y")
+
+                timestamp = _parse_timestamp(mo.group('timestamp'), start_date)
+
+                if loglevel is None:
+                    if current_message is not None:
+                        current_message.message += '\n' + message_text
+                else:
+                    if current_message is not None:
+                        _process_message(current_message)
+                    current_message = MessageObject(timestamp, loglevel, message_text)
+        f.close()
+        if current_message is not None:
+            _process_message(current_message)
+
+    except IOError as e:
+        exit_code = CRITICAL
+        exit_message = str(e)
+
+    now = datetime.datetime.now()
+    if start_date is not None and end_date is not None:
+        check_time = end_date - start_date
+        check_age = now - end_date
+    else:
+        check_time = datetime.timedelta()
+        check_age = datetime.timedelta()
+
+    np.set_value('checktime', int(check_time.total_seconds()))
+    np.set_value('infects', num_infects)
+    np.set_value('errors', num_errors)
+    np.set_value('warnings', num_warnings)
+
+    if np['critical']:
+        threshold_critical = datetime.timedelta(minutes=int(np['critical']))
+    else:
+        # one day
+        threshold_critical = datetime.timedelta(minutes=1440)
+    if np['warning']:
+        threshold_warning = datetime.timedelta(minutes=int(np['warning']))
+    else:
+        # one half day
+        threshold_warning = datetime.timedelta(minutes=720)
+
+    if check_age > threshold_critical:
+        exit_code = CRITICAL
+        exit_message = 'rkhunter results are old (%s at %s)' % (check_age, end_date)
+    elif check_age > threshold_warning:
+        exit_code = WARNING
+        exit_message = 'rkhunter results are old (%s at %s)' % (check_age, end_date)
+    else:
+        if num_infects > 0:
+            exit_code = CRITICAL
+            exit_message = 'rkhunter: %i infections (%i errors, %i warnings)' %(num_infects, num_errors, num_warnings)
+        elif num_errors > 0:
+            exit_code = CRITICAL
+            exit_message = 'rkhunter: %i errors (%i warnings)' %(num_errors, num_warnings)
+        elif num_warnings > 0:
+            exit_code = WARNING
+            if changed_file_properties:
+                exit_message = 'rkhunter: %i warnings, %i changed files (%s)' %(num_warnings, len(changed_file_properties), ','.join(changed_file_properties))
+            else:
+                exit_message = 'rkhunter: %i warnings' %(num_warnings)
+        else:
+            (exit_code, exit_message) = np.check_values()
+
+        if exit_code == OK:
+            exit_message = 'rkhunter: OK'
+
+else:
+    exit_code = CRITICAL
+    exit_message = 'Logfile %s does not exist' % logfile
+
+np.nagios_exit(exit_code, exit_message)

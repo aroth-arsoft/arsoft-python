@@ -1,0 +1,172 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+# onkyo-rs232 <cmd> <cmd2> <cmd3> ...
+
+import sys, time
+import serial
+import argparse
+
+__version__ = '1.0'
+
+DEFAULT_DEVFILE = '/dev/ttyUSB0'
+
+ONKYO_HIGHLEVEL_COMMANDS = {
+    'power_on': '!1PWR01',
+    'power_off': '!1PWR00',
+    'mute_on': '!1AMT01',
+    'mute_off': '!1AMT00',
+    'mute_status': '!1AMTQSTN',
+    
+    'sound_mode_stereo': '!1LMD00',
+    'sound_mode_direct': '!1LMD01',
+    'sound_mode_surround': '!1LMD02',
+    'sound_mode_film': '!1LMD03',
+    'sound_mode_thx': '!1LMD04',
+    'sound_mode_action': '!1LMD05',
+    'sound_mode_musical': '!1LMD06',
+    'sound_mode_mono_movie': '!1LMD07',
+    'sound_mode_orechstra': '!1LMD08',
+    'sound_mode_unplugged': '!1LMD09',
+    'sound_mode_studio_mix': '!1LMD0A',
+    'sound_mode_tvlogic': '!1LMD0B',
+    'sound_mode_all_ch_stereo': '!1LMD0C',
+    'sound_mode_theater_dimensional': '!1LMD0D',
+    'sound_mode_enhanced': '!1LMD0E',
+    'sound_mode_mono': '!1LMD0F',
+    'sound_mode_pure_audio': '!1LMD11',
+    'sound_mode_multiplex': '!1LMD12',
+    'sound_mode_full_mono': '!1LMD13',
+    'sound_mode_dolby_virtual': '!1LMD14',
+    'sound_mode_51_surround': '!1LMD40',
+    'sound_mode_dolby_ex_dts_ex': '!1LMD41',
+    'sound_mode_thx_surround_ex': '!1LMD42',
+    'sound_mode_u2_cinema': '!1LMD50',
+    'sound_mode_music_mode': '!1LMD51',
+    'sound_mode_games_mode': '!1LMD52',
+    'sound_mode_plii_movie': '!1LMD80',
+    'sound_mode_plii_music': '!1LMD81',
+    'sound_mode_neo6_cinema': '!1LMD82',
+    'sound_mode_neo6_music': '!1LMD83',
+    'sound_mode_plii_thx_cinema': '!1LMD84',
+    'sound_mode_neo6_thx_cinema': '!1LMD85',
+    'sound_mode_plii_game': '!1LMD86',
+    'sound_mode_neural_surround': '!1LMD87',
+    'sound_mode_neural_thx': '!1LMD88',
+    'sound_mode_plii_thx_games': '!1LMD89',
+    'sound_mode_neo6_thx_games': '!1LMD8A',
+    
+    'master_volume_up': '!1MVLUP',
+    'master_volume_down': '!1MVLDOWN',
+    }
+
+SPECIAL_HIGHLEVEL_COMMANDS = [
+    'mute_toggle'
+    ]
+
+class OnkyoRS232(object):
+    def __init__(self):
+        self.verbose = False
+        self.quiet = False
+        
+    def _get_raw_command(self, cmd):
+        cmd = cmd.lower()
+        if cmd in ONKYO_HIGHLEVEL_COMMANDS:
+            ret = ONKYO_HIGHLEVEL_COMMANDS[cmd]
+        else:
+            ret = None
+        return ret
+    
+    def _is_special_command(self, cmd):
+        cmd = cmd.lower()
+        ret = True if cmd in SPECIAL_HIGHLEVEL_COMMANDS else False
+        return ret
+    
+    def _special_command(self, cmd):
+        cmd = cmd.lower()
+        if cmd == 'mute_toggle':
+            status_cmd = ONKYO_HIGHLEVEL_COMMANDS['mute_status']
+            self.ser.write(status_cmd + '\r\n')      #write a string
+            resp = self.ser.readline()
+            print('got resp %s -> %s' % (resp, resp[6]))
+            if resp[6] == '0':
+                print('mute is off')
+                ret = self._get_raw_command('mute_on')
+            else:
+                print('mute is on')
+                ret = self._get_raw_command('mute_off')
+        else:
+            ret = None
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='send control command to a Onkyo using a RS232 connection.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('-q', '--quiet', dest='quiet', action='store_true', help='do not output the response.')
+        parser.add_argument('-r', '--raw', dest='use_raw_command', action='store_true', help='intepret given commands as raw (without !1 prefix).')
+        parser.add_argument('--version', dest='version', action='store_true', help='shows the version and exits.')
+        parser.add_argument('--port', dest='port', metavar='PORT', type=int, help='use the specified serial port number.')
+        parser.add_argument('--usbport', dest='usbport', metavar='USBPORT', type=int, help='use the specified USB serial port number.')
+        parser.add_argument('--dev', dest='device', metavar='DEV', help='use the specified device file for communication.')
+        parser.add_argument('command', metavar='CMD', nargs='+', help='commands to send to the receiver')
+
+        args = parser.parse_args()
+        self.verbose = args.verbose
+        self.quiet = args.quiet
+        self.use_raw_command = args.use_raw_command
+
+        if args.version:
+            return self.version()
+        
+        if args.device:
+            self.devfile = args.device
+        elif args.port:
+            self.devfile = '/dev/ttyS%i' % args.port
+        elif args.usbport:
+            self.devfile = '/dev/ttyUSB%i' % args.usbport
+        else:
+            self.devfile = DEFAULT_DEVFILE
+
+        try:
+            self.ser = serial.Serial(self.devfile, 9600, timeout=1)
+        except IOError as e:
+            self.ser = None
+            sys.stderr.write('Failed to open serial port %s; %s\n' % (self.devfile, str(e)))
+            ret = 2
+
+        if self.ser:
+            ret = 0
+            cmd_in_progress = 0
+            num_commands = len(args.command)
+            for cmd in args.command:
+                if self.use_raw_command:
+                    raw_cmd = "!1%s" % cmd
+                else:
+                    if self._is_special_command(cmd):
+                        raw_cmd = self._special_command(cmd)
+                    else:
+                        raw_cmd = self._get_raw_command(cmd)
+
+                if raw_cmd:
+                    if self.verbose:
+                        print("send %s" % raw_cmd)
+                    self.ser.write(raw_cmd + '\r\n')      #write a string
+                    if raw_cmd[5] == 'Q':
+                        resp = self.ser.readline()
+                        if not self.quiet:
+                            sys.stdout.write(resp)
+                    elif cmd_in_progress + 1 < num_commands:
+                        time.sleep(0.2)
+                else:
+                    sys.stderr.write('Failed to translate command %s\n' % (cmd))
+                cmd_in_progress = cmd_in_progress + 1
+            self.ser.close()             #close port 
+        return ret
+
+if __name__ == "__main__":
+    app =  OnkyoRS232()
+    sys.exit(app.main())

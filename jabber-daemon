@@ -1,0 +1,237 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import os.path
+import argparse
+import sys
+import logging
+import time
+import signal
+import threading
+import errno
+
+import arsoft.xmpp
+from arsoft.daemon_utils import arsoft_daemon_runner
+from arsoft.inifile import IniFile
+from arsoft.socket_utils import *
+from arsoft.utils import to_gid, to_uid
+
+# version of this script
+__version__  = '1.0'
+
+
+class jabberdaemon:
+    def __init__(self):
+        self.verbose = False
+        self.stdin_path = '/dev/null'
+        tty_ready = False
+        try:
+            f = open('/dev/tty', 'w+')
+            f.close()
+            tty_ready = True
+        except IOError:
+            pass
+        if tty_ready:
+            self.stdout_path = '/dev/tty'
+            self.stderr_path = '/dev/tty'
+        else:
+            self.stdout_path = '/dev/null'
+            self.stderr_path = '/dev/null'
+        self.pidfile_path =  '/run/jabber/daemon.pid'
+        self.pidfile_timeout = 5
+        self._configfile = '/etc/jabber/daemon.conf'
+
+        self._config = arsoft.xmpp.xmpp_config(self._configfile)
+        self._do_exit = False
+        self._sock = None
+        logger = logging.getLogger()
+        logger.setLevel(self._config.loglevel_numeric)
+        if self._config.logfile:
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            if self._config.logfile == 'syslog':
+                handler = logging.handlers.SysLogHandler(address = '/dev/log', facility=logging.handlers.SysLogHandler.LOG_DAEMON)
+                self.files_preserve=[handler.socket.fileno()]
+            else:
+                handler = logging.FileHandler(self._config.logfile)
+                self.files_preserve=[handler.stream]
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            
+        else:
+            self.files_preserve=[]
+
+    def version(self):
+        print('Version: ' + str(__version__))
+        print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
+        info = arsoft.xmpp.backend_info()
+        print('Backend: ' + str(info.name))
+        print('Backend Version: ' + str(info.version))
+        return 0
+    
+    def _xmpp_handler(self, xmppbot, eventtype, *args):
+        logger.info('_xmpp_handler ' + str(xmppbot) + eventtype + str(args))
+        
+    class ClientConnection(threading.Thread):
+        def __init__(self, sock, addr, bot):
+            threading.Thread.__init__(self)
+            self._sock = sock
+            self._addr = addr
+            self._bot = bot
+
+        def run(self):
+            current_message = ''
+            try:
+                # Receive the data in small chunks and retransmit it
+                while True:
+                    data = self._sock.recv(1024)
+
+                    if data:
+                        current_message = current_message + data
+                        while '\n' in current_message:
+                            idx = current_message.find('\n')
+                            msg = current_message[0:idx]
+                            current_message = current_message[idx + 1:]
+                            if self._bot.send_msg_json(msg):
+                                logger.debug('forward msg %s' %(msg))
+                            else:
+                                logger.warning('failed to forward msg %s' %(msg))
+
+                    else:
+                        logger.info('connection from %s closed.' %(self._addr))
+                        break
+            finally:
+                # Clean up the connection
+                self._sock.close()
+
+    def run(self):
+        self._sock = create_unix_socket(self.socket_path, 0666)
+        self._bot = arsoft.xmpp.message_bot(self.sender, 
+                                            self.password, 
+                                            callback=self._xmpp_handler, 
+                                            ipv4=(True if self.ipv6 == False else False),
+                                            ipv6=(True if self.ipv4 == False else False))
+        while not self._do_exit:
+            try:
+                connection, client_address = self._sock.accept()
+            except socket.error as e:
+                logger.debug('failed to accept socket %s' %(str(e)))
+                
+            if self._do_exit:
+                break
+            cxn = jabberdaemon.ClientConnection(connection, client_address, self._bot)
+            cxn.start()
+
+    def terminate(self):
+        self._do_exit = True
+        if self._sock is not None:
+            close_unix_socket(self._sock)
+        self._bot.close()
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='send messages using jabber')
+        parser.add_argument('--configfile', dest='configfile', help='input config file')
+        parser.add_argument('--noconfig', dest='noconfig', action='store_true', help='do not read the default configuration file.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
+        parser.add_argument('--save', dest='save', action='store_true', help='save the command line parameters into the config file.')
+        parser.add_argument('-f', '--from', dest='sender', help='sender name')
+        parser.add_argument('-p', '--password', dest='password', help='password for sender')
+        parser.add_argument('-4', dest='ipv4', default=False, action='store_true', help='only use IPv4 to connect to server.')
+        parser.add_argument('-6', dest='ipv6', default=False, action='store_true', help='only use IPv6 to connect to server.')
+        parser.add_argument('--daemon', dest='start_daemon', action='store_true', help='run in the background as daemon.')
+        parser.add_argument('--upstart', dest='start_upstart', action='store_true', help='run in the inside upstart.')
+        parser.add_argument('-u', '--user', dest='daemon_user', help='user to run the daemon.')
+        parser.add_argument('-g', '--group', dest='daemon_group', help='group to run the daemon.')
+
+        args = parser.parse_args()
+        self.verbose = args.verbose
+        self.sender = None
+        self.password = None
+        self.socket_path = '/run/jabber/daemon.sock'
+        self.daemon_user = None
+        self.daemon_group = None
+
+        if args.version:
+            return self.version()
+
+        if self.verbose:
+            logger = logging.getLogger()
+            logger.setLevel(logging.DEBUG) # change to DEBUG for higher verbosity
+
+        if args.configfile:
+            configfile = args.configfile
+        elif args.noconfig == False:
+            configfile = '/etc/jabber-daemon.conf'
+        else:
+            configfile = None
+
+        if configfile:
+            self._config = arsoft.xmpp.xmpp_config(configfile)
+
+            self.sender = self._config.sender
+            self.password = self._config.password
+            self.ipv4 = self._config.ipv4
+            self.ipv6 = self._config.ipv6
+            self.socket_path = self._config.socket_path
+            self.daemon_user = self._config.daemon_user
+            self.daemon_group = self._config.daemon_group
+
+        if args.ipv4 != parser.get_default('ipv4'):
+            self.ipv4 = args.ipv4
+        if args.ipv6 != parser.get_default('ipv6'):
+            self.ipv6 = args.ipv6
+
+        if args.daemon_user:
+            self.daemon_user = args.daemon_user
+        if args.daemon_group:
+            self.daemon_group = args.daemon_group
+
+        # override config from config file by command line value (if there are any).
+        if args.sender:
+            self.sender = args.sender
+        if args.password:
+            self.password = args.password
+
+        if args.save:
+            if not configfile:
+                sys.stderr.write('No config file specified to save parameters.\n') 
+                return 1
+
+            self._config = arsoft.xmpp.xmpp_config(filename=None, sender=self.sender, password=self.password, recipient=None, ipv4=self.ipv4, ipv6=self.ipv6)
+            self._config.save(configfile)
+
+        if not self.sender:
+            sys.stderr.write('No sender specified.\n') 
+            return 1
+
+        if args.start_daemon:
+            socket_dir = os.path.dirname(self.socket_path)
+            if not os.path.isdir(socket_dir):
+                os.mkdir(socket_dir, 0755)
+            try:
+                os.chown(socket_dir, to_uid(self.daemon_user), to_gid(self.daemon_group))
+            except OSError:
+                pass
+
+            runner = arsoft_daemon_runner(self)
+            runner._start()
+
+        elif args.start_upstart:
+            self.run()
+            self.terminate()
+        else:
+            print('Nothing to do.')
+        return 0
+
+if __name__ == "__main__":
+    # PyXMPP uses `logging` module for its debug output
+    # applications should set it up as needed
+    logger = logging.getLogger()
+
+    app = jabberdaemon()
+    sys.exit(app.main())

@@ -1,0 +1,59 @@
+#!/usr/bin/make -f
+
+PYTHON2=$(shell pyversions -vr)
+
+# Don't compress .py files
+DEB_COMPRESS_EXCLUDE := .py
+EDSKMGR_SUID_SOURCES = edskmgr-support/edskmgr-suid.c
+TRAC_ADMIN_SUID_SOURCES = trac/trac-admin-suid.c
+
+TARGET_DISTRIBUTION := $(shell dpkg-parsechangelog  | awk '/Distribution/ { print $$2}')
+SUBSTVARS=
+
+CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
+%:
+	dh $@ --buildsystem=python_distutils --with=python2
+
+edskload: $(EDSKMGR_SUID_SOURCES)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DEDSKMGR_LOAD -o $@ $(EDSKMGR_SUID_SOURCES)
+
+edskeject: $(EDSKMGR_SUID_SOURCES)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DEDSKMGR_EJECT -o $@ $(EDSKMGR_SUID_SOURCES)
+	
+trac-admin-suid: $(TRAC_ADMIN_SUID_SOURCES)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(TRAC_ADMIN_SUID_SOURCES)
+
+override_dh_clean:
+	dh_clean -O--buildsystem=python_distutils
+	rm *.zip || true
+	test -f edskload && rm edskload || true
+	test -f edskeject && rm edskeject || true
+	test -f trac-admin-suid && rm trac-admin-suid || true
+	
+override_dh_auto_build: edskeject edskload trac-admin-suid
+	dh_auto_build -O--buildsystem=python_distutils
+	
+override_dh_auto_install:
+	dh_auto_install -O--buildsystem=python_distutils
+	install -d $(CURDIR)/debian/tmp/usr/bin
+	install -o root -g root -m 0755 -s edskload $(CURDIR)/debian/tmp/usr/bin/edskload
+	install -o root -g root -m 0755 -s edskeject $(CURDIR)/debian/tmp/usr/bin/edskeject
+	install -d $(CURDIR)/debian/tmp/usr/lib/arsoft-python
+	install -o root -g root -m 0755 -s trac-admin-suid $(CURDIR)/debian/tmp/usr/lib/arsoft-python/trac-admin-suid
+	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr
+	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr/conf.d
+	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr/hook.d
+
+override_dh_fixperms:
+	dh_fixperms -O--buildsystem=python_distutils
+	chown root.root $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
+	chmod 4755 $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
+	test -f $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf && chown root.root $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf || true
+	test -f $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf && chmod 0600 $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf || true
+
+override_dh_gencontrol:
+	dh_gencontrol -O--buildsystem=python_distutils -- $(SUBSTVARS)

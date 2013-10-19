@@ -1,0 +1,140 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import os
+import argparse
+from arsoft.hostsfile import HostsFile, HostnameFile
+from arsoft.dnsutils import gethostname_tuple
+from arsoft.socket_utils import sethostname
+
+class ManageHostsApp(object):
+    
+    def __init__(self):
+        self.verbose = False
+        self.quiet = False
+        self.hostsfile = HostsFile()
+    
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='manages the local hosts entry file')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('--update', dest='update', nargs=2, help='update the specified host entry.')
+        parser.add_argument('--list', dest='list', action='store_true', help='lists all host entries.')
+        parser.add_argument('--set-hostname', dest='set_hostname', help='sets the hostname to the given one.')
+        parser.add_argument('--add', dest='add_hostname', nargs=2, help='adds the given host.')
+        parser.add_argument('--remove', dest='remove_hostname', help='removes the given host.')
+
+        args = parser.parse_args()
+        self.verbose = args.verbose
+
+        ret = 0
+        if args.update:
+            update_key = args.update[0]
+            update_values = args.update[1].split(',')
+            self.hostsfile[update_key] = update_values
+            ok = self.hostsfile.save()
+            if not ok:
+                sys.stderr.write('Failed to save hosts file.\n')
+
+            ret = 0 if ok else 1
+
+        elif args.list:
+            for (address, hostnames) in self.hostsfile:
+                print('%s\t%s' % (address, ','.join(hostnames)))
+        elif args.set_hostname:
+            (old_fqdn, old_hostname, old_domain) = gethostname_tuple()
+            (new_fqdn, new_hostname, new_domain) = gethostname_tuple(args.set_hostname)
+            
+            if old_fqdn == new_fqdn:
+                print('Old hostname and new hostname is identical.')
+                ret = 0
+            else:
+                ok = True
+                if new_fqdn == new_hostname:
+                    new_fqdn = None
+                has_fqdn_entry = False
+                has_hostname_entry = False
+                for (address, hostnames) in self.hostsfile:
+                    changed_entry = False
+                    if old_fqdn in hostnames:
+                        changed_entry = True
+                        has_fqdn_entry = True
+                        if new_fqdn:
+                            hostnames = [new_fqdn if x==old_fqdn else x for x in hostnames]
+                        else:
+                            hostnames.remove(old_fqdn)
+                    if old_hostname in hostnames:
+                        changed_entry = True
+                        has_hostname_entry = True
+                        if new_hostname:
+                            hostnames = [new_hostname if x==old_hostname else x for x in hostnames]
+                        else:
+                            hostnames.remove(old_hostname)
+                    if changed_entry:
+                        self.hostsfile[address] = hostnames
+                if not has_hostname_entry and new_hostname:
+                    hostnames = self.hostsfile['127.0.0.1']
+                    idx = hostnames.index(new_fqdn) if new_fqdn else -1
+                    if idx >= 0:
+                        hostnames.insert(idx + 1, new_hostname)
+                    else:
+                        hostnames.insert(0, new_hostname)
+                    self.hostsfile['127.0.0.1'] = hostnames
+                if not has_fqdn_entry and new_fqdn:
+                    hostnames = self.hostsfile['127.0.0.1']
+                    idx = hostnames.index(new_hostname) if new_hostname else -1
+                    if idx >= 0:
+                        hostnames.insert(idx, new_fqdn)
+                    else:
+                        hostnames.insert(0, new_fqdn)
+                    self.hostsfile['127.0.0.1'] = hostnames
+                hostnamefile = HostnameFile()
+                hostnamefile.hostname = new_hostname
+
+                #for (address, hostnames) in self.hostsfile:
+                    #print('%s\t%s' % (address, ','.join(hostnames)))
+
+                #return 0
+                if ok:
+                    ok = sethostname(new_hostname)
+                    if not ok:
+                        sys.stderr.write('Failed to set hostname to %s.\n' % new_hostname)
+                if ok:
+                    ok = hostnamefile.save()
+                    if not ok:
+                        sys.stderr.write('Failed to save hostname file.\n')
+                if ok:
+                    ok = self.hostsfile.save()
+                    if not ok:
+                        sys.stderr.write('Failed to save hosts file.\n')
+
+                ret = 0 if ok else 1
+        elif args.add_hostname:
+            update_key = args.add_hostname[0]
+            update_values = args.add_hostname[1].split(',')
+            self.hostsfile[update_key] = update_values
+
+            ok = self.hostsfile.save()
+            if not ok:
+                sys.stderr.write('Failed to save hosts file.\n')
+
+            ret = 0 if ok else 1
+        elif args.remove_hostname:
+            self.hostsfile[args.remove_hostname] = []
+
+            ok = self.hostsfile.save()
+            if not ok:
+                sys.stderr.write('Failed to save hosts file.\n')
+
+            ret = 0 if ok else 1
+        else:
+            sys.stderr.write('No operation specified.\n')
+        return ret
+
+if __name__ == "__main__":
+    app = ManageHostsApp()
+    sys.exit(app.main())

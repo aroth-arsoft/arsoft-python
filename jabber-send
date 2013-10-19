@@ -1,0 +1,166 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import os.path
+import argparse
+import sys
+import logging
+import time
+
+import arsoft.xmpp
+
+# version of this script
+__version__  = '1.0'
+
+class jabbersend:
+    def __init__(self):
+        self.verbose = False
+        self._config = None
+
+    def version(self):
+        print('Version: ' + str(__version__))
+        print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
+        info = arsoft.xmpp.backend_info()
+        print('Backend: ' + str(info.name))
+        print('Backend Version: ' + str(info.version))
+        return 0
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='send messages using jabber')
+        parser.add_argument('--configfile', dest='configfile', help='input config file')
+        parser.add_argument('--noconfig', dest='noconfig', action='store_true', help='do not read the default configuration file.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
+        parser.add_argument('--save', dest='save', action='store_true', help='save the command line parameters into the config file.')
+        parser.add_argument('-m', '--message', dest='message', help='message body text', metavar='MSG')
+        parser.add_argument('--html', dest='html', help='HTML message body text', metavar='HTML')
+        parser.add_argument('-s', '--subject', dest='subject', help='message subject', metavar='SUB')
+        parser.add_argument('-f', '--from', dest='sender', help='sender name')
+        parser.add_argument('-t', '--to', dest='recipient', help='recipient name')
+        parser.add_argument('-p', '--password', dest='password', help='password for sender')
+        parser.add_argument('-4', dest='ipv4', default=False, action='store_true', help='only use IPv4 to connect to server.')
+        parser.add_argument('-6', dest='ipv6', default=False, action='store_true', help='only use IPv6 to connect to server.')
+        parser.add_argument('-d', '--daemon', dest='use_daemon', action='store_true', help='use daemon to send message.')
+
+        args = parser.parse_args()
+
+        if args.version:
+            return self.version()
+
+        sender = None
+        recipient = None
+        password = None
+        subject = args.subject
+        self.verbose = args.verbose
+        
+        if self.verbose:
+            logger.setLevel(logging.DEBUG) # change to DEBUG for higher verbosity
+
+        if args.configfile:
+            configfile = args.configfile
+        elif args.noconfig == False:
+            configfile = os.path.expanduser("~/.jabber-send.conf")
+        else:
+            configfile = None
+
+        if configfile:
+            self._config = arsoft.xmpp.xmpp_config(configfile)
+
+            sender = self._config.sender
+            recipient = self._config.recipient
+            password = self._config.password
+            ipv4 = self._config.ipv4
+            ipv6 = self._config.ipv6
+
+        if args.ipv4 != parser.get_default('ipv4'):
+            self.ipv4 = args.ipv4
+        if args.ipv6 != parser.get_default('ipv6'):
+            self.ipv6 = args.ipv6
+
+        # override config from config file by command line value (if there are any).
+        if args.sender:
+            if args.use_daemon:
+                sys.stderr.write('Sender is ignored when using the jabber-daemon.\n') 
+            else:
+                sender = args.sender
+        if args.recipient:
+            recipient = args.recipient
+        if args.password:
+            password = args.password
+
+        if args.save:
+            if not configfile:
+                sys.stderr.write('No config file specified to save parameters.\n') 
+                return 1
+
+            self._config = arsoft.xmpp.xmpp_config(filename=None, sender=sender, password=password, recipient=recipient, ipv4=ipv4, ipv6=ipv6)
+            self._config.save(configfile)
+
+        if not sender and not args.use_daemon:
+            sys.stderr.write('No sender specified.\n') 
+            return 1
+        if not recipient:
+            sys.stderr.write('No recipient specified.\n') 
+            return 1
+
+        html = None
+        if args.message:
+            if args.message.startswith('file://'):
+                try:
+                    f = open(args.message[7:], 'r')
+                    body = f.read()
+                    f.close()
+                except IOError as e:
+                    sys.stderr.write('Failed to read message file %s.\n' % args.message[7:]) 
+                    return 1
+            else:
+                body = args.message
+        elif args.html and len(args.html) > 0:
+            body = ''
+            if args.html.startswith('file://'):
+                try:
+                    f = open(args.html[7:], 'r')
+                    html = f.read()
+                    f.close()
+                except IOError as e:
+                    sys.stderr.write('Failed to read html file %s.\n' % args.html[7:]) 
+                    return 1
+            else:
+                html = args.html
+        else:
+            body = sys.stdin.read()
+
+        if (not body or len(body) == 0) and (not html or len(html) == 0) :
+            sys.stderr.write('No message given.\n') 
+            return 1
+
+        if self.verbose:
+            if len(body) != 0:
+                print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
+            else:
+                print('Send message \'%s\' from %s to %s' %(html, sender, recipient))
+            
+        if arsoft.xmpp.send_message(sender, password, recipient, body, 
+                                    html=html, subject=subject, 
+                                    ipv4=(True if ipv6 == False else False),
+                                    ipv6=(True if ipv4 == False else False),
+                                    use_daemon=args.use_daemon):
+            ret = 0
+        else:
+            sys.stderr.write('Failed to send message from %s to %s.\n' %(sender, recipient))
+            ret = 1
+        return ret
+
+if __name__ == "__main__":
+    # PyXMPP uses `logging` module for its debug output
+    # applications should set it up as needed
+    logger = logging.getLogger()
+    logger.addHandler(logging.StreamHandler())
+
+    app =  jabbersend()
+    sys.exit(app.main())

@@ -1,0 +1,757 @@
+arsoft-python (1.106) raring; urgency=low
+
+  * add nsswitch-winbind script
+  * improved error messages for check_puppet_agent
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 12 Oct 2013 13:11:18 +0200
+
+arsoft-python (1.105) raring; urgency=low
+
+  * improve DNS script to handle CNAME records
+  * more DNS error handling
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 02 Oct 2013 08:18:06 +0200
+
+arsoft-python (1.104) raring; urgency=low
+
+  * fix build errors 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 26 Sep 2013 07:34:08 +0200
+
+arsoft-python (1.103) raring; urgency=low
+
+  * analyze the log file from rkhunter in check_rkhunter
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 26 Sep 2013 07:27:15 +0200
+
+arsoft-python (1.102) raring; urgency=low
+
+  * fixed jabber-daemon.conf trouble
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 25 Sep 2013 08:42:26 +0200
+
+arsoft-python (1.101) raring; urgency=low
+
+  * fixed package trouble with suid binaries
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 24 Sep 2013 19:52:17 +0200
+
+arsoft-python (1.100) raring; urgency=low
+
+  * add configuration for alog script
+  * add shortcuts to alog script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 22 Sep 2013 19:11:02 +0200
+
+arsoft-python (1.99) raring; urgency=low
+
+  * correcting git init for bare repos
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 10 Sep 2013 19:07:42 +0200
+
+arsoft-python (1.98) raring; urgency=low
+
+  * bring back missing git init function
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 10 Sep 2013 08:13:34 +0200
+
+arsoft-python (1.97) raring; urgency=low
+
+  * fixing suid trouble
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 05 Sep 2013 10:43:13 +0200
+
+arsoft-python (1.96) raring; urgency=low
+
+  * use hdparm in edskmgr to send disks to standby
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 05 Sep 2013 07:36:05 +0200
+
+arsoft-python (1.95) raring; urgency=low
+
+  * add triggers to edskmgr
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 02 Sep 2013 07:57:25 +0200
+
+arsoft-python (1.94) raring; urgency=low
+
+  * more advanced in edskmgr 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 01 Sep 2013 18:06:31 +0200
+
+arsoft-python (1.93) raring; urgency=low
+
+  * fixed dns-update when using a keyfile
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 28 Aug 2013 10:39:53 +0200
+
+arsoft-python (1.92) raring; urgency=low
+
+  * fixed in DNS key loading
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 27 Aug 2013 19:41:40 +0200
+
+arsoft-python (1.91) raring; urgency=low
+
+  * various update and minor improvements
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 27 Aug 2013 08:14:59 +0200
+
+arsoft-python (1.90) raring; urgency=low
+
+  * add arsoft-onkyo package
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 18 Aug 2013 09:53:37 +0200
+
+arsoft-python (1.89) raring; urgency=low
+
+  * fixed trouble with CRL file in openvpn-status
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 17 Aug 2013 18:55:06 +0200
+
+arsoft-python (1.88) raring; urgency=low
+
+  * enable sudo files along with ldap lookup
+  * fixed heimdal-password-expire script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 14 Aug 2013 07:47:54 +0200
+
+arsoft-python (1.87) raring; urgency=low
+
+  * advances in backup script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 11 Aug 2013 18:35:10 +0200
+
+arsoft-python (1.86) raring; urgency=low
+
+  * silence dns-update
+  * fixed trouble in heimdal-password-expire script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 09 Aug 2013 07:32:58 +0200
+
+arsoft-python (1.85) raring; urgency=low
+
+  * fixed dns-update python errors
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 08 Aug 2013 07:57:21 +0200
+
+arsoft-python (1.84) raring; urgency=low
+
+  * add arsoft-mailer script for simple mail sending
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 03 Aug 2013 13:13:34 +0200
+
+arsoft-python (1.83) raring; urgency=low
+
+  * fixed trouble in openvpn scripts
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 28 Jul 2013 19:52:35 +0200
+
+arsoft-python (1.82) raring; urgency=low
+
+  * introduce first version of dns-update in python
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 26 Jul 2013 08:05:45 +0200
+
+arsoft-python (1.81) raring; urgency=low
+
+  * fixed cups module
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 22 Jul 2013 07:33:38 +0200
+
+arsoft-python (1.80) raring; urgency=low
+
+  * fixes for openvpn configuration/admin
+  * use password file for zipped openvpn config
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 19 Jul 2013 17:46:31 +0200
+
+arsoft-python (1.79) raring; urgency=low
+
+  * fixed installing of openvpn config from zip
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 18 Jul 2013 19:23:15 +0200
+
+arsoft-python (1.78) raring; urgency=low
+
+  * fixed trouble in cups-admin
+  * more work on openvpn-admin
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 18 Jul 2013 15:08:51 +0200
+
+arsoft-python (1.77) raring; urgency=low
+
+  * added ccd file management
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 15 Jul 2013 17:59:05 +0200
+
+arsoft-python (1.76) raring; urgency=low
+
+  * enhance openvpn-admin script to create/update zip files
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 15 Jul 2013 15:10:26 +0200
+
+arsoft-python (1.75) raring; urgency=low
+
+  * add command to cert openvpn certificates
+  * enhancements in openvpn module
+  * add openvpn-admin script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 05 Jul 2013 19:31:15 +0200
+
+arsoft-python (1.74) raring; urgency=low
+
+  * fixed git syntax issues 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 26 Jun 2013 07:07:30 +0200
+
+arsoft-python (1.73) raring; urgency=low
+
+  * fixed loading of certs and keys in certinfo script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 15 Jun 2013 19:00:40 +0200
+
+arsoft-python (1.72) raring; urgency=low
+
+  * django improvements
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 15 Jun 2013 11:41:23 +0200
+
+arsoft-python (1.71) raring; urgency=low
+
+  * minor improvements to git module
+  * fixed trac-git-post-receive-hook
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 12 Jun 2013 07:11:44 +0200
+
+arsoft-python (1.70) raring; urgency=low
+
+  * check_fritzbox can now check for dymanic DNS names
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 08 Jun 2013 17:46:28 +0200
+
+arsoft-python (1.69) raring; urgency=low
+
+  * several minor improvements to nagios plugins
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 08 Jun 2013 13:26:26 +0200
+
+arsoft-python (1.68) raring; urgency=low
+
+  * manage git config
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 07 Jun 2013 16:13:38 +0200
+
+arsoft-python (1.67.1) raring; urgency=low
+
+  * removed debug output
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 07 Jun 2013 08:46:06 +0200
+
+arsoft-python (1.67) raring; urgency=low
+
+  * fixed custom property handling in GitCommitNotifierConfig
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 07 Jun 2013 08:32:57 +0200
+
+arsoft-python (1.66) raring; urgency=low
+
+  * improved error handling
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 03 Jun 2013 08:11:39 +0200
+
+arsoft-python (1.65) raring; urgency=low
+
+  * alog auto-detect logging format
+  * fix xmpp & html messages
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Jun 2013 19:10:51 +0200
+
+arsoft-python (1.64) raring; urgency=low
+
+  * new git module
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 31 May 2013 07:44:18 +0200
+
+arsoft-python (1.63) raring; urgency=low
+
+  * fixed check_ipp and check_fritzbox host parameter
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 27 May 2013 20:01:00 +0200
+
+arsoft-python (1.62) raring; urgency=low
+
+  * fixed send_xmpp_notification permissions
+  * added alog script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 25 May 2013 15:46:00 +0200
+
+arsoft-python (1.61) raring; urgency=low
+
+  * fixed trouble with html messages
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 24 May 2013 13:42:18 +0200
+
+arsoft-python (1.60) raring; urgency=low
+
+  * add check_ipp nagios plugin
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 23 May 2013 08:46:29 +0200
+
+arsoft-python (1.59) raring; urgency=low
+
+  * fixed upstart trouble with new jabber-daemon
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 22 May 2013 18:26:33 +0200
+
+arsoft-python (1.58.1) raring; urgency=low
+
+  * fix build errors
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 21 May 2013 11:08:34 +0200
+
+arsoft-python (1.58) raring; urgency=low
+
+  * new jabber daemon
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 19 May 2013 18:55:20 +0200
+
+arsoft-python (1.57) raring; urgency=low
+
+  * fixed range for fritzbox test
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 16 May 2013 18:19:03 +0200
+
+arsoft-python (1.56) raring; urgency=low
+
+  * add check_weather plugin
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 16 May 2013 11:29:17 +0200
+
+arsoft-python (1.55) raring; urgency=low
+
+  * add html functionality to jabber-send
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 15 May 2013 08:04:55 +0200
+
+arsoft-python (1.54) raring; urgency=low
+
+  * improve trac-manage to avoid duplicate configuration
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 07 May 2013 13:57:12 +0200
+
+arsoft-python (1.53) raring; urgency=low
+
+  * add support to configure repo aliases in trac-manage
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 06 May 2013 08:07:49 +0200
+
+arsoft-python (1.52) raring; urgency=low
+
+  * add trac-manage script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 05 May 2013 18:02:31 +0200
+
+arsoft-python (1.51) raring; urgency=low
+
+  * added yaml depends
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 29 Apr 2013 10:03:31 +0200
+
+arsoft-python (1.50) raring; urgency=low
+
+  * fixed check_puppet_agent
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 29 Apr 2013 08:00:42 +0200
+
+arsoft-python (1.49) raring; urgency=low
+
+  * re-implement check_puppet_agent in python
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 28 Apr 2013 19:26:17 +0200
+
+arsoft-python (1.48) quantal; urgency=low
+
+  * relocate edskmgr to arsoft-python
+  * improve disk manager
+  * more improvements to backup
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 18 Apr 2013 19:19:34 +0200
+
+arsoft-python (1.47) quantal; urgency=low
+
+  * include nagios tools to send xmpp notifications
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 15 Apr 2013 17:18:21 +0200
+
+arsoft-python (1.46) quantal; urgency=low
+
+  * show certificate serial as hex too
+  * check for not stopped openvpn instance
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 06 Apr 2013 18:06:56 +0200
+
+arsoft-python (1.45) quantal; urgency=low
+
+  * fixed compile error
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 18 Mar 2013 06:53:55 +0100
+
+arsoft-python (1.44) quantal; urgency=low
+
+  * bring new arsoft.xdg module
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 17 Mar 2013 17:17:37 +0100
+
+arsoft-python (1.43) quantal; urgency=low
+
+  * fixed trac module
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 03 Feb 2013 10:23:22 +0100
+
+arsoft-python (1.42) quantal; urgency=low
+
+  * add first django helper functions and template tags
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 02 Feb 2013 17:07:32 +0100
+
+arsoft-python (1.41) quantal; urgency=low
+
+  * create arsoft-python-web as base package for django web apps 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 28 Jan 2013 10:18:33 +0100
+
+arsoft-python (1.40) quantal; urgency=low
+
+  * ship heimdal-password-expire script 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 24 Jan 2013 08:27:09 +0100
+
+arsoft-python (1.39) quantal; urgency=low
+
+  * fixed trouble with certificates from windows
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 23 Jan 2013 16:23:18 +0100
+
+arsoft-python (1.38) quantal; urgency=low
+
+  * add kerberos module with kpasswd function
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 20 Jan 2013 14:51:44 +0100
+
+arsoft-python (1.37) quantal; urgency=low
+
+  * take over python scripts from arsoft-base
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 20 Jan 2013 12:51:44 +0100
+
+arsoft-python (1.36) quantal; urgency=low
+
+  * add scripts for trac administration
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 29 Dec 2012 18:19:55 +0100
+
+arsoft-python (1.35) quantal; urgency=low
+
+  * fixed openvpn trouble when parsing the status
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 27 Dec 2012 10:49:01 +0100
+
+arsoft-python (1.34) quantal; urgency=low
+
+  * use management interface to retrieve information from openvpn
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 26 Dec 2012 17:50:45 +0100
+
+arsoft-python (1.33) quantal; urgency=low
+
+  * minor bug fixes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 15 Dec 2012 16:42:05 +0100
+
+arsoft-python (1.32) quantal; urgency=low
+
+  * added check_openvpn and python modules behind it
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 15 Dec 2012 16:33:40 +0100
+
+arsoft-python (1.31) quantal; urgency=low
+
+  * fixed build errors
+  * check_kernel_modules now correctly handle multiple modules
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Dec 2012 15:18:09 +0100
+
+arsoft-python (1.30) quantal; urgency=low
+
+  * add check_kernel_modules plugin for nagios
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Dec 2012 12:20:07 +0100
+
+arsoft-python (1.29) quantal; urgency=low
+
+  * fixed trouble in ini-util
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 04 Nov 2012 16:30:31 +0100
+
+arsoft-python (1.28) quantal; urgency=low
+
+  * reload nscd when nsswitch is changed
+  * first build for quantal
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 01 Nov 2012 16:08:49 +0100
+
+arsoft-python (1.27) precise; urgency=low
+
+  * more actions in ini-util
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 28 Sep 2012 18:54:30 +0200
+
+arsoft-python (1.26) precise; urgency=low
+
+  * add option to specify the ini style via command line to avoid
+    trouble with comments
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 28 Sep 2012 09:05:18 +0200
+
+arsoft-python (1.25) precise; urgency=low
+
+  * add merge operation to ini-util
+  * enhance ini-util to process commands from a file
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 26 Sep 2012 18:01:40 +0200
+
+arsoft-python (1.24) precise; urgency=low
+
+  * improved ini file reading
+  * improved error handling
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 25 Sep 2012 18:09:27 +0200
+
+arsoft-python (1.23) precise; urgency=low
+
+  * add script and module for cups management
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 19 Sep 2012 12:35:26 +0200
+
+arsoft-python (1.22) precise; urgency=low
+
+  * fixed typo
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 15 Sep 2012 08:42:15 +0200
+
+arsoft-python (1.21) precise; urgency=low
+
+  * add script to change nsswitch configuration
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 14 Sep 2012 18:28:13 +0200
+
+arsoft-python (1.20) precise; urgency=low
+
+  * start with new openvpn module
+  * add check_openvpn nagios plugin
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 14 Sep 2012 16:43:16 +0200
+
+arsoft-python (1.19) precise; urgency=low
+
+  * fixed some minor depends issues
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 06 Sep 2012 07:54:48 +0200
+
+arsoft-python (1.18) precise; urgency=low
+
+  * add python module fritzbox and nagios
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 05 Sep 2012 19:51:58 +0200
+
+arsoft-python (1.17.1) precise; urgency=low
+
+  * rebuild on lucid
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Sep 2012 19:00:43 +0200
+
+arsoft-python (1.17) precise; urgency=low
+
+  * fixed python string concat in fritzbox-status
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 29 Aug 2012 06:58:31 +0200
+
+arsoft-python (1.16) precise; urgency=low
+
+  * added missing efi module
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 26 Aug 2012 17:45:24 +0200
+
+arsoft-python (1.15) precise; urgency=low
+
+  * get packages build on lucid, oneiric and precise
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 26 Aug 2012 10:17:54 +0200
+
+arsoft-python (1.14) precise; urgency=low
+
+  * install efi package as well
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 25 Aug 2012 10:14:06 +0200
+
+arsoft-python (1.13) precise; urgency=low
+
+  * add efiinfo script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 24 Aug 2012 20:09:17 +0200
+
+arsoft-python (1.12) precise; urgency=low
+
+  * fixed several small issues in ini-util
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 12 Aug 2012 12:47:37 +0200
+
+arsoft-python (1.11) precise; urgency=low
+
+  * fixed missing files are scripts
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 11 Aug 2012 14:31:55 +0200
+
+arsoft-python (1.10) precise; urgency=low
+
+  * fixed typo
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 11 Aug 2012 13:49:22 +0200
+
+arsoft-python (1.9) precise; urgency=low
+
+  * add ini-util script
+  * add fritzbox-status script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 11 Aug 2012 13:35:30 +0200
+
+arsoft-python (1.8) quantal; urgency=low
+
+  * improve certinfo error reporting
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 08 Jul 2012 10:15:56 +0200
+
+arsoft-python (1.7) quantal; urgency=low
+
+  * fixed missing files
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 08 Jun 2012 17:07:13 +0200
+
+arsoft-python (1.6) quantal; urgency=low
+
+  * use argparse in pxeconfig
+  * do not complain when no boot menu can be found
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 06 Jun 2012 07:26:29 +0200
+
+arsoft-python (1.5) quantal; urgency=low
+
+  * fixed several package depends
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 29 May 2012 07:34:55 +0200
+
+arsoft-python (1.4) quantal; urgency=low
+
+  * bump version
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 26 May 2012 19:15:56 +0200
+
+arsoft-python (1.3) oneiric; urgency=low
+
+  * rename arsoft-netconfig to arsoft-python
+  * add cert scripts
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 26 May 2012 14:59:50 +0200
+
+arsoft-python (1.3~oneiric1) oneiric; urgency=low
+
+  * fixed arsoft package
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 26 May 2012 11:50:11 +0200
+
+arsoft-python (1.2~oneiric1) oneiric; urgency=low
+
+  * use python debian helper scripts to create package
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 21 May 2012 07:04:50 +0200
+
+arsoft-python (1.1~oneiric1) oneiric; urgency=low
+
+  * use new version number schema only two digits and increment the version
+  number manually
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 08 Jan 2012 17:32:47 +0100
+
+arsoft-python (1.0.393) natty; urgency=low
+
+  * Automated build without a message
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 20 May 2011 08:41:07 +0200
+
+arsoft-python (1.0.393) natty; urgency=low
+
+  * Automated build without a message
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 20 May 2011 08:18:01 +0200
+
+arsoft-python (1.0.353) natty; urgency=low
+
+  * Automated build without a message
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 20 May 2011 08:17:35 +0200
+
+arsoft-python (1.0.334) lucid; urgency=low
+
+  * remove old unsupported stuff
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 09 Apr 2011 16:51:28 +0200
+
+arsoft-python (1.0.333) lucid; urgency=low
+
+  * remove old stuff get mkdeb working again
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 09 Apr 2011 12:55:37 +0200
+
+arsoft-python (1.0.333) maverick; urgency=low
+
+  * remove old stuff get mkdeb working again
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 09 Apr 2011 12:24:09 +0200
+
+arsoft-python (1.0.332) maverick; urgency=low
+
+  * Automated build without a message
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 09 Apr 2011 12:16:10 +0200
+
+arsoft-python (1.0.16) karmic; urgency=low
+
+  * create default config for unknown nodes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 07 Dec 2009 20:33:27 +0100
+
+arsoft-python (1.0.15) jaunty; urgency=low
+
+  * minor build script corrections
+  * create tftp configuration for unknown nodes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 19 Sep 2009 10:26:37 +0200
+
+arsoft-python (1.0.14) jaunty; urgency=low
+
+  * further improvements in the mkdeb script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 22 Aug 2009 17:10:31 +0200
+
+arsoft-python (1.0.13) jaunty; urgency=low
+
+  * added python setup and makefile
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 22 Aug 2009 17:08:48 +0200
+
+arsoft-python (1.0) hardy; urgency=low
+
+  * initial release
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 29 Jun 2008 17:14:12 +0200

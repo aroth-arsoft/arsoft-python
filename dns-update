@@ -1,0 +1,254 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+
+import arsoft.dnsutils
+import dns
+import dns.update
+
+def _is_hostaddr_equal(a, b):
+    if a is None and b is None:
+        ret = True
+    else:
+        if a is None or b is None:
+            ret = False
+        elif len(a) == len(b):
+            ret = True
+            for a_e in a:
+                if a_e not in b:
+                    ret = False
+                    break
+        else:
+            ret = False
+    return ret
+    
+class dns_update_app(object):
+
+    DEFAULT_RRTYPE = 'A'
+    DEFAULT_TTL = 86400
+    DEFAULT_SERVER = 'localhost'
+    DEFAULT_KEYFILE = None
+
+    def __init__(self):
+        self.verbose = False
+        self._updates = {}
+
+    @staticmethod
+    def _split_arg(arg):
+        if '=' in arg:
+            (key, value) = arg.split('=', 1)
+            return (key, value)
+        else:
+            return (arg, None)
+
+    @staticmethod
+    def _split_args(args):
+        ret = []
+        for arg in args:
+            ret.append(dns_update_app._split_arg(arg))
+        return ret
+
+    def _get_update_object(self, name):
+        if name in self._updates:
+            ret = self._updates[name]
+        else:
+            ret = None
+            Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(name)
+            if Origin is not None:
+                for update in self._updates:
+                    if update.origin == Origin:
+                        return update
+                ret = dns.update.Update(Origin)
+                arsoft.dnsutils.use_key_file(ret, self.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic)
+                self._updates[name] = ret
+        return ret
+    
+    def _add_record(self, args):
+        for (name, payload) in args:
+            update = self._get_update_object(name)
+            update.add(name, self.ttl, self.rrtype, payload)
+        return True
+
+    def _delete_record(self, args):
+        for (name, payload) in args:
+            update = self._get_update_object(name)
+            update.delete(name, self.rrtype)
+        return True
+
+    def _update_record(self, args):
+        for (name, payload) in args:
+            update = self._get_update_object(name)
+            update.replace(name, self.ttl, self.rrtype, payload)
+        return True
+
+    def _update_host(self, args):
+        ret = True
+        for (host, payload) in args:
+            addr_list = payload.split(',')
+
+            update = self._get_update_object(host)
+            update.delete(host, self.rrtype)
+            
+            for addr in addr_list:
+                update.add(host, self.ttl, self.rrtype, addr)
+                if self.rrtype == 'A' or self.rrtype == 'AAAA':
+                    # delete reverse addr and re-add it afterwards
+                    revaddrname = dns.reversename.from_address(addr)
+                    update.delete(revaddrname, 'PTR')
+                    update.add(revaddrname, self.ttl, 'PTR', addr)
+        return ret
+
+    def _import_host(self, args):
+        anotherserver = None
+        hosts_to_import = []
+
+        for (host, payload) in args:
+            if host[0] == '@':
+                anotherserver = host[1:]
+            else:
+                hosts_to_import.append(host)
+
+        if anotherserver is None:
+            sys.stderr.write("No DNS server to query specified.\n")
+            ret = False
+        else:
+            ipv6 = True if self.rrtype == 'AAAA' else False
+            ret = True
+            for host in hosts_to_import:
+                try:
+                    target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server)
+                except dns.resolver.NoAnswer as e:
+                    sys.stderr.write("Failed to retrieve host record %s from target DNS server %s - no answer.\n" % (host, self.server))
+                    target_hostaddr = None
+                except dns.resolver.NXDOMAIN as e:
+                    sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, self.server))
+                    target_hostaddr = None
+
+                if target_hostaddr is None:
+                    ret = False
+                    sys.stderr.write("Failed to retrieve host record %s from target DNS server %s.\n" % (host, self.server))
+                    continue
+
+                try:
+                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver, with_cname=True)
+                except dns.resolver.NoAnswer as e:
+                    sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s - no answer.\n" % (host, anotherserver))
+                    anotherserver_hostaddr = None
+                except dns.resolver.NXDOMAIN as e:
+                    sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, anotherserver))
+                    anotherserver_hostaddr = None
+
+                if anotherserver_hostaddr is None:
+                    ret = False
+                    sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s.\n" % (host, anotherserver))
+                    continue
+
+                if not _is_hostaddr_equal(target_hostaddr, anotherserver_hostaddr):
+                    if not self._update_host(host, anotherserver_hostaddr):
+                        sys.stderr.write("Failed to update host record %s on target DNS server\n" % (host, self.server))
+                        ret = False
+                else:
+                    if self.verbose:
+                        print("Host record %s up-to-date %s<>%s." % (host, target_hostaddr, anotherserver_hostaddr))
+        return ret
+
+    def _lookup_hosts(self, args):
+        dnsserver = self.server
+        hosts_to_lookup = []
+
+        for (host, payload) in args:
+            if host[0] == '@':
+                dnsserver = host[1:]
+            else:
+                hosts_to_lookup.append(host)
+
+        ipv6 = True if self.rrtype == 'AAAA' else False
+        ret = True
+        for host in hosts_to_lookup:
+            try:
+                hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=dnsserver, with_cname=True)
+            except dns.resolver.NoAnswer as e:
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (host, dnsserver))
+                hostaddr = None
+            except dns.resolver.NXDOMAIN as e:
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, dnsserver))
+                hostaddr = None
+            if hostaddr:
+                print('%s %s' % (host, hostaddr))
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='update the DNS information')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--noop', dest='noop', action='store_true', help='no not actual update anything, just show what would be done.')
+        parser.add_argument('--available', dest='available', action='store_true', help='checks if EFI is available on this machine.')
+        parser.add_argument('--server', dest='server', default=self.DEFAULT_SERVER, help='name of the DNS server for updates')
+        parser.add_argument('--rrtype', dest='rrtype', default=self.DEFAULT_RRTYPE, help='specify the RR type for the next operation')
+        parser.add_argument('--ttl', dest='ttl', default=self.DEFAULT_TTL, help='specify the TTL for the records')
+        parser.add_argument('-k', '--key', dest='keyfile', default=self.DEFAULT_KEYFILE, help='key to use for the update')
+
+        parser.add_argument('-l', '--lookup', dest='lookup', nargs='+', help='look up the given DNS record')
+        parser.add_argument('-a', '--add', dest='add', nargs='+', help='adds the given DNS record; name value')
+        parser.add_argument('-d', '--delete', dest='delete', nargs='+', help='deletes the specified DNS record')
+        parser.add_argument('-u', '--update', dest='update', nargs='+', help='updates the specified DNS record')
+        parser.add_argument('--update-host', dest='update_host', nargs='+', help='updates the given host for the specified address.')
+        parser.add_argument('--import-host', dest='import_host', nargs='+', help='import the result from the specified DNS server and update the local DNS server.')
+
+        args = parser.parse_args()
+
+        self.verbose = args.verbose
+        self.noop = args.noop
+        self.ttl = args.ttl
+        self.rrtype = args.rrtype
+        self.server = args.server
+        self.keyfile = args.keyfile
+
+        perform_update = True
+
+        if args.add:
+            if not self._add_record(dns_update_app._split_args(args.add)):
+                perform_update = False
+        if args.delete:
+            if not self._delete_record(dns_update_app._split_args(args.delete)):
+                perform_update = False
+        if args.update:
+            if not self._update_record(dns_update_app._split_args(args.update)):
+                perform_update = False
+
+        if args.update_host:
+            if not self._update_host(dns_update_app._split_args(args.update_host)):
+                perform_update = False
+
+        if args.import_host:
+            if not self._import_host(dns_update_app._split_args(args.import_host)):
+                perform_update = False
+
+        if args.lookup:
+            if not self._lookup_hosts(dns_update_app._split_args(args.lookup)):
+                perform_update = False
+
+        if perform_update:
+            if len(self._updates) == 0:
+                if self.verbose:
+                    print('Nothing to do.')
+                ret = 0
+            else:
+                for (host, update) in self._updates.iteritems():
+                    if self.verbose:
+                        print('update %s with %s' % (host, update))
+                    if not self.noop:
+                        response = dns.query.tcp(update, args.server)
+                ret = 0
+        else:
+            ret = 1
+        return ret
+
+if __name__ == "__main__":
+    app =  dns_update_app()
+    sys.exit(app.main())

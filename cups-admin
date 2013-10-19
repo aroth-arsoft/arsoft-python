@@ -1,0 +1,166 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os, sys
+import argparse
+
+from arsoft.cups import *
+
+class CupsAdminApp(object):
+
+    def __init__(self):
+        self._verbose = False
+        self._conn = None
+
+    def _show_printer(self, printer, include_attributes=False):
+        print('  Printer: %s' %(printer.name))
+        print('    Model: %s' % (printer.make_and_model))
+        print('    Location: %s' % (printer.location))
+        print('    Device URI: %s' % (printer.device_uri))
+        print('    Enabled: %s' % (printer.enabled))
+        print('    Shared: %s' % (printer.is_shared))
+
+        printer.getAttributes()
+        print('    Attributes:')
+        for key, value in printer.attributes.iteritems():
+            print('      %s: %s' % (key, value))
+
+        print('    Queued jobs:')
+        jobs = printer.jobsQueued()
+        if len(jobs) == 0:
+            print('      None')
+        else:
+            for job in jobs:
+                print('      %s' % (job))
+
+        print('    Preserved jobs:')
+        jobs = printer.jobsPreserved()
+        if len(jobs) == 0:
+            print('      None')
+        else:
+            for job in jobs:
+                print('      %s' % (job))
+
+    def show_printers(self, include_attributes=False):
+        print('Printers on %s:%i' % (self._conn.server, self._conn.port))
+        for (printername, printer_obj) in self._conn.printers.iteritems():
+            self._show_printer(printer_obj, include_attributes=include_attributes)
+        return True
+    
+    def show_printer(self, printername, include_attributes=False):
+        ret = False
+        for (current_printername, printer_obj) in self._conn.printers.iteritems():
+            if current_printername.lower() != printername.lower():
+                continue
+            self._show_printer(printer_obj, include_attributes=include_attributes)
+            ret = True
+        if not ret:
+            sys.stderr.write('Printer %s not found.\n' % (printername))
+        return ret
+    
+    def get_printer(self, printername):
+        for (current_printername, printer_obj) in self._conn.printers.iteritems():
+            if current_printername.lower() != printername.lower():
+                continue
+            return printer_obj
+        return None
+
+    def main(self, argv=None):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='manage CUPS')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debugging of this script.')
+        parser.add_argument('-l', '--localhost', dest='localhost', action='store_true', help='connect to local CUPS server.')
+        parser.add_argument('-S', '--socket', dest='socket', help='connect to local CUPS server using the given socket.')
+        parser.add_argument('-u', '--user', dest='user', help='connect to CUPS as the given user.')
+        parser.add_argument('-E', '--encryption', dest='encryption', choices=['Always', 'IfRequested', 'Never', 'Required'], help='use the specified encryption for the connection.')
+        parser.add_argument('--server', dest='server', type=str, help='specifies the CUPS server to use.')
+        parser.add_argument('--add-remote', dest='add_remote_server', type=str, help='adds all printers from the given remote CUPS server.')
+        parser.add_argument('--remove-remote', dest='remove_remote_server', type=str, help='removes all printers on the given remote CUPS server.')
+        parser.add_argument('--default', dest='default_printer', action='store_true', help='sets the default printer.')
+        parser.add_argument('--list-ppds', dest='list_ppds', type=str, nargs='?', help='list all available PPDs for the given maker.')
+        parser.add_argument('--set', dest='set_option', type=str, nargs='+', help='sets the printer option; format name=value.')
+        parser.add_argument('--unset', dest='unset_option', type=str, nargs='+', help='unsets the printer option')
+        parser.add_argument('--enable', dest='enable_printer', action='store_true', help='enables the printer.')
+        parser.add_argument('--disable', dest='disable_printer', action='store_true', help='disables the printer.')
+        parser.add_argument('printer', type=str, nargs='?', help='name of the printer to administrate.')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        if args.localhost:
+            server = 'localhost'
+        elif args.server:
+            server = args.server
+        elif args.socket:
+            server = args.socket
+        else:
+            server = None
+
+        self._conn = CupsConnection(server=server, user=args.user, encryption=args.encryption)
+
+        display_printers = True
+        selected_printer = self.get_printer(args.printer) if args.printer else None
+        ret = 0
+        if args.add_remote_server:
+            display_printers = False
+            self._remote_conn = CupsConnection(args.add_remote_server)
+            if not self._conn.add_remote_printers(self._remote_conn):
+                sys.stderr.write('Unable to add printers from remote server %s\n' % (self._conn.last_error))
+                ret = 1
+        elif args.remove_remote_server:
+            display_printers = False
+            if not self._conn.remove_remote_printers(args.remove_remote_server):
+                sys.stderr.write('Unable to remove printers from remote server %s\n' % (self._conn.last_error))
+                ret = 1
+        elif args.list_ppds:
+            display_printers = False
+            if not self.show_ppds(make_filter=args.list_ppds):
+                ret = 1
+        else:
+            if args.set_option:
+                display_printers = False
+                print('set opts')
+                for opt in args.set_option:
+                    key, value = opt.split('=', 2)
+                    print(' set %s=%s' %(key, value))
+                    selected_printer.setOption(key, value)
+
+            if args.default_printer:
+                display_printers = False
+                try:
+                    selected_printer.setAsDefault()
+                except cups.IPPError as (status, description):
+                    sys.stderr.write('Unable to set %s as default printer; error %i: %s\n' % (selected_printer.name, status, description))
+                    ret = 1
+
+            if args.enable_printer:
+                display_printers = False
+                try:
+                    selected_printer.setEnabled(on=True)
+                except cups.IPPError as (status, description):
+                    sys.stderr.write('Unable to enable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
+                    ret = 1
+            elif args.disable_printer:
+                display_printers = False
+                try:
+                    selected_printer.setEnabled(on=False)
+                except cups.IPPError as (status, description):
+                    sys.stderr.write('Unable to disable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
+                    ret = 1
+
+        if display_printers:
+            if selected_printer:
+                if not self._show_printer(selected_printer, include_attributes=True if args.debug is True else False):
+                    ret = 1
+            else:
+                if not self.show_printers(include_attributes=True if args.debug is True else False):
+                    ret = 1
+        return ret
+
+if __name__ == "__main__":
+    app = CupsAdminApp()
+    sys.exit(app.main(sys.argv))
