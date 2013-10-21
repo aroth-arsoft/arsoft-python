@@ -128,16 +128,21 @@ class GitCommitNotifierConfig(object):
     def message_map(self):
         return self._data['message_map']
     
-    def enable_trac(self, trac_url, keywords=['refs','ref','close','closes','implements','fixes','fixed']):
+    def enable_trac(self, trac_url, repo_name=None, keywords=['refs','ref','close','closes','implements','fixes','fixed']):
         for (regex, url) in self._data['message_map'].iteritems():
             if trac_url in url:
                 del self._data['message_map'][regex]
                 break
 
         regex = '\\b(' + '|'.join(keywords) + ')\\s*\\#(\\d+)'
-        url = trac_url + '/ticket/\\2'
-        self._data['message_map'][regex] = url
-        self._data['trac'] = { 'path': trac_url + '/changeset' }
+        ticket_url = trac_url + '/ticket/\\2'
+        changeset_url = trac_url + '/changeset'
+        
+        self._data['message_map'][regex] = ticket_url
+        if repo_name is None:
+            self._data['trac'] = { 'path': changeset_url, 'repo_name':repo_name  }
+        else:
+            self._data['trac'] = { 'path': changeset_url }
         self._data['link_files'] = 'trac'
 
     def enable_gitweb(self, gitweb_url, project=None):
