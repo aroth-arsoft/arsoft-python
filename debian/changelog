@@ -1,3 +1,9 @@
+arsoft-python (1.107) saucy; urgency=low
+
+  * add onky remote support/script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 26 Oct 2013 17:16:55 +0200
+
 arsoft-python (1.106) raring; urgency=low
 
   * add nsswitch-winbind script
