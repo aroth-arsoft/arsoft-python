@@ -212,8 +212,8 @@ class ARSoftBackupApp(BackupApp):
             sys.stderr.write('Given root directory %s does not exist.\n' % (rootdir))
             ret = 2
         else:
-            configdir = rootdir + args.configdir
-            statedir = rootdir + args.statedir
+            configdir = os.path.realpath(rootdir + args.configdir)
+            statedir = os.path.realpath(rootdir + args.statedir)
 
             if not self.reinitialize(configdir, statedir):
                 sys.stderr.write('Failed to load configuration from %s.\n' % (args.configdir)) 

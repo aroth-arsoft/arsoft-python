@@ -290,10 +290,15 @@ class BackupApp(object):
     
     def start_session(self):
         self.session = self.job_state.start_new_session()
+        self.session.writelog('Start')
         self.plugin_notify_start_session()
 
     def finish_session(self, success=True, failure_message=None):
         self.plugin_notify_finish_session(success=success, failure_message=failure_message)
+        if success:
+            self.session.writelog('Finish successfully')
+        else:
+            self.session.writelog('Finish with error %s' % failure_message)
         self.session.finish(success, failure_message)
 
     def _call_plugins(self, cmd, **kwargs):

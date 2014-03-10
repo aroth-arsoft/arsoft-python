@@ -38,6 +38,7 @@ class BackupJobHistoryItem(object):
         itemname = BackupStateDefaults.HISTORY_FILE_PREFIX + now.strftime(BackupStateDefaults.TIMESTAMP_FORMAT) + BackupStateDefaults.HISTORY_FILE_EXTENSION
         fullpath = os.path.join(state_dir, itemname)
         item = BackupJobHistoryItem(parent, fullpath)
+        item._startdate = now
         item._write_state()
         return item
 
@@ -116,11 +117,18 @@ class BackupJobHistoryItem(object):
 
     def openlog(self):
         if self._logfile_fobj is None:
-            if os.path.isfile(self.logfile):
-                self._logfile_fobj = open(self.logfile, 'w')
-            else:
-                self._logfile_fobj = None
+            self._logfile_fobj = open(self.logfile, 'w')
         return self._logfile_fobj
+
+    def writelog(self, *args):
+        fobj = self.openlog()
+        if fobj is not None:
+            now = datetime.datetime.utcnow()
+            line = str(now)
+            for a in args:
+                line += '\t' + str(a)
+            line += '\n'
+            fobj.write(line)
 
     def finish(self, success=True, failure_message=None):
         self._success = success
