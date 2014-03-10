@@ -18,6 +18,7 @@ usr/bin/ini-util
 usr/bin/alog
 usr/bin/jabber-send
 usr/bin/jabber-daemon
+usr/bin/arsoft-backup
 usr/bin/arsoft-mailer
 usr/sbin/slapd-config
 usr/sbin/svnbackup

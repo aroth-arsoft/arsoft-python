@@ -1,3 +1,10 @@
+arsoft-python (1.109) saucy; urgency=low
+
+  * add missing arsoft-backup script
+  * several backup script fixes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 10 Mar 2014 13:38:13 +0100
+
 arsoft-python (1.108) saucy; urgency=low
 
   * fixed fritzbox status scripts with fritz OS 6 or newer
