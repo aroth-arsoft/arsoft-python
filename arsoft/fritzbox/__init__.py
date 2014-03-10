@@ -96,8 +96,12 @@ class FritzBox(object):
             ret = False
         return ret
 
-    def _retrieveWANAddress(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetExternalIPAddress') )
+    def _retrieveWANAddress(self, pre_os6=False):
+        if pre_os6:
+            request = FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANPPPConnection:1', 'GetExternalIPAddress')
+        else:
+            request = FritzBox.Request('/upnp/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetExternalIPAddress')
+        response = self._sendRequest( request )
         if response is not None:
             self._wanAddress = ''
             ret = False
@@ -105,10 +109,17 @@ class FritzBox(object):
                 doc = libxml2.parseDoc(response.contents)
                 ctxt = doc.xpathNewContext()
                 ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
-                ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANIPConnection:1")
+                if pre_os6:
+                    ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANPPPConnection:1")
+                else:
+                    ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANIPConnection:1")
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetExternalIPAddressResponse/NewExternalIPAddress')
-                self._wanAddress = elements[0].content
-                ret = True
+                if elements:
+                    self._wanAddress = elements[0].content
+                    ret = True
+                else:
+                    self._wanAddress = None
+                    ret = False
             finally:
                 doc.freeDoc()
         else:
