@@ -16,11 +16,11 @@ import datetime, time
 
 class ExternalDiskManager(object):
 
-    def __init__(self):
+    def __init__(self, trigger=None):
         self.verbose = False
         self.noop = False
         self.config = ExternalDiskManagerConfig()
-        self._trigger = None
+        self._trigger = trigger
         self._private_operation_data = None
 
         syslog.openlog('edskmgr', logoption=syslog.LOG_PID, facility=syslog.LOG_MAIL)
@@ -338,15 +338,16 @@ class ExternalDiskManager(object):
             elif isinstance(timeout, datetime.timedelta):
                 abs_timeout = time.time()+timeout.total_seconds()
             else:
-                raise ValueError
+                raise ValueError('expected int, float, datetime.datetime or datetime.timedelta but cannot handle a %s' % type(timeout))
 
         disk_mgr = Disks()
         diskobj = disk_mgr.find_disk_by_pattern(pattern)
         if not diskobj:
-            while time.time() < abs_timeout:
-                time.sleep(wait_interval)
-                disk_mgr.rescan()
-                diskobj = disk_mgr.find_disk_by_pattern(pattern)
-                if diskobj:
-                    break
+            if abs_timeout is not None:
+                while time.time() < abs_timeout:
+                    time.sleep(wait_interval)
+                    disk_mgr.rescan()
+                    diskobj = disk_mgr.find_disk_by_pattern(pattern)
+                    if diskobj:
+                        break
         return diskobj

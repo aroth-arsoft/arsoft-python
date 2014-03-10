@@ -166,7 +166,7 @@ class BackupApp(object):
         self.job_state.open(statedir)
 
         # in any case continue with the config we got
-        self._diskmgr = DiskManager()
+        self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag)
 
         plugins_to_load = self.config.active_plugins
         for plugin in plugins_to_load:
@@ -254,18 +254,20 @@ class BackupApp(object):
 
     def prepare_destination(self):
         # load all available external discs
-        if not self._diskmgr.is_disk_ready():
+        disk_ready = self._diskmgr.is_disk_ready()
+        if not disk_ready:
             if not self._diskmgr.load():
+                self.session.writelog('Failed to load external discs')
                 sys.stderr.write('Failed to load external discs\n')
                 ret = 1
             else:
-                self.plugin_notify_disk_ready()
-                disk_loaded = True
-                disk_ready = True
-        else:
-            disk_ready = True
+                self.session.writelog('Waiting for disk for %f seconds' % self.config.disk_timeout)
+                if self._diskmgr.wait_for_disk(timeout=self.config.disk_timeout):
+                    disk_loaded = True
+                    disk_ready = True
 
         if disk_ready:
+            self.plugin_notify_disk_ready()
             ret = self._prepare_backup_dir()
         else:
             ret = False

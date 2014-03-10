@@ -27,6 +27,8 @@ class BackupConfigDefaults(object):
     USE_TIMESTAMP_FOR_BACKUP_DIR = True
     TIMESTAMP_FORMAT_FOR_BACKUP_DIR = '%Y%m%d%H%M%S'
     ACTIVE_PLUGINS = ['git', 'dir']
+    DISK_TAG = None
+    DISK_TIMEOUT = 60.0
 
 class BackupConfig(object):
     def __init__(self, config_dir=BackupConfigDefaults.CONFIG_DIR, 
@@ -46,6 +48,8 @@ class BackupConfig(object):
                  use_timestamp_for_backup_dir=BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR,
                  timestamp_format_for_backup_dir=BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR,
                  active_plugins=BackupConfigDefaults.ACTIVE_PLUGINS,
+                 disk_tag=BackupConfigDefaults.DISK_TAG,
+                 disk_timeout=BackupConfigDefaults.DISK_TIMEOUT,
                  filelist_include=None, 
                  filelist_exclude=None):
         self.config_dir = config_dir
@@ -67,6 +71,8 @@ class BackupConfig(object):
         self.use_timestamp_for_backup_dir = use_timestamp_for_backup_dir
         self.timestamp_format_for_backup_dir = timestamp_format_for_backup_dir
         self.active_plugins = active_plugins
+        self.disk_tag = disk_tag
+        self.disk_timeout = disk_timeout
 
     def clear(self):
         self.config_dir = BackupConfigDefaults.CONFIG_DIR
@@ -87,6 +93,8 @@ class BackupConfig(object):
         self.use_timestamp_for_backup_dir = BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR
         self.timestamp_format_for_backup_dir = BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR
         self.active_plugins = BackupConfigDefaults.ACTIVE_PLUGINS
+        self.disk_tag = BackupConfigDefaults.DISK_TAG
+        self.disk_timeout = BackupConfigDefaults.DISK_TIMEOUT
 
     @property
     def retention_time(self):
@@ -228,6 +236,8 @@ class BackupConfig(object):
         self.filelist_include_dir = inifile.get(None, 'FileListIncludeDirectory', BackupConfigDefaults.INCLUDE_DIR)
         self.filelist_exclude_dir = inifile.get(None, 'FileListExcludeDirectory', BackupConfigDefaults.EXCLUDE_DIR)
         self.active_plugins = inifile.getAsArray(None, 'ActivePlugins', BackupConfigDefaults.ACTIVE_PLUGINS)
+        self.disk_tag = inifile.get(None, 'DiskTag', BackupConfigDefaults.DISK_TAG)
+        self.disk_timeout = inifile.get(None, 'DiskTimeout', BackupConfigDefaults.DISK_TIMEOUT)
         return ret
         
     def _write_main_conf(self, filename):
@@ -251,6 +261,8 @@ class BackupConfig(object):
         inifile.set(None, 'FileListIncludeDirectory', self.filelist_include_dir)
         inifile.set(None, 'FileListExcludeDirectory', self.filelist_exclude_dir)
         inifile.set(None, 'ActivePlugins', self.active_plugins)
+        inifile.set(None, 'DiskTag', self.disk_tag)
+        inifile.set(None, 'DiskTimeout', self.disk_timeout)
 
         ret = inifile.save(filename)
         return ret
@@ -273,6 +285,8 @@ class BackupConfig(object):
         ret = ret + 'use timestamp for backup dirs: ' + str(self.use_timestamp_for_backup_dir) + '\n'
         ret = ret + 'timestamp format for backup dirs: ' + str(self.timestamp_format_for_backup_dir) + '\n'
         ret = ret + 'active plugins: ' + str(self.active_plugins) + '\n'
+        ret = ret + 'disk tag: ' + str(self.disk_tag) + '\n'
+        ret = ret + 'disk timeout: ' + str(self.disk_timeout) + '\n'
         return ret
 
 class BackupPluginConfig(object):

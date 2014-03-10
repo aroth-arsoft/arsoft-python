@@ -133,6 +133,18 @@ class ARSoftBackupApp(BackupApp):
 
         if not self.load_previous():
             return 1
+        
+        disk = None
+        if self._diskmgr.is_disk_ready():
+            # just get the disk when it's already there
+            disk = self._diskmgr.wait_for_disk(timeout=None)
+        if disk:
+            print('Disk ready:   yes')
+            print('  Vendor:     %s' % (disk.vendor))
+            print('  Model:      %s' % (disk.model))
+            print('  Serial:     %s' % (disk.serial))
+        else:
+            print('Disk not yet ready:   %s' % (self._diskmgr.disk_tag))
 
         print('Last success: %s' % (self.job_state.last_success))
         print('Last failure: %s' % (self.job_state.last_failure))
