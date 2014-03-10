@@ -229,7 +229,7 @@ class Rsync(object):
             url_destination = urlparse.urlparse(destination)
         else:
             url_destination = None
-        if '://' in link_dest_dir:
+        if link_dest_dir and '://' in link_dest_dir:
             url_link_dest = urlparse.urlparse(link_dest_dir)
         else:
             url_link_dest = None
