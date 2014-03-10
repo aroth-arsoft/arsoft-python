@@ -1,4 +1,5 @@
 etc/edskmgr
+etc/edskmgr/hooks.d/arsoft-backup
 usr/bin/edskmgr
 lib/udev/external-disk
 lib/udev/rules.d/88-external-disk.rules

@@ -278,7 +278,7 @@ class Partition(Device):
             ret = None
         return ret
 
-    def mount(self, filesystem_type, options=[]):
+    def mount(self, filesystem_type='', options=[]):
         try:
             self._device_if.FilesystemMount(filesystem_type, options)
             ret = True

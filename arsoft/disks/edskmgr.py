@@ -277,6 +277,7 @@ class ExternalDiskManager(object):
         hook_env = os.environ
         if self._trigger:
             hook_env['EDSKMGR_TRIGGER'] = str(self._trigger)
+        self.log('run_hooks %s from %s args=%s\n'%(command, self.hook_dir, str(args)))
         for item in os.listdir(self.hook_dir):
             fullpath = os.path.abspath(os.path.join(self.hook_dir, item))
             if os.path.isfile(fullpath) and os.access(fullpath, os.X_OK):
@@ -289,6 +290,23 @@ class ExternalDiskManager(object):
             else:
                 self.err('Ignore hook %s because not executable\n'%(item))
         return ret
+    
+    def udev_hook_initialize(self):
+        udev_env = self._get_udev_env()
+        action = udev_env['ACTION']
+        devpath = udev_env['DEVPATH']
+        devtype = udev_env['DEVTYPE']
+
+        disk_mgr = Disks()
+        disk_obj = None
+        disk_tags = []
+        dev_obj = disk_mgr.find_device(devpath=devpath)
+        if dev_obj:
+            if not isinstance(dev_obj, Disk):
+                disk_obj = disk_mgr.find_disk_for_device(dev_obj)
+        if disk_obj:
+            disk_tags = self.config.get_tags_for_disk(disk_obj.match_pattern)
+        return (disk_obj, dev_obj, disk_tags)
 
     def udev_action(self):
         udev_env = self._get_udev_env()
@@ -299,7 +317,6 @@ class ExternalDiskManager(object):
             disk_mgr = Disks()
             disk_obj = disk_mgr.find_disk_from_devpath(devpath=devpath)
             if disk_obj:
-                is_external = self.is_external_disk(disk_obj)
                 if action == 'add':
                     cmd = 'disk-loaded'
                 else:
@@ -315,8 +332,8 @@ class ExternalDiskManager(object):
     def get_disk_patterns_for_tag(self, tag):
         return self.config.get_disks_by_tag(tag)
 
-    def get_tags_for_disk(self, diskobj):
-        return self.config.get_tags_for_disk(diskobj.match_pattern)
+    def get_tags_for_disk(self, disk_obj):
+        return self.config.get_tags_for_disk(disk_obj.match_pattern)
 
     def wait_for_disk(self, pattern=None, tag=None, timeout=None, wait_interval=1.0):
         abs_timeout = None
