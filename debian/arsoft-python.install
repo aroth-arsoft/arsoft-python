@@ -3,6 +3,7 @@ etc/arsoft
 etc/init/jabber-daemon.conf
 usr/lib/python*/dist-packages/arsoft/*.py
 usr/lib/python*/dist-packages/arsoft/backup/*.py
+usr/lib/python*/dist-packages/arsoft/backup/plugins/*.py
 usr/lib/python*/dist-packages/arsoft/config/*.py
 usr/lib/python*/dist-packages/arsoft/cups/*.py
 usr/lib/python*/dist-packages/arsoft/disks/*.py

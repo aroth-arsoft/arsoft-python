@@ -5,13 +5,14 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.109',
+		version='1.110',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
 		url='http://www.arsoft-online.com/',
 		packages=['arsoft', 
                     'arsoft.backup',
+                    'arsoft.backup.plugins',
                     'arsoft.config',
                     'arsoft.crypto',
                     'arsoft.cups',
