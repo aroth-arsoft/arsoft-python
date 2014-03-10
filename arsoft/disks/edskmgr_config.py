@@ -157,9 +157,13 @@ class ExternalDiskManagerConfigItem(object):
         inifile.set(None, 'Tags', self.tags)
         inifile.setAsBoolean(None, 'External', self.external)
         return inifile.save()
-        
+
     def save(self, filename=None):
         return self._write_conf(filename)
+
+    @property
+    def is_valid(self):
+        return False if self.pattern is None else True
 
     def remove(self):
         try:
@@ -246,7 +250,10 @@ class ExternalDiskManagerConfig(object):
                 if ext == '.conf':
                     fullpath = os.path.join(self.additional_config_dir, f)
                     item = ExternalDiskManagerConfigItem(fullpath)
-                    self._items.append(item)
+                    if item.is_valid:
+                        self._items.append(item)
+                    else:
+                        print('config item %s is invalid' % (fullpath))
         except (IOError, OSError) as e:
             self._last_error = str(e)
             ret = False
