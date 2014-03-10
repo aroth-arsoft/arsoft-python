@@ -206,7 +206,7 @@ class FileListItemWithDestination(FileListItemBase):
                 self._items[source] = dest_fullname
         else:
             if dest is None:
-                dest_fullname = os.path.basename(newitem)
+                dest_fullname = os.path.basename(source_fullname)
             else:
                 if self._dest_base_directory:
                     dest_fullname = os.path.join(self._dest_base_directory, dest)
