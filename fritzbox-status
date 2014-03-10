@@ -13,7 +13,7 @@ from arsoft.fritzbox import *
 
 class NagiosPluginApp(object):
         
-    def _buildNagiosPerfData(self, data_dict)
+    def _buildNagiosPerfData(self, data_dict):
         ret = '|'
         for key, value in data_dict.items():
             ret = ret + key + '='
@@ -81,11 +81,11 @@ class FritxBoxStatusApp(NagiosPluginApp):
         elif args.status_nagios:
             # first pre-fill the perfdata dictionary with all fields
             perfdata = {
-                'downStream': None
-                'upStream': None
-                'wanAddress': None
-                'wanConnectTime': None
-                'wanConnectDuration': None
+                'downStream': None,
+                'upStream': None,
+                'wanAddress': None,
+                'wanConnectTime': None,
+                'wanConnectDuration': None,
                 'dnsServers': None
                 }
             if fritz.isPhysicalConnected():
@@ -98,10 +98,6 @@ class FritxBoxStatusApp(NagiosPluginApp):
                     perfdata['downStream'] = fritz.physicalLinkDownStream()
                     perfdata['upStream'] = fritz.physicalLinkUpStream()
 
-                        ';wanAddress=' + str(fritz.wanAddress()) +\
-                        ';wanConnectTime=' + str(fritz.connectTime()) +\
-                        ';wanConnectDuration=' + str(fritz.connectDuration()) +\
-                        ';dnsServers=' + perfdata_dnsServers
                     if args.mindown is not None and args.mindown > fritz.physicalLinkDownStream():
                         print('WARNING: Downstream bitrate ' + str(fritz.physicalLinkDownStream()) + ' too low! (min=' + str(args.mindown) + ')')
                         status = False
