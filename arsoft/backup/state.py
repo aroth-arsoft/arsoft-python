@@ -160,6 +160,10 @@ class BackupJobHistory(object):
         item = BackupJobHistoryItem.create(self, self.state_dir)
         self._items.append(item)
         return item
+    
+    @property
+    def is_loaded(self):
+        return True if self._items is not None else False
 
     def reload(self):
         self._items = None
@@ -219,7 +223,20 @@ class BackupJobState(object):
             ret = self._write_state_conf(self.job_state_conf)
 
         self.history.load()
-
+        return ret
+    
+    def _mkdir(self, dir):
+        ret = True
+        if os.path.exists(dir):
+            if not os.path.isdir(dir):
+                sys.stderr.write('%s is not a directory\n' % (dir) )
+                ret = False
+        else:
+            try:
+                os.makedirs(dir)
+            except (IOError, OSError) as e:
+                sys.stderr.write('Failed to create directory %s; error %s\n' % (dir, str(e)) )
+                ret = False
         return ret
 
     def save(self, state_dir=None):
@@ -228,9 +245,15 @@ class BackupJobState(object):
         else:
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
             self.state_dir = state_dir
+
+        if not os.path.isdir(state_dir):
+            ret = self._mkdir(state_dir)
+        else:
+            ret = True
+        if ret:
             self.history = BackupJobHistory(self, state_dir)
 
-        ret = self._write_state_conf(self.job_state_conf)
+            ret = self._write_state_conf(self.job_state_conf)
         return ret
 
     def _read_state_conf(self, filename):
@@ -256,6 +279,9 @@ class BackupJobState(object):
     
     def remove_old_items(self, max_age, min_count=0, max_count=50):
         
+        if not self.history.is_loaded:
+            self.history.reload()
+
         if min_count > max_count:
             raise ValueError('min_count=%i must be greater than max_count=%i' % (min_count, max_count))
         

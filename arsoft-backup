@@ -42,6 +42,9 @@ class ARSoftBackupApp(BackupApp):
     
     def _do_rsync(self):
         backup_dir = self.session.backup_dir
+        if backup_dir is None:
+            return False
+
         previous_backup_dir = None
         if self.config.use_filesystem_hardlinks:
             if self.previous_backups.last_full_backup:

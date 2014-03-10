@@ -218,7 +218,7 @@ class BackupApp(object):
         else:
             try:
                 os.makedirs(dir)
-            except IOError as e:
+            except (IOError, OSError) as e:
                 sys.stderr.write('Failed to create directory %s; error %s\n' % (dir, str(e)) )
                 ret = False
         return ret
