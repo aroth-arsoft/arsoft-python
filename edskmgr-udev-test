@@ -38,7 +38,7 @@ done
 this_script=`readlink -f $0`
 this_dir=`dirname "$this_script"`
 [ $verbose -ne 0 ] && echo "Environment:" && export
-[ $verbose -ne 0 ] && echo "$this_dir/edskmgr --verbose --udev-partition --hook-dir $this_dir/edskmgr-support/hooks"
+[ $verbose -ne 0 ] && echo "$this_dir/edskmgr --verbose --udev --hook-dir $this_dir/edskmgr-support/hooks"
 
 case "$DEVTYPE" in
 	'partition'|'disk')
