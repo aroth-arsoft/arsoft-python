@@ -154,6 +154,7 @@ class BackupApp(object):
         self.plugins = []
         self._diskmgr = None
         self.disk_loaded = False
+        self._disk_obj = None
 
     def cleanup(self):
         self.job_state.save()
@@ -262,8 +263,9 @@ class BackupApp(object):
                 ret = 1
             else:
                 self.session.writelog('Waiting for disk for %f seconds' % self.config.disk_timeout)
-                if self._diskmgr.wait_for_disk(timeout=self.config.disk_timeout):
-                    disk_loaded = True
+                self._disk_obj = self._diskmgr.wait_for_disk(timeout=self.config.disk_timeout)
+                if self._disk_obj:
+                    self.disk_loaded = True
                     disk_ready = True
 
         if disk_ready:
@@ -285,9 +287,11 @@ class BackupApp(object):
         ret = True
         if self.disk_loaded:
             self.plugin_notify_disk_eject()
-
-            if not self._diskmgr.eject():
-                ret = False
+            
+            if self._disk_obj:
+                if not self._diskmgr.eject(self._disk_obj):
+                    ret = False
+                self._disk_obj = None
         return ret
     
     def start_session(self):

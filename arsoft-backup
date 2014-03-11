@@ -143,8 +143,13 @@ class ARSoftBackupApp(BackupApp):
             print('  Vendor:     %s' % (disk.vendor))
             print('  Model:      %s' % (disk.model))
             print('  Serial:     %s' % (disk.serial))
+            for part in disk.partitions:
+                if part.is_mounted:
+                    print('    %s:   %s' % (part.path, ','.join(part.mountpaths)))
+                else:
+                    print('    %s:   not mounted' % (part.path))
         else:
-            print('Disk not yet ready:   %s' % (self._diskmgr.disk_tag))
+            print('Disk not yet ready:   tag=%s' % (self._diskmgr.disk_tag))
 
         print('Last success: %s' % (self.job_state.last_success))
         print('Last failure: %s' % (self.job_state.last_failure))

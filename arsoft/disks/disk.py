@@ -57,8 +57,15 @@ class Device(object):
         return Disks._get_device_property(self._device_props, "NativePath")
 
     @property
-    def mountpath(self):
-        return Disks._get_device_property(self._device_props, "DeviceMountPaths")
+    def mountpaths(self):
+        tmp = Disks._get_device_property(self._device_props, "DeviceMountPaths")
+        if isinstance(tmp, dbus.Array):
+            ret = []
+            for a in tmp:
+                ret.append(str(a))
+        else:
+            ret = None
+        return ret
 
     @property
     def is_media_ejectable(self):
@@ -182,7 +189,7 @@ class Disk(Device):
             ' vendor=' + str(self.vendor) + \
             ' model=' + str(self.model) +\
             ' serial=' + str(self.serial) +\
-            ' mounted=' + ','.join(self.mountpath) +\
+            ' mounted=' + ','.join(self.mountpaths) +\
             ''
         return ret
 
@@ -249,7 +256,7 @@ class Floppy(Device):
             ' vendor=' + str(self.vendor) + \
             ' model=' + str(self.model) +\
             ' serial=' + str(self.serial) +\
-            ' mounted=' + ','.join(self.mountpath) +\
+            ' mounted=' + ','.join(self.mountpaths) +\
             ''
         return ret
 
@@ -637,7 +644,7 @@ class Disks(object):
     def root_partition(self):
         ret = None
         for d in self._list:
-            if ( isinstance(d, Partition) or isinstance(d, Lvm2LV) ) and d.is_mounted and '/' in d.mountpath:
+            if ( isinstance(d, Partition) or isinstance(d, Lvm2LV) ) and d.is_mounted and '/' in d.mountpaths:
                 ret = d
         return ret
 

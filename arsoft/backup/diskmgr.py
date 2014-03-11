@@ -17,8 +17,8 @@ class DiskManager(object):
     def cleanup(self):
         self._mgr.cleanup()
 
-    def eject(self):
-        return self._mgr.remove_external_disks()
+    def eject(self, disk_obj):
+        return self._mgr.remove_disk(disk_obj)
 
     def load(self):
         return self._mgr.rescan_empty_scsi_hosts()
