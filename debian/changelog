@@ -1,3 +1,9 @@
+arsoft-python (1.111) saucy; urgency=low
+
+  * several edskmgr improvements in preparation of arsoft-backup
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 11 Mar 2014 08:12:31 +0100
+
 arsoft-python (1.110) saucy; urgency=low
 
   * integrate arsoft-backup into edskmgr

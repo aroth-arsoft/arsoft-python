@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.110',
+		version='1.111',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -60,7 +60,7 @@ setup(name='arsoft-python',
 			('/etc', ['config/jabber-daemon.conf']),
 			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
                            'config/default_pattern.conf', 'config/default_shortcuts.conf']),
-            ('/etc/edskmgr/hooks.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),
+            ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),
 			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg', 
                                    'nagios/openvpn.cfg', 
                                    'nagios/kernel_modules.cfg', 
