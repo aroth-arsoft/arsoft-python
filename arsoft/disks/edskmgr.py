@@ -270,13 +270,27 @@ class ExternalDiskManager(object):
                 self.err('Given device name %s is not a valid block device.\n'%(devname))
         return ret
 
-    def run_hooks(self, command, args):
+    def run_hooks(self, command, dev_obj, disk_obj, args=[]):
         ret = True
         hook_args = [ command ]
+        if dev_obj:
+            hook_args.append(dev_obj.nativepath)
         hook_args.extend(args)
+
         hook_env = os.environ
         if self._trigger:
             hook_env['EDSKMGR_TRIGGER'] = str(self._trigger)
+        if disk_obj:
+            hook_env['EDSKMGR_MATCH_PATTERN'] = disk_obj.match_pattern
+            hook_env['EDSKMGR_DISK_VENDOR'] = disk_obj.vendor
+            hook_env['EDSKMGR_DISK_MODEL'] = disk_obj.model
+            hook_env['EDSKMGR_DISK_SERIAL'] = disk_obj.serial
+            disk_tags = self.config.get_tags_for_disk(disk_obj.match_pattern)
+            hook_env['EDSKMGR_DISK_TAGS'] = ','.join(disk_tags) if disk_tags else ''
+            disk_is_internal = self.is_internal_disk(disk_obj)
+            hook_env['EDSKMGR_IS_INTERNAL'] = '1' if disk_is_internal else '0'
+            hook_env['EDSKMGR_IS_EXTERNAL'] = '0' if disk_is_internal else '1'
+
         self.log('run_hooks %s from %s args=%s\n'%(command, self.hook_dir, str(args)))
         for item in os.listdir(self.hook_dir):
             fullpath = os.path.abspath(os.path.join(self.hook_dir, item))
@@ -315,13 +329,17 @@ class ExternalDiskManager(object):
         devtype = udev_env['DEVTYPE']
         if action == 'add' or action == 'remove':
             disk_mgr = Disks()
-            disk_obj = disk_mgr.find_disk_from_devpath(devpath=devpath)
+            disk_obj = None
+            dev_obj = disk_mgr.find_device(devpath=devpath)
+            if dev_obj:
+                if not isinstance(dev_obj, Disk):
+                    disk_obj = disk_mgr.find_disk_for_device(dev_obj)
             if disk_obj:
                 if action == 'add':
                     cmd = 'disk-loaded'
                 else:
                     cmd = 'disk-ejected'
-                ret = self.run_hooks(cmd, [disk_obj.nativepath])
+                ret = self.run_hooks(cmd, dev_obj, disk_obj)
             else:
                 ret = False
         else:
