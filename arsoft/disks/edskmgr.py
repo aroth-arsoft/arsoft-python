@@ -228,6 +228,14 @@ class ExternalDiskManager(object):
                 self.err('Given device name %s is not a valid block device.\n'%(devname))
         return ret
 
+    def remove_disk(self, disk_obj):
+        ret = True
+        disk_mgr = Disks()
+        scsi_mgr = Scsi()
+        if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
+            ret = False
+        return ret
+
     def reset_config(self):
         ret = self.config.reset()
         if ret:
