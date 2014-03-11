@@ -49,8 +49,7 @@ class ExternalDiskManagerApp(object):
         parser.add_argument('--load', dest='load', action='store_true', help='rescans all empty host interfaces.')
         parser.add_argument('--reset-config', dest='reset_config', action='store_true', help='reset configuration and treat all disks as internal ones.')
         parser.add_argument('--eject', dest='eject', nargs='*', help='removes the given external disks or all present external disks.')
-        parser.add_argument('--udev-disk', dest='udev_disk', action='store_true', help='handles disk event within udev.')
-        parser.add_argument('--udev-partition', dest='udev_partition', action='store_true', help='handles partition event within udev.')
+        parser.add_argument('--udev', dest='udev', action='store_true', help='handles disk or partition event within udev.')
         parser.add_argument('--trigger', dest='trigger', help='specifies the name of the action; use by other scripts.')
         parser.add_argument('--register', dest='register', nargs='+', metavar='DISK', help='registers the given disk as external HDD to the system.')
         parser.add_argument('--unregister', dest='unregister', nargs='+', metavar='DISK', help='unregisters the given disk from the known external HDDs of the system.')
@@ -101,7 +100,7 @@ class ExternalDiskManagerApp(object):
                         ret = 0
             else:
                 ret = 1
-        elif args.udev_disk or args.udev_partition:
+        elif args.udev:
             if self._mgr.checkRoot():
                 if not self._mgr.udev_action():
                     ret = 1
