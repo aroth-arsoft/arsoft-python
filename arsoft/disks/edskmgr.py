@@ -340,7 +340,9 @@ class ExternalDiskManager(object):
             disk_obj = None
             dev_obj = disk_mgr.find_device(devpath=devpath)
             if dev_obj:
-                if not isinstance(dev_obj, Disk):
+                if isinstance(dev_obj, Disk):
+                    disk_obj = dev_obj
+                else:
                     disk_obj = disk_mgr.find_disk_for_device(dev_obj)
             if disk_obj:
                 if action == 'add':
@@ -349,6 +351,7 @@ class ExternalDiskManager(object):
                     cmd = 'disk-ejected'
                 ret = self.run_hooks(cmd, dev_obj, disk_obj)
             else:
+                self.err('Unable to find device %s for %s (%s)\n'%(devpath, action, devtype))
                 ret = False
         else:
             self.err('Unhandled udev action %s for %s (%s)\n'%(action, devpath, devtype))
