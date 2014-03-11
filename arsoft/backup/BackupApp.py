@@ -237,14 +237,19 @@ class BackupApp(object):
                     nowstr = now.strftime(self.config.timestamp_format_for_backup_dir)
                     backup_dir = os.path.join(backup_dir, nowstr)
 
+            backup_disk = None
             if Rsync.is_rsync_url(backup_dir):
-                # assume the given URL is good
+                # assume the given URL is good and there's no backup disk for
+                # remote backups
                 pass
             else:
                 if not self._mkdir(backup_dir):
                     ret = False
+                else:
+                    backup_disk = self._diskmgr.get_disk_for_directory(backup_dir)
             if ret:
                 self.session.backup_dir = backup_dir
+                self.session.backup_disk = backup_disk
                 if self.config.intermediate_backup_directory:
                     if not self._mkdir(self.config.intermediate_backup_directory):
                         ret = False

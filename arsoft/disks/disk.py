@@ -518,21 +518,41 @@ class Disks(object):
                 ret.append(dev)
         return ret
 
-    def find_device(self, devfile=None, devpath=None):
+    def find_device(self, devfile=None, devpath=None, dev_inode=None):
         if not Disks._dbus_connect():
             return None
-        if devfile is not None:
+        ret = None
+        if dev_inode is not None:
+            dev_major, dev_minor = os.major(dev_inode), os.minor(dev_inode)
+            path = Disks._udisks_manager.FindDeviceByMajorMinor(dev_major, dev_minor)
+            if path:
+                ret = self._get_device_by_udisks_path(path)
+        elif devfile is not None:
             path = Disks._udisks_manager.FindDeviceByDeviceFile(devfile)
             if path:
                 ret = self._get_device_by_udisks_path(path)
-            else:
-                ret = None
         elif devpath is not None:
             ret = self._get_device_by_devpath(devpath)
-        else:
-            ret = None
         return ret
-    
+
+    def find_device_for_file(self, path):
+        ret = None
+        if os.path.exists(path):
+            # given argument might be a device file
+            s = os.stat(path)
+            if stat.S_ISBLK(s.st_mode):
+                ret = self.find_device(devfile=path)
+            elif stat.S_ISDIR(s.st_mode) or stat.S_ISFILE(s.st_mode):
+                ret = self.find_device(dev_inode=s.st_dev)
+        return ret
+
+    def find_disk_for_file(self, path):
+        ret = self.find_device_for_file(path)
+        if ret:
+            if not isinstance(ret, Disk):
+                ret = self.find_disk_for_device(ret)
+        return ret
+
     def find_disk_from_devpath(self, devpath):
         ret = self.find_device(devpath=devpath)
         if ret:
@@ -568,6 +588,8 @@ class Disks(object):
             for dev in devobj.group_devices:
                 if isinstance(dev, Partition):
                     ret.append(dev.slave)
+            if len(ret) == 1:
+                ret = ret[0]
         else:
             ret = None
         return ret
@@ -677,5 +699,9 @@ if __name__ == '__main__':
     print('root partition:')
     print(e.root_partition)
 
-    print('system drive:')
+    print('system disk:')
     print(e.system_disk)
+
+    root_disk = e.find_disk_for_file('/')
+    print('root disk:')
+    print(root_disk)

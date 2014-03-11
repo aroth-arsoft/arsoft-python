@@ -248,6 +248,11 @@ class ExternalDiskManager(object):
                     self.log('register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
         return ret
 
+    def get_disk_for_file(self, path):
+        disk_mgr = Disks()
+        disk_obj = disk_mgr.find_disk_for_file(path)
+        return disk_obj
+
     def register_disk(self, devices, external=True, tags=[]):
         ret = True
         disk_mgr = Disks()
@@ -374,8 +379,11 @@ class ExternalDiskManager(object):
                     pattern.extend(patterns_for_tag)
             else:
                 pattern = self.get_disk_patterns_for_tag(tag)
+            if len(pattern) == 0:
+                # unable to find any patterns for a disk to look for
+                return None
         if pattern is None or len(pattern) == 0:
-            raise ValueError
+            raise ValueError('Invalid pattern %s' % pattern)
         if timeout is not None:
             if isinstance(timeout, int) or isinstance(timeout, float):
                 abs_timeout = time.time()+float(timeout)

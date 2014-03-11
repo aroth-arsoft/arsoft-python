@@ -6,6 +6,7 @@ import os.path
 import datetime
 from arsoft.inifile import IniFile
 from arsoft.timestamp import timestamp_from_datetime
+from arsoft.disks.disk import Disk
 
 class BackupStateDefaults(object):
     JOB_STATE_CONF = 'backup_job.state'
@@ -31,6 +32,7 @@ class BackupJobHistoryItem(object):
         self._logfile_fobj = None
         self._require_read = True
         self._backup_dir = None
+        self._backup_disk = None
 
     @staticmethod
     def create(parent, state_dir):
@@ -80,10 +82,23 @@ class BackupJobHistoryItem(object):
         if self._require_read:
             self._read_state()
         return self._backup_dir
-
     @backup_dir.setter
     def backup_dir(self, value):
         self._backup_dir = value
+
+    @property
+    def backup_disk(self):
+        if self._require_read:
+            self._read_state()
+        return self._backup_disk
+    @backup_disk.setter
+    def backup_disk(self, value):
+        if isinstance(value, Disk):
+            self._backup_disk = value.match_pattern
+        elif isinstance(value, str):
+            self._backup_disk = value
+        else:
+            raise ValueError("invalid value for backup_disk %s" % value)
 
     def _read_state(self):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
@@ -93,6 +108,7 @@ class BackupJobHistoryItem(object):
         self._startdate = inifile.getAsTimestamp(None, 'Start', None)
         self._enddate = inifile.getAsTimestamp(None, 'End', None)
         self._backup_dir = inifile.get(None, 'BackupDir', None)
+        self._backup_disk = inifile.get(None, 'BackupDisc', None)
         self._require_read = False
         return ret
 
@@ -105,6 +121,7 @@ class BackupJobHistoryItem(object):
         inifile.setAsTimestamp(None, 'Start', self._startdate)
         inifile.setAsTimestamp(None, 'End', self._enddate)
         inifile.set(None, 'BackupDir', self._backup_dir)
+        inifile.set(None, 'BackupDisc', self._backup_disk)
         ret = inifile.save(self.filename)
         if ret:
             self.parent._item_changed(self)
@@ -207,6 +224,7 @@ class BackupJobState(object):
             self.job_state_conf = None
         self.history = BackupJobHistory(self, state_dir)
         self.clear()
+        self._dirty = False
 
     def clear(self):
         self.oldest_entry = None
@@ -231,6 +249,7 @@ class BackupJobState(object):
             ret = self._write_state_conf(self.job_state_conf)
 
         self.history.load()
+        self._dirty = False
         return ret
     
     def _mkdir(self, dir):
@@ -251,17 +270,23 @@ class BackupJobState(object):
         if state_dir is None:
             state_dir = self.state_dir
         else:
-            self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
-            self.state_dir = state_dir
+            if state_dir != self.state_dir:
+                self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
+                self.state_dir = state_dir
+                self._dirty = True
 
-        if not os.path.isdir(state_dir):
-            ret = self._mkdir(state_dir)
+        if self._dirty:
+            if not os.path.isdir(state_dir):
+                ret = self._mkdir(state_dir)
+            else:
+                ret = True
+            if ret:
+                self.history = BackupJobHistory(self, state_dir)
+
+                ret = self._write_state_conf(self.job_state_conf)
         else:
+            # nothing to do
             ret = True
-        if ret:
-            self.history = BackupJobHistory(self, state_dir)
-
-            ret = self._write_state_conf(self.job_state_conf)
         return ret
 
     def _read_state_conf(self, filename):
@@ -283,7 +308,10 @@ class BackupJobState(object):
         return ret
     
     def start_new_session(self):
-        return self.history.create_new_item()
+        ret = self.history.create_new_item()
+        if ret:
+            self._dirty = True
+        return ret
     
     def remove_old_items(self, max_age, min_count=0, max_count=50):
         
@@ -300,6 +328,7 @@ class BackupJobState(object):
             for i in range(0, num_to_delete):
                 #print('delete num %i=%s' % (i, self.history[0]))
                 del self.history[0]
+                self._dirty = True
 
         if isinstance(max_age, datetime.datetime):
             max_rentention_time = max_age
@@ -314,14 +343,22 @@ class BackupJobState(object):
             if self.history[0].date < max_rentention_time:
                 #print('remove old item %s' % (self.history[i]))
                 del self.history[0]
+                self._dirty = True
             else:
                 break
 
         return True
 
-    def find_session(self, timestamp, backup_dir):
+    def find_session(self, timestamp, backup_dir=None, backup_disk=None):
         for item in self.history:
-            if item.date == timestamp and item.backup_dir == backup_dir:
+            if item.date == timestamp:
+                if backup_dir is not None:
+                    if item.backup_dir != backup_dir:
+                        continue
+
+                if backup_disk is not None:
+                    if item.backup_disk != backup_disk:
+                        continue
                 return item
         return None
     

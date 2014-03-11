@@ -37,6 +37,9 @@ class DiskManager(object):
     def wait_for_disk(self, timeout=30.0):
         disk = self._mgr.wait_for_disk(tag=self._tag, timeout=timeout)
         return disk
+
+    def get_disk_for_directory(self, dir):
+        return self._mgr.get_disk_for_file(dir)
  
 if __name__ == "__main__":
     dm = DiskManager()
