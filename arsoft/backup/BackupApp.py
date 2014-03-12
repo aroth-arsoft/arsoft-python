@@ -155,6 +155,11 @@ class BackupApp(object):
         self._diskmgr = None
         self.disk_loaded = False
         self._disk_obj = None
+        self._verbose = False
+
+    @property
+    def verbose(self):
+        return self._verbose
 
     def cleanup(self):
         self.job_state.save()

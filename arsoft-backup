@@ -15,7 +15,6 @@ class ARSoftBackupApp(BackupApp):
 
     def __init__(self):
         BackupApp.__init__(self, 'arsoft-backup')
-        self._verbose = False
         self._dryrun = False
 
     def _check_config(self):
