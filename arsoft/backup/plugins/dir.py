@@ -11,11 +11,13 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
     class DirectoryConfigItem(object):
         def __init__(self, inifile=None, section=None):
             self._directory_list = None
+            self._exclude_list = None
             self.inifile = inifile
             self.section = section
 
         def read_conf(self):
             self.directory_list = self.inifile.getAsArray(self.section, 'Directories', [])
+            self.exclude_list = self.inifile.getAsArray(self.section, 'Exclude', [])
             return True
 
         def write_conf(self, inifile):
@@ -23,6 +25,10 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
                 inifile.set(self.section, 'Directories', self._directory_list.items)
             else:
                 inifile.set(self.section, 'Directories', [])
+            if self._exclude_list:
+                inifile.set(self.section, 'Exclude', self._exclude_list.items)
+            else:
+                inifile.set(self.section, 'Exclude', [])
             return True
 
         @property
@@ -38,6 +44,22 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
                     self._directory_list = FileListWithDestination.from_list(value, use_glob=False)
             else:
                 self._directory_list = None
+
+        @property
+        def exclude_list(self):
+            return self._exclude_list
+
+        @exclude_list.setter
+        def exclude_list(self, value):
+            print('exclude_list=%s' % (value))
+            if value is not None:
+                if isinstance(value, FileList):
+                    self._exclude_list = value
+                else:
+                    self._exclude_list = FileList.from_list(value, use_glob=False)
+            else:
+                self._exclude_list = None
+            print('_exclude_list=%s' % (self._exclude_list))
 
     def __init__(self, parent):
         BackupPluginConfig.__init__(self, parent, 'dir')
@@ -77,6 +99,7 @@ class DirectoryBackupPlugin(BackupPlugin):
         if ret:
             dir_backup_filelist = FileListItem(base_directory=self.config.base_directory)
             for item in self.config.items:
+                item_exclude_list = item.exclude_list
                 for (source_dir, dest_dir) in item.directory_list:
                     backup_dest_dir = os.path.join(backup_dir, dest_dir)
                     if os.path.isdir(source_dir):
@@ -84,13 +107,13 @@ class DirectoryBackupPlugin(BackupPlugin):
                             backup_dest_dir += '/'
                         if self.backup_app._verbose:
                             print('backup %s to %s' % (source_dir, backup_dest_dir))
-                        if Rsync.sync_directories(source_dir, backup_dest_dir):
+                        if Rsync.sync_directories(source_dir, backup_dest_dir, exclude=item_exclude_list, verbose=self.backup_app.verbose):
                             dir_backup_filelist.append(backup_dest_dir)
                     elif os.path.isfile(source_dir):
                         backup_dest_dir = os.path.join(backup_dest_dir, os.path.basename(source_dir))
                         if self.backup_app._verbose:
                             print('backup %s to %s' % (source_dir, backup_dest_dir))
-                        if Rsync.sync_file(source_dir, backup_dest_dir):
+                        if Rsync.sync_file(source_dir, backup_dest_dir, exclude=item_exclude_list, verbose=self.backup_app.verbose):
                             dir_backup_filelist.append(backup_dest_dir)
                     else:
                         sys.stderr.write('Refuse to back up %s because it is not a file or directory.\n' % source_dir)
