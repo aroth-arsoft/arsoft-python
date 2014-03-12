@@ -4,12 +4,14 @@ root_device_partition='/dev/sda1'
 action='add'
 device='/dev/sda'
 verbose=0
+simulate=0
 
 function usage()
 {
 	echo "edskmgr-udev-test [OPTIONS] [add|remove] [device]"
 	echo "    -h, --help      shows this help screen"
 	echo "    -v,--verbose    verbose output"
+	echo "    -s,--simulate   simulate a udev event on the given device, but does not execute any udev scripts."
 	echo "    add             testing the addition of a device"
 	echo "    remove          testing the removal of a device"
 	exit 0
@@ -21,6 +23,12 @@ while [ $# -ne 0 ]; do
 		"-?"|"-h"|"--help") usage;;
 		"-v"|"--verbose") verbose=1; ;;
 		"add"|"remove") action="$1"; ;;
+		"--partition") device="${device}1"; ;;
+		"-s"|"--simulate") simulate=1; ;;
+		-*)
+			echo "Invalid option $1" >&2
+			exit 1
+			;;
 		*)
 			device="$1"
 		;;
@@ -28,23 +36,29 @@ while [ $# -ne 0 ]; do
 	shift
 done
 
-export ACTION=$action
-req_env=`udevadm info -n $device | awk '/E:/ { print $2}'`
+if [ $simulate -ne 0 ]; then
+	udev_devpath=`udevadm info -q path -n $device`
+	echo "udev device path: $udev_devpath"
+	udevadm test "$udev_devpath" 2>&1
+else
+	export ACTION=$action
+	req_env=`udevadm info -n $device | awk '/E:/ { print $2}'`
 
-for e in $req_env; do
-	export $e
-done
+	for e in $req_env; do
+		export $e
+	done
 
-this_script=`readlink -f $0`
-this_dir=`dirname "$this_script"`
-[ $verbose -ne 0 ] && echo "Environment:" && export
-[ $verbose -ne 0 ] && echo "$this_dir/edskmgr --verbose --udev --hook-dir $this_dir/edskmgr-support/hooks"
+	this_script=`readlink -f $0`
+	this_dir=`dirname "$this_script"`
+	[ $verbose -ne 0 ] && echo "Environment:" && export
+	[ $verbose -ne 0 ] && echo "$this_dir/edskmgr --verbose --udev --hook-dir $this_dir/edskmgr-support/hooks"
 
-case "$DEVTYPE" in
-	'partition'|'disk')
-		"$this_dir/edskmgr" --verbose --udev --hook-dir "$this_dir/edskmgr-support/hooks"
-		;;
-	*)
-		echo "unhandled device type $DEVTYPE"
-		;;
-esac
+	case "$DEVTYPE" in
+		'partition'|'disk')
+			PYTHONPATH="$this_dir" "$this_dir/edskmgr" --verbose --udev --hook-dir "$this_dir/edskmgr-support/hooks"
+			;;
+		*)
+			echo "unhandled device type $DEVTYPE"
+			;;
+	esac
+fi
