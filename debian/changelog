@@ -1,3 +1,10 @@
+arsoft-python (1.113) saucy; urgency=low
+
+  * add capability to runcmdAndGetData to work with a logfile proxy
+  * backup: write all rsync output to the session log file
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 12 Mar 2014 14:18:15 +0100
+
 arsoft-python (1.112) saucy; urgency=low
 
   * further improvements to backup script
