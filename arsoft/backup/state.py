@@ -93,7 +93,9 @@ class BackupJobHistoryItem(object):
         return self._backup_disk
     @backup_disk.setter
     def backup_disk(self, value):
-        if isinstance(value, Disk):
+        if value is None:
+            self._backup_disk = value
+        elif isinstance(value, Disk):
             self._backup_disk = value.match_pattern
         elif isinstance(value, str):
             self._backup_disk = value

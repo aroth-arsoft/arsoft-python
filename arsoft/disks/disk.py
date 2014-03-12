@@ -424,6 +424,7 @@ class Disks(object):
     DEVICE_CLASS = 'org.freedesktop.UDisks.Device'
 
     def __init__(self):
+        self._last_error = None
         self.rescan()
         
     @staticmethod
@@ -480,6 +481,10 @@ class Disks(object):
         else:
             ret = None
         return ret
+    
+    @property
+    def last_error(self):
+        return self._last_error
 
     def rescan(self):
         self._list = []
@@ -524,13 +529,19 @@ class Disks(object):
         ret = None
         if dev_inode is not None:
             dev_major, dev_minor = os.major(dev_inode), os.minor(dev_inode)
-            path = Disks._udisks_manager.FindDeviceByMajorMinor(dev_major, dev_minor)
-            if path:
-                ret = self._get_device_by_udisks_path(path)
+            try:
+                path = Disks._udisks_manager.FindDeviceByMajorMinor(dev_major, dev_minor)
+                if path:
+                    ret = self._get_device_by_udisks_path(path)
+            except dbus.exceptions.DBusException as e:
+                self._last_error = str(e)
         elif devfile is not None:
-            path = Disks._udisks_manager.FindDeviceByDeviceFile(devfile)
-            if path:
-                ret = self._get_device_by_udisks_path(path)
+            try:
+                path = Disks._udisks_manager.FindDeviceByDeviceFile(devfile)
+                if path:
+                    ret = self._get_device_by_udisks_path(path)
+            except dbus.exceptions.DBusException as e:
+                self._last_error = str(e)
         elif devpath is not None:
             ret = self._get_device_by_devpath(devpath)
         return ret
