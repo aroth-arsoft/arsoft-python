@@ -7,6 +7,7 @@ import datetime
 from arsoft.inifile import IniFile
 from arsoft.timestamp import timestamp_from_datetime
 from arsoft.disks.disk import Disk
+from arsoft.utils import logfile_writer_proxy
 
 class BackupStateDefaults(object):
     JOB_STATE_CONF = 'backup_job.state'
@@ -30,6 +31,7 @@ class BackupJobHistoryItem(object):
         self._startdate = None
         self._enddate = None
         self._logfile_fobj = None
+        self._logfile_proxy = None
         self._require_read = True
         self._backup_dir = None
         self._backup_disk = None
@@ -136,18 +138,22 @@ class BackupJobHistoryItem(object):
 
     def openlog(self):
         if self._logfile_fobj is None:
-            self._logfile_fobj = open(self.logfile, 'w')
-        return self._logfile_fobj
+            try:
+                self._logfile_fobj = open(self.logfile, 'w')
+            except IOError as e:
+                self._logfile_fobj = None
+            if self._logfile_fobj:
+                self._logfile_proxy = logfile_writer_proxy(self._logfile_fobj)
+        return self._logfile_proxy
 
     def writelog(self, *args):
-        fobj = self.openlog()
-        if fobj is not None:
-            now = datetime.datetime.utcnow()
-            line = str(now)
-            for a in args:
-                line += '\t' + str(a)
-            line += '\n'
-            fobj.write(line)
+        proxy = self.openlog()
+        if proxy:
+            proxy.write(*args)
+
+    @property
+    def logfile_proxy(self):
+        return self._logfile_proxy
 
     def finish(self, success=True, failure_message=None):
         self._success = success

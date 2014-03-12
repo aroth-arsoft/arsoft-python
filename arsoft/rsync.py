@@ -50,7 +50,7 @@ class Rsync(object):
         self._include = include
         self._exclude = exclude
 
-    def execute(self):
+    def execute(self, stdout=None, stderr=None, stderr_to_stdout=False):
         if self._source is None or \
             (isinstance(self._source, str) and len(self._source) == 0) or \
             (isinstance(self._source, FileList) and self._source.empty()):
@@ -162,13 +162,8 @@ class Rsync(object):
         if self.verbose:
             print("runcmd " + ' '.join(args))
 
-        (status_code, stdout, stderr) = runcmdAndGetData(self._rsync_bin, args)
+        (status_code, stdout_data, stderr_data) = runcmdAndGetData(self._rsync_bin, args, stdout=stdout, stderr_to_stdout=stderr_to_stdout, verbose=self.verbose)
         ret = True if status_code == 0 else False
-        if not ret or self.verbose:
-            sys.stdout.write(stdout)
-            sys.stderr.write(stderr)
-            sys.stdout.flush()
-            sys.stderr.flush()
 
         #if tmp_include:
             #os.remove(tmp_include)
@@ -244,21 +239,21 @@ class Rsync(object):
         return ret
 
     @staticmethod
-    def sync_directories(source_dir, target_dir, recursive=True, relative=True, exclude=None, delete=True, deleteExcluded=True, verbose=False):
+    def sync_directories(source_dir, target_dir, recursive=True, relative=True, exclude=None, delete=True, deleteExcluded=True, stdout=None, stderr=None, stderr_to_stdout=False, verbose=False):
         r = Rsync(source=source_dir, dest=target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete, deleteExcluded=deleteExcluded, verbose=verbose)
-        return r.execute()
+        return r.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout)
 
     @staticmethod
-    def sync_file(source_file, target_file, relative=True, exclude=None, verbose=False):
+    def sync_file(source_file, target_file, relative=True, exclude=None, stdout=None, stderr=None, stderr_to_stdout=False, verbose=False):
         # first we must create the target directory
         target_dir = os.path.dirname(target_file)
         if target_dir[-1] != '/':
             target_dir += '/'
         rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False, verbose=verbose)
-        if rdir.execute():
+        if rdir.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout):
             # when the directory exists we can copy the file
             r = Rsync(source=source_file, dest=target_file, recursive=False, relative=False, verbose=verbose, exclude=exclude)
-            return r.execute()
+            return r.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout)
         else:
             return False
 

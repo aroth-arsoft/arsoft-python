@@ -51,7 +51,7 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
 
         @exclude_list.setter
         def exclude_list(self, value):
-            print('exclude_list=%s' % (value))
+            #print('exclude_list=%s' % (value))
             if value is not None:
                 if isinstance(value, FileList):
                     self._exclude_list = value
@@ -59,7 +59,7 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
                     self._exclude_list = FileList.from_list(value, use_glob=False)
             else:
                 self._exclude_list = None
-            print('_exclude_list=%s' % (self._exclude_list))
+            #print('_exclude_list=%s' % (self._exclude_list))
 
     def __init__(self, parent):
         BackupPluginConfig.__init__(self, parent, 'dir')
@@ -95,8 +95,10 @@ class DirectoryBackupPlugin(BackupPlugin):
         ret = True
         backup_dir = self.config.intermediate_backup_directory
         if not self._mkdir(backup_dir):
+            self.writelog('Failed to create directory %s' % backup_dir)
             ret = False
         if ret:
+            my_stdout = self.logfile_proxy
             dir_backup_filelist = FileListItem(base_directory=self.config.base_directory)
             for item in self.config.items:
                 item_exclude_list = item.exclude_list
@@ -107,13 +109,13 @@ class DirectoryBackupPlugin(BackupPlugin):
                             backup_dest_dir += '/'
                         if self.backup_app._verbose:
                             print('backup %s to %s' % (source_dir, backup_dest_dir))
-                        if Rsync.sync_directories(source_dir, backup_dest_dir, exclude=item_exclude_list, verbose=self.backup_app.verbose):
+                        if Rsync.sync_directories(source_dir, backup_dest_dir, exclude=item_exclude_list, stdout=my_stdout, stderr_to_stdout=True, verbose=self.backup_app.verbose):
                             dir_backup_filelist.append(backup_dest_dir)
                     elif os.path.isfile(source_dir):
                         backup_dest_dir = os.path.join(backup_dest_dir, os.path.basename(source_dir))
                         if self.backup_app._verbose:
                             print('backup %s to %s' % (source_dir, backup_dest_dir))
-                        if Rsync.sync_file(source_dir, backup_dest_dir, exclude=item_exclude_list, verbose=self.backup_app.verbose):
+                        if Rsync.sync_file(source_dir, backup_dest_dir, exclude=item_exclude_list, stdout=my_stdout, stderr_to_stdout=True, verbose=self.backup_app.verbose):
                             dir_backup_filelist.append(backup_dest_dir)
                     else:
                         sys.stderr.write('Refuse to back up %s because it is not a file or directory.\n' % source_dir)

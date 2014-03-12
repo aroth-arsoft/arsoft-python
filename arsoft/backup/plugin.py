@@ -16,3 +16,10 @@ class BackupPlugin(object):
     def _mkdir(self, dirname):
         # forward request to app
         return self.backup_app._mkdir(dirname)
+
+    @property
+    def logfile_proxy(self):
+        return self.backup_app.session.logfile_proxy
+
+    def writelog(self, msg):
+        return self.backup_app.session.writelog(msg)
