@@ -8,6 +8,7 @@ import grp
 import subprocess
 import sys
 import platform
+import datetime
 from pwd import getpwnam
 from grp import getgrnam
 
@@ -50,33 +51,65 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=No
     return sts
 
 
-def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, input=None, cwd=None, env=None):
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
         print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
     
     stdin_param = stdin if stdin is not None else subprocess.PIPE
-    stdout_param = stdout if stdout is not None else subprocess.PIPE
-    stderr_param = stderr if stderr is not None else subprocess.PIPE
+    if stdout is not None and hasattr(stdout, '__call__'):
+        stdout_param = subprocess.PIPE
+    else:
+        stdout_param = stdout if stdout is not None else subprocess.PIPE
+    if stderr_to_stdout:
+        stderr_param = subprocess.STDOUT
+    else:
+        if stdout is not None and hasattr(stdout, '__call__'):
+            stderr_param = subprocess.PIPE
+        else:
+            stderr_param = stdout if stdout is not None else subprocess.PIPE
     p = subprocess.Popen(all_args, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
-        (stdoutdata, stderrdata) = p.communicate(input)
-        if stdoutdata is not None and outputStdOut:
-            if int(python_major) < 3: # check for version < 3
-                sys.stdout.write(stdoutdata)
-                sys.stdout.flush()
+        if stdout is not None and hasattr(stdout, '__call__'):
+            encoding = 'CP1252' if platform.system() == 'Windows' else 'utf-8'
+            while True:
+                line = ""
+                try:
+                    line = p.stdout.readline()
+                except Exception:
+                    pass
+                try:
+                    line = line.decode(encoding)
+                except:
+                    continue
+                if not line:
+                    break
+                line = line.rstrip('\n\r')
+                stdout(line)
+            sts = p.wait()
+            stdoutdata = None
+            stderrdata = None
+        else:
+            if input:
+                (stdoutdata, stderrdata) = p.communicate(input.encode())
             else:
-                sys.stdout.buffer.write(stdoutdata)
-                sys.stdout.buffer.flush()
-        if stderrdata is not None and outputStdErr:
-            if int(python_major) < 3: # check for version < 3
-                sys.stderr.write(stderrdata)
-                sys.stderr.flush()
-            else:
-                sys.stderr.buffer.write(stderrdata)
-                sys.stderr.buffer.flush()
-        sts = p.returncode
+                (stdoutdata, stderrdata) = p.communicate()
+            if stdoutdata is not None and outputStdOut:
+                if int(python_major) < 3: # check for version < 3
+                    sys.stdout.write(stdoutdata)
+                    sys.stdout.flush()
+                else:
+                    sys.stdout.buffer.write(stdoutdata)
+                    sys.stdout.buffer.flush()
+            if stderrdata is not None and outputStdErr:
+                if int(python_major) < 3: # check for version < 3
+                    sys.stderr.write(stderrdata)
+                    sys.stderr.flush()
+                else:
+                    sys.stderr.buffer.write(stderrdata)
+                    sys.stderr.buffer.flush()
+            sts = p.returncode
     else:
         sts = -1
         stdoutdata = None
@@ -300,3 +333,32 @@ def getlogin():
         if username == ukn and hasattr(os, 'getlogin'):
             username = os.getlogin()
     return username
+
+class logfile_writer_proxy(object):
+    def __init__(self, writer, prefix=None, add_timestamp=True):
+        self._writer = writer
+        self._prefix = prefix
+        self._add_timestamp = True
+
+    def current_timestamp(self, timestamp=None):
+        if timestamp is None:
+            now = datetime.datetime.utcnow()
+        else:
+            now = datetime.datetime.fromtimestamp(timestamp)
+        return now.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    def __call__(self, line):
+        self._write_line(line)
+
+    def write(self, *args):
+        self._write_line('\t'.join(args))
+
+    def _write_line(self, line):
+        if self._prefix:
+            full = self._prefix + line + '\n'
+        else:
+            full = line + '\n'
+        if self._add_timestamp:
+            self._writer.write(self.current_timestamp() + '\t' + full)
+        else:
+            self._writer.write(full)
