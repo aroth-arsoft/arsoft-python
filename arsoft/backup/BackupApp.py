@@ -306,7 +306,10 @@ class BackupApp(object):
     
     def start_session(self):
         self.session = self.job_state.start_new_session()
-        self.session.writelog('Start')
+        utcnow = datetime.datetime.utcnow()
+        localnow = datetime.datetime.now()
+        utcOffset_minutes = int(round((localnow - utcnow).total_seconds())) / 60
+        self.session.writelog('Start at %s local time (%d minutes UTC diff)' % (str(localnow), utcOffset_minutes))
         self.plugin_notify_start_session()
 
     def finish_session(self, success=True, failure_message=None):
