@@ -94,7 +94,7 @@ class Rsync(object):
         if self.delete:
             args.append('--delete')
         if self.deleteExcluded:
-            args.append('-delete-excluded')
+            args.append('--delete-excluded')
         if self.force:
             args.append('--force')
         if self.delayUpdates:
@@ -244,20 +244,20 @@ class Rsync(object):
         return ret
 
     @staticmethod
-    def sync_directories(source_dir, target_dir, recursive=True, relative=True):
-        r = Rsync(source=source_dir, dest=target_dir, recursive=recursive, relative=relative)
+    def sync_directories(source_dir, target_dir, recursive=True, relative=True, exclude=None, delete=True, deleteExcluded=True, verbose=False):
+        r = Rsync(source=source_dir, dest=target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete, deleteExcluded=deleteExcluded, verbose=verbose)
         return r.execute()
 
     @staticmethod
-    def sync_file(source_file, target_file, relative=True):
+    def sync_file(source_file, target_file, relative=True, exclude=None, verbose=False):
         # first we must create the target directory
         target_dir = os.path.dirname(target_file)
         if target_dir[-1] != '/':
             target_dir += '/'
-        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False)
+        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False, verbose=verbose)
         if rdir.execute():
             # when the directory exists we can copy the file
-            r = Rsync(source=source_file, dest=target_file, recursive=False, relative=False)
+            r = Rsync(source=source_file, dest=target_file, recursive=False, relative=False, verbose=verbose, exclude=exclude)
             return r.execute()
         else:
             return False
