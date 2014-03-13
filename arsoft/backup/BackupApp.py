@@ -155,6 +155,7 @@ class BackupApp(object):
         self._diskmgr = None
         self.disk_loaded = False
         self._disk_obj = None
+        self._real_backup_dir = None
         self._verbose = False
 
     @property
@@ -231,7 +232,7 @@ class BackupApp(object):
 
     def _prepare_backup_dir(self):
         ret = True
-        backup_dir = self.config.backup_directory
+        backup_dir = self._real_backup_dir
         if backup_dir is None or len(backup_dir) == 0:
             sys.stderr.write('No backup directory configured in %s\n' % (self.config.main_conf) )
             ret = False
@@ -277,10 +278,33 @@ class BackupApp(object):
                 if self._disk_obj:
                     self.disk_loaded = True
                     disk_ready = True
+        else:
+            # just get the present disk
+            self._disk_obj = self._diskmgr.get_disk()
 
         if disk_ready:
-            self.plugin_notify_disk_ready()
-            ret = self._prepare_backup_dir()
+            ret = True
+            if self._disk_obj is None:
+                # no disk required for this backup
+                self._real_backup_dir = self.config.backup_directory
+            else:
+                # get the mount path of the backup disk and use it as
+                # real backup directory
+                mountpath = self._diskmgr.get_disk_mountpath(self._disk_obj)
+                if mountpath:
+                    self._real_backup_dir = mountpath
+                    self.session.writelog('Disk already available and mount to %s' % mountpath)
+                else:
+                    mountpath = self._diskmgr.disk_mount(self._disk_obj)
+                    if mountpath:
+                        self._real_backup_dir = mountpath
+                        self.session.writelog('Disk mount to %s' % mountpath)
+                    else:
+                        self.session.writelog('Failed to mount disk')
+                        ret = False
+            if ret:
+                self.plugin_notify_disk_ready()
+                ret = self._prepare_backup_dir()
         else:
             ret = False
         return ret

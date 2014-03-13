@@ -13,7 +13,7 @@ class ExternalDiskManagerApp(object):
     def __init__(self):
         self._mgr = ExternalDiskManager()
 
-    def show_status(self):
+    def show_status(self, show_partitions=True):
         print('Internal disks:')
         for disk in self._mgr.internal_disks:
             print('  ' + disk)
@@ -36,6 +36,11 @@ class ExternalDiskManagerApp(object):
                 print('    Tags:        %s'%(','.join(disk_tags)))
             else:
                 print('    Tags:        None')
+            if show_partitions:
+                if disk_obj.partitions:
+                    print('    Partitions:')
+                for dev_obj in disk_obj.partitions:
+                    print('      %s: %s' % (dev_obj.path, ','.join(dev_obj.mountpaths)))
 
 
     def main(self, argv=None):

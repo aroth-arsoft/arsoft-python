@@ -35,11 +35,38 @@ class DiskManager(object):
             return True
     
     def wait_for_disk(self, timeout=30.0):
+        if self._tag is None:
+            return None
         disk = self._mgr.wait_for_disk(tag=self._tag, timeout=timeout)
+        return disk
+
+    def get_disk(self):
+        if self._tag is None:
+            return None
+        disk = self._mgr.wait_for_disk(tag=self._tag, timeout=None)
         return disk
 
     def get_disk_for_directory(self, dir):
         return self._mgr.get_disk_for_file(dir)
+
+    def get_disk_mountpath(self, disk_obj):
+        ret = None
+        for part_obj in disk_obj.partitions:
+            mountpaths = part_obj.mountpaths
+            if mountpaths is not None and mountpaths:
+                ret = mountpaths[0]
+                break
+        return ret
+
+    def disk_mount(self, disk_obj):
+        mountpath = None
+        for part_obj in disk_obj.partitions:
+            mountpaths = part_obj.mountpaths
+            if mountpaths is not None and len(mountpaths) == 0:
+                mountpath = part_obj.mount()
+                break
+        return mountpath
+
  
 if __name__ == "__main__":
     dm = DiskManager()
