@@ -193,6 +193,10 @@ class BackupJobHistory(object):
         item = BackupJobHistoryItem.create(self, self.state_dir)
         self._items.append(item)
         return item
+
+    def create_temporary_item(self):
+        item = BackupJobHistoryItem.create(self, '/tmp')
+        return item
     
     @property
     def is_loaded(self):
@@ -320,7 +324,10 @@ class BackupJobState(object):
         if ret:
             self._dirty = True
         return ret
-    
+
+    def start_temporary_session(self):
+        return self.history.create_temporary_item()
+
     def remove_old_items(self, max_age, min_count=0, max_count=50):
         
         if not self.history.is_loaded:

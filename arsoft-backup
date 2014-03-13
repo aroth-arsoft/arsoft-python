@@ -85,14 +85,17 @@ class ARSoftBackupApp(BackupApp):
         
         success = True
         failure_message = None
-        self.load_previous()
 
         BackupApp.start_session(self)
 
         if not BackupApp.prepare_destination(self):
             success = False
-            failure_message = 'Failed to prepare backup'
+            failure_message = 'Failed to prepare backup destination/disk'
         else:
+            if not BackupApp.load_previous(self):
+                success = False
+                failure_message = 'Failed to load previous backups'
+
             ret = 0
             self.plugin_notify_start_backup()
             self.plugin_notify_perform_backup()
@@ -111,8 +114,9 @@ class ARSoftBackupApp(BackupApp):
             self.manage_retention()
 
         if not BackupApp.shutdown_destination(self):
-            success = False
-            failure_message = 'Failed to shut down backup correctly'
+            if success:
+                success = False
+                failure_message = 'Failed to shut down backup correctly'
 
         BackupApp.finish_session(self, success, failure_message)
         
@@ -122,7 +126,7 @@ class ARSoftBackupApp(BackupApp):
             ret = -1
         return ret
     
-    def _show_status(self):
+    def _show_status(self, load_disk=True):
         if not self._check_config():
             return 1
 
@@ -131,8 +135,19 @@ class ARSoftBackupApp(BackupApp):
         print('Retention time:   %s' % (self.config.retention_time))
         print('Retention count:  %i' % (self.config.retention_count))
 
-        if not self.load_previous():
-            return 1
+        success = True
+        failure_message = None
+
+        BackupApp.start_session(self, temporary=True)
+
+        if load_disk:
+            if not BackupApp.prepare_destination(self):
+                success = False
+                failure_message = 'Failed to prepare backup destination/disk'
+
+        if not BackupApp.load_previous(self):
+            success = False
+            failure_message = 'Failed to load previous backups'
         
         # check if this backup is configured to use a disk
         if self._diskmgr.disk_tag is not None:
@@ -176,6 +191,14 @@ class ARSoftBackupApp(BackupApp):
                 print('Last backup:      %s in %s' % (self.previous_backups.last_full_backup.timestamp, self.previous_backups.last_full_backup.fullpath))
             else:
                 print('Last backup:      None')
+
+        if load_disk:
+            if not BackupApp.shutdown_destination(self):
+                if success:
+                    success = False
+                    failure_message = 'Failed to shut down backup correctly'
+
+        BackupApp.finish_session(self, success, failure_message)
 
         ret = 0
         return ret

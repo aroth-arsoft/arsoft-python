@@ -27,12 +27,12 @@ class BackupList(object):
         self._items = []
         self._last_full = None
 
-    def load(self):
+    def load(self, backup_dir):
         ret = True
         local_backup_dir = None
         ssh_remote_backup_dir = None
-        if Rsync.is_rsync_url(self.config.backup_directory):
-            url = Rsync.parse_url(self.config.backup_directory)
+        if Rsync.is_rsync_url(backup_dir):
+            url = Rsync.parse_url(backup_dir)
             if url is not None:
                 if not self.config.use_ssh_for_rsync:
                     local_backup_dir = url.path
@@ -262,7 +262,7 @@ class BackupApp(object):
         return ret
 
     def load_previous(self):
-        return self.previous_backups.load()
+        return self.previous_backups.load(self._real_backup_dir)
 
     def prepare_destination(self):
         # load all available external discs
@@ -284,9 +284,11 @@ class BackupApp(object):
 
         if disk_ready:
             ret = True
+            # use configure backup directory as fallback (or for disk-less backups)
+            self._real_backup_dir = self.config.backup_directory
             if self._disk_obj is None:
                 # no disk required for this backup
-                self._real_backup_dir = self.config.backup_directory
+                pass
             else:
                 # get the mount path of the backup disk and use it as
                 # real backup directory
@@ -295,10 +297,10 @@ class BackupApp(object):
                     self._real_backup_dir = mountpath
                     self.session.writelog('Disk already available and mount to %s' % mountpath)
                 else:
-                    mountpath = self._diskmgr.disk_mount(self._disk_obj)
-                    if mountpath:
+                    (result, mountpath) = self._diskmgr.disk_mount(self._disk_obj)
+                    if result:
                         self._real_backup_dir = mountpath
-                        self.session.writelog('Disk mount to %s' % mountpath)
+                        self.session.writelog('Disk mount to %s' % str(mountpath))
                     else:
                         self.session.writelog('Failed to mount disk')
                         ret = False
@@ -328,8 +330,11 @@ class BackupApp(object):
                 self._disk_obj = None
         return ret
     
-    def start_session(self):
-        self.session = self.job_state.start_new_session()
+    def start_session(self, temporary=False):
+        if temporary:
+            self.session = self.job_state.start_temporary_session()
+        else:
+            self.session = self.job_state.start_new_session()
         utcnow = datetime.datetime.utcnow()
         localnow = datetime.datetime.now()
         utcOffset_minutes = int(round((localnow - utcnow).total_seconds())) / 60

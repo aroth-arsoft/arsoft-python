@@ -59,13 +59,13 @@ class DiskManager(object):
         return ret
 
     def disk_mount(self, disk_obj):
-        mountpath = None
+        ret = (False, None)
         for part_obj in disk_obj.partitions:
             mountpaths = part_obj.mountpaths
             if mountpaths is not None and len(mountpaths) == 0:
-                mountpath = part_obj.mount()
+                ret = part_obj.mount()
                 break
-        return mountpath
+        return ret
 
  
 if __name__ == "__main__":
