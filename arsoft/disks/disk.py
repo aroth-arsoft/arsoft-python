@@ -277,6 +277,14 @@ class Partition(Device):
         return Disks._get_device_property(self._device_props, "PartitionLabel")
 
     @property
+    def type(self):
+        return Disks._get_device_property(self._device_props, "PartitionType")
+
+    @property
+    def scheme(self):
+        return Disks._get_device_property(self._device_props, "PartitionScheme")
+
+    @property
     def slave(self):
         path = Disks._get_device_property(self._device_props, "PartitionSlave")
         if path:
@@ -286,13 +294,14 @@ class Partition(Device):
         return ret
 
     def mount(self, filesystem_type='', options=[]):
+        mountpath = None
         try:
-            self._device_if.FilesystemMount(filesystem_type, options)
+            mountpath = self._device_if.FilesystemMount(filesystem_type, options)
             ret = True
         except dbus.exceptions.DBusException as e:
             self._mgr._last_error = str(e)
             ret = False
-        return ret
+        return (ret, mountpath)
 
     def unmount(self, options=[]):
         try:
