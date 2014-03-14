@@ -88,7 +88,7 @@ class ARSoftBackupApp(BackupApp):
 
         BackupApp.start_session(self)
 
-        if not BackupApp.prepare_destination(self):
+        if not BackupApp.prepare_destination(self, True):
             success = False
             failure_message = 'Failed to prepare backup destination/disk'
         else:
@@ -141,11 +141,13 @@ class ARSoftBackupApp(BackupApp):
         BackupApp.start_session(self, temporary=True)
 
         if load_disk:
-            if not BackupApp.prepare_destination(self):
+            if not BackupApp.prepare_destination(self, False):
+                self.session.writelog('Failed to prepare backup destination/disk')
                 success = False
                 failure_message = 'Failed to prepare backup destination/disk'
 
         if not BackupApp.load_previous(self):
+            self.session.writelog('Failed to load previous backups')
             success = False
             failure_message = 'Failed to load previous backups'
         
@@ -195,6 +197,7 @@ class ARSoftBackupApp(BackupApp):
         if load_disk:
             if not BackupApp.shutdown_destination(self):
                 if success:
+                    self.session.writelog('Failed to shut down backup correctly')
                     success = False
                     failure_message = 'Failed to shut down backup correctly'
 
@@ -217,17 +220,37 @@ class ARSoftBackupApp(BackupApp):
 
         return ret
     
-    def _cleanup(self):
+    def _cleanup(self, load_disk=True):
         if not self._check_config():
             return 1
+
+        success = True
+        failure_message = None
+
+        BackupApp.start_session(self, temporary=True)
+
+        if not BackupApp.prepare_destination(self, True):
+            success = False
+            failure_message = 'Failed to prepare backup destination/disk'
+        else:
+            if not BackupApp.load_previous(self):
+                success = False
+                failure_message = 'Failed to load previous backups'
 
         print('Backup directory: %s' % (self.config.backup_directory))
         print('Retention time:   %s' % (self.config.retention_time))
         print('Retention count:   %s' % (self.config.retention_count))
-
-        if not self.load_previous():
-            return 1
         self.manage_retention()
+
+        if load_disk:
+            if not BackupApp.shutdown_destination(self):
+                if success:
+                    self.session.writelog('Failed to shut down backup correctly')
+                    success = False
+                    failure_message = 'Failed to shut down backup correctly'
+
+        BackupApp.finish_session(self, success, failure_message)
+
         return 0
 
     def main(self, argv=None):

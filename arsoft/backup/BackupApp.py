@@ -250,6 +250,7 @@ class BackupApp(object):
                 pass
             else:
                 if not self._mkdir(backup_dir):
+                    self.session.writelog('Failed to create backup directory %s' % backup_dir)
                     ret = False
                 else:
                     backup_disk = self._diskmgr.get_disk_for_directory(backup_dir)
@@ -258,13 +259,14 @@ class BackupApp(object):
                 self.session.backup_disk = backup_disk
                 if self.config.intermediate_backup_directory:
                     if not self._mkdir(self.config.intermediate_backup_directory):
+                        self.session.writelog('Failed to create intermediate backup directory %s' % self.config.intermediate_backup_directory)
                         ret = False
         return ret
 
     def load_previous(self):
         return self.previous_backups.load(self._real_backup_dir)
 
-    def prepare_destination(self):
+    def prepare_destination(self, create_backup_dir=False):
         # load all available external discs
         disk_ready = self._diskmgr.is_disk_ready()
         if not disk_ready:
@@ -306,7 +308,8 @@ class BackupApp(object):
                         ret = False
             if ret:
                 self.plugin_notify_disk_ready()
-                ret = self._prepare_backup_dir()
+                if create_backup_dir:
+                    ret = self._prepare_backup_dir()
         else:
             ret = False
         return ret
