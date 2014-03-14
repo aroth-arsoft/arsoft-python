@@ -39,7 +39,7 @@ class BackupList(object):
                 else:
                     ssh_remote_backup_dir = url
         else:
-            local_backup_dir = None
+            local_backup_dir = backup_dir
         if local_backup_dir is not None:
             if os.path.isdir(local_backup_dir):
                 found_backup_dirs = []
