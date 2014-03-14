@@ -1,3 +1,9 @@
+arsoft-python (1.115) saucy; urgency=low
+
+  * improvements and fixed to arsoft-backup script 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 14 Mar 2014 08:03:58 +0100
+
 arsoft-python (1.114) saucy; urgency=low
 
   * wait until the disk/device is available in udisks when running the hooks
