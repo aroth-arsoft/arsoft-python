@@ -60,6 +60,11 @@ def initialize_settings(settings_module, setttings_file):
 
     #print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver))
 
+    if 'BASE_PATH' in os.environ:
+        settings_obj.BASE_PATH = os.environ['BASE_PATH']
+    else:
+        settings_obj.BASE_PATH = ''
+
     settings_obj.DEBUG = in_devserver
     settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
 
@@ -94,7 +99,7 @@ def initialize_settings(settings_module, setttings_file):
 
     # URL prefix for static files.
     # Example: "http://media.lawrence.com/static/"
-    settings_obj.STATIC_URL = '/static/'
+    settings_obj.STATIC_URL = settings_obj.BASE_PATH + '/static/'
 
     # Absolute filesystem path to the directory that will hold user-uploaded files.
     # Example: "/home/media/media.lawrence.com/media/"
@@ -103,7 +108,7 @@ def initialize_settings(settings_module, setttings_file):
     # URL that handles the media served from MEDIA_ROOT. Make sure to use a
     # trailing slash.
     # Examples: "http://media.lawrence.com/media/", "http://example.com/media/"
-    settings_obj.MEDIA_URL = ''
+    settings_obj.MEDIA_URL = settings_obj.BASE_PATH + '/media/'
 
     settings_obj.ROOT_URLCONF = appname + '.urls'
 
