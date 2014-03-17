@@ -1,3 +1,9 @@
+arsoft-python (1.117) saucy; urgency=low
+
+  * fixed django static_url and media_url template tags with BASE_PATH
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 17 Mar 2014 08:23:59 +0100
+
 arsoft-python (1.116) saucy; urgency=low
 
   * use base path from environment for django web apps

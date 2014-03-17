@@ -10,12 +10,9 @@ register = template.Library()
 
 class StaticURLNode(template.Node):
     def __init__(self, url):
-        self._url = get_script_prefix()
-        while self._url.endswith('/'):
-            self._url = self._url[:-1]
+        self._url = ''
         try:
-            settings_static_url = getattr(settings,'STATIC_URL')
-            self._url = self._url + settings_static_url
+            self._url = getattr(settings,'STATIC_URL')
         except AttributeError as e:
             pass
         if url:

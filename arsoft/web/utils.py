@@ -58,12 +58,12 @@ def initialize_settings(settings_module, setttings_file):
         app_data_dir = setttings_dir
     in_devserver = _is_running_in_devserver(appdir)
 
-    #print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver))
-
     if 'BASE_PATH' in os.environ:
         settings_obj.BASE_PATH = os.environ['BASE_PATH']
     else:
         settings_obj.BASE_PATH = ''
+
+    #print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver) + ' basepath=' + str(settings_obj.BASE_PATH))
 
     settings_obj.DEBUG = in_devserver
     settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
