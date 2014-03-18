@@ -137,12 +137,12 @@ class GitCommitNotifierConfig(object):
         regex = '\\b(' + '|'.join(keywords) + ')\\s*\\#(\\d+)'
         ticket_url = trac_url + '/ticket/\\2'
         changeset_url = trac_url + '/changeset'
-        
+
         self._data['message_map'][regex] = ticket_url
         if repo_name is None:
-            self._data['trac'] = { 'path': changeset_url, 'repo_name':repo_name  }
-        else:
             self._data['trac'] = { 'path': changeset_url }
+        else:
+            self._data['trac'] = { 'path': changeset_url, 'repository':repo_name  }
         self._data['link_files'] = 'trac'
 
     def enable_gitweb(self, gitweb_url, project=None):
