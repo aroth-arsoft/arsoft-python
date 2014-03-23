@@ -411,6 +411,9 @@ class alog_application(object):
         if self._logfile_obj is None:
             sys.stdout.write('Unable to open log file %s\n' % (self._logfile))
             ret = 1
+        elif not self._first_line:
+            sys.stdout.write('Log file %s is empty.\n' % (self._logfile))
+            ret = 0
         else:
             timestamp_format = self._timestamp_format(self._pattern)
             line_re = self._compile_pattern_re(self._pattern)
