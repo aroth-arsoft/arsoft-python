@@ -1,3 +1,9 @@
+arsoft-python (1.119) saucy; urgency=low
+
+  * make managehosts compatible with arsoft-base usage and simplify
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 23 Mar 2014 16:46:27 +0100
+
 arsoft-python (1.118) saucy; urgency=low
 
   * add sleep function to onkyo-rs232

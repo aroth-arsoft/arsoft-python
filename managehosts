@@ -5,7 +5,7 @@
 import sys
 import os
 import argparse
-from arsoft.hostsfile import HostsFile, HostnameFile
+from arsoft.hostsfile import HostsFile, HostnameFile, DEFAULT_HOSTS_FILE
 from arsoft.dnsutils import gethostname_tuple
 from arsoft.socket_utils import sethostname
 
@@ -22,11 +22,12 @@ class ManageHostsApp(object):
         #=============================================================================================
         parser = argparse.ArgumentParser(description='manages the local hosts entry file')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
-        parser.add_argument('--update', dest='update', nargs=2, help='update the specified host entry.')
-        parser.add_argument('--list', dest='list', action='store_true', help='lists all host entries.')
-        parser.add_argument('--set-hostname', dest='set_hostname', help='sets the hostname to the given one.')
-        parser.add_argument('--add', dest='add_hostname', nargs=2, help='adds the given host.')
-        parser.add_argument('--remove', dest='remove_hostname', help='removes the given host.')
+        parser.add_argument('-f','--file', dest='hostfile', default=DEFAULT_HOSTS_FILE, help='specifies the name of the hosts files.')
+        parser.add_argument('list', action='store_true', help='lists all host entries.')
+        parser.add_argument('set-hostname', help='sets the hostname to the given one.')
+        parser.add_argument('add', nargs='*', help='adds the given host.')
+        parser.add_argument('remove', nargs='*', help='removes the given host.')
+        parser.add_argument('update', nargs='*', help='update the specified host entry.')
 
         args = parser.parse_args()
         self.verbose = args.verbose
@@ -34,14 +35,42 @@ class ManageHostsApp(object):
         ret = 0
         if args.update:
             update_key = args.update[0]
-            update_values = args.update[1].split(',')
+            update_values = []
+            for val in args.update[1:]:
+                update_values.extend(val.split(','))
+            if self.verbose:
+                print('update host %s to %s' % (update_key, ','.join(update_values)))
             self.hostsfile[update_key] = update_values
             ok = self.hostsfile.save()
             if not ok:
                 sys.stderr.write('Failed to save hosts file.\n')
 
             ret = 0 if ok else 1
+        elif args.add:
+            update_key = args.add[0]
+            update_values = []
+            for val in args.add[1:]:
+                update_values.extend(val.split(','))
+            if self.verbose:
+                print('add host %s to %s' % (update_key, ','.join(update_values)))
+            self.hostsfile[update_key] = update_values
 
+            ok = self.hostsfile.save()
+            if not ok:
+                sys.stderr.write('Failed to save hosts file %s, error %s.\n' % (self.hostsfile.name, self.hostsfile.last_error) )
+
+            ret = 0 if ok else 1
+        elif args.remove:
+            for host in args.remove:
+                if self.verbose:
+                    print('remove host %s' % host)
+                self.hostsfile[host] = []
+
+            ok = self.hostsfile.save()
+            if not ok:
+                sys.stderr.write('Failed to save hosts file %s, error %s.\n' % (self.hostsfile.name, self.hostsfile.last_error) )
+
+            ret = 0 if ok else 1
         elif args.list:
             for (address, hostnames) in self.hostsfile:
                 print('%s\t%s' % (address, ','.join(hostnames)))
@@ -106,31 +135,13 @@ class ManageHostsApp(object):
                 if ok:
                     ok = hostnamefile.save()
                     if not ok:
-                        sys.stderr.write('Failed to save hostname file.\n')
+                        sys.stderr.write('Failed to save hostname file %s, error %s.\n' % (hostnamefile.name, hostnamefile.last_error) )
                 if ok:
                     ok = self.hostsfile.save()
                     if not ok:
-                        sys.stderr.write('Failed to save hosts file.\n')
+                        sys.stderr.write('Failed to save hosts file %s, error %s.\n' % (self.hostsfile.name, self.hostsfile.last_error) )
 
                 ret = 0 if ok else 1
-        elif args.add_hostname:
-            update_key = args.add_hostname[0]
-            update_values = args.add_hostname[1].split(',')
-            self.hostsfile[update_key] = update_values
-
-            ok = self.hostsfile.save()
-            if not ok:
-                sys.stderr.write('Failed to save hosts file.\n')
-
-            ret = 0 if ok else 1
-        elif args.remove_hostname:
-            self.hostsfile[args.remove_hostname] = []
-
-            ok = self.hostsfile.save()
-            if not ok:
-                sys.stderr.write('Failed to save hosts file.\n')
-
-            ret = 0 if ok else 1
         else:
             sys.stderr.write('No operation specified.\n')
         return ret

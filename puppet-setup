@@ -151,7 +151,7 @@ exit $RES
 
     def _rename_host(self, new_hostname):
         script = """
-%(sudo_command)smanagehosts --set-hostname "%(new_hostname)s"
+%(sudo_command)smanagehosts set-hostname "%(new_hostname)s"
 """ % { 'sudo_command': self.sudo_command, 
        'new_hostname':new_hostname }
         (sts, stdout, stderr) = self._runssh(script)
@@ -162,7 +162,7 @@ exit $RES
 
     def _add_puppet_server_host_entry(self):
         script = """
-%(sudo_command)smanagehosts --add "%(hostname)s" "%(addr)s"
+%(sudo_command)smanagehosts add "%(hostname)s" "%(addr)s"
 """ % { 'sudo_command': self.sudo_command, 
        'hostname':self.puppet_server,
        'addr':self.puppet_server_ip}

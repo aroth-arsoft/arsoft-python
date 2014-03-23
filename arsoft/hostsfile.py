@@ -19,37 +19,53 @@ class HostnameFile(object):
     def __init__(self, filename=DEFAULT_HOSTNAME_FILE):
         self.filename = filename
         self.hostname = None
+        self.last_error = None
         if filename is not None:
             self.open(filename)
+
+    @property
+    def name(self):
+        return self.filename
 
     def open(self, filename=None):
         if filename is None:
             filename = self.filename
         self.hostname = None
         ret = False
-        with open(filename, 'r') as f:
-            line = f.readline()
-            self.hostname = line.strip()
-            ret = True
+        try:
+            with open(filename, 'r') as f:
+                line = f.readline()
+                self.hostname = line.strip()
+                ret = True
+        except IOError as e:
+            self.last_error = e
         return ret
 
     def save(self, filename=None):
         if filename is None:
             filename = self.filename
         ret = False
-        with open(filename, 'w') as f:
-            if self.hostname:
-                f.write(str(self.hostname) + '\n')
-            f.close()
-            ret = True
+        try:
+            with open(filename, 'w') as f:
+                if self.hostname:
+                    f.write(str(self.hostname) + '\n')
+                f.close()
+                ret = True
+        except IOError as e:
+            self.last_error = e
         return ret
 
 class HostsFile(object):
     def __init__(self, filename=DEFAULT_HOSTS_FILE):
         self.filename = filename
         self._content = []
+        self.last_error = None
         if filename is not None:
             self.open(filename)
+
+    @property
+    def name(self):
+        return self.filename
 
     class HostLine(object):
         def __init__(self, raw_line=None):
@@ -135,23 +151,29 @@ class HostsFile(object):
             filename = self.filename
         self._content = []
         ret = False
-        with open(filename, 'r') as f:
-            for line in f:
-                line_stripped = line.strip()
-                self._content.append(self.HostLine(line))
-            f.close()
-            ret = True
+        try:
+            with open(filename, 'r') as f:
+                for line in f:
+                    line_stripped = line.strip()
+                    self._content.append(self.HostLine(line))
+                f.close()
+                ret = True
+        except IOError as e:
+            self.last_error = e
         return ret
 
     def save(self, filename=None):
         if filename is None:
             filename = self.filename
         ret = False
-        with open(filename, 'w') as f:
-            for line in self._content:
-                f.write(str(line))
-            f.close()
-            ret = True
+        try:
+            with open(filename, 'w') as f:
+                for line in self._content:
+                    f.write(str(line))
+                f.close()
+                ret = True
+        except IOError as e:
+            self.last_error = e
         return ret
 
     @property
