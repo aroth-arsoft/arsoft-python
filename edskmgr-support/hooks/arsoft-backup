@@ -21,6 +21,7 @@ if ACTION == 'add':
         if EDSKMGR_TRIGGER == 'arsoft-backup' and 'arsoft-backup' in EDSKMGR_DISK_TAGS:
             # partition was added and arsoft-backup script is waiting for it. The backup
             # script does mount the disk/partition when everything is ready
+            pass
     elif DEVTYPE == 'disk':
         # A new disk has been added, but need to check if this was triggered by the
         # arsoft-backup script or not
