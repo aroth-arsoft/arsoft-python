@@ -41,6 +41,7 @@ class PuppetSetupApp(object):
         return 0
     
     def _generate_key(self):
+        ret = False
         if self.keyfile is None:
             self._temp_directory = tempfile.mkdtemp()
             keyfile = os.path.join(self._temp_directory, 'puppet-setup')
@@ -53,13 +54,14 @@ class PuppetSetupApp(object):
                     self._private_keyfile = private_keyfile
                     self._public_keyfile = public_keyfile
                     self.keyfile = self._private_keyfile
-                    return True
+                    ret = True
                 else:
-                    return False
+                    sys.stderr.write('Failed to copy SSH key %s to %s@%s\n' % (keyfile, self.username, self.target_hostname))
             else:
-                return False
+                sys.stderr.write('Failed to generate SSH key\n')
         else:
-            return True
+            ret = True
+        return ret
 
     def _remove_key(self):
         if self._public_key_comment:
@@ -88,7 +90,7 @@ sed '/%(public_key_comment)s/d' -i.old ~/.ssh/authorized_keys
                                                      allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
                                                      keyfile=self.keyfile, username=self.username, verbose=self.verbose)
     
-    def _add_apt_source(self, sourcename, url, distcode=None, components=['main'], has_source=True):
+    def _add_apt_source(self, sourcename, url, keyid, distcode=None, components=['main'], has_source=True):
         distro_cs="`lsb_release -cs`" if distcode is None else ("'%s'" %distcode)
         components_str = ' '.join(components)
         sourcefilename = os.path.join('/etc/apt/sources.list.d', sourcename + '.list')
@@ -100,6 +102,9 @@ echo "deb %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
 echo "deb-src %(url)s $distro_cs %(components_str)s" >> "$tmpfile"
 if ! /usr/bin/diff -q "$tmpfile" "%(sourcefilename)s" > /dev/null; then
     %(sudo_command)smv "$tmpfile" "%(sourcefilename)s"; RES=$?
+    if [ $RES -eq 0 ]; then
+        %(sudo_command)sapt-key adv --recv-keys --keyserver keyserver.ubuntu.com %(keyid)s; RES=$?
+    fi
 else
     rm -f "$tmpfile"
     RES=3
@@ -107,6 +112,7 @@ fi
 exit $RES
 """ % { 'sudo_command': self.sudo_command,
        'distro_cs':distro_cs, 'url':url, 
+       'keyid':keyid,
        'components_str':components_str, 
        'sourcename':sourcename,
        'sourcefilename':sourcefilename }
@@ -126,6 +132,8 @@ exit $RES
             script = "%(sudo_command)sapt-get -qq update" % {'sudo_command': self.sudo_command }
             (sts, stdout, stderr) = self._runssh(script)
             ret = True if sts == 0 else False
+            if not ret:
+                sys.stderr.write('Failed to update package sources.\n%s\n%s\n' % (stdout, stderr))
         else:
             ret = True
         return ret
@@ -139,7 +147,7 @@ exit $RES
         (sts, stdout, stderr) = self._runssh(script)
         ret = True if sts == 0 else False
         if not ret:
-            sys.stderr.write('Failed to install packages %s. %s\n' % (packages_str, stderr))
+            sys.stderr.write('Failed to install packages %s.\n%s\n%s\n' % (packages_str, stdout, stderr))
         return ret
     
     def _get_local_puppet_server(self):
@@ -225,7 +233,7 @@ rm /tmp/puppet-setup.log
         parser.add_argument('--openvpn', dest='openvpn_zipfile', metavar='ZIPFILE', help='path to the OpenVPN configuration zip.')
         parser.add_argument('--rename-host', dest='rename_host', metavar='HOSTNAME', help='path to the OpenVPN configuration zip.')
         parser.add_argument('--puppet-server', dest='puppet_server', metavar='HOSTNAME', help='hostname of the puppet server')
-        parser.add_argument('--sudo', dest='use_sudo', action='store_true', help='use sudo to run command to remote machine')
+        parser.add_argument('--no-sudo', dest='use_sudo', action='store_false', help='use sudo to run command to remote machine')
         parser.add_argument('hostname', help='name of the host to setup')
 
         args = parser.parse_args()
@@ -245,7 +253,7 @@ rm /tmp/puppet-setup.log
         if self.puppet_server:
             self.puppet_server_ip = socket.gethostbyname(self.puppet_server)
 
-        if self.use_sudo:
+        if self.use_sudo and self.username != 'root':
             self.sudo_command = 'sudo '
         else:
             self.sudo_command = ''
@@ -262,16 +270,14 @@ rm /tmp/puppet-setup.log
         ret = True
         if ret:
             ret = self._generate_key()
-            if not ret:
-                sys.stderr.write('Failed to generate SSH key\n')
 
         if ret:
-            ret = self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu')
+            ret = self._add_apt_source('ppa-aroth', 'http://ppa.launchpad.net/aroth/ppa/ubuntu', keyid='AFF68B78')
             if not ret:
                 sys.stderr.write('Failed to add PPA aroth\n')
 
         if ret:
-            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', components=['main', 'dependencies'])
+            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['main', 'dependencies'])
             if not ret:
                 sys.stderr.write('Failed to add PuppetLabs APT repository\n')
 
