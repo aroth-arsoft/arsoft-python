@@ -8,7 +8,7 @@ import argparse
 import sys
 import tempfile
 import socket
-from arsoft.dnsutils import get_dns_srv_record, gethostname
+from arsoft.dnsutils import get_dns_srv_record, get_dns_host_record, gethostname_tuple
 from arsoft.utils import rmtree
 from arsoft.sshutils import *
 import arsoft.openvpn
@@ -45,18 +45,18 @@ class PuppetSetupApp(object):
         if self.keyfile is None:
             self._temp_directory = tempfile.mkdtemp()
             keyfile = os.path.join(self._temp_directory, 'puppet-setup')
-            comment = 'puppet-setup@%s' % gethostname()
+            comment = 'puppet-setup@%s' % self.local_fqdn
             
             (private_keyfile, public_keyfile) = ssh_keygen(keyfile, comment=comment, verbose=self.verbose)
             if private_keyfile and public_keyfile:
-                if ssh_copy_id(public_keyfile, self.target_hostname, username=self.username, verbose=self.verbose):
+                if ssh_copy_id(public_keyfile, self.target_hostname_full, username=self.username, verbose=self.verbose):
                     self._public_key_comment = comment
                     self._private_keyfile = private_keyfile
                     self._public_keyfile = public_keyfile
                     self.keyfile = self._private_keyfile
                     ret = True
                 else:
-                    sys.stderr.write('Failed to copy SSH key %s to %s@%s\n' % (keyfile, self.username, self.target_hostname))
+                    sys.stderr.write('Failed to copy SSH key %s to %s@%s\n' % (keyfile, self.username, self.target_hostname_full))
             else:
                 sys.stderr.write('Failed to generate SSH key\n')
         else:
@@ -79,13 +79,13 @@ sed '/%(public_key_comment)s/d' -i.old ~/.ssh/authorized_keys
 
     def _runssh(self, script, commandline=None, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
 
-        return ssh_runcmdAndGetData(self.target_hostname, commandline=commandline, script=script, 
+        return ssh_runcmdAndGetData(self.target_hostname_full, commandline=commandline, script=script,
                                                      outputStdErr=outputStdErr, outputStdOut=outputStdOut, stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
                                                      allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
                                                      keyfile=self.keyfile, username=self.username, verbose=self.verbose)
 
     def _runssh_with_inputfile(self, commandline, inputfile, outputStdErr=False, outputStdOut=False, stdout=None, stderr=None, allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
-        return ssh_runcmdAndGetData(self.target_hostname, commandline=commandline, script=None, 
+        return ssh_runcmdAndGetData(self.target_hostname_full, commandline=commandline, script=None,
                                                      outputStdErr=outputStdErr, outputStdOut=outputStdOut, stdin=inputfile, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
                                                      allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
                                                      keyfile=self.keyfile, username=self.username, verbose=self.verbose)
@@ -117,6 +117,7 @@ exit $RES
        'sourcename':sourcename,
        'sourcefilename':sourcefilename }
         (sts, stdout, stderr) = self._runssh(script)
+        print('_add_apt_source %s sts=%i' % (sourcename, sts))
         if sts == 0:
             self._apt_update_required = True
             ret = True
@@ -168,6 +169,22 @@ exit $RES
             sys.stderr.write('Failed to rename host to %s. %s\n' % (new_hostname, stderr))
         return ret
 
+    def _enforce_fqdn(self):
+        script = """
+current_fqdn=`hostname -f`
+if [ "$current_fqdn" != "%(fqdn)s" ]; then
+    %(sudo_command)smanagehosts set-hostname "%(fqdn)s"; RES=$?
+else
+    RES=0
+fi
+exit $RES
+""" % { 'sudo_command': self.sudo_command, 'fqdn':self.target_hostname_full }
+        (sts, stdout, stderr) = self._runssh(script)
+        ret = True if sts == 0 else False
+        if not ret:
+            sys.stderr.write('Failed to enforce full qualified hostname %s.\n%s\n%s\n' % (self.target_hostname_full, stdout, stderr))
+        return ret
+
     def _add_puppet_server_host_entry(self):
         script = """
 %(sudo_command)smanagehosts add "%(hostname)s" "%(addr)s"
@@ -186,7 +203,7 @@ exit $RES
             ret = False
         else:
             zipcfg = arsoft.openvpn.ZippedConfigFile(config_file)
-            ret = zipcfg.ssh_install(self.target_hostname, keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+            ret = zipcfg.ssh_install(self.target_hostname_full, keyfile=self.keyfile, username=self.username, verbose=self.verbose)
             if not ret:
                 sys.stderr.write('Failed install openvpn config file %s. %s\n' % (config_file, stderr))
             else:
@@ -202,10 +219,11 @@ exit $RES
         return ret
 
     def _puppet_agent_run(self, screen_session='puppet-setup'):
-        commandline = "screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent -tv --waitforcert 30 --server %(puppet_server)s 2>&1 | tee /tmp/puppet-setup.log\"" % { 
-                'sudo_command': self.sudo_command, 
-                'screen_session': screen_session,
-                'puppet_server': self.puppet_server }
+        commandline = """
+screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent --enable\n%(sudo_command)spuppet agent -tv --waitforcert 30 --server %(puppet_server)s 2>&1 | tee /tmp/puppet-setup.log\"
+""" % { 'sudo_command': self.sudo_command,
+        'screen_session': screen_session,
+        'puppet_server': self.puppet_server }
         (sts, stdout, stderr) = self._runssh(script=None, commandline=commandline, allocateTerminal=True, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
         ret = True if sts == 0 else False
         if not ret:
@@ -239,6 +257,7 @@ rm /tmp/puppet-setup.log
         args = parser.parse_args()
         self.verbose = args.verbose
         self.target_hostname = args.hostname
+        self.target_domainname = None
         self.username = args.username
         self.password = args.password
         self.keyfile = args.keyfile
@@ -248,10 +267,27 @@ rm /tmp/puppet-setup.log
         if args.version:
             return self.version()
 
+        # get the local domain information
+        (self.local_fqdn, self.local_hostname, self.local_domainname) = gethostname_tuple()
+
         if self.puppet_server is None:
             self.puppet_server, self.puppet_server_port = self._get_local_puppet_server()
         if self.puppet_server:
             self.puppet_server_ip = socket.gethostbyname(self.puppet_server)
+
+        (self.target_fqdn, tmp, self.target_domainname) = gethostname_tuple(self.target_hostname)
+        if self.target_domainname is None or self.target_domainname == 'localdomain':
+            query_hostname = self.target_hostname + '.' + self.local_domainname
+            print('query %s' % query_hostname)
+            target_host_record = get_dns_host_record(query_hostname)
+            if len(target_host_record) > 0:
+                (self.target_hostname_full, hostname, self.target_domainname) = gethostname_tuple(query_hostname)
+            else:
+                self.target_hostname_full = None
+                self.target_domainname = None
+
+        if self.target_domainname is None:
+            sys.stderr.write('Unable to determine full qualified domain name for target host %s. Unable to continue without it. Make sure\nthe hostname is correct and DNS is working.' % self.target_hostname)
 
         if self.use_sudo and self.username != 'root':
             self.sudo_command = 'sudo '
@@ -287,6 +323,8 @@ rm /tmp/puppet-setup.log
         if ret:
             if args.rename_host:
                 ret = self._rename_host(args.rename_host)
+            else:
+                ret = self._enforce_fqdn()
 
         if ret:
             if args.openvpn_zipfile:
@@ -294,7 +332,7 @@ rm /tmp/puppet-setup.log
                 if ret:
                     ret = self._add_puppet_server_host_entry()
 
-        if ret:
+        if ret and 0:
             ret = self._puppet_agent_run()
 
         # in any case remove the newly install SSH key
