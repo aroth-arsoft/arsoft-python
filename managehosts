@@ -10,11 +10,14 @@ from arsoft.dnsutils import gethostname_tuple
 from arsoft.socket_utils import sethostname
 
 class ManageHostsApp(object):
-    
+
+    all_loopback_addresses = ['127.0.0.1', '127.0.1.1', '::1']
+
     def __init__(self):
         self.verbose = False
         self.quiet = False
-        self.hostsfile = HostsFile()
+        self.hostsfile = None
+        HostsFile()
     
     def main(self):
         #=============================================================================================
@@ -23,45 +26,29 @@ class ManageHostsApp(object):
         parser = argparse.ArgumentParser(description='manages the local hosts entry file')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('-f','--file', dest='hostfile', default=DEFAULT_HOSTS_FILE, help='specifies the name of the hosts files.')
-        parser.add_argument('list', action='store_true', help='lists all host entries.')
-        parser.add_argument('set-hostname', help='sets the hostname to the given one.')
-        parser.add_argument('add', nargs='*', help='adds the given host.')
-        parser.add_argument('remove', nargs='*', help='removes the given host.')
-        parser.add_argument('update', nargs='*', help='update the specified host entry.')
+        parser.add_argument('action', default='list', choices=['list', 'add', 'update', 'remove', 'set-hostname'], help='select the action to perform')
+        parser.add_argument('opts', nargs='*', help='options for the action')
 
         args = parser.parse_args()
         self.verbose = args.verbose
+        self.hostsfile = HostsFile(filename=args.hostfile)
 
         ret = 0
-        if args.update:
-            update_key = args.update[0]
+        if args.action == 'update' or args.action == 'add':
+            update_key = args.opts[0]
             update_values = []
-            for val in args.update[1:]:
+            for val in args.opts[1:]:
                 update_values.extend(val.split(','))
             if self.verbose:
                 print('update host %s to %s' % (update_key, ','.join(update_values)))
             self.hostsfile[update_key] = update_values
             ok = self.hostsfile.save()
             if not ok:
-                sys.stderr.write('Failed to save hosts file.\n')
-
-            ret = 0 if ok else 1
-        elif args.add:
-            update_key = args.add[0]
-            update_values = []
-            for val in args.add[1:]:
-                update_values.extend(val.split(','))
-            if self.verbose:
-                print('add host %s to %s' % (update_key, ','.join(update_values)))
-            self.hostsfile[update_key] = update_values
-
-            ok = self.hostsfile.save()
-            if not ok:
                 sys.stderr.write('Failed to save hosts file %s, error %s.\n' % (self.hostsfile.name, self.hostsfile.last_error) )
 
             ret = 0 if ok else 1
-        elif args.remove:
-            for host in args.remove:
+        elif args.action == 'remove':
+            for host in args.opts:
                 if self.verbose:
                     print('remove host %s' % host)
                 self.hostsfile[host] = []
@@ -71,79 +58,96 @@ class ManageHostsApp(object):
                 sys.stderr.write('Failed to save hosts file %s, error %s.\n' % (self.hostsfile.name, self.hostsfile.last_error) )
 
             ret = 0 if ok else 1
-        elif args.list:
+        elif args.action == 'list':
             for (address, hostnames) in self.hostsfile:
                 print('%s\t%s' % (address, ','.join(hostnames)))
-        elif args.set_hostname:
-            (old_fqdn, old_hostname, old_domain) = gethostname_tuple()
-            (new_fqdn, new_hostname, new_domain) = gethostname_tuple(args.set_hostname)
-            
-            if old_fqdn == new_fqdn:
-                print('Old hostname and new hostname is identical.')
-                ret = 0
+        elif args.action == 'set-hostname':
+            if len(args.opts) == 0:
+                sys.stderr.write('No hostname specified.\n')
+                ret = 1
+            elif len(args.opts) > 1:
+                sys.stderr.write('Too many parameters: %s.\n' % (' '.join(args.opts)))
+                ret = 1
             else:
-                ok = True
-                if new_fqdn == new_hostname:
-                    new_fqdn = None
-                has_fqdn_entry = False
-                has_hostname_entry = False
-                for (address, hostnames) in self.hostsfile:
-                    changed_entry = False
-                    if old_fqdn in hostnames:
-                        changed_entry = True
-                        has_fqdn_entry = True
-                        if new_fqdn:
-                            hostnames = [new_fqdn if x==old_fqdn else x for x in hostnames]
-                        else:
-                            hostnames.remove(old_fqdn)
-                    if old_hostname in hostnames:
-                        changed_entry = True
-                        has_hostname_entry = True
-                        if new_hostname:
-                            hostnames = [new_hostname if x==old_hostname else x for x in hostnames]
-                        else:
-                            hostnames.remove(old_hostname)
-                    if changed_entry:
-                        self.hostsfile[address] = hostnames
-                if not has_hostname_entry and new_hostname:
-                    hostnames = self.hostsfile['127.0.0.1']
-                    idx = hostnames.index(new_fqdn) if new_fqdn else -1
-                    if idx >= 0:
-                        hostnames.insert(idx + 1, new_hostname)
-                    else:
-                        hostnames.insert(0, new_hostname)
-                    self.hostsfile['127.0.0.1'] = hostnames
-                if not has_fqdn_entry and new_fqdn:
-                    hostnames = self.hostsfile['127.0.0.1']
-                    idx = hostnames.index(new_hostname) if new_hostname else -1
-                    if idx >= 0:
-                        hostnames.insert(idx, new_fqdn)
-                    else:
-                        hostnames.insert(0, new_fqdn)
-                    self.hostsfile['127.0.0.1'] = hostnames
-                hostnamefile = HostnameFile()
-                hostnamefile.hostname = new_hostname
+                (old_fqdn, old_hostname, old_domain) = gethostname_tuple()
+                (new_fqdn, new_hostname, new_domain) = gethostname_tuple(args.opts[0])
 
-                #for (address, hostnames) in self.hostsfile:
-                    #print('%s\t%s' % (address, ','.join(hostnames)))
+                if old_fqdn == new_fqdn:
+                    print('Old hostname and new hostname is identical.')
+                    ret = 0
+                else:
+                    ok = True
+                    if new_fqdn == new_hostname:
+                        new_fqdn = None
+                    has_fqdn_entry = False
+                    has_hostname_entry = False
+                    for (address, hostnames) in self.hostsfile:
+                        changed_entry = False
+                        if old_fqdn in hostnames:
+                            changed_entry = True
+                            has_fqdn_entry = True
+                            if new_fqdn:
+                                hostnames = [new_fqdn if x==old_fqdn else x for x in hostnames]
+                            else:
+                                hostnames.remove(old_fqdn)
+                        if old_hostname in hostnames:
+                            changed_entry = True
+                            has_hostname_entry = True
+                            if new_hostname:
+                                hostnames = [new_hostname if x==old_hostname else x for x in hostnames]
+                            else:
+                                hostnames.remove(old_hostname)
+                        if changed_entry:
+                            self.hostsfile[address] = hostnames
 
-                #return 0
-                if ok:
-                    ok = sethostname(new_hostname)
-                    if not ok:
-                        sys.stderr.write('Failed to set hostname to %s.\n' % new_hostname)
-                if ok:
-                    ok = hostnamefile.save()
-                    if not ok:
-                        sys.stderr.write('Failed to save hostname file %s, error %s.\n' % (hostnamefile.name, hostnamefile.last_error) )
-                if ok:
-                    ok = self.hostsfile.save()
-                    if not ok:
-                        sys.stderr.write('Failed to save hosts file %s, error %s.\n' % (self.hostsfile.name, self.hostsfile.last_error) )
+                    if not has_hostname_entry and new_hostname:
+                        for loopback_addr in all_loopback_addresses:
+                            hostnames = self.hostsfile[loopback_addr]
+                            if new_fqdn and new_fqdn in hostnames:
+                                idx = hostnames.index(new_fqdn)
+                            else:
+                                idx = -1
+                            if idx >= 0:
+                                hostnames.insert(idx + 1, new_hostname)
+                            else:
+                                hostnames.insert(0, new_hostname)
+                            self.hostsfile[loopback_addr] = hostnames
+                    if not has_fqdn_entry and new_fqdn:
+                        for loopback_addr in all_loopback_addresses:
+                            hostnames = self.hostsfile[loopback_addr]
+                            if new_hostname and new_hostname in hostnames:
+                                idx = hostnames.index(new_hostname)
+                            else:
+                                idx = -1
+                            if idx >= 0:
+                                hostnames.insert(idx, new_fqdn)
+                            else:
+                                hostnames.insert(0, new_fqdn)
+                            self.hostsfile[loopback_addr] = hostnames
+                    hostnamefile = HostnameFile()
+                    hostnamefile.hostname = new_hostname
 
-                ret = 0 if ok else 1
+                    if self.verbose:
+                        for (address, hostnames) in self.hostsfile:
+                            print('%s\t%s' % (address, ','.join(hostnames)))
+
+                    if ok:
+                        ok = sethostname(new_hostname)
+                        if not ok:
+                            sys.stderr.write('Failed to set hostname to %s.\n' % new_hostname)
+                    if ok:
+                        ok = hostnamefile.save()
+                        if not ok:
+                            sys.stderr.write('Failed to save hostname file %s, error %s.\n' % (hostnamefile.name, hostnamefile.last_error) )
+                    if ok:
+                        ok = self.hostsfile.save()
+                        if not ok:
+                            sys.stderr.write('Failed to save hosts file %s, error %s.\n' % (self.hostsfile.name, self.hostsfile.last_error) )
+
+                    ret = 0 if ok else 1
         else:
-            sys.stderr.write('No operation specified.\n')
+            sys.stderr.write('No action specified.\n')
+            ret = 1
         return ret
 
 if __name__ == "__main__":
