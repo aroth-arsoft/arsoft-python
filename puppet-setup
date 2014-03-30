@@ -278,7 +278,6 @@ rm /tmp/puppet-setup.log
         (self.target_fqdn, tmp, self.target_domainname) = gethostname_tuple(self.target_hostname)
         if self.target_domainname is None or self.target_domainname == 'localdomain':
             query_hostname = self.target_hostname + '.' + self.local_domainname
-            print('query %s' % query_hostname)
             target_host_record = get_dns_host_record(query_hostname)
             if len(target_host_record) > 0:
                 (self.target_hostname_full, hostname, self.target_domainname) = gethostname_tuple(query_hostname)
