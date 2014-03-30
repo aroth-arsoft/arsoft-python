@@ -332,7 +332,7 @@ rm /tmp/puppet-setup.log
                 if ret:
                     ret = self._add_puppet_server_host_entry()
 
-        if ret and 0:
+        if ret:
             ret = self._puppet_agent_run()
 
         # in any case remove the newly install SSH key
