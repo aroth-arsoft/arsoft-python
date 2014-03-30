@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.120',
+		version='1.121',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
