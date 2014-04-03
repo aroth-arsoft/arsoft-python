@@ -1,3 +1,9 @@
+arsoft-python (1.122) saucy; urgency=low
+
+  * fixed dns-update script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 03 Apr 2014 12:05:22 +0200
+
 arsoft-python (1.121) saucy; urgency=low
 
   * fixed managehosts command line parsing
