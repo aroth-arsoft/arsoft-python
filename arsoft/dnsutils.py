@@ -13,6 +13,7 @@ import dns.resolver
 import dns.rdtypes
 import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
+import dns.name
 from arsoft.utils import enum
 
 ALGORITHM_ID_TO_NAME = {
@@ -146,11 +147,13 @@ def _read_key_data_zone(data):
         #print('keyline %s' % keyline)
         keyline_elems = keyline.rsplit(' ')
         try:
-            keyprotocol = int(keyline_elems[4])
-            keyalgorithm = get_algorithm_for_number(int(keyline_elems[5]))
-            keyname = dns.name.from_text(keyline_elems[0])
-            secret = base64.decodestring(''.join(keyline_elems[6:]))
-            ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm }
+            if keyline_elems[1] == 'IN' and keyline_elems[2] == 'KEY':
+                keyflags = int(keyline_elems[3])
+                keyprotocol = int(keyline_elems[4])
+                keyalgorithm = get_algorithm_for_number(int(keyline_elems[5]))
+                keyname = dns.name.from_text(keyline_elems[0])
+                secret = base64.decodestring(''.join(keyline_elems[6:]))
+                ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm, 'flags':keyflags }
         except IndexError:
             ret = None
             break
@@ -243,13 +246,16 @@ def use_key_file(update_obj, keyfile, format=KeyFileFormat.Zone):
                 first_keyname = keyname
             keyring[keyname] = keydata['secret']
 
-        if keyprotocol:
+        if keyalgorithm is None:
             update_obj.keyalgorithm = get_algorithm_for_number(keyprotocol)
         else:
             update_obj.keyalgorithm = keyalgorithm
-        update_obj.keyname = first_keyname
-        update_obj.keyring = keyring
-        ret = True
+        if update_obj.keyalgorithm is None:
+            ret = False
+        else:
+            update_obj.keyname = first_keyname
+            update_obj.keyring = keyring
+            ret = True
     else:
         ret = False
     return ret
@@ -306,10 +312,13 @@ def _get_resolver(dnsserver=None):
     return ret
 
 def get_dns_zone_for_name(Name, Origin=None):
-    try:
-        n = dns.name.from_text(Name)
-    except:
-        return None, None
+    if isinstance(Name, dns.name.Name):
+        n = Name
+    else:
+        try:
+            n = dns.name.from_text(Name)
+        except:
+            return None, None
     if Origin is None:
         Origin = dns.resolver.zone_for_name(n)
         Name = n.relativize(Origin)
