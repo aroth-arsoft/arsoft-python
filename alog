@@ -3,12 +3,14 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import sys
+import errno
 import argparse
 import re
 import os.path
 import logging
 from datetime import datetime, timedelta
 from arsoft.inifile import IniFileDirectory
+import arsoft.timestamp
 
 class alog_known_pattern(object):
     def __init__(self, name=None, line_re=None, timestamp=None, logfile_names=[], output_format=None):
@@ -167,15 +169,19 @@ class alog_application(object):
                 score = 0
                 if logfile_basename in pattern_obj.logfile_names:
                     score = score + 1000
-                line_re = re.compile(pattern_obj.line_re)
-                mo = line_re.match(line)
-                if mo:
-                    num_groups = len(mo.groups())
-                    #print('got match for %s=%s' % (pattern_name, mo))
-                    score = score + (num_groups * 100)
-                else:
-                    score = score - 100
-                pattern_score[pattern_name] = score
+                try:
+                    line_re = re.compile(pattern_obj.line_re)
+                    mo = line_re.match(line)
+                    if mo:
+                        num_groups = len(mo.groups())
+                        #print('got match for %s=%s' % (pattern_name, mo))
+                        score = score + (num_groups * 100)
+                    else:
+                        score = score - 100
+                    pattern_score[pattern_name] = score
+                except re.error as e:
+                    sys.stderr.write('WARNING: Unable to compile regex for line pattern %s: %s.\n' % (pattern_name, pattern_obj.line_re))
+                    sys.stderr.write('         Error %s\n' % str(e))
             #print('pattern_score=%s' % pattern_score)
             best_score = -1
             for (pattern_name, score) in pattern_score.iteritems():
@@ -246,9 +252,17 @@ class alog_application(object):
                 if ret:
                     now = datetime.now()
                     ret = ret.replace(year=now.year, month=now.month, day=now.day)
+            elif format == 'rfc2822':
+                ret = arsoft.timestamp.parsedate_rfc2822(timestamp)
             else:
-                ret = datetime.strptime(timestamp, format)
+                ret = arsoft.timestamp.strptime_as_datetime(timestamp, format)
         return ret
+
+    def _get_full_loglevel(self, loglevel_char):
+        for ll in self._config.loglevel_names:
+            if ll[0] == loglevel_char:
+                return ll
+        return loglevel_char
 
     def _process_line(self, line_re, find_re, timestamp_format, line):
         ret = None
@@ -267,6 +281,8 @@ class alog_application(object):
             
             if loglevel:
                 loglevel = loglevel.upper()
+                if len(loglevel) == 1:
+                    loglevel = self._get_full_loglevel(loglevel)
             else:
                 if self._last_msg_obj is not None and self._last_msg_obj.loglevel is not None:
                     loglevel = self._last_msg_obj.loglevel
@@ -317,7 +333,12 @@ class alog_application(object):
         else:
             output = True if not msg_obj.filtered else False
         if output:
-            print( self._output_format % msg_obj.__dict__)
+            try:
+                print( self._output_format % msg_obj.__dict__)
+            except IOError as e:
+                if e.errno == errno.EPIPE:
+                    sys.exit(0)
+                    pass
 
     def main(self):
         #=============================================================================================
@@ -356,7 +377,7 @@ class alog_application(object):
             for filter in args.output_level:
                 if filter[0] == '=':
                     filter = filter[1:].upper()
-                    if filter in self._confog.loglevel_names:
+                    if filter in self._config.loglevel_names:
                         self._loglevel.append(filter.upper())
                     else:
                         sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
@@ -365,12 +386,12 @@ class alog_application(object):
                     filter = filter.upper()
                     i = 0
                     found = False
-                    while i < len(self._confog.loglevel_names):
+                    while i < len(self._config.loglevel_names):
                         if found:
-                            self._loglevel.append(self._confog.loglevel_names[i])
+                            self._loglevel.append(self._config.loglevel_names[i])
                         else:
-                            if self._confog.loglevel_names[i] == filter:
-                                self._loglevel.append(self._confog.loglevel_names[i])
+                            if self._config.loglevel_names[i] == filter:
+                                self._loglevel.append(self._config.loglevel_names[i])
                                 found = True
                         i = i + 1
                     if not found:
@@ -409,7 +430,7 @@ class alog_application(object):
         self._pattern = self._select_pattern(args.pattern)
 
         if self._logfile_obj is None:
-            sys.stdout.write('Unable to open log file %s\n' % (self._logfile))
+            sys.stdout.write('Unable to open log file %s or unknown shortcut.\n' % (self._logfile))
             ret = 1
         elif not self._first_line:
             sys.stdout.write('Log file %s is empty.\n' % (self._logfile))
