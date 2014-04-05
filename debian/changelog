@@ -1,3 +1,9 @@
+arsoft-python (1.123) saucy; urgency=low
+
+  * add support to load and display cups log files
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 05 Apr 2014 13:18:08 +0200
+
 arsoft-python (1.122) saucy; urgency=low
 
   * fixed dns-update script
