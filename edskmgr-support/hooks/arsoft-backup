@@ -30,6 +30,7 @@ if ACTION == 'add':
             # event was triggered manually and we can eject this disk again. This
             # happens when the external backup disks are exchanged but we can shut it
             # down to safe some power
+            from arsoft.disks.edskmgr import *
             edskmgr = ExternalDiskManager()
             edskmgr.load_config()
             (disk_obj, dev_obj, disk_tags) = edskmgr.udev_hook_initialize()
