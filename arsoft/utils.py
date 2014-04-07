@@ -51,11 +51,10 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=No
     return sts
 
 
-def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None):
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False,
+                     stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None):
     all_args = [str(exe)]
     all_args.extend(args)
-    if verbose:
-        print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
     
     stdin_param = stdin if stdin is not None else subprocess.PIPE
     if stdout is not None and hasattr(stdout, '__call__'):
@@ -69,6 +68,13 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
             stderr_param = subprocess.PIPE
         else:
             stderr_param = stdout if stdout is not None else subprocess.PIPE
+    if verbose:
+        print("runcmd " + ' '.join(all_args) +
+                ' <' + str(stdin_param) +
+                ' 1>' + str(stdout_param) +
+                ' 2>' + str(stderr_param)
+                    )
+
     p = subprocess.Popen(all_args, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
         if stdout is not None and hasattr(stdout, '__call__'):
