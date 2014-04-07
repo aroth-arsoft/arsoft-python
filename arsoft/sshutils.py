@@ -3,6 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from utils import runcmdAndGetData, platform_is_windows, which
+import copy, uuid
 
 def _find_executable_impl(user_override, ssh_name, putty_name):
     if user_override:
@@ -55,7 +56,7 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
         elif password:
             args.extend(['-pw', password])
     else:
-        args = ['-a', '-x', '-o', 'BatchMode=yes']
+        args = ['-a', '-o', 'BatchMode=yes']
         if username:
             args.extend(['-l', username ])
         if keyfile:
@@ -67,17 +68,39 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
     if commandline:
         args.append(commandline)
         input = None
+        return runcmdAndGetData(ssh_executable, args,
+                                verbose=verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env)
+
     elif script:
-        args.append('/bin/bash -')
+        tmpfile = '/tmp/arsoft_remote_ssh_%s.sh' % uuid.uuid4()
+        put_args = copy.deepcopy(args)
+        put_args.append('/bin/cat > ' + tmpfile)
+        cleanup_args = copy.deepcopy(args)
+        cleanup_args.append('/bin/rm -f ' + tmpfile)
+        exec_args = copy.deepcopy(args)
+        exec_args.append('/bin/bash ' + tmpfile)
+
         # convert any M$-newlines into the real-ones
-        input = script.replace('\r\n', '\n')
-        if verbose:
-            print('script=%s' %input)
+        real_script = script.replace('\r\n', '\n')
+
+        (put_sts, put_stdout, put_stderr) = runcmdAndGetData(ssh_executable, put_args, input=real_script,
+                                verbose=verbose)
+
+        if put_sts == 0:
+            if verbose:
+                print(real_script)
+            (sts, stdout_data, stderr_data) = runcmdAndGetData(ssh_executable, exec_args,
+                                verbose=verbose, outputStdErr=outputStdErr, outputStdOut=True,
+                                stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env)
+        else:
+            (sts, stdout_data, stderr_data) = (put_sts, put_stdout, put_stderr)
+
+        (cleanup_sts, cleanup_stdout, cleanup_stderr) = runcmdAndGetData(ssh_executable, cleanup_args,
+                                verbose=verbose)
+        return (sts, stdout_data, stderr_data)
     else:
         raise ValueError('neither commandline nor script specified.')
-    return runcmdAndGetData(ssh_executable, args, input=input, 
-                            verbose=verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut, 
-                            stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env)
 
 def scp(server, files, target_dir, keyfile=None, username=None, password=None, 
                          verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
