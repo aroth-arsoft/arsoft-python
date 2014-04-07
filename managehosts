@@ -101,7 +101,7 @@ class ManageHostsApp(object):
                             self.hostsfile[address] = hostnames
 
                     if not has_hostname_entry and new_hostname:
-                        for loopback_addr in all_loopback_addresses:
+                        for loopback_addr in ManageHostsApp.all_loopback_addresses:
                             hostnames = self.hostsfile[loopback_addr]
                             if new_fqdn and new_fqdn in hostnames:
                                 idx = hostnames.index(new_fqdn)
@@ -113,7 +113,7 @@ class ManageHostsApp(object):
                                 hostnames.insert(0, new_hostname)
                             self.hostsfile[loopback_addr] = hostnames
                     if not has_fqdn_entry and new_fqdn:
-                        for loopback_addr in all_loopback_addresses:
+                        for loopback_addr in ManageHostsApp.all_loopback_addresses:
                             hostnames = self.hostsfile[loopback_addr]
                             if new_hostname and new_hostname in hostnames:
                                 idx = hostnames.index(new_hostname)
