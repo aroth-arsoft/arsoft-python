@@ -1,3 +1,9 @@
+arsoft-python (1.125) saucy; urgency=low
+
+  * improvements to puppet-setup script in combination with sudo
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 07 Apr 2014 08:08:03 +0200
+
 arsoft-python (1.124) saucy; urgency=low
 
   * load DNS updates from a zone file
