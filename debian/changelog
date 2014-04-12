@@ -1,3 +1,9 @@
+arsoft-python (1.127) saucy; urgency=low
+
+  * use default DNS server for lookup
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 12 Apr 2014 18:36:36 +0200
+
 arsoft-python (1.126) saucy; urgency=low
 
   * add dns-query script

@@ -30,7 +30,7 @@ class dns_query_app(object):
 
     DEFAULT_RRTYPE = 'A'
     DEFAULT_TTL = 86400
-    DEFAULT_SERVER = 'localhost'
+    DEFAULT_SERVER = None
 
     def __init__(self):
         self.verbose = False
@@ -52,7 +52,7 @@ class dns_query_app(object):
         return ret
 
     def _lookup_hosts(self, args):
-        dnsserver = self.server
+        dnsserver = self.dnsserver
         hosts_to_lookup = []
 
         for (host, payload) in args:
