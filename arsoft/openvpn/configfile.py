@@ -37,7 +37,6 @@ class ConfigFile(object):
             if config_name is not None:
                 cfg = config.Config()
                 self.filename = cfg.get_config_file(config_name)
-                self.config_directory = os.path.dirname(self.filename)
                 self._name = config_name
             else:
                 self.filename = filename
@@ -62,6 +61,7 @@ class ConfigFile(object):
             else:
                 ret = True
         else:
+            self._conf = None
             ret = False
         return ret
     
@@ -305,12 +305,12 @@ class ConfigFile(object):
 
     @property
     def client(self):
-        remote = self._conf.get(section=None, key='remote', default=None)
+        remote = self._conf.get(section=None, key='remote', default=None) if self._conf else None
         return True if remote is not None else False
 
     @property
     def server(self):
-        server = self._conf.get(section=None, key='server', default=None)
+        server = self._conf.get(section=None, key='server', default=None) if self._conf else None
         return True if server is not None else False
 
     @server.setter
