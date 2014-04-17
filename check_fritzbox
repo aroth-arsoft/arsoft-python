@@ -55,7 +55,7 @@ if fritz.isPhysicalConnected():
                     try:
                         resolver.reset()
                         resolver.nameservers = fritzbox_addresses
-                        answers = resolver.query(ddnsname, 'A')
+                        answers = resolver.query(ddnsname, dns.rdatatype.A)
                         for rdata in answers:
                             ddnsname_results[ddnsname].append(str(rdata))
                     except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
@@ -80,9 +80,9 @@ if fritz.isPhysicalConnected():
             for (ddnsname, results) in ddnsname_results.items():
                 if fritz.wanAddress() not in results:
                     if len(results) != 0:
-                        ddns_failures.append( '%s=>%s != %s' % (str(ddnsname), ','.join(results), str(fritz.wanAddress())) )
+                        ddns_failures.append( '%s points to %s but should be %s' % (str(ddnsname), ','.join(results), str(fritz.wanAddress())) )
                     else:
-                        ddns_failures.append( '%s=><dnserror> != %s' % (str(ddnsname), str(fritz.wanAddress())) )
+                        ddns_failures.append( '%s points to <dnserror> but should be %s' % (str(ddnsname), str(fritz.wanAddress())) )
 
             if len(ddns_failures) != 0:
                 exit_code = WARNING
