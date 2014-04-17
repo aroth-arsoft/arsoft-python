@@ -1,3 +1,11 @@
+arsoft-python (1.128) saucy; urgency=low
+
+  * minor fixes to check_fritxbox
+  * minor fixes to openvpn config handling
+  * enhancements to puppet-setup script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 17 Apr 2014 18:52:36 +0200
+
 arsoft-python (1.127) saucy; urgency=low
 
   * use default DNS server for lookup
