@@ -114,7 +114,6 @@ def parse_timedelta(time_str):
 
 def format_timedelta(delta):
     secs = abs(delta.total_seconds())
-
     if secs >= SECONDS_ONE_WEEK:
         days = int(secs / SECONDS_ONE_DAY)
         ret = '%i days' % (days)
@@ -134,6 +133,8 @@ def format_timedelta(delta):
         ret = '%i minutes, %i seconds' % (minutes, remain)
     else:
         ret = '%i seconds' % (secs)
+    if delta.total_seconds() < 0:
+        ret += ' ago'
     return ret
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
