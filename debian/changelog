@@ -1,3 +1,9 @@
+arsoft-python (1.129) trusty; urgency=medium
+
+  * improve timedelta format 
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 30 Apr 2014 07:03:00 +0200
+
 arsoft-python (1.128) saucy; urgency=low
 
   * minor fixes to check_fritxbox
