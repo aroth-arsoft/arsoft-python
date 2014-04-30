@@ -14,7 +14,7 @@ import arsoft.mail
 import arsoft.sshutils
 import shutil
 from arsoft.inifile import *
-from arsoft.timestamp import UTC
+from arsoft.timestamp import UTC, format_timedelta
 from arsoft.utils import enum
 
 __version__ = '1.0'
@@ -96,10 +96,13 @@ class OpenVPNAdmin(object):
                             min_expire_cert = cert
 
                     if min_expire_cert:
-                        expire_date = str(min_expire_cert.expire_date) + ' in ' + str(min_expire_in)
+                        if min_expire_in.total_seconds() < 0:
+                            expire_date = 'expired ' + str(min_expire_cert.expire_date) + ' was ' + format_timedelta(min_expire_in)
+                        else:
+                            expire_date = 'expires ' + str(min_expire_cert.expire_date) + ' in ' + format_timedelta(min_expire_in)
                     else:
                         expire_date = 'unavailable'
-                    print('  %s: %s (expires %s)' % (prefix, cert_file, expire_date))
+                    print('  %s: %s (%s)' % (prefix, cert_file, expire_date))
             else:
                 print('  %s: %s (does not exist)' % (prefix, cert_file))
         else:
