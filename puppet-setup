@@ -303,7 +303,7 @@ rm /tmp/puppet-setup.log
         return ret
 
     def _install_screenrc(self):
-        screenrc="""
+        script="""
 tmpfile=`mktemp`
 cat > "$tmpfile" <<SCREENRC_EOF
 startup_message off
@@ -321,7 +321,7 @@ bind } history
 termcapinfo vt100 dl=5\E[M
 hardstatus alwayslastline
 termcapinfo xterm*|rxvt*|kterm*|Eterm* hs:ts=\E]0;:fs=\007:ds=\E]0;\007
-hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{=kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B}%Y-%m-%d %{W}%c %{g}]'
+hardstatus string '%%{= kG}[ %%{G}%%H %%{g}][%%= %%{=kw}%%?%%-Lw%%?%%{r}(%%{W}%%n*%%f%%t%%?(%%u)%%?%%{r})%%{w}%%?%%+Lw%%?%%?%%= %%{g}][%%{B}%%Y-%%m-%%d %%{W}%%c %%{g}]'
 termcapinfo xterm*|linux*|rxvt*|Eterm* OP
 termcapinfo xterm 'is=\E[r\E[m\E[2J\E[H\E[?7h\E[?1;4;6l'
 termcapinfo xterm|xterms|xs|rxvt ti@:te@
@@ -561,4 +561,3 @@ exit $RES
 if __name__ == "__main__":
     app =  PuppetSetupApp()
     sys.exit(app.main())
- 
