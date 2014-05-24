@@ -176,6 +176,9 @@ def initialize_settings(settings_module, setttings_file):
             ]
     if in_devserver:
         settings_obj.LOG_DIR = os.path.join(appdir, 'data')
+        if not os.path.isdir(settings_obj.LOG_DIR):
+            # create LOG_DIR if it does not exists
+            os.makedirs(settings_obj.LOG_DIR)
     else:
         settings_obj.LOG_DIR = '/var/log/django'
     # A sample logging configuration. The only tangible logging
@@ -248,3 +251,64 @@ def initialize_settings(settings_module, setttings_file):
         execfile(custom_settings_file)
 
     #print(settings_obj.INSTALLED_APPS)
+
+def _django_request_info_view_dict(request, dict_name):
+    from django.utils.html import escape
+    ret = ''
+    if hasattr(request, dict_name):
+        ret += '<h1>%s</h1>' % dict_name
+        d = getattr(request, dict_name)
+        if isinstance(d, dict):
+            d_keys = sorted(d.keys())
+            ret += '<table border=\'1\'>'
+            for key in d_keys:
+                value = d[key]
+                ret += '<tr><td>%s</td><td>%s</td></tr>' % (escape(str(key)), escape(str(value)))
+            ret += '</table>'
+        else:
+            ret += '<pre>%s</pre>' % (escape(str(d)))
+    else:
+        ret += '<h1>%s (not available)</h1>' % dict_name
+    return ret
+
+def _django_request_info_view_impl(request, attr_names):
+    from django.utils.html import escape
+    ret = ''
+    ret += '<table border=\'1\'>'
+    for attr in attr_names:
+        ret += '<tr><td>%s</td><td>' % escape(str(attr))
+
+        if hasattr(request, attr):
+            d = getattr(request, attr)
+            if isinstance(d, dict):
+                d_keys = sorted(d.keys())
+                ret += '<table border=\'1\'>'
+                for key in d_keys:
+                    value = d[key]
+                    ret += '<tr><td>%s</td><td>%s</td></tr>' % (escape(str(key)), escape(str(value)))
+                ret += '</table>'
+            else:
+                ret += '<pre>%s</pre>' % (escape(str(d)))
+        else:
+            ret += 'NA'
+        ret += '</td></tr>'
+    ret += '</table>'
+    return ret
+
+def django_request_info_view(request):
+    from django.http import HttpResponse
+    body = ''
+    body += '<html>'
+    border-collapse:collapse;
+
+    body += _django_request_info_view_impl(request, ['META', 'GET', 'POST', 'REQUEST', 'user'])
+    return HttpResponse(body)
+
+def django_debug_urls(urls_module, urls_file):
+    from django.conf.urls import patterns, include, url
+
+    urls_module_obj = sys.modules[urls_module]
+    urls_module_obj_type = type(urls_module_obj)
+
+    # add debug handler here
+    urls_module_obj.urlpatterns.append(url(r'^debug/request$', 'arsoft.web.utils.django_request_info_view', name='django_request'))
