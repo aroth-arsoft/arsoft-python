@@ -274,35 +274,48 @@ def _django_request_info_view_dict(request, dict_name):
 def _django_request_info_view_impl(request, attr_names):
     from django.utils.html import escape
     ret = ''
-    ret += '<table border=\'1\'>'
+    ret += '<table border=\'1\'>\n'
     for attr in attr_names:
-        ret += '<tr><td>%s</td><td>' % escape(str(attr))
+        ret += '<tr><td>%s</td><td>\n' % escape(str(attr))
 
         if hasattr(request, attr):
             d = getattr(request, attr)
             if isinstance(d, dict):
                 d_keys = sorted(d.keys())
-                ret += '<table border=\'1\'>'
-                for key in d_keys:
-                    value = d[key]
-                    ret += '<tr><td>%s</td><td>%s</td></tr>' % (escape(str(key)), escape(str(value)))
-                ret += '</table>'
+                if d_keys:
+                    ret += '<table border=\'1\'>\n'
+                    for key in d_keys:
+                        value = d[key]
+                        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+                    ret += '</table>\n'
+                else:
+                    ret += '<i>empty</o>\n'
             else:
-                ret += '<pre>%s</pre>' % (escape(str(d)))
+                ret += '<pre>%s (%s)</pre>\n' % (escape(str(d)), escape(str(type(d))))
         else:
             ret += 'NA'
-        ret += '</td></tr>'
-    ret += '</table>'
+        ret += '</td></tr>\n'
+    ret += '</table>\n'
     return ret
 
 def django_request_info_view(request):
     from django.http import HttpResponse
     body = ''
-    body += '<html>'
-    border-collapse:collapse;
-
-    body += _django_request_info_view_impl(request, ['META', 'GET', 'POST', 'REQUEST', 'user'])
-    return HttpResponse(body)
+    body += '<html><head><style>\n'
+    body += 'table { border-collapse:collapse; vertical-align:top; }\n'
+    body += 'tr, th, td, tbody {\n'
+    body += 'border-style: inherit;\n'
+    body += 'border-color: inherit;\n'
+    body += 'border-width: inherit;\n'
+    body += 'text-align: left;\n'
+    body += 'vertical-align: top;\n'
+    body += 'padding:1px 3px 1px 3px;\n'
+    body += '}\n'
+    body += '</style></head>\n'
+    body += _django_request_info_view_impl(request, ['META', 'GET', 'POST', 'REQUEST', 'FILES', 'COOKIES',
+                                                     'scheme', 'method', 'path', 'path_info', 'user', 'session', 'urlconf'])
+    body += '</html>\n'
+    return HttpResponse(body, content_type='text/html')
 
 def django_debug_urls(urls_module, urls_file):
     from django.conf.urls import patterns, include, url
