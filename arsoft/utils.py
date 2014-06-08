@@ -23,7 +23,7 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=No
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
-        print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
+        print(("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else '')))
     if stdin is not None:
         stdin_param = stdin
     else:
@@ -69,11 +69,11 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
         else:
             stderr_param = stdout if stdout is not None else subprocess.PIPE
     if verbose:
-        print("runcmd " + ' '.join(all_args) +
+        print(("runcmd " + ' '.join(all_args) +
                 ' <' + str(stdin_param) +
                 ' 1>' + str(stdout_param) +
                 ' 2>' + str(stderr_param)
-                    )
+                    ))
 
     p = subprocess.Popen(all_args, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
@@ -180,7 +180,7 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
     os.setuid(running_uid)
 
     # Ensure a very conservative umask
-    old_umask = os.umask(077)
+    old_umask = os.umask(0o77)
     return True
 
 def isMountDirectory(path):
@@ -265,7 +265,7 @@ def which(name, flags=os.X_OK):
     order in which they were found.
     """
     result = []
-    exts = filter(None, os.environ.get('PATHEXT', '').split(os.pathsep))
+    exts = [_f for _f in os.environ.get('PATHEXT', '').split(os.pathsep) if _f]
     path = os.environ.get('PATH', None)
     if path is None:
         return []
