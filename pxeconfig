@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent off; indent-width 4; mixedindent off; indent-mode python;
 
@@ -110,7 +110,7 @@ ALLOWOPTIONS 0\n\
 			f.write("#\n")
 			f.close()
 			ret = True
-		except IOError, e:
+		except IOError as e:
 			error("error creating " + pxeclient_conf + ":" + str(e))
 			ret = False
 		
@@ -135,7 +135,7 @@ ALLOWOPTIONS 0\n\
 						if f == pxeclient_conf or f == os.path.abspath(pxeclient_conf):
 							found = True
 			f.close()
-		except IOError, e:
+		except IOError as e:
 			error("error patching " + dhcpd_conf + ":" + str(e))
 			found = False
 			
@@ -149,7 +149,7 @@ ALLOWOPTIONS 0\n\
 				f = open(dhcpd_conf,'a')
 				f.write('include "' + os.path.abspath(pxeclient_conf) + '";\n')
 				f.close()
-			except IOError, e:
+			except IOError as e:
 				error("error creating " + self.m_dhcpd_conf + ":" + str(e))
 				ret = False
 		return ret
@@ -344,7 +344,7 @@ class PXEConfigApp(object):
 			)
 			flog.setFormatter(formatter)
 			root.addHandler(flog)
-		except IOError, e:
+		except IOError as e:
 			pass
 
 	def main(self, argv=None):

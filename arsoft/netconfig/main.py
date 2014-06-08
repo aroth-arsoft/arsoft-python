@@ -8,7 +8,7 @@ import sys
 import ldif
 import string
 import os.path
-from StringIO import StringIO
+from io import StringIO
 from ldap.cidict import cidict
 from logging import debug, info, exception, error, warning, handlers
 import logging
@@ -18,11 +18,11 @@ import glob
 import re
 import socket
 
-from ldapresult import *
-from exception import *
-from menu import *
-from util import *
-from preseed import *
+from .ldapresult import *
+from .exception import *
+from .menu import *
+from .util import *
+from .preseed import *
 
 from arsoft import ifconfig, IniFile
 
@@ -228,7 +228,7 @@ class NetconfigFile(object):
     data = None
     owner = None
     group = None
-    perm = 0666
+    perm = 0o666
 
     def __init__(self, netconfig=None, path='', name='', comment='', type='', arch=None, value=None):
         self.netconfig = netconfig
@@ -255,7 +255,7 @@ class NetconfigFile(object):
         if result.has_attribute('netconfigFilePermission'):
             self.perm = result.get_attr_values('netconfigFilePermission')[0]
         else:
-            self.perm = 0660
+            self.perm = 0o660
         if result.has_attribute('netconfigFileData'):
             self.data = result.get_attr_values('netconfigFileData')[0]
         else:
@@ -271,7 +271,7 @@ class NetconfigArchive(object):
     data = None
     owner = None
     group = None
-    perm = 0666
+    perm = 0o666
 
     def __init__(self, netconfig=None, path='', name='', comment='', type='', arch=None, value=None):
         self.netconfig = netconfig
@@ -298,7 +298,7 @@ class NetconfigArchive(object):
         if result.has_attribute('netconfigFilePermission'):
             self.perm = result.get_attr_values('netconfigFilePermission')[0]
         else:
-            self.perm = 0660
+            self.perm = 0o660
         if result.has_attribute('netconfigFileData'):
             self.data = result.get_attr_values('netconfigFileData')[0]
         else:
@@ -329,7 +329,7 @@ class NetconfigHardwareAddress(object):
 		return ret
 	
 	def __repr__(self):
-		print string.join(self.address, ':')
+		print(string.join(self.address, ':'))
 		
 	def raw(self):
 		return string.join(self.address, '')
@@ -454,11 +454,11 @@ class Netconfig(object):
                             value = value.strip('\'"')
                         config[name] = value
                 f.close()
-        if config.has_key('uri'):
+        if 'uri' in config:
             self.m_server = config['uri']
-        if config.has_key('host'):
+        if 'host' in config:
             self.m_server = config['host']
-        if config.has_key('base'):
+        if 'base' in config:
             self.m_base = config['base']
         
         
@@ -482,13 +482,13 @@ class Netconfig(object):
                             value = value.strip('\'"')
                         config[name] = value
                 f.close()
-        if config.has_key('server'):
+        if 'server' in config:
             self.m_server = config['server']
-        if config.has_key('base'):
+        if 'base' in config:
             self.m_base = config['base']
-        if config.has_key('user') and len(config['user']) != 0:
+        if 'user' in config and len(config['user']) != 0:
             self.m_user = config['user']
-        if config.has_key('password') and len(config['password']) != 0:
+        if 'password' in config and len(config['password']) != 0:
             self.m_password = config['password']
             
     def _initEnvironment(self):
@@ -668,7 +668,7 @@ class Netconfig(object):
                     else:
                         childs[next] = rawvalue
                         next += 1
-                for child in childs.values():
+                for child in list(childs.values()):
                     #print child
                     self._getSubMenus(child,childmenu)
                 menu.addChild(childmenu)
@@ -732,11 +732,11 @@ class Netconfig(object):
     
         return res
     def _expandString(self, str):
-        for (e, v) in self.m_environ.items():
+        for (e, v) in list(self.m_environ.items()):
             str = str.replace('$' + e,v)
         return str
     def addEnvironment(self, environ):
-        for (n, v) in environ.items():
+        for (n, v) in list(environ.items()):
             self.m_environ[n] = v
         
     def getString(self, name, default_value=''):

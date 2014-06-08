@@ -42,8 +42,8 @@ import datetime
 import logging
 import sys
 import os
-import configfile
-import management
+from . import configfile
+from . import management
 
 class Statistics(object):
     def __init__(self):
@@ -86,7 +86,7 @@ class Statistics(object):
                 self._properties.append(prop)
             self._it = iter(self._properties)
 
-        def next(self):
+        def __next__(self):
             return next(self._it)
 
     def __iter__(self):
@@ -255,7 +255,7 @@ class State(object):
 class ConnectedClient(object):
     def __init__(self, headers, row):
         self.name = row[1]
-        self._info = dict(zip(headers, row[1:]))
+        self._info = dict(list(zip(headers, row[1:])))
         
         self.connected_since = self._get_info('Connected Since (time_t)', type=datetime.datetime, default_value=0)
         self.virtual_address = self._get_info('Virtual Address', type=str)
@@ -282,7 +282,7 @@ class ConnectedClient(object):
 class RoutingTableEntry(object):
     def __init__(self, headers, row):
         self.name = row[1]
-        self._info = dict(zip(headers, row[1:]))
+        self._info = dict(list(zip(headers, row[1:])))
         
         self.last_ref = self._get_info('Last Ref (time_t)', type=datetime.datetime, default_value=0)
         self.virtual_address = self._get_info('Virtual Address', type=str)
@@ -523,19 +523,19 @@ if __name__ == '__main__':
             parser = StatusFile(filename=file)
         else:
             parser = StatusFile(config_name=file)
-        print("="*79)
+        print(("="*79))
         print(file)
-        print("="*79)
+        print(("="*79))
         print("Last updated")
         pprint.pprint(parser.last_update)
         print("Connected clients")
         pprint.pprint(parser.connected_clients)
-        print("-"*79)
+        print(("-"*79))
         print("Routing table")
         pprint.pprint(parser.routing_table)
-        print("-"*79)
+        print(("-"*79))
         print("Additional details")
         pprint.pprint(parser.details)
-        print("-"*79)
+        print(("-"*79))
         print("Statistics")
         pprint.pprint(parser.statistics)

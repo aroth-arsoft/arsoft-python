@@ -6,7 +6,7 @@ import argparse
 import ldap
 import ldap.modlist as modlist
 import string
-from action_base import *
+from .action_base import *
 
 class action_database(action_base):
 
@@ -95,34 +95,34 @@ class action_database(action_base):
                 else:
                     show_db = True
                 if show_db:
-                    print('Database: ' + str(db['suffix']) + ' (' + db['type'] + ')')
-                    print('  dn:        ' + str(db['dn']))
-                    print('  root dn:   ' + str(db['rootdn']))
+                    print(('Database: ' + str(db['suffix']) + ' (' + db['type'] + ')'))
+                    print(('  dn:        ' + str(db['dn'])))
+                    print(('  root dn:   ' + str(db['rootdn'])))
                     if db['readonly'] is not None:
-                        print('  read-only: ' + ('yes' if db['readonly'] == True else 'no'))
+                        print(('  read-only: ' + ('yes' if db['readonly'] == True else 'no')))
                     if db['mirrormode'] is not None:
-                        print('  mirror mode: ' + ('yes' if db['mirrormode'] == True else 'no'))
+                        print(('  mirror mode: ' + ('yes' if db['mirrormode'] == True else 'no')))
 
                     if len(db['index']) != 0:
                         print('  index:')
-                        for idx in db['index'].values():
-                            print('    ' + str(idx))
+                        for idx in list(db['index'].values()):
+                            print(('    ' + str(idx)))
                     if len(db['access']) != 0:
                         print('  access:')
-                        for idx in db['access'].values():
-                            print('    ' + str(idx))
+                        for idx in list(db['access'].values()):
+                            print(('    ' + str(idx)))
                     if len(db['config']) != 0:
                         print('  config:')
-                        for idx in db['config'].values():
-                            print('    ' + str(idx))
+                        for idx in list(db['config'].values()):
+                            print(('    ' + str(idx)))
                     if len(db['overlay']) != 0:
                         print('  overlay:')
-                        for overlay in db['overlay'].values():
-                            print('    ' + overlay['name'] + '(' + str(overlay['type']) + ')')
+                        for overlay in list(db['overlay'].values()):
+                            print(('    ' + overlay['name'] + '(' + str(overlay['type']) + ')'))
                     if len(db['replication']) != 0:
                         print('  replication:')
                         for repl in db['replication']:
-                            print('    ' + str(repl))
+                            print(('    ' + str(repl)))
         else:
             print("Databases: <none>")
         return 0 

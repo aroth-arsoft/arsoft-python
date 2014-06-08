@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -40,7 +40,7 @@ class ManageHostsApp(object):
             for val in args.opts[1:]:
                 update_values.extend(val.split(','))
             if self.verbose:
-                print('update host %s to %s' % (update_key, ','.join(update_values)))
+                print(('update host %s to %s' % (update_key, ','.join(update_values))))
             self.hostsfile[update_key] = update_values
             ok = self.hostsfile.save()
             if not ok:
@@ -50,7 +50,7 @@ class ManageHostsApp(object):
         elif args.action == 'remove':
             for host in args.opts:
                 if self.verbose:
-                    print('remove host %s' % host)
+                    print(('remove host %s' % host))
                 self.hostsfile[host] = []
 
             ok = self.hostsfile.save()
@@ -60,7 +60,7 @@ class ManageHostsApp(object):
             ret = 0 if ok else 1
         elif args.action == 'list':
             for (address, hostnames) in self.hostsfile:
-                print('%s\t%s' % (address, ','.join(hostnames)))
+                print(('%s\t%s' % (address, ','.join(hostnames))))
         elif args.action == 'set-hostname':
             if len(args.opts) == 0:
                 sys.stderr.write('No hostname specified.\n')
@@ -129,7 +129,7 @@ class ManageHostsApp(object):
 
                     if self.verbose:
                         for (address, hostnames) in self.hostsfile:
-                            print('%s\t%s' % (address, ','.join(hostnames)))
+                            print(('%s\t%s' % (address, ','.join(hostnames))))
 
                     if ok:
                         ok = sethostname(new_hostname)

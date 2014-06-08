@@ -704,23 +704,23 @@ if __name__ == '__main__':
     e = Disks()
     print('devices:')
     for obj in e.devices:
-        print('  ' + str(obj))
+        print(('  ' + str(obj)))
 
     print('disks:')
     for obj in e.disks:
-        print('  %s %s (%s)'%(str(obj.vendor), str(obj.model), str(obj.serial)))
+        print(('  %s %s (%s)'%(str(obj.vendor), str(obj.model), str(obj.serial))))
         for child in obj.childs:
-            print('    %s'%(str(child.nativepath)))
+            print(('    %s'%(str(child.nativepath))))
 
     print('partitions:')
     for obj in e.partitions:
-        print('  ' + str(obj))
+        print(('  ' + str(obj)))
 
     print('root partition:')
-    print(e.root_partition)
+    print((e.root_partition))
 
     print('system disk:')
-    print(e.system_disk)
+    print((e.system_disk))
 
     root_disk = e.find_disk_for_file('/')
     print('root disk:')

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from base import xdg_menu_file
+from .base import xdg_menu_file
 from arsoft.utils import runcmd
 import os.path
 import tempfile
@@ -25,13 +25,13 @@ class DesktopMenu(xdg_menu_file):
 
 if __name__ == '__main__':
     m1 = DesktopMenu('/etc/xdg/menus/kde4-applications.menu')
-    print(m1.root)
+    print((m1.root))
     
     m2 = DesktopMenu(company='arsoft', product='hello', name='world')
     m2.root.name = 'Applications'
     m2.root.add_child('Tools', 'dirddname')
     m2.root.add_child('Tools', 'dirname', includes=['test.desktop'])
-    print(m2.root)
+    print((m2.root))
     m2.save('test.menu')
 
     m2.install()

@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-import xmlrpclib
+import xmlrpc.client
 import sys
-from urlparse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin
 
 class TracXmlrpc(object):
     def __init__(self, url=None, server=None, base='/', username=None, password=None, https=True):
@@ -26,7 +26,7 @@ class TracXmlrpc(object):
             o = urlparse(uri)
 
         self._url = o.geturl()
-        print(self._url)
+        print((self._url))
 
         self._server = server
         self._base = base
@@ -40,7 +40,7 @@ class TracXmlrpc(object):
     def _connect(self):
         url = self._url + '/login/xmlrpc'
         print(url)
-        self._cxn = xmlrpclib.ServerProxy(url)
+        self._cxn = xmlrpc.client.ServerProxy(url)
         return True if self._cxn is not None else False
         
     @property
@@ -56,6 +56,6 @@ class TracXmlrpc(object):
 
 if __name__ == '__main__':
     t = TracXmlrpc(url=sys.argv[1])
-    print(t.api_version)
-    print(t.methods)
+    print((t.api_version))
+    print((t.methods))
  

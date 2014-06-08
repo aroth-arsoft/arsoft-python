@@ -61,9 +61,9 @@ GIT_CLIENT_HOOKS = ['applypatch-msg',
 GIT_HOOKS = GIT_SERVER_HOOKS + GIT_CLIENT_HOOKS
 
 if __name__ == '__main__':
-    print('GIT_EXECUTABLE=%s' % (GIT_EXECUTABLE))
-    print('GIT_VERSION_STR=%s' % (GIT_VERSION_STR))
-    print('GIT_VERSION=%s' % (str(GIT_VERSION)))
-    print('GIT_SERVER_HOOKS=%s' % (GIT_SERVER_HOOKS))
-    print('GIT_CLIENT_HOOKS=%s' % (GIT_CLIENT_HOOKS))
-    print('GIT_HOOKS=%s' % (GIT_HOOKS))
+    print(('GIT_EXECUTABLE=%s' % (GIT_EXECUTABLE)))
+    print(('GIT_VERSION_STR=%s' % (GIT_VERSION_STR)))
+    print(('GIT_VERSION=%s' % (str(GIT_VERSION))))
+    print(('GIT_SERVER_HOOKS=%s' % (GIT_SERVER_HOOKS)))
+    print(('GIT_CLIENT_HOOKS=%s' % (GIT_CLIENT_HOOKS)))
+    print(('GIT_HOOKS=%s' % (GIT_HOOKS)))

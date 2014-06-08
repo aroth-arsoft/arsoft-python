@@ -136,9 +136,9 @@ class ManagementInterface(object):
 if __name__ == '__main__':
     m = ManagementInterface('unix:/run/openvpn.' + sys.argv[1] + '.socket')
     if m.open():
-        print(m.version)
+        print((m.version))
         r = m.status()
         print (r)
         m.close()
     else:
-        print('failed to open openvpn management socket ' + sys.argv[1])
+        print(('failed to open openvpn management socket ' + sys.argv[1]))

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -64,14 +64,14 @@ class trac_manage(object):
                 if reponame == '':
                     reponame = '(default)'
                 if repoalias:
-                    print('%s: alias for %s' %(reponame, repoalias))
+                    print(('%s: alias for %s' %(reponame, repoalias)))
                 else:
-                    print('%s: %s (%s)' %(reponame, repodir, repotype))
+                    print(('%s: %s (%s)' %(reponame, repodir, repotype)))
             ret = True
         elif args.action_config_repos:
             inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
             if not inifile.open(args.action_config_repos[0]):
-                print('Failed to open %s' % (args.action_config_repos[0]))
+                print(('Failed to open %s' % (args.action_config_repos[0])))
                 ret = False
             else:
                 supported_repository_types = self._trac.supported_repository_types
@@ -110,7 +110,7 @@ class trac_manage(object):
                         else:
                             result = self._trac.add_repository_alias(reponame, repoalias)
                             if not result:
-                                print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
+                                print(('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error)))
                     else:
                         if repotype not in supported_repository_types:
                             if repotype == 'svn':
@@ -120,8 +120,8 @@ class trac_manage(object):
                                 self._enable_git()
                                 supported_repository_types = self._trac.supported_repository_types
                             else:
-                                print('Repository type %s of repository %s is not supported (only %s is supported).' % 
-                                    (repotype, reponame, ','.join(supported_repository_types)))
+                                print(('Repository type %s of repository %s is not supported (only %s is supported).' % 
+                                    (repotype, reponame, ','.join(supported_repository_types))))
                         changes = {}
                         if reponame in repos_to_remove:
                             # repo already exists, so check if we need to modify it
@@ -145,22 +145,22 @@ class trac_manage(object):
                                     changes['description'] = repodesc
                         if result:
                             if len(changes) != 0:
-                                print('modify repository %s changes=%s' % (reponame, str(changes)))
+                                print(('modify repository %s changes=%s' % (reponame, str(changes))))
                                 result = self._trac.modify_repository(reponame, changes)
                                 if not result:
-                                    print('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error))
+                                    print(('Failed to modify repository %s, error %s' % (reponame, self._trac.last_error)))
                         else:
-                            print('Failed to add repository %s, error %s' % (reponame, self._trac.last_error))
+                            print(('Failed to add repository %s, error %s' % (reponame, self._trac.last_error)))
                     if not result:
                         break
 
                 inifile.close()
 
                 if result:
-                    for reponame in repos_to_remove.iterkeys():
-                        print('remove repository %s' % (reponame))
+                    for reponame in list(repos_to_remove.keys()):
+                        print(('remove repository %s' % (reponame)))
                         if not self._trac.remove_repository(reponame):
-                            print('Failed to remove repository %s, error %s' % (reponame, self._trac.last_error))
+                            print(('Failed to remove repository %s, error %s' % (reponame, self._trac.last_error)))
                             result = False
                             break
                 ret = True if result else False
@@ -179,7 +179,7 @@ class trac_manage(object):
             ret = True
             for reponame in selected_repos:
                 if not self._trac.sync_repository(reponame, clean=True if resync else False):
-                    print('Failed to %s repository %s, error %s' % ('re-sync' if resync else 'sync', reponame, self._trac.last_error))
+                    print(('Failed to %s repository %s, error %s' % ('re-sync' if resync else 'sync', reponame, self._trac.last_error)))
                     ret = False
         else:
             print('No action specified.')

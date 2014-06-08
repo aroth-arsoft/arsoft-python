@@ -57,7 +57,7 @@ class arsoft_daemon_runner(runner.DaemonRunner):
         """ Emit a usage message, then exit.
             """
         usage_exit_code = 2
-        action_usage = "|".join(self.action_funcs.keys())
+        action_usage = "|".join(list(self.action_funcs.keys()))
         message = "usage: %(progname)s %(action_usage)s" % (self.progname, action_usage)
         runner.emit_message(message)
         sys.exit(usage_exit_code)
@@ -151,7 +151,7 @@ def pidfile_status(pidfile):
         try:
             os.kill(pidfile_pid, signal.SIG_DFL)
             result = (True, pidfile_pid)
-        except OSError, exc:
+        except OSError as exc:
             if exc.errno == errno.ESRCH:
                 # The specified PID does not exist
                 result = (False, pidfile_pid)

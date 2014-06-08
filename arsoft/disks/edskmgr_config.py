@@ -24,7 +24,7 @@ class RegisteredDiskList(object):
     def reset(self):
         ret = True
         # remove all items to make sure the config is clean
-        for (filename, item) in self._config_items.iteritems():
+        for (filename, item) in self._config_items.items():
             if os.path.exists(filename):
                 try:
                     os.remove(filename)
@@ -40,7 +40,7 @@ class RegisteredDiskList(object):
     @property
     def disks(self):
         ret = []
-        for item in self._config_items.itervalues():
+        for item in self._config_items.values():
             value = item.get(None, self._key, default=None)
             if value:
                 ret.append( value )
@@ -81,7 +81,7 @@ class RegisteredDiskList(object):
         ret = True
         if self._dirty:
             # only save the config when it's marked as dirty
-            for (filename, item) in self._config_items.iteritems():
+            for (filename, item) in self._config_items.items():
                 if item.empty:
                     if os.path.exists(filename):
                         try:
@@ -99,7 +99,7 @@ class RegisteredDiskList(object):
     def register_disk(self, name, pattern):
         # first check if the pattern already exists
         found_in_file = None
-        for item in self._config_items.itervalues():
+        for item in self._config_items.values():
             value = item.get(None, self._key, default=None)
             if value and value == pattern:
                 found_in_file = item
@@ -117,7 +117,7 @@ class RegisteredDiskList(object):
         #print('unregister_disk %s, %s' %(name, pattern))
         # first check if the pattern already exists
         ret = False
-        for item in self._config_items.itervalues():
+        for item in self._config_items.values():
             value = item.get(None, self._key, default=None)
             if value and value == pattern:
                 #print('remove ' + self._key)
@@ -253,7 +253,7 @@ class ExternalDiskManagerConfig(object):
                     if item.is_valid:
                         self._items.append(item)
                     else:
-                        print('config item %s is invalid' % (fullpath))
+                        print(('config item %s is invalid' % (fullpath)))
         except (IOError, OSError) as e:
             self._last_error = str(e)
             ret = False

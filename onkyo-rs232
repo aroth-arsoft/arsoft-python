@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -91,7 +91,7 @@ class OnkyoRS232(object):
             ret = '!1' + raw_cmd if self.ser is not None else raw_cmd
         else:
             ret = None
-            for re_cmd, re_raw_cmd in ONKYO_HIGHLEVEL_COMMANDS_WITH_ARGS.iteritems():
+            for re_cmd, re_raw_cmd in ONKYO_HIGHLEVEL_COMMANDS_WITH_ARGS.items():
                 m = re_cmd.match(cmd)
                 if m:
                     if m.groups:
@@ -130,11 +130,11 @@ class OnkyoRS232(object):
     
     def discover(self, timeout=5):
         for receiver in eISCP.discover(timeout=timeout):
-            print('%s %s:%s' % (receiver.info['model_name'], receiver.host, receiver.port) )
+            print(('%s %s:%s' % (receiver.info['model_name'], receiver.host, receiver.port) ))
         return 0
     
     def version(self):
-        print('Version %s' % __version__)
+        print(('Version %s' % __version__))
         return 0
 
     def main(self):
@@ -202,7 +202,7 @@ class OnkyoRS232(object):
 
                     if raw_cmd:
                         if self.verbose:
-                            print("send %s" % raw_cmd)
+                            print(("send %s" % raw_cmd))
                         self.ser.write(raw_cmd + '\r\n')      #write a string
                         if raw_cmd[5] == 'Q':
                             resp = self.ser.readline()
@@ -232,7 +232,7 @@ class OnkyoRS232(object):
 
                     if raw_cmd:
                         if self.verbose:
-                            print("send %s" % raw_cmd)
+                            print(("send %s" % raw_cmd))
                         response = self.net.raw(raw_cmd + '\r\n')      #write a string
                         if raw_cmd[3] == 'Q':
                             #response = iscp_to_command(response)

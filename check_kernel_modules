@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import os,sys
 from datetime import datetime, timedelta
 
@@ -14,7 +14,7 @@ np.add_arg('c', 'critical', 'list of the modules to issue a critical status when
 ## This starts the actual plugin activation
 np.activate()
 
-modlist = kernel_module.get_module_list().keys()
+modlist = list(kernel_module.get_module_list().keys())
 np.set_value('modules', modlist)
 
 ok_modules = []

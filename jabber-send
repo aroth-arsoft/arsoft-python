@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -20,11 +20,11 @@ class jabbersend:
         self._config = None
 
     def version(self):
-        print('Version: ' + str(__version__))
-        print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
+        print(('Version: ' + str(__version__)))
+        print(('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__)))
         info = arsoft.xmpp.backend_info()
-        print('Backend: ' + str(info.name))
-        print('Backend Version: ' + str(info.version))
+        print(('Backend: ' + str(info.name)))
+        print(('Backend Version: ' + str(info.version)))
         return 0
 
     def main(self):
@@ -141,9 +141,9 @@ class jabbersend:
 
         if self.verbose:
             if len(body) != 0:
-                print('Send message \'%s\' from %s to %s' %(body, sender, recipient))
+                print(('Send message \'%s\' from %s to %s' %(body, sender, recipient)))
             else:
-                print('Send message \'%s\' from %s to %s' %(html, sender, recipient))
+                print(('Send message \'%s\' from %s to %s' %(html, sender, recipient)))
             
         if arsoft.xmpp.send_message(sender, password, recipient, body, 
                                     html=html, subject=subject, 

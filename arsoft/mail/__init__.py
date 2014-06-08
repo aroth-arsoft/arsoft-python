@@ -2,5 +2,5 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from mail import *
-from sendmail import *
+from .mail import *
+from .sendmail import *

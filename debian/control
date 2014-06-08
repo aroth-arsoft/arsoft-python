@@ -16,7 +16,7 @@ Description: common files for the AR Soft python scripts
 
 Package: python3-arsoft
 Architecture: all
-Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp, python3-magic
+Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp, python3-magic, python3-lxml
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 

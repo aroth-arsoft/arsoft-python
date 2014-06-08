@@ -3,7 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import os
-from pem import *
+from .pem import *
 from OpenSSL import crypto
 
 class KeyItem(PEMItem):
@@ -142,7 +142,7 @@ class KeyList:
             else:
                 unique_files[keyfile] = [ key ]
         
-        for keyfile, keylist in unique_files.iteritems():
+        for keyfile, keylist in unique_files.items():
             pemfile = PEMFile()
             for key in keylist:
                 pemfile.append(key)

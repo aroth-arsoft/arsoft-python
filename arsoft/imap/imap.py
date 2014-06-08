@@ -36,8 +36,8 @@ try:
     import imaplib
     import re
     from binascii import b2a_base64
-except ImportError, e:
-    print e
+except ImportError as e:
+    print(e)
     exit(1)
 
 Commands = {
@@ -326,7 +326,7 @@ class CYRUS:
     
     def __verbose(self, msg):
         if self.VERBOSE:
-            print >> self.LOGFD, msg
+            print(msg, file=self.LOGFD)
 
     def __doexception(self, function, msg=None, *args):
         if msg is None:
@@ -366,7 +366,7 @@ class CYRUS:
             res, msg = wrapped(*args)
             if ok(res):
                 return res, msg
-        except Exception, info:
+        except Exception as info:
             error = info.args[0].split(':').pop().strip()
             if error.upper().startswith('BAD'):
                 error = error.split('BAD', 1).pop().strip()
@@ -391,7 +391,7 @@ class CYRUS:
         try:
             res, msg = self.m.login(username, password)
             admin = self.m.isadmin()
-        except Exception, info:
+        except Exception as info:
             error = info.args[0].split(':').pop().strip()
             self.__doexception("LOGIN", error)
         if admin or forceNoAdmin:
@@ -425,7 +425,7 @@ class CYRUS:
     def logout(self):
         try:
             res, msg = self.m.logout()
-        except Exception, info:
+        except Exception as info:
             error = info.args[0].split(':').pop().strip()
             self.__doexception("LOGOUT", error)
         self.AUTH = False
@@ -450,7 +450,7 @@ class CYRUS:
         if re.search("&", text):
             text = re.sub("/", "+AC8-", text)
             text = re.sub("&", "+", text)
-            text = unicode(text, 'utf-7').encode(self.ENCODING)
+            text = str(text, 'utf-7').encode(self.ENCODING)
         return text
 
     def encode(self, text):
@@ -462,7 +462,7 @@ class CYRUS:
     def __decode(self, text):
         text = re.sub("/", "-&", text)
         text = re.sub(" ", "-@", text)
-        text = unicode(text, self.ENCODING).encode('utf-7')
+        text = str(text, self.ENCODING).encode('utf-7')
         text = re.sub("-@", " ", text)
         text = re.sub("-&", "/", text)
         text = re.sub("\+", "&", text)
@@ -554,7 +554,7 @@ class CYRUS:
             try:
                 userid = self.encode(aclList[i])
                 rights = aclList[i + 1]
-            except Exception, info:
+            except Exception as info:
                 self.__verbose( '[GETACL %s] BAD: %s' % (mailbox, info.args[0]) )
                 raise self.__doraise("GETACL")
             self.__verbose( '[GETACL %s] %s %s' % (mailbox, userid, rights) )
@@ -593,7 +593,7 @@ class CYRUS:
         self.__prepare('SETQUOTA', mailbox)
         try:
             limit = int(limit)
-        except ValueError, e:
+        except ValueError as e:
             self.__verbose( '[SETQUOTA %s] BAD: %s %s' % (mailbox, self.ERROR.get("SETQUOTA")[1], limit) )
             raise self.__doraise("SETQUOTA")
         res, msg = self.__docommand("setquota", self.decode(mailbox), limit)
@@ -616,9 +616,9 @@ class CYRUS:
             key = annotation[3]
             value = annotation[7]
             self.__verbose( '[GETANNOTATION %s] %s: %s' % (mbx, key, value) )
-            if not ann.has_key(mbx):
+            if mbx not in ann:
                 ann[mbx] = {}
-            if not ann[mbx].has_key(key):
+            if key not in ann[mbx]:
                 ann[mbx][key] = value
         return ann
 

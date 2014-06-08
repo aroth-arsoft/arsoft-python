@@ -38,5 +38,5 @@ class TracConfig(object):
 if __name__ == '__main__':
     t = TracConfig(tracenv=sys.argv[1])
     t.open()
-    print(t.enabled_components)
+    print((t.enabled_components))
  

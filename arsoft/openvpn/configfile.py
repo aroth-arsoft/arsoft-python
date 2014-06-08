@@ -11,9 +11,9 @@ import os
 from arsoft.inifile import *
 from arsoft.crypto import CertificateFile, CRLFile
 from arsoft.utils import replace_invalid_chars, is_quoted_string, unquote_string, quote_string
-import config
-from ccdfile import CCDFile
-import StringIO
+from . import config
+from .ccdfile import CCDFile
+import io
 
 class ConfigFile(object):
     def __init__(self, filename=None, config_name=None, zipfile=None):
@@ -883,7 +883,7 @@ push "persist-tun"
     'server_auth':server_auth,
     'routes':'\n'.join(routes)
         }
-        zip_cfgfile_stream = StringIO.StringIO(template_buf)
+        zip_cfgfile_stream = io.StringIO(template_buf)
         return ConfigFile(zip_cfgfile_stream)
 
     def __str__(self):

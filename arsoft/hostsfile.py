@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from utils import platform_is_windows
+from .utils import platform_is_windows
 
 import os
 import sys
@@ -223,14 +223,14 @@ class HostsFile(object):
                 self._content.append(new_line)
                 
     def __iter__(self):
-        return self.hosts.iteritems()
+        return iter(self.hosts.items())
 
 if __name__ == "__main__":
     hosts = HostsFile()
     print(hosts)
-    print(hosts.hosts)
+    print((hosts.hosts))
     hosts['blubb'] = '12.1.1.1'
     hosts['127.0.0.1'] = '10.1.1.1'
-    print(hosts.hosts)
+    print((hosts.hosts))
     hosts.save('/tmp/hosts')
 

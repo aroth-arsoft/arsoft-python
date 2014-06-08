@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -232,7 +232,7 @@ class iniutil(object):
                         modified = True
                 elif action == 'get':
                     value = self.inifile.get(section, key, default=value)
-                    print(self.format_value(section, key, value, only_values=args.only_values))
+                    print((self.format_value(section, key, value, only_values=args.only_values)))
                 elif action == 'delete':
                     success = self.inifile.remove(section, key)
                     if not success:

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -25,29 +25,29 @@ class certinfo:
         self._crl_list = CRLList()
         for filename in filenames:
             if self._verbose:
-                print('add %s' % str(filename))
+                print(('add %s' % str(filename)))
             filename_result = False
             num_keys = len(self._key_list)
             num_certs = len(self._certificate_list)
             num_crls = len(self._crl_list)
             if not filename_result and self._key_list.add(filename):
                 if self._verbose:
-                    print('add keys from %s' % str(filename))
+                    print(('add keys from %s' % str(filename)))
                 if len(self._key_list) > num_keys:
                     filename_result = True
             if not filename_result and self._certificate_list.add(filename):
                 if self._verbose:
-                    print('add certicates from %s' % str(filename))
+                    print(('add certicates from %s' % str(filename)))
                 if len(self._certificate_list) > num_certs:
                     filename_result = True
             if not filename_result and self._crl_list.add(filename):
                 if self._verbose:
-                    print('add CRL from %s' % str(filename))
+                    print(('add CRL from %s' % str(filename)))
                 if len(self._crl_list) > num_crls:
                     filename_result = True
             if not filename_result:
                 ret = False
-                print("Failed to add " + str(filename))
+                print(("Failed to add " + str(filename)))
         return ret
 
     def find(self, term, output_number=True):
@@ -57,7 +57,7 @@ class certinfo:
             num_certs = num_certs + 1
 
         if output_number:
-            print("Number of certificates: " + str(num_certs))
+            print(("Number of certificates: " + str(num_certs)))
 
     def _addcertfile(self, cert_filename, directory=None, enable=True):
         (tmp, certs) = self._readCertFile(cert_filename)
@@ -137,12 +137,12 @@ class certinfo:
                     cert_basename = self._getFilenameForCert(cert)
                 
                     certfile = os.path.join(outdir, cert_basename)
-                    print("extract to " + certfile)
+                    print(("extract to " + certfile))
                     self._writeCertFile(certfile, [cert] )
                     num_certs = num_certs + 1
 
         if output_number:
-            print("Number of certificates: " + str(num_certs))
+            print(("Number of certificates: " + str(num_certs)))
         return False
         
     def update(self, outdir, expired_only=False, valid_only=True, output_number=True):

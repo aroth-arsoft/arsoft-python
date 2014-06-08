@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -35,13 +35,13 @@ class IMAPCheckApp(object):
         typ, data = self._cxn.search(None, 'ALL')
         for num in data[0].split():
             typ, data = self._cxn.fetch(num, '(RFC822)')
-            print 'Message %s\n%s\n' % (num, data[0][1])
+            print('Message %s\n%s\n' % (num, data[0][1]))
             
     def _annotate(self, mailbox, entry, attribute):
         try:
-            print self._cxn.getannotation(mailbox, entry, attribute)
+            print(self._cxn.getannotation(mailbox, entry, attribute))
         except Exception as e:
-            print(str(e))
+            print((str(e)))
         self._cxn.setannotation(mailbox, entry, attribute)
 
     def main(self, argv=None):
@@ -69,10 +69,10 @@ class IMAPCheckApp(object):
         else:
             #self._list(self._mailbox)
             try:
-                print self._cxn.getannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv")')
+                print(self._cxn.getannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv")'))
             except Exception as e:
-                print(str(e))
-            print self._cxn.setannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv" "42")')
+                print((str(e)))
+            print(self._cxn.setannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv" "42")'))
             ret = 0
         self._disconnect()
         

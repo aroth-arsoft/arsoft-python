@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -63,11 +63,11 @@ class jabberdaemon:
             self.files_preserve=[]
 
     def version(self):
-        print('Version: ' + str(__version__))
-        print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
+        print(('Version: ' + str(__version__)))
+        print(('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__)))
         info = arsoft.xmpp.backend_info()
-        print('Backend: ' + str(info.name))
-        print('Backend Version: ' + str(info.version))
+        print(('Backend: ' + str(info.name)))
+        print(('Backend Version: ' + str(info.version)))
         return 0
     
     def _xmpp_handler(self, xmppbot, eventtype, *args):
@@ -106,7 +106,7 @@ class jabberdaemon:
                 self._sock.close()
 
     def run(self):
-        self._sock = create_unix_socket(self.socket_path, 0666)
+        self._sock = create_unix_socket(self.socket_path, 0o666)
         self._bot = arsoft.xmpp.message_bot(self.sender, 
                                             self.password, 
                                             callback=self._xmpp_handler, 
@@ -212,7 +212,7 @@ class jabberdaemon:
         if args.start_daemon:
             socket_dir = os.path.dirname(self.socket_path)
             if not os.path.isdir(socket_dir):
-                os.mkdir(socket_dir, 0755)
+                os.mkdir(socket_dir, 0o755)
             try:
                 os.chown(socket_dir, to_uid(self.daemon_user), to_gid(self.daemon_group))
             except OSError:

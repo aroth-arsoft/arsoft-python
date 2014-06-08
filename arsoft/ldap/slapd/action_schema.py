@@ -4,7 +4,7 @@ import argparse
 import string
 import ldap
 import ldap.modlist as modlist
-from action_base import *
+from .action_base import *
 
 class action_schema(action_base):
 
@@ -113,7 +113,7 @@ class action_schema(action_base):
             print("Schemas:")
             for schemaidx in sorted(self._schemas.keys()):
                 schemaname = self._schemas[schemaidx]
-                print('  ' + schemaname)
+                print(('  ' + schemaname))
         else:
             print("Schemas: <none>")
         return 0 

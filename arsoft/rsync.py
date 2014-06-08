@@ -5,7 +5,7 @@
 import tempfile
 from .filelist import *
 from .utils import runcmdAndGetData
-import urlparse
+import urllib.parse
 import sys
 
 class RsyncDefaults(object):
@@ -123,7 +123,7 @@ class Rsync(object):
             tmp_fobj.close()
             args.append('--include-from=' + tmp_include)
             if self.verbose:
-                print('Include=[%s]' % self._include)
+                print(('Include=[%s]' % self._include))
 
         if self._exclude:
             tmp_fd, tmp_exclude = tempfile.mkstemp()
@@ -133,7 +133,7 @@ class Rsync(object):
             tmp_fobj.close()
             args.append('--exclude-from=' + tmp_exclude)
             if self.verbose:
-                print('Exclude=[%s]' % self._exclude)
+                print(('Exclude=[%s]' % self._exclude))
 
         if self.linkDest:
             linkDest_url = Rsync.parse_url(self.linkDest)
@@ -154,13 +154,13 @@ class Rsync(object):
             else:
                 args.append('/')
             if self.verbose:
-                print('Source=[%s]' % self._source)
+                print(('Source=[%s]' % self._source))
         else:
             args.append(self._source)
         args.append(self._normalize_url(self._dest))
 
         if self.verbose:
-            print("runcmd " + ' '.join(args))
+            print(("runcmd " + ' '.join(args)))
 
         (status_code, stdout_data, stderr_data) = runcmdAndGetData(self._rsync_bin, args, stdout=stdout, stderr_to_stdout=stderr_to_stdout, verbose=self.verbose)
         ret = True if status_code == 0 else False
@@ -175,7 +175,7 @@ class Rsync(object):
 
     @staticmethod
     def _normalize_url(url):
-        o = urlparse.urlparse(url)
+        o = urllib.parse.urlparse(url)
         if o.scheme == 'rsync':
             ret = ''
             if o.username:
@@ -190,12 +190,12 @@ class Rsync(object):
 
     @staticmethod
     def is_rsync_url(url):
-        o = urlparse.urlparse(url)
+        o = urllib.parse.urlparse(url)
         return True if o.scheme == 'rsync' else False
 
     @staticmethod
     def parse_url(url):
-        o = urlparse.urlparse(url)
+        o = urllib.parse.urlparse(url)
         if o.scheme == 'rsync':
             return o
         else:
@@ -216,16 +216,16 @@ class Rsync(object):
                 ret += os.path.join(base.path, url)
             return ret
         else:
-            return urlparse.urljoin(base, url)
+            return urllib.parse.urljoin(base, url)
         
     @staticmethod
     def is_link_dest_valid(destination, link_dest_dir):
         if '://' in destination:
-            url_destination = urlparse.urlparse(destination)
+            url_destination = urllib.parse.urlparse(destination)
         else:
             url_destination = None
         if link_dest_dir and '://' in link_dest_dir:
-            url_link_dest = urlparse.urlparse(link_dest_dir)
+            url_link_dest = urllib.parse.urlparse(link_dest_dir)
         else:
             url_link_dest = None
         if url_destination and url_link_dest:

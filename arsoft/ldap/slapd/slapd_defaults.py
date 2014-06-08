@@ -3,7 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.inifile import IniFile
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 class slapd_defaults(object):
     def __init__(self, filename='/etc/default/slapd'):
@@ -73,7 +73,7 @@ class slapd_defaults(object):
 
     def to_string(self):
         elems = []
-        for (key, value) in self._data.items():
+        for (key, value) in list(self._data.items()):
             if value is not None:
                 key_value_pair = key + '="' + str(value) + '"'
                 elems.append(key_value_pair)
@@ -88,7 +88,7 @@ class slapd_defaults(object):
 if __name__ == "__main__":
     s = slapd_defaults()
     print(s)
-    print(s.services)
-    print(s.public_services)
+    print((s.services))
+    print((s.public_services))
 
 

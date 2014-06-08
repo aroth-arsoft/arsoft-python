@@ -45,7 +45,6 @@ nosetests.xml
 *.exe
 *.o
 *.obj
-*.so
 *~
 *.bak
 *.7z
@@ -72,3 +71,4 @@ Thumbs.db
 *.old
 /.kdev4/
 /*.kdev4
+/.pybuild/

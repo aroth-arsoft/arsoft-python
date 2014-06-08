@@ -8,11 +8,11 @@ from arsoft.zipfileutils import ZipFileEx
 import arsoft.crypto
 from arsoft.sshutils import *
 from OpenSSL import crypto
-from configfile import ConfigFile
-from systemconfig import SystemConfig
+from .configfile import ConfigFile
+from .systemconfig import SystemConfig
 import arsoft.utils
 import zipfile
-import StringIO
+import io
 
 class ZippedConfigFile(object):
 
@@ -99,7 +99,7 @@ class ZippedConfigFile(object):
             
             ret = org_keyfile.open()
             if ret:
-                zip_keyfile_stream = StringIO.StringIO()
+                zip_keyfile_stream = io.StringIO()
                 ret = org_keyfile.export(zip_keyfile_stream, key_passphrase)
                 if ret:
                     data = zip_keyfile_stream.getvalue()
@@ -147,14 +147,14 @@ class ZippedConfigFile(object):
                 if ret and cfgfile.client_config_directory:
                     #print('ccd dir %s' % (cfgfile.client_config_directory))
                     zip_cfgfile.client_config_directory = cfgfile.suggested_private_directory + '/ccd'
-                    for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
+                    for (client_name, client_config_file) in cfgfile.client_config_files.items():
                         #print('add %s as %s' % (client_config_file, client_name))
                         ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, client_config_file.filename, cfgfile.suggested_private_directory + '/ccd/' + client_name)
                         if not ret:
                             break
                 if ret:
                     zip_cfgfile.name = cfgfile.name
-                    zip_cfgfile_stream = StringIO.StringIO()
+                    zip_cfgfile_stream = io.StringIO()
                     ret = zip_cfgfile.save(zip_cfgfile_stream)
                     if ret:
                         fobj.writestr(zip_cfgfile.suggested_filename, zip_cfgfile_stream.getvalue())
@@ -296,7 +296,7 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(target_config_directory)
                     ret = True
-                except IOError, OSError:
+                except IOError as OSError:
                     ret = False
         if ret:
             private_config_directory = os.path.join(target_config_directory, cfgfile.suggested_private_directory)
@@ -304,7 +304,7 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(private_config_directory)
                     ret = True
-                except IOError, OSError:
+                except IOError as OSError:
                     ret = False
         if ret and cfgfile.cert_filename:
             ret = self.extract(cfgfile.cert_filename, private_config_directory, 'cert.pem')
@@ -342,10 +342,10 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(private_config_directory_ccd)
                     ret = True
-                except IOError, OSError:
+                except IOError as OSError:
                     ret = False
             if ret:
-                for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
+                for (client_name, client_config_file) in cfgfile.client_config_files.items():
                     ret = self.extract(client_config_file.filename, private_config_directory_ccd, client_name)
                     if not ret:
                         break
@@ -446,9 +446,9 @@ if __name__ == '__main__':
     c = ZippedConfigFile(sys.argv[1])
 
     print(c)
-    print(c.config_file)
-    print(c.config_file.ca_file)
-    print(c[c.config_file.ca_file])
-    print(iter(c))
+    print((c.config_file))
+    print((c.config_file.ca_file))
+    print((c[c.config_file.ca_file]))
+    print((iter(c)))
     for f in iter(c):
-        print(f.name)
+        print((f.name))

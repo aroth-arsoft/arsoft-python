@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -107,7 +107,7 @@ class ARSoftMailer(object):
                 ret = 1
             except smtplib.SMTPRecipientsRefused as e:
                 mail_server_errors = e[0]
-                for (recipient, error_desc) in mail_server_errors.items():
+                for (recipient, error_desc) in list(mail_server_errors.items()):
                     (status_code, error_msg) = error_desc
                     sys.stderr.write('Mail server refused recipients %s: %i %s\n' % (recipient, status_code, error_msg))
                 ret = 1

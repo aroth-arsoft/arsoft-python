@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -24,7 +24,7 @@ class ARSoftBackupApp(BackupApp):
             sys.stderr.write('No backup directory configured in %s\n' % (self.config.main_conf) )
             ret = False
         if self._verbose:
-            print(self.config)
+            print((self.config))
         return ret
 
     def _on_system_startup(self):
@@ -130,10 +130,10 @@ class ARSoftBackupApp(BackupApp):
         if not self._check_config():
             return 1
 
-        print('Active Plugins:   %s' % (','.join(self.config.active_plugins)))
-        print('Backup directory: %s' % (self.config.backup_directory))
-        print('Retention time:   %s' % (self.config.retention_time))
-        print('Retention count:  %i' % (self.config.retention_count))
+        print(('Active Plugins:   %s' % (','.join(self.config.active_plugins))))
+        print(('Backup directory: %s' % (self.config.backup_directory)))
+        print(('Retention time:   %s' % (self.config.retention_time)))
+        print(('Retention count:  %i' % (self.config.retention_count)))
 
         success = True
         failure_message = None
@@ -159,38 +159,38 @@ class ARSoftBackupApp(BackupApp):
                 disk = self._diskmgr.wait_for_disk(timeout=None)
             if disk:
                 print('Disk ready:       yes')
-                print('  Vendor:         %s' % (disk.vendor))
-                print('  Model:          %s' % (disk.model))
-                print('  Serial:         %s' % (disk.serial))
+                print(('  Vendor:         %s' % (disk.vendor)))
+                print(('  Model:          %s' % (disk.model)))
+                print(('  Serial:         %s' % (disk.serial)))
                 for part in disk.partitions:
                     if part.is_mounted:
-                        print('    %s:   %s' % (part.path, ','.join(part.mountpaths)))
+                        print(('    %s:   %s' % (part.path, ','.join(part.mountpaths))))
                     else:
-                        print('    %s:   not mounted' % (part.path))
+                        print(('    %s:   not mounted' % (part.path)))
             else:
-                print('Disk ready:       no (tag=%s)' % (self._diskmgr.disk_tag))
-            print('Used backup directory: %s' % (self._real_backup_dir))
+                print(('Disk ready:       no (tag=%s)' % (self._diskmgr.disk_tag)))
+            print(('Used backup directory: %s' % (self._real_backup_dir)))
 
-        print('Last success:     %s' % (self.job_state.last_success))
-        print('Last failure:     %s' % (self.job_state.last_failure))
+        print(('Last success:     %s' % (self.job_state.last_success)))
+        print(('Last failure:     %s' % (self.job_state.last_failure)))
         for item in self.job_state.history:
-            print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))
-            print('  Log file:  %s' % (item.logfile))
-            print('  Start:     %s ' % (item.startdate))
-            print('  End:       %s ' % (item.enddate))
-            print('  Directory: %s' % (item.backup_dir))
+            print(('%s (%s)' % (item.date, 'Success' if item.success else 'Failure')))
+            print(('  Log file:  %s' % (item.logfile)))
+            print(('  Start:     %s ' % (item.startdate)))
+            print(('  End:       %s ' % (item.enddate)))
+            print(('  Directory: %s' % (item.backup_dir)))
             if item.backup_disk:
-                print('  DisK:      %s' % (item.backup_disk))
+                print(('  DisK:      %s' % (item.backup_disk)))
 
         if self.previous_backups:
             print('Previous backups:')
             for bak in self.previous_backups:
                 if bak.session is None:
-                    print('  %s in %s' % (bak.timestamp, bak.fullpath))
+                    print(('  %s in %s' % (bak.timestamp, bak.fullpath)))
                 else:
-                    print('  %s in %s (got session)' % (bak.timestamp, bak.fullpath))
+                    print(('  %s in %s (got session)' % (bak.timestamp, bak.fullpath)))
             if self.previous_backups.last_full_backup:
-                print('Last backup:      %s in %s' % (self.previous_backups.last_full_backup.timestamp, self.previous_backups.last_full_backup.fullpath))
+                print(('Last backup:      %s in %s' % (self.previous_backups.last_full_backup.timestamp, self.previous_backups.last_full_backup.fullpath)))
             else:
                 print('Last backup:      None')
 
@@ -209,14 +209,14 @@ class ARSoftBackupApp(BackupApp):
     def _show_log(self):
         ret = 0
         
-        print('Last success: %s' % (self.job_state.last_success))
-        print('Last failure: %s' % (self.job_state.last_failure))
+        print(('Last success: %s' % (self.job_state.last_success)))
+        print(('Last failure: %s' % (self.job_state.last_failure)))
         for item in self.job_state.history:
-            print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))
-            print('  Log file:  %s' % (item.logfile))
-            print('  Start:     %s ' % (item.startdate))
-            print('  End:       %s ' % (item.enddate))
-            print('  Directory: %s' % (item.backup_dir))
+            print(('%s (%s)' % (item.date, 'Success' if item.success else 'Failure')))
+            print(('  Log file:  %s' % (item.logfile)))
+            print(('  Start:     %s ' % (item.startdate)))
+            print(('  End:       %s ' % (item.enddate)))
+            print(('  Directory: %s' % (item.backup_dir)))
 
         return ret
     
@@ -237,9 +237,9 @@ class ARSoftBackupApp(BackupApp):
                 success = False
                 failure_message = 'Failed to load previous backups'
 
-        print('Backup directory: %s' % (self.config.backup_directory))
-        print('Retention time:   %s' % (self.config.retention_time))
-        print('Retention count:   %s' % (self.config.retention_count))
+        print(('Backup directory: %s' % (self.config.backup_directory)))
+        print(('Retention time:   %s' % (self.config.retention_time)))
+        print(('Retention count:   %s' % (self.config.retention_count)))
         self.manage_retention()
 
         if load_disk:
@@ -288,7 +288,7 @@ class ARSoftBackupApp(BackupApp):
                 ret = 1
             else:
                 if self._verbose:
-                    print(self.config)
+                    print((self.config))
                 if args.system_startup:
                     ret = self._on_system_startup()
                 elif args.perform_backup:

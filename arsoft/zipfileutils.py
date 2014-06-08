@@ -13,7 +13,7 @@ class ZipFileEx(zipfile.ZipFile):
             self._list_iter = iter(self._list)
         def __iter__(self):
             return self
-        def next(self):
+        def __next__(self):
             info = next(self._list_iter)
             if info:
                 return self._zipfile.open(info)
@@ -33,7 +33,7 @@ class ZipFileEx(zipfile.ZipFile):
             if self.date_time and selfinfo.date_time != otherinfo.date_time:
                 ret = False
             if self.content and selfinfo.CRC != otherinfo.CRC:
-                print('%s changed' % (selfinfo.filename))
+                print(('%s changed' % (selfinfo.filename)))
                 ret = False
             return ret
 

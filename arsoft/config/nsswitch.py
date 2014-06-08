@@ -61,7 +61,7 @@ class Nsswitch(object):
         try:
             f = open(filename, 'w')
             for item in self.m_items:
-                if isinstance(item, basestring):
+                if isinstance(item, str):
                     # simply write the line/item
                     f.write(item + '\n')
                 else:
@@ -83,7 +83,7 @@ class Nsswitch(object):
         ret = None
         for item in self.m_items:
             # skip any unrecognized lines (e.g. comments)
-            if not isinstance(item, basestring):
+            if not isinstance(item, str):
                 (service, values) = item
                 if service == name:
                     ret = values
@@ -95,7 +95,7 @@ class Nsswitch(object):
         i = 0
         while i < len(self.m_items):
             # skip any unrecognized lines (e.g. comments)
-            if not isinstance(self.m_items[i], basestring):
+            if not isinstance(self.m_items[i], str):
                 (service, ignore_values) = self.m_items[i]
                 if service == name:
                     self.m_items[i] = (name, values)
@@ -111,7 +111,7 @@ class Nsswitch(object):
         """ Returns a list of all configured services """
         ret = []
         for item in self.m_items:
-            if not isinstance(item, basestring):
+            if not isinstance(item, str):
                 (service, ignore_values) = item
                 ret.append(service)
         return ret

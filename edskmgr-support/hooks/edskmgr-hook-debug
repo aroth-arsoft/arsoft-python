@@ -3,19 +3,19 @@
 import os
 import sys
 
-print('script=%s' % os.path.realpath(__file__))
+print(('script=%s' % os.path.realpath(__file__)))
 for arg in sys.argv:
-    print('arg=%s' % (arg))
+    print(('arg=%s' % (arg)))
 
 for name in sorted(os.environ.keys()):
-    print('ENV[%s]=%s' % (name, os.environ[name]))
+    print(('ENV[%s]=%s' % (name, os.environ[name])))
 
 from arsoft.disks.edskmgr import ExternalDiskManager
 edskmgr = ExternalDiskManager()
 edskmgr.load_config()
 (disk_obj, dev_obj, disk_tags) = edskmgr.udev_hook_initialize()
 
-print('disk_obj=%s' % str(disk_obj))
-print('dev_obj=%s' % str(dev_obj))
-print('disk_tags=%s' % str(disk_tags))
+print(('disk_obj=%s' % str(disk_obj)))
+print(('dev_obj=%s' % str(dev_obj)))
+print(('disk_tags=%s' % str(disk_tags)))
 

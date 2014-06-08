@@ -5,7 +5,7 @@
 import os
 import sys
 import socket
-from utils import runcmdAndGetData
+from .utils import runcmdAndGetData
 
 def create_unix_socket(path, mode, socktype=socket.SOCK_STREAM):
     # Make sure the socket does not already exist
