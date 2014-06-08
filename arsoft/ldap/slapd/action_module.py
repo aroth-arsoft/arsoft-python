@@ -6,7 +6,7 @@ import argparse
 import string
 import ldap
 import ldap.modlist as modlist
-from .action_base import *
+from action_base import *
 
 class action_module(action_base):
 
@@ -31,12 +31,12 @@ class action_module(action_base):
             mod_attrs = []
             if self._add is not None:
                 for mod in self._add:
-                    if mod not in list(self._modules.values()):
+                    if mod not in self._modules.values():
                         mod_attrs.append( (ldap.MOD_ADD, 'olcModuleLoad', mod) )
             if self._remove is not None:
                 for mod in self._remove:
                     found = False
-                    for (modidx, modname) in list(self._modules.items()):
+                    for (modidx, modname) in self._modules.items():
                         if modname == mod:
                             found = True
                             mod_attrs.append( (ldap.MOD_DELETE, 'olcModuleLoad', '{' + str(modidx) + '}' + mod) )
@@ -49,12 +49,12 @@ class action_module(action_base):
         return ret
 
     def _list(self):
-        print(("Modulepath: " + (self._modulepath if self._modulepath is not None else '<default>')))
+        print("Modulepath: " + (self._modulepath if self._modulepath is not None else '<default>'))
         if len(self._modules) > 0:
             print("Modules:")
             for modidx in sorted(self._modules.keys()):
                 modname = self._modules[modidx]
-                print(('  ' + modname))
+                print('  ' + modname)
         else:
             print("Modules: <none>")
         return 0

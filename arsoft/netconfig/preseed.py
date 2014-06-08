@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from urllib.parse import urlparse
-from urllib.parse import urlunparse
+from urlparse import urlparse
+from urlparse import urlunparse
 
 class PreseedInstaller(object):
 
@@ -95,6 +95,6 @@ class PreseedItem(object):
 		ret = 'dn: ' + self.dn + '\n'
 		ret += 'url: ' + self.url.geturl() + '\n'
 		ret += 'append: ' + self.append + '\n'
-		for i in list(self.installer.values()):
+		for i in self.installer.values():
 			ret += str(i)
 		return ret

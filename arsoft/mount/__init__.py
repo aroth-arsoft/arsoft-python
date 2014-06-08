@@ -2,4 +2,4 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from .manager import *
+from manager import *

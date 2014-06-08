@@ -248,7 +248,7 @@ def initialize_settings(settings_module, setttings_file):
     custom_settings_file = os.path.join(settings_obj.CONFIG_DIR, 'settings.py')
     #print(custom_settings_file)
     if os.path.exists(custom_settings_file):
-        exec(compile(open(custom_settings_file).read(), custom_settings_file, 'exec'))
+        execfile(custom_settings_file)
 
     #print(settings_obj.INSTALLED_APPS)
 

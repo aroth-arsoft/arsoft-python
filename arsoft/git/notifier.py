@@ -129,7 +129,7 @@ class GitCommitNotifierConfig(object):
         return self._data['message_map']
     
     def enable_trac(self, trac_url, repo_name=None, keywords=['refs','ref','close','closes','implements','fixes','fixed']):
-        for (regex, url) in self._data['message_map'].items():
+        for (regex, url) in self._data['message_map'].iteritems():
             if trac_url in url:
                 del self._data['message_map'][regex]
                 break
@@ -170,14 +170,14 @@ if __name__ == '__main__':
     notify_config = GitCommitNotifierConfig(repo)
 
     print(notify_config)
-    print(('email_sender: %s' % (str(notify_config.email_sender))))
-    print(('email_recipients: %s' % (str(notify_config.email_recipients))))
-    print(('show_master_branch_name: %s' % (str(notify_config.show_master_branch_name))))
-    print(('message_map: %s' % (str(notify_config.message_map))))
+    print('email_sender: %s' % (str(notify_config.email_sender)))
+    print('email_recipients: %s' % (str(notify_config.email_recipients)))
+    print('show_master_branch_name: %s' % (str(notify_config.show_master_branch_name)))
+    print('message_map: %s' % (str(notify_config.message_map)))
     
     notify_config.email_recipients = 'me@you'
-    print(('email_recipients: %s' % (str(notify_config.email_recipients))))
+    print('email_recipients: %s' % (str(notify_config.email_recipients)))
 
     notify_config.enable_trac('http://local')
-    print(('message_map: %s' % (str(notify_config.message_map))))
-    print(('trac: %s' % (str(notify_config.trac))))
+    print('message_map: %s' % (str(notify_config.message_map)))
+    print('trac: %s' % (str(notify_config.trac)))

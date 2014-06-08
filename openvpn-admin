@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -36,7 +36,7 @@ class PrivateKeyPasswordFile(object):
             #print('self.m_filename=%s' % (self._conf.m_filename))
             ret = self._conf.save()
             if ret:
-                os.chmod(self._conf.filename, 0o600)
+                os.chmod(self._conf.filename, 0600)
 
 class OpenVPNAdmin(object):
 
@@ -52,7 +52,7 @@ class OpenVPNAdmin(object):
         self._private_key_passwords = None
 
     def version(self):
-        print(('Version: %s' % str(__version__)))
+        print('Version: %s' % str(__version__))
         return 0
 
     def _get_config(self):
@@ -84,7 +84,7 @@ class OpenVPNAdmin(object):
             if os.path.isfile(cert_file):
                 num_certs = len(cert.certificates)
                 if num_certs == 0:
-                    print(('  %s: %s (%s)' % (prefix, cert_file, cert.last_error)))
+                    print('  %s: %s (%s)' % (prefix, cert_file, cert.last_error))
                 else:
                     now = datetime.datetime.utcnow().replace(tzinfo=UTC)
                     min_expire_in = datetime.timedelta(days=100*365)
@@ -102,28 +102,28 @@ class OpenVPNAdmin(object):
                             expire_date = 'expires ' + str(min_expire_cert.expire_date) + ' in ' + format_timedelta(min_expire_in)
                     else:
                         expire_date = 'unavailable'
-                    print(('  %s: %s (%s)' % (prefix, cert_file, expire_date)))
+                    print('  %s: %s (%s)' % (prefix, cert_file, expire_date))
             else:
-                print(('  %s: %s (does not exist)' % (prefix, cert_file)))
+                print('  %s: %s (does not exist)' % (prefix, cert_file))
         else:
-            print(('  %s: none' % (prefix)))
+            print('  %s: none' % (prefix))
 
     def _print_crl(self, prefix, crl):
         if crl:
             crl_file = str(crl.filename)
             if os.path.isfile(crl_file):
                 if not crl.valid:
-                    print(('  %s: %s (invalid)' % (prefix, crl_file)))
+                    print('  %s: %s (invalid)' % (prefix, crl_file))
                 else:
                     num_revoked = len(crl.revoked)
                     if num_revoked == 0:
-                        print(('  %s: %s (empty)' % (prefix, crl_file)))
+                        print('  %s: %s (empty)' % (prefix, crl_file))
                     else:
-                        print(('  %s: %s (%i revoked)' % (prefix, crl_file, num_revoked)))
+                        print('  %s: %s (%i revoked)' % (prefix, crl_file, num_revoked))
             else:
-                print(('  %s: %s (does not exist)' % (prefix, crl_file)))
+                print('  %s: %s (does not exist)' % (prefix, crl_file))
         else:
-            print(('  %s: none' % (prefix)))
+            print('  %s: none' % (prefix))
 
     def action_status(self, selected_vpns):
         self._get_config()
@@ -153,75 +153,75 @@ class OpenVPNAdmin(object):
                         is_running = self._config.is_running(vpnname)
                         status_file = arsoft.openvpn.StatusFile(config_file=config_file)
                         autostart = True if vpnname in self._systemconfig.autostart else False
-                        print(('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') ))
+                        print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
                         if config_file.name != vpnname:
-                            print(('  Configured name mismatch %s != %s' % (vpnname, config_file.name) ))
+                            print('  Configured name mismatch %s != %s' % (vpnname, config_file.name) )
 
-                        print(('  Running: %s' % is_running))
-                        print(('  Autostart: %s' % autostart))
-                        print(('  State: %s' % status_file.state.long_state))
-                        print(('  Last updated: %s' % status_file.last_update))
+                        print('  Running: %s' % is_running)
+                        print('  Autostart: %s' % autostart)
+                        print('  State: %s' % status_file.state.long_state)
+                        print('  Last updated: %s' % status_file.last_update)
                         self._print_cert('Certificate file', config_file.cert_file)
-                        print(('  Key file: %s' % config_file.key_file))
+                        print('  Key file: %s' % config_file.key_file)
                         self._print_cert('CA file', config_file.ca_file)
                         self._print_crl('CRL file', config_file.crl_file)
-                        print(('  DH file: %s' % config_file.dh_file))
+                        print('  DH file: %s' % config_file.dh_file)
                         
                         if config_file.server:
-                            print(('  Client config directory: %s' % config_file.client_config_directory))
+                            print('  Client config directory: %s' % config_file.client_config_directory)
                             print('  Configured clients:')
                             if config_file.client_config_files:
-                                for (clientname, ccdfile) in config_file.client_config_files.items():
+                                for (clientname, ccdfile) in config_file.client_config_files.iteritems():
                                     
                                     if status_file.connected_clients:
                                         client_is_connected = True if clientname in status_file.connected_clients else False
                                     else:
                                         client_is_connected = False
-                                    print(('    %s (%s; %s)' % (ccdfile.name, 'Connected' if client_is_connected else 'Not connected', ccdfile.ostype)))
+                                    print('    %s (%s; %s)' % (ccdfile.name, 'Connected' if client_is_connected else 'Not connected', ccdfile.ostype))
                                     if len(ccdfile.routes):
                                         print('    Routes:')
                                         for (network, netmask) in ccdfile.routes:
-                                            print(('      %s/%s' % (network, netmask)))
+                                            print('      %s/%s' % (network, netmask))
                                     if len(ccdfile.push_options):
                                         print('    Pushed options:')
                                         for (option, value) in ccdfile.push_options:
-                                            print(('      %s %s' % (option, value)))
+                                            print('      %s %s' % (option, value))
                             print('  Connected clients:')
                             if status_file.connected_clients:
-                                for (clientname, clientinfo) in status_file.connected_clients.items():
-                                    print(('    %s' % (clientinfo)))
+                                for (clientname, clientinfo) in status_file.connected_clients.iteritems():
+                                    print('    %s' % (clientinfo))
                         if len(config_file.routes):
                             print('  Routes:')
                             for (network, netmask) in config_file.routes:
-                                print(('    %s/%s' % (network, netmask)))
+                                print('    %s/%s' % (network, netmask))
                         if len(config_file.push_options):
                             print('  Pushed options:')
                             for (option, value) in config_file.push_options:
-                                print(('    %s %s' % (option, value)))
+                                print('    %s %s' % (option, value))
                         if status_file.routing_table:
                             print('  Routing table:')
-                            for (address, entry) in status_file.routing_table.items():
-                                print(('    %s' % (entry)))
+                            for (address, entry) in status_file.routing_table.iteritems():
+                                print('    %s' % (entry))
                         if status_file.statistics:
                             print('  Statistics:')
                             for name in status_file.statistics:
-                                print(('    %s: %s' % (name, getattr(status_file.statistics, name))))
+                                print('    %s: %s' % (name, getattr(status_file.statistics, name)))
         return ret
     
     def action_zip_info(self, zipfile):
         if os.path.exists(zipfile):
             zipcfg = arsoft.openvpn.ZippedConfigFile(zipfile)
             if zipcfg.valid:
-                print(('Config file: %s' % (zipcfg.config_file.filename)))
+                print('Config file: %s' % (zipcfg.config_file.filename))
                 self._print_cert('Certificate file', zipcfg.config_file.cert_file)
-                print(('  Key file: %s' % zipcfg.config_file.key_file))
+                print('  Key file: %s' % zipcfg.config_file.key_file)
                 self._print_cert('CA file', zipcfg.config_file.ca_file)
                 self._print_cert('CRL file', zipcfg.config_file.crl_file)
-                print(('  DH file: %s' % zipcfg.config_file.dh_file))
+                print('  DH file: %s' % zipcfg.config_file.dh_file)
                 
-                print(('Files in %s:' % (zipfile)))
+                print('Files in %s:' % (zipfile))
                 for f in iter(zipcfg):
-                    print(('  ' + f.name))
+                    print('  ' + f.name)
                 ret = self.ExitCode.Success
             else:
                 sys.stderr.write('ZIP file %s does not contain a valid VPN configuration.\n' % (zipfile))
@@ -261,7 +261,7 @@ class OpenVPNAdmin(object):
                 if outfile_obj:
                     if not zipcfg.compare(output_zip_file, key_passphrase=key_passphrase):
                         # zip file has changed, so copy the temp file to the real output file
-                        print(('Copy %s to %s' % (outfile_obj.name, output_zip_file)))
+                        print('Copy %s to %s' % (outfile_obj.name, output_zip_file))
                         shutil.copy2(outfile_obj.name, output_zip_file)
                         list_of_changed_zip_files.append(zipcfg)
                     else:
@@ -270,9 +270,9 @@ class OpenVPNAdmin(object):
                     # zip file does not exists until now, so it's changed
                     list_of_changed_zip_files.append(zipcfg)
                 if zip_changed:
-                    print(('Compressed %s to %s' % (vpn_display_name, output_zip_file)))
+                    print('Compressed %s to %s' % (vpn_display_name, output_zip_file))
                 else:
-                    print(('Compressed %s to %s (unchanged)' % (vpn_display_name, output_zip_file)))
+                    print('Compressed %s to %s (unchanged)' % (vpn_display_name, output_zip_file))
                 ret = self.ExitCode.Success
             else:
                 ret = self.ExitCode.Failure
@@ -312,7 +312,7 @@ class OpenVPNAdmin(object):
                         if zip_ok:
                             if config_file.server:
                                 # create a ZIP file for each client of the server
-                                for (clientname, ccdfile) in config_file.client_config_files.items():
+                                for (clientname, ccdfile) in config_file.client_config_files.iteritems():
                                     client_cfgfile = config_file.client_config_file(ccdfile)
                                     zip_result = self._compress_config(list_of_changed_zip_files, client_cfgfile, output_directory, parent_vpn_name=vpnname)
                                     if zip_result != self.ExitCode.Success:
@@ -402,7 +402,7 @@ to use the provided configuration.
         notification_mail = arsoft.mail.Mail(sender=None, to=[recipient], subject=mail_subject, bodytext=mail_message)
         notification_mail.add_attachment(zipcfg.filename, attachment_name=cfgfile.name + '.zip')
         #print(notification_mail)
-        print(('Zip config %s changed and notification sent to %s' % (cfgfile.name, recipient)))
+        print('Zip config %s changed and notification sent to %s' % (cfgfile.name, recipient))
         arsoft.mail.sendmail(notification_mail)
         return True
 
@@ -430,7 +430,7 @@ to use the provided configuration.
                     sys.stderr.write('Failed to install OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
                     ret = self.ExitCode.ConfigurationError
             elif conf_file_ok:
-                print(('use raw config file %s' % filename))
+                print('use raw config file %s' % filename)
                 ret = self.ExitCode.NotImplemented
             else:
                 sys.stderr.write('Given file %s is neither a ZIP file nor a valid OpenVPN configuration.\n' % (filename))
@@ -465,7 +465,7 @@ to use the provided configuration.
                     sys.stderr.write('Failed to install OpenVPN configuration from %s. Error %s\n' % (filename, zipcfg.last_error))
                     ret = self.ExitCode.ConfigurationError
             elif conf_file_ok:
-                print(('use raw config file %s' % filename))
+                print('use raw config file %s' % filename)
                 ret = self.ExitCode.NotImplemented
             else:
                 sys.stderr.write('Given file %s is neither a ZIP file nor a valid OpenVPN configuration.\n' % (filename))
@@ -506,11 +506,11 @@ to use the provided configuration.
             self._get_config()
             if self._config.is_running(vpnname):
                 # already started
-                print(('Started %s' % vpnname))
+                print('Started %s' % vpnname)
                 ret = self.ExitCode.Success
             else:
                 if self._config.start(vpnname):
-                    print(('Started %s' % vpnname))
+                    print('Started %s' % vpnname)
                     ret = self.ExitCode.Success
                 else:
                     sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, self._config.last_error))
@@ -526,14 +526,14 @@ to use the provided configuration.
             if self._config.is_running(vpnname):
                 if self._config.stop(vpnname):
                     ret = self.ExitCode.Success
-                    print(('Stopped %s' % vpnname))
+                    print('Stopped %s' % vpnname)
                 else:
                     ret = self.ExitCode.Failure
                     sys.stderr.write('Failed to stop VPN %s. %s\n' % (vpnname, self._config.last_error))
             else:
                 # VPN already stopped
                 ret = self.ExitCode.Success
-                print(('Stopped %s' % vpnname))
+                print('Stopped %s' % vpnname)
         else:
             ret = self.ExitCode.VPNNotFound
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
@@ -546,7 +546,7 @@ to use the provided configuration.
             if self._config.is_running(vpnname):
                 if self._config.restart(vpnname):
                     ret = self.ExitCode.Success
-                    print(('Restart %s' % vpnname))
+                    print('Restart %s' % vpnname)
                 else:
                     ret = self.ExitCode.Failure
                     sys.stderr.write('Failed to restart VPN %s. %s\n' % (vpnname, self._config.last_error))
@@ -564,7 +564,7 @@ to use the provided configuration.
             self._get_config()
             if self._config.is_running(vpnname):
                 if self._config.reload(vpnname):
-                    print(('Reload %s' % vpnname))
+                    print('Reload %s' % vpnname)
                     ret = self.ExitCode.Success
                 else:
                     ret = self.ExitCode.Failure

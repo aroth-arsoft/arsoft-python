@@ -4,4 +4,4 @@
 
 __version__ = 1.0
 
-from .BackupDirectory import *
+from BackupDirectory import *

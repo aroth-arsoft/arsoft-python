@@ -2,7 +2,7 @@
 
 import string
 import os
-import urllib.request, urllib.parse, urllib.error
+import urllib
 import rfc822
 import time
 
@@ -26,7 +26,7 @@ def unpack(filename, target=None, files=''):
         #print "ar -p " + filename + ' data.tar.gz | tar xz -C ' + target + ' ' + files + ' 2>&1 > /dev/null'
         os.system("ar -p " + filename + ' data.tar.gz | tar xz -C ' + target + ' ' + files + ' 2>&1 > /dev/null')
     else: 
-        print("Wrong archive or filename")         # other types not supported
+        print "Wrong archive or filename"         # other types not supported
 
 def createpath(path):
     e = path.split('/')
@@ -39,13 +39,13 @@ def createpath(path):
 
 
 def retrieve_file(url, localfile):
-    f = urllib.request.urlopen(url)
+    f = urllib.urlopen(url)
     tmp = f.info()
     f.close()
     #print tmp
     #print tmp['Last-Modified']
     modified = time.mktime(rfc822.parsedate(tmp['Last-Modified']))
-    if 'Content-Length' in tmp:
+    if tmp.has_key('Content-Length'):
         size = int(tmp['Content-Length'])
     else:
         size = 0
@@ -56,7 +56,7 @@ def retrieve_file(url, localfile):
         localmodified = 0
         localsize = -1
     if modified > localmodified or size != localsize:
-        urllib.request.urlretrieve(url, localfile)
+        urllib.urlretrieve(url, localfile)
     return True
 
 def qsort(L):
@@ -65,6 +65,6 @@ def qsort(L):
 
 def sortdict(d):
     r = []
-    for k in qsort(list(d.keys())):
+    for k in qsort(d.keys()):
         r.append(d[k])
     return r

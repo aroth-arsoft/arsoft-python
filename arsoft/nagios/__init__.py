@@ -106,7 +106,7 @@ class pynagPlugin:
             ## Set Warn
             self.data['warning'] = args.warning
             
-        for (name, value) in vars(args).items():
+        for (name, value) in vars(args).iteritems():
             self.data[name] = value
 
     def add_perfdata(self, label , value , uom = None, warn = None, crit = None, minimum = None, maximum = None, exclude=False):
@@ -165,10 +165,10 @@ class pynagPlugin:
 
         # Service check
         if service:
-            print("%s    %s    %s    %s %s" % (hostname, service, code, message, self.perfdata_string()), file=p.tochild)
+            print >>p.tochild, "%s    %s    %s    %s %s" % (hostname, service, code, message, self.perfdata_string())
         # Host check, omit service_description
         else:
-            print("%s    %s    %s %s" % (hostname, code, message, self.perfdata_string()), file=p.tochild)
+            print >>p.tochild, "%s    %s    %s %s" % (hostname, code, message, self.perfdata_string())
 
         # Send eof
         # TODO, support multiple statuses ?
@@ -201,7 +201,7 @@ class pynagPlugin:
         code = self.code_string2int(code_text)
 
         ## This should be one line (or more in nagios 3)
-        print("%s: %s %s" % (self.status_text[code], message, self.perfdata_string()))
+        print "%s: %s %s" % (self.status_text[code], message, self.perfdata_string())
         sys.exit(code)
 
     def perfdata_string(self):
@@ -215,7 +215,7 @@ class pynagPlugin:
         for pd in self.data['perfdata']:
             if pd['exclude'] != 0:
                 continue
-            if isinstance(pd['value'], collections.Iterable) and not isinstance(pd['value'], str):
+            if isinstance(pd['value'], collections.Iterable) and not isinstance(pd['value'], types.StringTypes):
                 pd_value = ','.join(pd['value'])
             else:
                 pd_value = pd['value']
@@ -271,7 +271,7 @@ class pynagPlugin:
         """
         # Check for messages in unknown, critical, warning, ok to determine
         # code
-        keys = list(self.data['messages'].keys())
+        keys = self.data['messages'].keys()
         keys.sort(reverse=True)
         code = UNKNOWN
         for code in keys:
@@ -507,7 +507,7 @@ class NagiosPlugin(pynagPlugin):
             label_name = self.data['perfdata'][i]['label']
             label_value = self[label_name]
             if label_value is not None:
-                for label, named_value_data in list(self._named_values.items()):
+                for label, named_value_data in self._named_values.items():
                     if label_name == label:
                         if named_value_data['warning']:
                             self.data['perfdata'][i]['warn'] = label_value

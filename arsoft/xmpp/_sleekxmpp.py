@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from ._backend import *
+from _backend import *
 import sys
 import logging
 import xml.etree.ElementTree as ET

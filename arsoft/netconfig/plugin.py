@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from optparse import OptionParser
-from .main import *
+from main import *
 
 class NetconfigPlugin(object):
     _netconfig = None
@@ -49,7 +49,7 @@ class NetconfigPlugin(object):
         str = ''
         for a in args:
             str += a
-        print(str)
+        print str
 
     def startup(self):
         return 0

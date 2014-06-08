@@ -1,13 +1,13 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-
+from __future__ import unicode_literals
 import sys
 import os
 import argparse
 import re
-from urllib.parse import urlparse
+from urlparse import urlparse
 from arsoft.utils import rmtree, runcmdAndGetData
 from arsoft.trac.admin import TracAdmin
 
@@ -63,11 +63,11 @@ class trac_svn2git(object):
                 gitcommitlist = self._svn2git[svnrevno]
                 for (reponame, gitcommithash) in gitcommitlist:
                     gitidstr = gitcommithash[0:nrHashCharacters]
-                    new_text_elems.append('[' + gitidstr + '/' + reponame + ']')
-                new_text = ','.join(new_text_elems) + ' (SVN r' + str(svnrevno) + ')'
+                    new_text_elems.append(u'[' + gitidstr + u'/' + reponame + u']')
+                new_text = ','.join(new_text_elems) + u' (SVN r' + str(svnrevno) + u')'
                 text = text.replace(org_text, new_text)
                 num_matches = num_matches + 1
-                print(('replace ' + str(org_text) + ' with '+str(new_text)))
+                print('replace ' + str(org_text) + ' with '+str(new_text))
         return (num_matches, text)
 
     def _convert_ticket_change(self):
@@ -98,7 +98,7 @@ class trac_svn2git(object):
                 elif self._dbtype == 'mysql':
                     stmt = "UPDATE ticket_change SET oldvalue=%(oldvalue)s, newvalue=%(newvalue)s WHERE ticket=%(ticket)s AND time=%(time)s AND field=%(field)s"
                     params = {'oldvalue':oldvalue, 'newvalue':newvalue, 'ticket': ticket, 'time':time, 'field':field}
-                print((stmt, params))
+                print(stmt, params)
                 update_cur.execute(stmt, params)
 
         self._db.commit()
@@ -128,7 +128,7 @@ class trac_svn2git(object):
                 elif self._dbtype == 'mysql':
                     stmt = "UPDATE ticket SET description=%(description)s WHERE id=%(id)s"
                     params = {'description': description, 'id':str(ticket_id)}
-                print((stmt, params))
+                print(stmt, params)
                 update_cur.execute(stmt, params)
                 
         self._db.commit()
@@ -157,7 +157,7 @@ class trac_svn2git(object):
                 elif self._dbtype == 'mysql':
                     stmt = "UPDATE milestone SET description=%(description)s WHERE name=%(name)s"
                     params = {'description': description, 'name':milestone_name}
-                print((stmt, params))
+                print(stmt, params)
                 update_cur.execute(stmt, params)
 
         self._db.commit()
@@ -187,7 +187,7 @@ class trac_svn2git(object):
                 elif self._dbtype == 'mysql':
                     stmt = "UPDATE wiki SET text=%(text)s WHERE name=%(name)s AND version=%(version)s"
                     params = {'text':text, 'name': wiki_name, 'version':wiki_version}
-                print((stmt, params))
+                print(stmt, params)
                 update_cur.execute(stmt, params)
         self._db.commit()
         return True

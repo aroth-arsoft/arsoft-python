@@ -23,7 +23,7 @@ class kernel_module(object):
     def is_module_loaded(modname):
         obj = kernel_module.instance()
         modlist = obj._get_list()
-        ret = True if modname in list(modlist.keys()) else False
+        ret = True if modname in modlist.keys() else False
         return ret
 
     def _update_list(self):

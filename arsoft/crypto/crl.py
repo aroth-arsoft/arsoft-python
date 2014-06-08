@@ -4,8 +4,8 @@
 
 import os
 import socket, ssl
-from urllib.parse import urlparse
-from .pem import *
+from urlparse import urlparse
+from pem import *
 from OpenSSL import crypto
 from arsoft.timestamp import parse_date
 from arsoft.utils import detect_file_type
@@ -237,7 +237,7 @@ class CRLList:
 if __name__ == "__main__":
     f =  CRLFile(sys.argv[1])
     print(f)
-    print((f.crls))
+    print(f.crls)
     for rev in f.revoked:
-        print((rev.get_serial(), rev.get_reason()))
+        print(rev.get_serial(), rev.get_reason())
 

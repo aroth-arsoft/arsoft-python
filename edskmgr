@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -16,31 +16,31 @@ class ExternalDiskManagerApp(object):
     def show_status(self, show_partitions=True):
         print('Internal disks:')
         for disk in self._mgr.internal_disks:
-            print(('  ' + disk))
+            print('  ' + disk)
         print('External disks:')
         for disk in self._mgr.external_disks:
-            print(('  ' + disk))
+            print('  ' + disk)
 
         e = Disks()
         print('Available disks:')
         for disk_obj in e.disks:
-            print(('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial))))
+            print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             if self._mgr.verbose:
-                print(('    Native path: %s'%(disk_obj.nativepath)))
-            print(('    Path:        %s'%(disk_obj.path)))
-            print(('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no')))
-            print(('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no')))
-            print(('    Internal:    %s'%('yes' if self._mgr.is_internal_disk(disk_obj) else 'no')))
+                print('    Native path: %s'%(disk_obj.nativepath))
+            print('    Path:        %s'%(disk_obj.path))
+            print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
+            print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
+            print('    Internal:    %s'%('yes' if self._mgr.is_internal_disk(disk_obj) else 'no'))
             disk_tags = self._mgr.get_tags_for_disk(disk_obj)
             if disk_tags:
-                print(('    Tags:        %s'%(','.join(disk_tags))))
+                print('    Tags:        %s'%(','.join(disk_tags)))
             else:
                 print('    Tags:        None')
             if show_partitions:
                 if disk_obj.partitions:
                     print('    Partitions:')
                 for dev_obj in disk_obj.partitions:
-                    print(('      %s: %s' % (dev_obj.path, ','.join(dev_obj.mountpaths))))
+                    print('      %s: %s' % (dev_obj.path, ','.join(dev_obj.mountpaths)))
 
 
     def main(self, argv=None):

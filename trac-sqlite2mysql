@@ -1,8 +1,8 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-
+from __future__ import unicode_literals
 import sys
 import os
 import argparse
@@ -61,17 +61,17 @@ class trac_sqlite2mysql(object):
                     trac.set_logging('trac.log')
                     if self._trac_plugins is not None:
                         for plugin in self._trac_plugins:
-                            print(('trac enable plugin ' + plugin))
+                            print('trac enable plugin ' + plugin)
                             trac.enable_plugin(plugin)
                     if self._trac_components is not None:
                         if self._verbose:
                             for (c, v) in self._trac_components:
-                                print(('activate trac component ' + c))
+                                print('activate trac component ' + c)
                         trac.set_configured_components(self._trac_components)
                     if trac.save_config():
                         print('trac configuration saved.')
                     else:
-                        print(('failed to save trac configuration. error ' + trac.last_error))
+                        print('failed to save trac configuration. error ' + trac.last_error)
                     if trac.upgrade(backup=False):
                         print('trac database upgrade.')
                         (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysqldump', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '--no-data', dbname ], verbose=self._verbose)
@@ -80,11 +80,11 @@ class trac_sqlite2mysql(object):
                             self._db_struct = stdoutdata
                             ret = True
                         else:
-                            print(('mysql dump database failed. ' + stderrdata))
+                            print('mysql dump database failed. ' + stderrdata)
                     else:
-                        print(('trac database upgrade failed: ' + trac.last_error))
+                        print('trac database upgrade failed: ' + trac.last_error)
                 else:
-                    print(('Failed to initialize temporary trac environment. ' + trac.last_error))
+                    print('Failed to initialize temporary trac environment. ' + trac.last_error)
             query = "DROP DATABASE " + dbname + ";"
             self._run_mysql_query(query)
         else:
@@ -125,7 +125,7 @@ class trac_sqlite2mysql(object):
         return ret
 
     def _write_sql_file(self, outfile):
-        print(('Save SQL file to %s' %(outfile)))
+        print('Save SQL file to %s' %(outfile))
         try:
             f = codecs.open(outfile, 'w', 'utf-8')
             f.write('SET autocommit=0;\n')
@@ -164,7 +164,7 @@ class trac_sqlite2mysql(object):
     def _load_tracenv(self, tracenv):
         trac = TracAdmin(tracenv)
         if trac.database_type != 'sqlite':
-            print(('This script is designed to convert SQLite3 database only. Current database is of type \'' + str(trac.database_type) + '\''))
+            print('This script is designed to convert SQLite3 database only. Current database is of type \'' + str(trac.database_type) + '\'')
             ret = False
         else:
             self._trac_components = trac.configured_components
@@ -220,14 +220,14 @@ class trac_sqlite2mysql(object):
                 self._write_sql_file(output_sqlfile)
 
                 if args.mysql_database:
-                    print(('Import %s into MySQL database %s.' %(output_sqlfile, args.mysql_database)))
+                    print('Import %s into MySQL database %s.' %(output_sqlfile, args.mysql_database))
                     ret = self._import_sql_file_to_database(output_sqlfile, args.mysql_database)
                     if ret:
                         print('import converted database to mysql successful.')
                     else:
                         print('Failed to import')
                 else:
-                    print(('No database specified to import sql file %s' %(output_sqlfile)))
+                    print('No database specified to import sql file %s' %(output_sqlfile))
         
                 if not args.outfile:
                     # remove temp sql file

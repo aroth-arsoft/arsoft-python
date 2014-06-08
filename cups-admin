@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -14,17 +14,17 @@ class CupsAdminApp(object):
         self._conn = None
 
     def _show_printer(self, printer, include_attributes=False):
-        print(('  Printer: %s' %(printer.name)))
-        print(('    Model: %s' % (printer.make_and_model)))
-        print(('    Location: %s' % (printer.location)))
-        print(('    Device URI: %s' % (printer.device_uri)))
-        print(('    Enabled: %s' % (printer.enabled)))
-        print(('    Shared: %s' % (printer.is_shared)))
+        print('  Printer: %s' %(printer.name))
+        print('    Model: %s' % (printer.make_and_model))
+        print('    Location: %s' % (printer.location))
+        print('    Device URI: %s' % (printer.device_uri))
+        print('    Enabled: %s' % (printer.enabled))
+        print('    Shared: %s' % (printer.is_shared))
 
         printer.getAttributes()
         print('    Attributes:')
-        for key, value in printer.attributes.items():
-            print(('      %s: %s' % (key, value)))
+        for key, value in printer.attributes.iteritems():
+            print('      %s: %s' % (key, value))
 
         print('    Queued jobs:')
         jobs = printer.jobsQueued()
@@ -32,7 +32,7 @@ class CupsAdminApp(object):
             print('      None')
         else:
             for job in jobs:
-                print(('      %s' % (job)))
+                print('      %s' % (job))
 
         print('    Preserved jobs:')
         jobs = printer.jobsPreserved()
@@ -40,17 +40,17 @@ class CupsAdminApp(object):
             print('      None')
         else:
             for job in jobs:
-                print(('      %s' % (job)))
+                print('      %s' % (job))
 
     def show_printers(self, include_attributes=False):
-        print(('Printers on %s:%i' % (self._conn.server, self._conn.port)))
-        for (printername, printer_obj) in self._conn.printers.items():
+        print('Printers on %s:%i' % (self._conn.server, self._conn.port))
+        for (printername, printer_obj) in self._conn.printers.iteritems():
             self._show_printer(printer_obj, include_attributes=include_attributes)
         return True
     
     def show_printer(self, printername, include_attributes=False):
         ret = False
-        for (current_printername, printer_obj) in self._conn.printers.items():
+        for (current_printername, printer_obj) in self._conn.printers.iteritems():
             if current_printername.lower() != printername.lower():
                 continue
             self._show_printer(printer_obj, include_attributes=include_attributes)
@@ -60,7 +60,7 @@ class CupsAdminApp(object):
         return ret
     
     def get_printer(self, printername):
-        for (current_printername, printer_obj) in self._conn.printers.items():
+        for (current_printername, printer_obj) in self._conn.printers.iteritems():
             if current_printername.lower() != printername.lower():
                 continue
             return printer_obj
@@ -126,15 +126,14 @@ class CupsAdminApp(object):
                 print('set opts')
                 for opt in args.set_option:
                     key, value = opt.split('=', 2)
-                    print((' set %s=%s' %(key, value)))
+                    print(' set %s=%s' %(key, value))
                     selected_printer.setOption(key, value)
 
             if args.default_printer:
                 display_printers = False
                 try:
                     selected_printer.setAsDefault()
-                except cups.IPPError as xxx_todo_changeme:
-                    (status, description) = xxx_todo_changeme.args
+                except cups.IPPError as (status, description):
                     sys.stderr.write('Unable to set %s as default printer; error %i: %s\n' % (selected_printer.name, status, description))
                     ret = 1
 
@@ -142,16 +141,14 @@ class CupsAdminApp(object):
                 display_printers = False
                 try:
                     selected_printer.setEnabled(on=True)
-                except cups.IPPError as xxx_todo_changeme1:
-                    (status, description) = xxx_todo_changeme1.args
+                except cups.IPPError as (status, description):
                     sys.stderr.write('Unable to enable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
                     ret = 1
             elif args.disable_printer:
                 display_printers = False
                 try:
                     selected_printer.setEnabled(on=False)
-                except cups.IPPError as xxx_todo_changeme2:
-                    (status, description) = xxx_todo_changeme2.args
+                except cups.IPPError as (status, description):
                     sys.stderr.write('Unable to disable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
                     ret = 1
 

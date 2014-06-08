@@ -4,8 +4,8 @@
 
 import os
 import socket, ssl
-from urllib.parse import urlparse
-from .pem import *
+from urlparse import urlparse
+from pem import *
 from OpenSSL import crypto
 from arsoft.timestamp import parse_date
 from arsoft.utils import detect_file_type
@@ -50,10 +50,10 @@ class Certificate(PEMItem):
         rhs_not_before = rhs_cert.get_notBefore()
         rhs_not_after = rhs_cert.get_notAfter()
 
-        print(('  LHS Not After:  ', lhs_not_after.ctime()))
-        print(('  RHS Not After:  ', rhs_not_after.ctime()))
-        print(('  LHS Not Before: ', lhs_not_before.ctime()))
-        print(('  RHS Not Before: ', rhs_not_before.ctime()))
+        print('  LHS Not After:  ', lhs_not_after.ctime())
+        print('  RHS Not After:  ', rhs_not_after.ctime())
+        print('  LHS Not Before: ', lhs_not_before.ctime())
+        print('  RHS Not Before: ', rhs_not_before.ctime())
         return lhs_not_after > rhs_not_after
 
     def _matchName(self, name, term):
@@ -201,7 +201,7 @@ class Certificate(PEMItem):
                 org += ' '
             org += '(' + name.emailAddress + ')'
 
-        fobj.write(prefix + label + str(name.commonName))
+        fobj.write(prefix + label + unicode(name.commonName))
         if len(org):
             fobj.write(', ' + org)
         if len(where):
@@ -359,7 +359,7 @@ class CertificateList:
             else:
                 unique_files[certfile] = [ cert ]
         
-        for certfile, certlist in unique_files.items():
+        for certfile, certlist in unique_files.iteritems():
             pemfile = PEMFile()
             for cert in certlist:
                 pemfile.append(cert)

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import ldif
-from io import StringIO
+from StringIO import StringIO
 from ldap.cidict import cidict
 
 class LDAPSearchResult:
@@ -44,13 +44,13 @@ class LDAPSearchResult:
 
         has_attribute(string attr_name)->boolean
         """
-        return attr_name in self.attrs
+        return self.attrs.has_key( attr_name )
 
     def get_attr_values(self, key):
         """Get a list of attribute values.
         get_attr_values(string key)->['value1','value2']
         """
-        if key in self.attrs:
+        if self.attrs.has_key(key):
             return self.attrs[key]
         else:
             return []
@@ -58,7 +58,7 @@ class LDAPSearchResult:
     def get_attr_value(self, key, default=None):
         """Get the first attribute value.
         """
-        if key in self.attrs:
+        if self.attrs.has_key(key):
             if type(self.attrs[key]) == type([]):
                 return self.attrs[key][0]
             else:
@@ -70,7 +70,7 @@ class LDAPSearchResult:
         """Get a list of attribute names.
         get_attr_names()->['name1','name2',...]
         """
-        return list(self.attrs.keys())
+        return self.attrs.keys()
 
     def get_dn(self):
         """Get the DN string for the record.
@@ -85,7 +85,7 @@ class LDAPSearchResult:
         pretty_print()->string
         """
         str = "DN: " + self.dn + "\n"
-        for a, v_list in self.attrs.items():
+        for a, v_list in self.attrs.iteritems():
             str = str + "Name: " + a + "\n"
             for v in v_list:
                 str = str + "  Value: " + v + "\n"

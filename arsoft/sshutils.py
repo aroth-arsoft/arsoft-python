@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from .utils import runcmdAndGetData, platform_is_windows, which
+from utils import runcmdAndGetData, platform_is_windows, which
 import copy, uuid
 
 def _find_executable_impl(user_override, ssh_name, putty_name):

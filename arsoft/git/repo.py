@@ -484,7 +484,7 @@ class GitRepository(object):
             ret = True
         return ret
     
-    def fix_permissions(self, owner=None, group=None, dir_perms=0o775, file_perms=0o664 ):
+    def fix_permissions(self, owner=None, group=None, dir_perms=0775, file_perms=0664 ):
         
         uid = to_uid(owner) if owner else None
         gid = to_gid(group) if group else None
@@ -500,7 +500,7 @@ class GitRepository(object):
         for hook in GIT_HOOKS:
             file_path = os.path.join(self.hook_directory, d)
             if os.path.isfile(file_path):
-                ret = self._fix_permissions_impl(file_path, uid, gid, dir_perms, 0o775)
+                ret = self._fix_permissions_impl(file_path, uid, gid, dir_perms, 0775)
                 if not ret:
                     break
 
@@ -572,7 +572,7 @@ class GitRepository(object):
 
         for (key, params) in value:
             str_params = []
-            for (param_key, param_value) in params.items():
+            for (param_key, param_value) in params.iteritems():
                 if param_value is None:
                     str_params.append(param_key)
                 else:
@@ -625,15 +625,15 @@ if __name__ == '__main__':
         
     repo = GitRepository(sys.argv[1])
     
-    print(('git: %s' % (GIT_EXECUTABLE)))
-    print(('path: %s' % (str(repo.path))))
-    print(('name: %s' % (str(repo.name))))
-    print(('bare: %s' % (str(repo.bare))))
-    print(('magic: %s' % (str(repo.magic_directory))))
-    print(('description: %s' % (str(repo.description))))
-    print(('current branch: %s' % (str(repo.current_branch))))
-    print(('attributes: %s' % (str(repo.attributes))))
-    print(('excludes: %s' % (str(repo.excludes))))
+    print('git: %s' % (GIT_EXECUTABLE))
+    print('path: %s' % (str(repo.path)))
+    print('name: %s' % (str(repo.name)))
+    print('bare: %s' % (str(repo.bare)))
+    print('magic: %s' % (str(repo.magic_directory)))
+    print('description: %s' % (str(repo.description)))
+    print('current branch: %s' % (str(repo.current_branch)))
+    print('attributes: %s' % (str(repo.attributes)))
+    print('excludes: %s' % (str(repo.excludes)))
     
     repo.attributes = DEFAULT_ATTIRBUTES
     repo.excludes = DEFAULT_EXCLUDES

@@ -6,9 +6,9 @@ import argparse
 import string
 import ldap
 import ldap.modlist as modlist
-from urllib.parse import urlparse
-from .action_base import *
-from .syncrepl import *
+from urlparse import urlparse
+from action_base import *
+from syncrepl import *
 import arsoft.utils
 import arsoft.ldap.utils
 
@@ -81,7 +81,7 @@ class action_replication(action_base):
 
     def _get_next_serverid(self):
         ret = 1
-        used_serverids = list(self._server_list.keys())
+        used_serverids = self._server_list.keys()
         while ret < 4096:
             if ret in used_serverids:
                 ret = ret + 1
@@ -91,7 +91,7 @@ class action_replication(action_base):
     
     def _find_server_by_uri(self, uri):
         ret = None
-        for (serverid, serveruri) in list(self._server_list.items()):
+        for (serverid, serveruri) in self._server_list.items():
             if serveruri == uri:
                 ret = serverid
                 break
@@ -101,7 +101,7 @@ class action_replication(action_base):
         ret = 1
         used_rids = []
         for db in self._databases:
-            for repl in list(db['replication'].values()):
+            for repl in db['replication'].values():
                 used_rids.append(repl.rid)
         while ret < 4096:
             if ret in used_rids:
@@ -113,7 +113,7 @@ class action_replication(action_base):
     def _ensure_syncprov_module(self):
         self._select_modulelist(add_modulelist_if_not_available=True)
         
-        if 'syncprov' not in list(self._modules.values()):
+        if 'syncprov' not in self._modules.values():
             mod_attrs = []
             mod_attrs.append( (ldap.MOD_ADD, 'olcModuleLoad', 'syncprov') )
             ret = self._modify_direct(self._selected_modulelist_dn, mod_attrs)
@@ -123,7 +123,7 @@ class action_replication(action_base):
 
     def _add_syncprov_to_database(self, database):
         has_syncprov = False
-        for overlay in list(database['overlay'].values()):
+        for overlay in database['overlay'].values():
             if overlay['type'] == 'syncprov':
                 has_syncprov = True
                 break
@@ -140,14 +140,14 @@ class action_replication(action_base):
         return ret
 
     def _add_syncrepl_to_database(self, database):
-        print(('_add_syncrepl_to_database ' + str(database)))
-        print(('_add_syncrepl_to_database ' + str(self._server_list)))
+        print('_add_syncrepl_to_database ' + str(database))
+        print('_add_syncrepl_to_database ' + str(self._server_list))
 
         mod_attrs = []
-        for (serverid, serveruri) in list(self._server_list.items()):
-            print(('_add_syncrepl_to_database check for server ' + str(serveruri)))
+        for (serverid, serveruri) in self._server_list.items():
+            print('_add_syncrepl_to_database check for server ' + str(serveruri))
             server_has_syncrepl = False
-            for repl in list(database['replication'].values()):
+            for repl in database['replication'].values():
                 if repl.provider == serveruri:
                     server_has_syncrepl = True
                     break
@@ -174,7 +174,7 @@ class action_replication(action_base):
         return ret
     
     def _set_mirrormode_to_database(self, database):
-        print(('_set_mirrormode_to_database ' + str(database)))
+        print('_set_mirrormode_to_database ' + str(database))
         mod_attrs = []
         if database['mirrormode'] is None:
             mod_attrs.append( (ldap.MOD_ADD, 'olcMirrorMode', 'TRUE' ) )
@@ -257,11 +257,11 @@ class action_replication(action_base):
         return ret
 
     def _remove_syncrepl_from_database(self, database, serveruri):
-        print(('_remove_syncrepl_from_database ' + str(database)))
-        print(('_remove_syncrepl_from_database ' + str(self._server_list)))
+        print('_remove_syncrepl_from_database ' + str(database))
+        print('_remove_syncrepl_from_database ' + str(self._server_list))
         server_has_syncrepl = False
         mod_attrs = []
-        for (replno, repl) in list(database['replication'].items()):
+        for (replno, repl) in database['replication'].items():
             if repl.provider == serveruri:
                 server_has_syncrepl = True
                 mod_attrs.append( (ldap.MOD_DELETE, 'olcSyncRepl', '{' + str(replno) + '}' + repl.original_string() ) )
@@ -314,11 +314,11 @@ class action_replication(action_base):
             for serverid in sorted(self._server_list.keys()):
                 serveruri = self._server_list[serverid]
                 if self._own_serverid == serverid:
-                    print(('  ' + str(serverid) + ': ' + serveruri + ' (current server)'))
+                    print('  ' + str(serverid) + ': ' + serveruri + ' (current server)')
                 else:
-                    print(('  ' + str(serverid) + ': ' + serveruri))
+                    print('  ' + str(serverid) + ': ' + serveruri)
             if self._own_serverid is not None and self._own_serverid < 0:
-                print(('  No server id for the LDAP server ' + self._ldap_hostname + ' or ' + self._ldap_hostaddr + ' configured.'))
+                print('  No server id for the LDAP server ' + self._ldap_hostname + ' or ' + self._ldap_hostaddr + ' configured.')
         else:
             print("No replication configured.")
         return 0
@@ -359,7 +359,7 @@ class action_replication(action_base):
                     if serverid is None:
                         serverid = self._find_server_by_uri(serveruri)
                         
-                    if serverid not in list(self._server_list.keys()):
+                    if serverid not in self._server_list.keys():
                         self._error('Server with serverid ' + str(serverid) + ' and URI ' + str(serveruri) + ' not found.')
                         ret = 1
                         break

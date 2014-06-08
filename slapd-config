@@ -1,8 +1,8 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-
+from __future__ import print_function
 import sys
 import argparse
 import os
@@ -51,7 +51,7 @@ class SlapdConfigApp(object):
         try:
             self.verbose("ldapsearch_ext cmdline " + str(cmdline))
             p = subprocess.Popen(cmdline, stdout=subprocess.PIPE)
-        except OSError as e:
+        except OSError, e:
             p = None
             self.error("Execution failed:" + str(e))
         if p is not None:

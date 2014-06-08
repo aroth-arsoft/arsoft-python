@@ -86,7 +86,7 @@ def parse_date(datestring, default_timezone=UTC):
     default timezone specified in default_timezone is used. This is UTC by
     default.
     """
-    if not isinstance(datestring, str):
+    if not isinstance(datestring, basestring):
         raise ParseError("Expecting a string %r" % datestring)
     m = ISO8601_REGEX.match(datestring)
     if not m:
@@ -107,7 +107,7 @@ def parse_timedelta(time_str):
         return None
     parts = parts.groupdict()
     time_params = {}
-    for (name, param) in parts.items():
+    for (name, param) in parts.iteritems():
         if param:
             time_params[name] = int(param)
     return timedelta(**time_params)

@@ -2,4 +2,4 @@
 
 version = 0.9
 
-from .nsswitch import Nsswitch
+from nsswitch import Nsswitch

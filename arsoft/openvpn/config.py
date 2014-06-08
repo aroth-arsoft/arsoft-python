@@ -75,7 +75,7 @@ class Config(object):
 
     @property
     def names(self):
-        return list(self._names.keys())
+        return self._names.keys()
     
     def _invoke_rc_d_openvpn(self, action, args):
         invoke_args = ['openvpn', action]
@@ -93,7 +93,7 @@ class Config(object):
         ret = "config directory: " + str(self._config_directory) + "\r\n" +\
             "config extension: " + str(self._config_extension) + "\r\n"
         if len(self._names) > 0:
-            for vpn in list(self._names.values()):
+            for vpn in self._names.values():
                 ret = ret + '  VPN ' + vpn['name'] + ":\r\n"
                 ret = ret + '    config file: ' + vpn['configfile'] + "\r\n"
                 ret = ret + '    running: ' + ('yes' if vpn['running'] else 'no') + "\r\n"

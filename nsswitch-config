@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -42,7 +42,7 @@ class nsswitch_config:
                         service = set_line[0]
                         values = set_line[1:]
                         if self._verbose:
-                            print(('Set service %s to %s' % (service, ','.join(values))))
+                            print('Set service %s to %s' % (service, ','.join(values)))
                         config_changed = switchfile.setService(service, values)
                 if config_changed:
                     if not switchfile.save():
@@ -54,13 +54,13 @@ class nsswitch_config:
                 for s in args.get:
                     service = s.strip()
                     v = switchfile.getService(service)
-                    print((str(service) + ': ' + ' '.join(v)))
+                    print(str(service) + ': ' + ' '.join(v))
                 ret = 0
             else:
                 all_services = switchfile.services
                 for s in all_services:
                     v = switchfile.getService(s)
-                    print((str(s) + ': ' + ' '.join(v)))
+                    print(str(s) + ': ' + ' '.join(v))
                 ret = 0
         return ret
 

@@ -243,7 +243,7 @@ class Scsi(object):
 
     def rescan_hosts(self, only_empty=False):
         ret = True
-        for (hostno, hostinfo) in list(self.hosts.items()):
+        for (hostno, hostinfo) in self.hosts.items():
             if only_empty == False:
                 do_rescan = True
             else:
@@ -293,7 +293,7 @@ class Scsi(object):
                 files = os.listdir(dm_device_path)
                 for f in files:
                     slave_sys_path = os.path.join(dm_device_path, f)
-                    print(('slave_sys_path=' + slave_sys_path))
+                    print('slave_sys_path=' + slave_sys_path)
                     slave_dev = self.find_device(slave_sys_path)
                     if slave_dev is not None:
                         ret.extend(slave_dev)
@@ -334,8 +334,8 @@ if __name__ == '__main__':
     for device in e.devices:
         print(device)
     print('hosts:')
-    for (hostno, hostinfo) in list(e.hosts.items()):
-        print((str(hostno) + ': ' + str(hostinfo)))
+    for (hostno, hostinfo) in e.hosts.items():
+        print(str(hostno) + ': ' + str(hostinfo))
         
     dev = e.find_device('/sys/devices/pci0000:00/0000:00:11.0/ata4/host3/target3:0:0/3:0:0:0/block/sda')
     print(dev)

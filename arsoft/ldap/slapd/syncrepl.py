@@ -101,7 +101,7 @@ class syncrepl(object):
         
     def to_string(self):
         elems = []
-        for (key, value) in list(self._data.items()):
+        for (key, value) in self._data.items():
             if value is not None:
                 if syncrepl._need_quotes(value):
                     key_value_pair = key + '="' + str(value) + '"'

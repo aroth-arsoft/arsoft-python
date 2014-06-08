@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -34,11 +34,11 @@ class PuppetSetupApp(object):
             rmtree(self._temp_directory)
 
     def version(self):
-        print(('Version: %s' % str(__version__)))
-        print(('SSH: %s' % str(SSH_EXECUTABLE)))
-        print(('SSH keygen: %s' % str(SSH_KEYGEN_EXECUTABLE)))
-        print(('SSH copy id: %s' % str(SSH_COPY_ID_EXECUTABLE)))
-        print(('SCP: %s' % str(SCP_EXECUTABLE)))
+        print('Version: %s' % str(__version__))
+        print('SSH: %s' % str(SSH_EXECUTABLE))
+        print('SSH keygen: %s' % str(SSH_KEYGEN_EXECUTABLE))
+        print('SSH copy id: %s' % str(SSH_COPY_ID_EXECUTABLE))
+        print('SCP: %s' % str(SCP_EXECUTABLE))
         return 0
     
     def _generate_key(self):
@@ -67,7 +67,7 @@ class PuppetSetupApp(object):
     def _remove_key(self):
         if self._public_key_comment:
             if self.verbose:
-                print(('remove key %s' % self._public_key_comment))
+                print('remove key %s' % self._public_key_comment)
             commandline = 'sed \'/%(public_key_comment)s/d\' -i.old ~/.ssh/authorized_keys' % { 'public_key_comment':self._public_key_comment }
             ret = self._runssh(commandline=commandline)
         else:
@@ -139,7 +139,7 @@ exit $RES
        'sourcename':sourcename,
        'sourcefilename':sourcefilename }
         (sts, stdout, stderr) = self._runssh(script)
-        print(('_add_apt_source %s sts=%i' % (sourcename, sts)))
+        print('_add_apt_source %s sts=%i' % (sourcename, sts))
         if sts == 0:
             self._apt_update_required = True
             ret = True
@@ -231,7 +231,7 @@ exit $RES
 
     def _enforce_fqdn(self):
         if self.verbose:
-            print(('_enforce_fqdn %s' % self.target_hostname_full))
+            print('_enforce_fqdn %s' % self.target_hostname_full)
         script = """
 current_fqdn=`hostname -f`
 if [ "$current_fqdn" != "%(fqdn)s" ]; then
@@ -402,7 +402,7 @@ exit $RES
             self.sudo_askpass_script = stdout.strip()
             self.sudo_command = 'SUDO_ASKPASS=\'%s\' sudo -A ' % self.sudo_askpass_script
             if self.verbose:
-                print(('sudo command %s' % self.sudo_command))
+                print('sudo command %s' % self.sudo_command)
         return ret
 
     def _deinitialize_sudo(self):

@@ -101,7 +101,7 @@ class MenuItem:
 		return self.toString()
 
 	def __repr__(self):
-		print(self.toString())
+		print self.toString()
 
 	def toString(self, depth=0):
 		string = (' ' * depth)

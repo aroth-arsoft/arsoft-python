@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 import os,sys
 
 from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
@@ -77,7 +77,7 @@ if fritz.isPhysicalConnected():
         
         if exit_code == OK:
             ddns_failures = []
-            for (ddnsname, results) in list(ddnsname_results.items()):
+            for (ddnsname, results) in ddnsname_results.items():
                 if fritz.wanAddress() not in results:
                     if len(results) != 0:
                         ddns_failures.append( '%s points to %s but should be %s' % (str(ddnsname), ','.join(results), str(fritz.wanAddress())) )

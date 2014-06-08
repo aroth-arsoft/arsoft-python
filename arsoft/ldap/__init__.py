@@ -4,5 +4,5 @@
 
 version = 0.1
 
-from .utils import *
-from .cxn import *
+from utils import *
+from cxn import *

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from .base import xdg_file
+from base import xdg_file
 from arsoft.utils import runcmd
 
 class IconFile(xdg_file):

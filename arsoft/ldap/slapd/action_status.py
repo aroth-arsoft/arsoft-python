@@ -5,7 +5,7 @@
 import string
 import ldap
 import ldap.modlist as modlist
-from .action_base import *
+from action_base import *
 
 class action_status(action_base):
 
@@ -32,20 +32,20 @@ class action_status(action_base):
             if 'supportedSASLMechanisms' in rootDSE:
                 saslMechs = rootDSE['supportedSASLMechanisms']
 
-        print(("LDAP uri:        " + str(self._app._uri)))
-        print(("LDAP version:    " + str(ldapversion)))
+        print("LDAP uri:        " + str(self._app._uri))
+        print("LDAP version:    " + str(ldapversion))
         if len(namingContexts) > 0:
-            print(("namingContexts:  " + str(string.join(namingContexts, ', '))))
+            print("namingContexts:  " + str(string.join(namingContexts, ', ')))
         else:
             print("namingContexts:  <none>")
-        print(("configContext:   " + str(configContext)))
-        print(("SASL mechanisms: " + str(string.join(saslMechs, ', '))))
+        print("configContext:   " + str(configContext))
+        print("SASL mechanisms: " + str(string.join(saslMechs, ', ')))
         
         if self._local_defaults is not None:
             if self._local_defaults.has_ldapi_service():
                 print("LDAPI socket:    enabled")
             else:
                 print("LDAPI socket:    disabled")
-            print(("Public services: " + str(string.join(self._local_defaults.public_services, ', '))))
+            print("Public services: " + str(string.join(self._local_defaults.public_services, ', ')))
 
         return 0

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -24,11 +24,11 @@ class jabbersend:
         self._config = None
 
     def version(self):
-        print(('Version: ' + str(__version__)))
-        print(('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__)))
+        print('Version: ' + str(__version__))
+        print('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__))
         info = arsoft.xmpp.backend_info()
-        print(('Backend: ' + str(info.name)))
-        print(('Backend Version: ' + str(info.version)))
+        print('Backend: ' + str(info.name))
+        print('Backend Version: ' + str(info.version))
         return 0
     
     def _build_text_message(self, host_notification=False):

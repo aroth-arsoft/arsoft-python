@@ -60,7 +60,7 @@ class BackupList(object):
                         keyfile=self.config.ssh_identity_file)
             if remote_items:
                 found_backup_dirs = []
-                for item, item_stat in remote_items.items():
+                for item, item_stat in remote_items.iteritems():
                     if stat.S_ISDIR(item_stat.st_mode):
                         fullpath = Rsync.join_url(ssh_remote_backup_dir, item)
                         (backup_ok, timestamp) = self.config.is_backup_item(item)
@@ -195,7 +195,7 @@ class BackupApp(object):
             d=mod.__dict__
             for m in plugin_module_name.split('.')[1:]:
                 d=d[m].__dict__
-            for (key, entry) in d.items():
+            for (key, entry) in d.iteritems():
                 if key.startswith('_') or key == BackupPlugin.__name__:
                     continue
 

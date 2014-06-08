@@ -9,7 +9,7 @@
 import sys
 import os
 from arsoft.inifile import *
-from . import config
+import config
 
 class CCDFile(object):
     def __init__(self, filename=None, configfile=None):

@@ -48,8 +48,8 @@ class FritzBox(object):
             data = request.data()
             try:
                 if verbose:
-                    print(('C: ' + url))
-                    print(('C: ' + data))
+                    print('C: ' + url)
+                    print('C: ' + data)
                 c.setopt(pycurl.URL, url)
                 c.setopt(pycurl.POST, 1)
                 c.setopt(pycurl.POSTFIELDS, data)
@@ -60,10 +60,10 @@ class FritzBox(object):
                 c.setopt(pycurl.HTTPHEADER, ['SOAPACTION: "urn:' + request._urn + '#' + request._action + '"', 'CONTENT-TYPE: text/xml;', 'User-Agent: nagios'])
                 c.perform()
                 if verbose:
-                    print(('S: ' + resp.contents))
+                    print('S: ' + resp.contents)
                 ret = True
             except Exception as e:
-                print("ERROR - HTTP request to UPNP server not possible " + str(e))
+                print "ERROR - HTTP request to UPNP server not possible " + str(e)
                 ret = False
         finally:
             c.close()
@@ -196,7 +196,7 @@ class FritzBox(object):
         if response is not None:
             self._userList = []
             ret = False
-            print((response.contents))
+            print(response.contents)
             try:
                 doc = libxml2.parseDoc(response.contents)
                 ctxt = doc.xpathNewContext()

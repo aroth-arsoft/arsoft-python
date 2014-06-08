@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -6,6 +6,7 @@ import os, sys
 import argparse
 
 import pycurl
+import libxml2
 from datetime import datetime, timedelta
 
 from arsoft.fritzbox import *
@@ -14,7 +15,7 @@ class NagiosPluginApp(object):
         
     def _buildNagiosPerfData(self, data_dict):
         ret = '|'
-        for key, value in list(data_dict.items()):
+        for key, value in data_dict.items():
             ret = ret + key + '='
             if value is not None:
                 if isinstance(value, list):
@@ -57,11 +58,11 @@ class FritxBoxStatusApp(NagiosPluginApp):
 
         fritz = FritzBox(args.address)
         if args.status_dsl:
-            print((str(fritz.dslLinkStatus())))
+            print(str(fritz.dslLinkStatus()))
             critical = True if fritz.isDSLConnected() else False
 
         elif args.status_wan:
-            print((str(fritz.connectionStatus()) + ': ' + str(fritz.connectDuration()) + ', ' + str(fritz.wanAddress())))
+            print(str(fritz.connectionStatus()) + ': ' + str(fritz.connectDuration()) + ', ' + str(fritz.wanAddress()))
             critical = True if fritz.isConnected() else False
 
         elif args.status_dns:
@@ -70,11 +71,11 @@ class FritxBoxStatusApp(NagiosPluginApp):
                 print('No DNS servers available')
                 status = False
             else:
-                print((','.join(dnsservers)))
+                print(','.join(dnsservers))
                 status = True
                 
         elif args.status_physical:
-            print((str(fritz.physicalLinkStatus()) + ': ' + str(fritz.physicalLinkDownStream()) + ', ' + str(fritz.physicalLinkUpStream())))
+            print(str(fritz.physicalLinkStatus()) + ': ' + str(fritz.physicalLinkDownStream()) + ', ' + str(fritz.physicalLinkUpStream()))
             critical = True if fritz.isPhysicalConnected() else False
             
         elif args.status_nagios:
@@ -98,20 +99,20 @@ class FritxBoxStatusApp(NagiosPluginApp):
                     perfdata['upStream'] = fritz.physicalLinkUpStream()
 
                     if args.mindown is not None and args.mindown > fritz.physicalLinkDownStream():
-                        print(('WARNING: Downstream bitrate ' + str(fritz.physicalLinkDownStream()) + ' too low! (min=' + str(args.mindown) + ')'))
+                        print('WARNING: Downstream bitrate ' + str(fritz.physicalLinkDownStream()) + ' too low! (min=' + str(args.mindown) + ')')
                         status = False
                         cxnok = False
                     if args.maxdown is not None and args.maxdown < fritz.physicalLinkDownStream():
-                        print(('WARNING: Downstream bitrate ' + str(fritz.physicalLinkDownStream()) + ' too high! (max=' + str(args.maxdown) + ')'))
+                        print('WARNING: Downstream bitrate ' + str(fritz.physicalLinkDownStream()) + ' too high! (max=' + str(args.maxdown) + ')')
                         status = False
                         cxnok = False
                         
                     if args.minup is not None and args.minup > fritz.physicalLinkUpStream():
-                        print(('WARNING: Upstream bitrate ' + str(fritz.physicalLinkUpStream()) + ' too low! (min=' + str(args.minup) + ')'))
+                        print('WARNING: Upstream bitrate ' + str(fritz.physicalLinkUpStream()) + ' too low! (min=' + str(args.minup) + ')')
                         status = False
                         cxnok = False
                     if args.maxup is not None and args.maxup < fritz.physicalLinkUpStream():
-                        print(('WARNING: Upstream bitrate ' + str(fritz.physicalLinkUpStream()) + ' too high! (max=' + str(args.maxup) + ')'))
+                        print('WARNING: Upstream bitrate ' + str(fritz.physicalLinkUpStream()) + ' too high! (max=' + str(args.maxup) + ')')
                         status = False
                         cxnok = False
 
@@ -123,27 +124,27 @@ class FritxBoxStatusApp(NagiosPluginApp):
                         perfdata['wanConnectDuration'] = fritz.connectDuration()
                         perfdata['dnsServers'] = fritz.dnsServer()
 
-                        print((str(fritz.connectionStatus()) + ': ' + str(fritz.connectDuration()) + ', ' + str(fritz.wanAddress())))
+                        print(str(fritz.connectionStatus()) + ': ' + str(fritz.connectDuration()) + ', ' + str(fritz.wanAddress()))
                     else:
                         critical = True 
-                        print(('CRITICAL: Not connected! (' + str(fritz.connectionStatus()) + ')'))
+                        print('CRITICAL: Not connected! (' + str(fritz.connectionStatus()) + ')')
                 else:
                     critical = True 
-                    print(('CRITICAL: DSL link is not up! (' + str(fritz.dslLinkStatus()) + ')'))
+                    print('CRITICAL: DSL link is not up! (' + str(fritz.dslLinkStatus()) + ')')
             else:
                 critical = True 
-                print(('CRITICAL: Physical link is not up! (' + str(fritz.physicalLinkStatus()) + ')'))
+                print('CRITICAL: Physical link is not up! (' + str(fritz.physicalLinkStatus()) + ')')
 
         else:
-            print(('Physical link status: ' + str(fritz.physicalLinkStatus())))
-            print(('Physical link down: ' + str(fritz.physicalLinkDownStream()) + ' bit/sec'))
-            print(('Physical link up: ' + str(fritz.physicalLinkUpStream()) + ' bit/sec'))
-            print(('DSL link status: ' + str(fritz.dslLinkStatus())))
-            print(('WAN connection status: ' + str(fritz.connectionStatus())))
-            print(('WAN connect time: ' + str(fritz.connectTime())))
-            print(('WAN connect duration: ' + str(fritz.connectDuration())))
-            print(('WAN address: ' + str(fritz.wanAddress())))
-            print(('DNS servers: ' + str(fritz.dnsServer())))
+            print('Physical link status: ' + str(fritz.physicalLinkStatus()))
+            print('Physical link down: ' + str(fritz.physicalLinkDownStream()) + ' bit/sec')
+            print('Physical link up: ' + str(fritz.physicalLinkUpStream()) + ' bit/sec')
+            print('DSL link status: ' + str(fritz.dslLinkStatus()))
+            print('WAN connection status: ' + str(fritz.connectionStatus()))
+            print('WAN connect time: ' + str(fritz.connectTime()))
+            print('WAN connect duration: ' + str(fritz.connectDuration()))
+            print('WAN address: ' + str(fritz.wanAddress()))
+            print('DNS servers: ' + str(fritz.dnsServer()))
             #print('userList: ' + str(fritz.userList()))
 
         if critical == True:

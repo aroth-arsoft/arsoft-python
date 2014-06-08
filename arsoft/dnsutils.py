@@ -25,7 +25,7 @@ ALGORITHM_ID_TO_NAME = {
     165: dns.tsig.HMAC_SHA512,
     }
 
-ALGORITHM_NAME_TO_ID = {v:k for k, v in list(ALGORITHM_ID_TO_NAME.items())}
+ALGORITHM_NAME_TO_ID = {v:k for k, v in ALGORITHM_ID_TO_NAME.items()}
 
 def get_algorithm_for_number(num):
     if num in ALGORITHM_ID_TO_NAME:
@@ -237,7 +237,7 @@ def use_key_file(update_obj, keyfile, format=KeyFileFormat.Zone):
         keyprotocol = None
         first_keyname = None
         keyring = {}
-        for (keyname, keydata) in keys.items():
+        for (keyname, keydata) in keys.iteritems():
             if keyalgorithm is None:
                 keyalgorithm = keydata['algorithm']
             if keyprotocol is None:

@@ -156,7 +156,7 @@ class FileListItemWithDestination(FileListItemBase):
         self._items = {}
 
     def __iter__(self):
-        return iter(self._items.items())
+        return self._items.iteritems()
 
     def _item_to_string(self, item):
         (source, dest) = item
@@ -224,7 +224,7 @@ class FileListItemWithDestination(FileListItemBase):
     def items(self, value):
         self.clear()
         if isinstance(value, dict):
-            for (source, dest) in value.items():
+            for (source, dest) in value.iteritems():
                 self._append(source, dest)
         else:
             self.append(value)
@@ -416,7 +416,7 @@ class FileListWithDestination(FileListBase):
 
     def __iter__(self):
         self._build_plain_list()
-        return iter(self._plain_list.items())
+        return self._plain_list.iteritems()
 
 if __name__ == "__main__":
     import sys
@@ -426,8 +426,8 @@ if __name__ == "__main__":
     #fl.save(sys.argv[2])
     fl = FileListWithDestination(sys.argv[1])
     print(fl)
-    for it in fl.items.items():
-        print(('got fl.item %s' % str(it)))
+    for it in fl.items.iteritems():
+        print('got fl.item %s' % str(it))
     for it in fl:
-        print(('got item %s' % str(it)))
+        print('got item %s' % str(it))
     fl.save(sys.argv[2])

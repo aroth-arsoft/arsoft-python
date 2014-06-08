@@ -119,7 +119,7 @@ class GitBundle(object):
         bundle_heads = self._list_heads()
         repo_heads = repository.list_heads(remotes=False)
         recreate_required = False
-        for (ref_name, repo_sha1) in list(repo_heads.items()):
+        for (ref_name, repo_sha1) in repo_heads.items():
             if ref_name in bundle_heads:
                 # ref_name was previously included in the bundle, so just update it
                 bundle_sha1 = bundle_heads[ref_name]
@@ -143,7 +143,7 @@ if __name__ == '__main__':
 
     bundle = GitBundle(sys.argv[1])
 
-    print(('git: %s' % (GIT_EXECUTABLE)))
-    print(('filename: %s' % (str(bundle.filename))))
-    print(('valid: %s' % (str(bundle.valid))))
-    print(('heads: %s' % (str(bundle.heads))))
+    print('git: %s' % (GIT_EXECUTABLE))
+    print('filename: %s' % (str(bundle.filename)))
+    print('valid: %s' % (str(bundle.valid)))
+    print('heads: %s' % (str(bundle.heads)))

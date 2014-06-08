@@ -7,9 +7,9 @@ import ldap
 import ldap.modlist as modlist
 import ldif
 import socket
-from urllib.parse import urlparse
-from .syncrepl import *
-from .slapd_defaults import *
+from urlparse import urlparse
+from syncrepl import *
+from slapd_defaults import *
 import arsoft.utils
 from arsoft.ldap.cxn import LdapConnection
 
@@ -136,7 +136,7 @@ class action_base(object):
     def _ldap_error_message(e):
         if type(e.message) == dict:
             msg = ''
-            for (k, v) in e.message.items():
+            for (k, v) in e.message.iteritems():
                 msg = msg + "%s: %s" % (k, v)
         else:
             msg = str(e)

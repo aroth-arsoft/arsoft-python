@@ -5,7 +5,7 @@
 import ldap
 import ldap.modlist as modlist
 
-from .utils import *
+from utils import *
 
 class LdapConnection(object):
     def __init__(self, uri=None, username=None, password=None, saslmech=None, logger=None):
@@ -28,7 +28,7 @@ class LdapConnection(object):
     def _ldap_error_message(e):
         if type(e.message) == dict:
             msg = ''
-            for (k, v) in e.message.items():
+            for (k, v) in e.message.iteritems():
                 msg = msg + "%s: %s" % (k, v)
         else:
             msg = str(e)
@@ -164,7 +164,7 @@ class LdapConnection(object):
     def update(self, dn, values):
         searchBase = dn
         searchFilter = '(objectClass=*)'
-        attrsFilter = list(values.keys())
+        attrsFilter = values.keys()
         
         mod_old_values = {}
         mod_new_values = {}
@@ -173,7 +173,7 @@ class LdapConnection(object):
             for rec in result_set:
                 (dn, current_values) = rec[0]
                 
-                for (key, current_value) in list(current_values.items()):
+                for (key, current_value) in current_values.items():
                     if values[key] == current_value:
                         # value already up-to-date
                         continue
@@ -182,7 +182,7 @@ class LdapConnection(object):
                         # the modify op
                         mod_old_values[key] = current_value
                         mod_new_values[key] = values[key]
-        for (key, new_value) in list(values.items()):
+        for (key, new_value) in values.items():
             if key not in mod_new_values:
                 mod_new_values[key] = new_value
         return self._modify(dn, mod_old_values, mod_new_values)

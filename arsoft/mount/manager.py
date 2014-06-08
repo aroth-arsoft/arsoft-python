@@ -248,7 +248,7 @@ class MountManager(object):
 
     def getEntryForFile(self, filename):
         mp = MountManager._getMountpoint(filename)
-        print(('getEntryForFile(%s) = %s' % (filename, str(mp))))
+        print('getEntryForFile(%s) = %s' % (filename, str(mp)))
         return self.getEntry(mp) if mp is not None else None
         
     def getDeviceNameForFile(self, filename):
@@ -265,23 +265,23 @@ class MountManager(object):
         
 if __name__ == "__main__":
     mmgr = MountManager()
-    print((str(mmgr)))
+    print(str(mmgr))
 
     print('Filesystems:')
     for e in mmgr.filesystems:
-        print(('  ' + str(e)))
+        print('  ' + str(e))
     
     print('Active entries:')
     for e in mmgr.active_entries:
-        print(('  ' + str(e)))
+        print('  ' + str(e))
         
     print('Configured entries:')
     for e in mmgr.configured_entries:
-        print(('  ' + str(e)))
+        print('  ' + str(e))
     
     if not os.path.exists('/tmp/dhclient-script.debug'):
         f = open('/tmp/dhclient-script.debug', 'w')
         f.close()
     mp = mmgr.getEntryForFile('/tmp/dhclient-script.debug')
-    print(('mp=' + str(mp)))
+    print('mp=' + str(mp))
  
