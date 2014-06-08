@@ -52,7 +52,7 @@ class ifconfig (object):
         ifreq = struct.pack("32s", ifname)
         try:
             result = self._ioctl(func, ifreq)
-        except IOError as msg:
+        except IOError, msg:
             warning("error getting addr for interface %r: %s", ifname, msg)
             return None
         return socket.inet_ntoa(result[20:24])
@@ -71,7 +71,7 @@ class ifconfig (object):
             try:
                 result = self._ioctl(self.SIOCGIFCONF, ifreq)
                 break
-            except IOError as msg:
+            except IOError, msg:
                 # in case of EINVAL the buffer size was too small
                 if msg[0] != errno.EINVAL or bufsize == max_bufsize:
                     raise
@@ -113,7 +113,7 @@ class ifconfig (object):
         ifreq = struct.pack("32s", ifname)
         try:
             result = self._ioctl(self.SIOCGIFFLAGS, ifreq)
-        except IOError as msg:
+        except IOError, msg:
             warning("error getting flags for interface " + ifname + ": " + str(msg))
             return 0
         # extract the interface's flags from the return value
@@ -154,7 +154,7 @@ class ifconfig (object):
         ifreq = struct.pack("32s", ifname)
         try:
             result = self._ioctl(self.SIOCGIFHWADDR, ifreq)
-        except IOError as msg:
+        except IOError, msg:
             warning("error getting addr for interface " + ifname + ": " + str(msg))
             return None
         hwaddr=[]
