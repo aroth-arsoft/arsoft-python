@@ -1,111 +1,93 @@
 Source: arsoft-python
-Section: python
+Section: admin
 Priority: optional
 Maintainer: Andreas Roth <aroth@arsoft-online.com>
-Standards-Version: 3.9.5
-Build-Depends: debhelper (>= 8), python (>= 2.7), python3 (>= 3.2)
+Standards-Version: 3.9.4
+Build-Depends: debhelper (>= 8), python (>= 2.7)
 X-Python-Version: >=2.7
-X-Python3-Version: >= 3.2
 
-Package: python-arsoft
+Package: arsoft-python
 Architecture: all
 Depends: ${python:Depends}, ${misc:Depends}, python-sleekxmpp, python-daemon, python-magic
-Replaces: arsoft-python
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 
-Package: python3-arsoft
+Package: arsoft-netconfig
 Architecture: all
-Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp, python3-magic
-Description: common files for the AR Soft python scripts
- This package includes all common files for the AR Soft python scripts.
-
-Package: python-arsoft-netconfig
-Architecture: all
-Replaces: arsoft-netconfig
-Depends: python-arsoft, ${python:Depends}, ${misc:Depends}, ${dhcpserver:Depends}
+Depends: arsoft-python, ${python:Depends}, ${misc:Depends}, ${dhcpserver:Depends}
 Description: common files for the AR Soft netconfig framework
  This package includes all files of the AR Soft netconfig
  framework and all binaries.
 
-Package: python-arsoft-crypto
+Package: arsoft-crypto
 Architecture: all
-Replaces: arsoft-crypto
-Depends: python-arsoft, python-openssl, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, python-openssl, ${python:Depends}, ${misc:Depends}
 Description: crypto utility scripts
  Some scripts to help with crypto related tasks.
 
-Package: python-arsoft-fritzbox
+Package: arsoft-python-fritzbox
 Architecture: all
-Replaces: arsoft-python-fritzbox
-Depends: python-arsoft, python-pynag, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, python-pynag, ${python:Depends}, ${misc:Depends}
 Description: python module to access a AVM FritzBox
  Access the AVM FritzBox using Python and retrieve all kind of information
  from your box.
 
-Package: python-arsoft-openvpn
+Package: arsoft-python-openvpn
 Architecture: all
-Depends: python-arsoft, python-arsoft-crypto, ${python:Depends}, ${misc:Depends}
-Replaces: arsoft-openvpn, arsoft-python-openvpn
+Depends: arsoft-python, arsoft-crypto, ${python:Depends}, ${misc:Depends}
+Replaces: arsoft-openvpn
 Description: access the OpenVPN configuration and status
  Includes the openvpn-admin script to control and maintain the OpenVPN 
  configuration. This script can also be used to show the status of all
  configured VPNs and the related certificates and other files.
 
-Package: python-arsoft-nagios
+Package: arsoft-python-nagios
 Architecture: all
-Replaces: arsoft-python-nagios
-Depends: python-arsoft, python-arsoft-fritzbox, python-yaml, arsoft-python-openvpn,
+Depends: arsoft-python, arsoft-python-fritzbox, python-yaml, arsoft-python-openvpn, 
  ${python:Depends}, ${misc:Depends}
 Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
  includes ready to use plugins for nagios to monitor an AVM FritzBox
  and an OpenVPN server or client.
 
-Package: python-arsoft-git
+Package: arsoft-python-git
 Architecture: all
-Replaces: arsoft-python-git
-Depends: python-arsoft, git, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, git, ${python:Depends}, ${misc:Depends}
 Description: utilities for working with GIT
  Some tools to make working with GIT a bit easier:
   - git info: display basic information about a repository
   - git shrink: reduce the disk space of a repository
 
-Package: python-arsoft-trac
+Package: arsoft-python-trac
 Architecture: all
-replaces: arsoft-python-trac
-Depends: python-arsoft, trac, arsoft-trac-suid, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, trac, arsoft-trac-suid, ${python:Depends}, ${misc:Depends}
 Description: utilities for trac administration
  Several adminstration helper scripts for trac:
   - convert repository from SVN to GIT
   - convert trac database from SQLite to MySQL
   - manage the trac environment by using command line
 
-Package: python-arsoft-kerberos
+Package: arsoft-python-kerberos
 Architecture: all
-Replaces: arsoft-python-kerberos
-Depends: python-arsoft, python-pexpect, python-ldap, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, python-pexpect, python-ldap, ${python:Depends}, ${misc:Depends}
 Description: python module to access and control a Kerberos environment
  Includes functions to change the kerberos password with a simple function call.
 
-Package: python-arsoft-web
+Package: arsoft-python-web
 Architecture: all
-Replaces: arsoft-python-web
-Depends: python-arsoft, python-django (>= 1.4), python-flup, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, python-django (>= 1.4), python-flup, ${python:Depends}, ${misc:Depends}
 Description: base package for Django based web applications
  This package installs all required packages for Django based web applications.
 
 Package: arsoft-edskmgr
 Architecture: all
-Section: admin
-Depends: python-arsoft, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
 Replaces: edskmgr
 Description: external disk management tools
  This package provides scripts and tools to work with external disks.
 
 Package: arsoft-edskmgr-suid
 Architecture: i386 amd64
-Section: admin
 Depends: ${shlibs:Depends}, ${misc:Depends}, arsoft-edskmgr
 Replaces: edskmgr-suid
 Description: suid helpers for the external disk management tools
@@ -114,7 +96,6 @@ Description: suid helpers for the external disk management tools
 
 Package: arsoft-trac-suid
 Architecture: i386 amd64
-Section: admin
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: suid helpers for the accessing Trac from a web server
  This package suid helpers to allow the user of the web server (or any
@@ -122,7 +103,6 @@ Description: suid helpers for the accessing Trac from a web server
 
 Package: arsoft-onkyo
 Architecture: all
-Section: admin
-Depends: python-arsoft, python-serial, ${python:Depends}, ${misc:Depends}
+Depends: arsoft-python, python-serial, ${python:Depends}, ${misc:Depends}
 Description: control a Onkyo receiver using RS232
  Uses a RS232 connection to a Onkyo receiver to control it.
