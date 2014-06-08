@@ -1,0 +1,6 @@
+usr/lib/python2.*/dist-packages/arsoft/trac/*.py
+usr/lib/python2.*/dist-packages/arsoft/trac/plugins/*.py
+usr/bin/trac-sqlite2mysql
+usr/bin/trac-svn2git
+usr/bin/trac-manage
+usr/bin/trac-git-post-receive-hook

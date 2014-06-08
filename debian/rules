@@ -1,6 +1,7 @@
 #!/usr/bin/make -f
 
 PYTHON2=$(shell pyversions -vr)
+PYTHON3=$(shell pyversions -vr)
 
 # Don't compress .py files
 DEB_COMPRESS_EXCLUDE := .py
@@ -16,7 +17,7 @@ CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
 LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 
 %:
-	dh $@ --buildsystem=python_distutils --with=python2
+	dh $@ --with python2,python3 --buildsystem=pybuild
 
 edskload: $(EDSKMGR_SUID_SOURCES)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DEDSKMGR_LOAD -o $@ $(EDSKMGR_SUID_SOURCES)
@@ -28,17 +29,17 @@ trac-admin-suid: $(TRAC_ADMIN_SUID_SOURCES)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(TRAC_ADMIN_SUID_SOURCES)
 
 override_dh_clean:
-	dh_clean -O--buildsystem=python_distutils
+	dh_clean -O--buildsystem=pybuild
 	rm *.zip || true
 	test -f edskload && rm edskload || true
 	test -f edskeject && rm edskeject || true
 	test -f trac-admin-suid && rm trac-admin-suid || true
 	
 override_dh_auto_build: edskeject edskload trac-admin-suid
-	dh_auto_build -O--buildsystem=python_distutils
+	dh_auto_build -O--buildsystem=pybuild
 	
 override_dh_auto_install:
-	dh_auto_install -O--buildsystem=python_distutils
+	dh_auto_install -O--buildsystem=pybuild
 	install -d $(CURDIR)/debian/tmp/usr/bin
 	install -o root -g root -m 0755 -s edskload $(CURDIR)/debian/tmp/usr/bin/edskload
 	install -o root -g root -m 0755 -s edskeject $(CURDIR)/debian/tmp/usr/bin/edskeject
@@ -49,11 +50,11 @@ override_dh_auto_install:
 	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr/hook.d
 
 override_dh_fixperms:
-	dh_fixperms -O--buildsystem=python_distutils
+	dh_fixperms -O--buildsystem=pybuild
 	chown root.root $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
 	chmod 4755 $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
 	test -f $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf && chown root.root $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf || true
 	test -f $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf && chmod 0600 $(CURDIR)/debian/arsoft-python/etc/jabber-daemon.conf || true
 
 override_dh_gencontrol:
-	dh_gencontrol -O--buildsystem=python_distutils -- $(SUBSTVARS)
+	dh_gencontrol -O--buildsystem=pybuild -- $(SUBSTVARS)
