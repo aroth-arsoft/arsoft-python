@@ -24,6 +24,8 @@ ONKYO_HIGHLEVEL_COMMANDS = {
     'sleep_status': 'SLPQSTN',
     'sleep_off': 'SLPOFF',
 
+    'input_status': 'SLIQSTN',
+
     'sound_mode_stereo': 'LMD00',
     'sound_mode_direct': 'LMD01',
     'sound_mode_surround': 'LMD02',
@@ -68,10 +70,39 @@ ONKYO_HIGHLEVEL_COMMANDS = {
 
 SPECIAL_HIGHLEVEL_COMMANDS = [
     'mute_toggle',
+    'input'
     ]
 
 ONKYO_HIGHLEVEL_COMMANDS_WITH_ARGS = {
     re.compile(r'sleep([0-9]{2})'): 'SLP\1',
+    re.compile(r'input([0-9]{2})'): 'SLI\1',
+    }
+
+ONKYO_INPUT_NUM_STR = {
+    0x01: 'CBL/SAT',
+    0x02: 'GAME',
+    0x03: 'AUX1',
+    0x04: 'AUX2',
+    0x05: 'PC',
+    0x06: 'VIDEO7',
+    0x10: 'BD/DVD',
+    0x20: 'TAPE1',
+    0x21: 'TAPE2',
+    0x22: 'PHONO',
+    0x23: 'CD',
+    0x24: 'FM',
+    0x25: 'AM',
+    0x26: 'TUNER',
+    0x27: 'DLNA',
+    0x28: 'INTERNET RADIO',
+    0x29: 'USB(Front)',
+    0x2A: 'USB(Rear)',
+    0x2B: 'NET',
+    0x2C: 'USB(toggle)',
+    0x40: 'Universal PORT',
+    0x30: 'Multi CH',
+    0x31: 'XM',
+    0x32: 'SERIUS'
     }
 
 
@@ -118,12 +149,31 @@ class OnkyoRS232(object):
                 resp = self.net.raw(status_cmd + '\r\n')      #write a string
                 mute_is_off = True if int(resp[4]) == 0 else False
                 #print('got resp %s -> %x' % (resp, int(resp[4])))
+            else:
+                mute_is_off = False
             if mute_is_off:
                 #print('mute is off')
                 ret = self._get_raw_command('mute_on')
             else:
                 #print('mute is on')
                 ret = self._get_raw_command('mute_off')
+        elif cmd == 'input':
+            status_cmd = ONKYO_HIGHLEVEL_COMMANDS['input_status']
+            if self.ser is not None:
+                self.ser.write(status_cmd + '\r\n')      #write a string
+                resp = self.ser.readline()
+                input_num = int(resp[5:7], 16)
+                #print('got resp %s -> %x' % (resp, int(resp[6])))
+            elif self.net is not None:
+                resp = self.net.raw(status_cmd + '\r\n')      #write a string
+                input_num = int(resp[3:5], 16)
+            else:
+                input_num = 0
+            if input_num in ONKYO_INPUT_NUM_STR:
+                print(ONKYO_INPUT_NUM_STR[input_num])
+            else:
+                print('Unknown %x' % input_num)
+            ret = None
         else:
             ret = None
         return ret
@@ -137,11 +187,20 @@ class OnkyoRS232(object):
         print('Version %s' % __version__)
         return 0
 
+    def list_commands(self):
+        for (cmd_name, cmd_raw) in ONKYO_HIGHLEVEL_COMMANDS.iteritems():
+            print(cmd_name)
+        for (cmd_name) in SPECIAL_HIGHLEVEL_COMMANDS:
+            print(cmd_name)
+        for (cmd_name_re, cmd_raw_re) in ONKYO_HIGHLEVEL_COMMANDS_WITH_ARGS.iteritems():
+            print(cmd_name_re.pattern)
+        return 0
+
     def main(self):
         #=============================================================================================
         # process command line
         #=============================================================================================
-        parser = argparse.ArgumentParser(description='send control command to a Onkyo using a RS232 connection.')
+        parser = argparse.ArgumentParser(description='send control command to a Onkyo using a RS232/LAN connection.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('-q', '--quiet', dest='quiet', action='store_true', help='do not output the response.')
         parser.add_argument('-r', '--raw', dest='use_raw_command', action='store_true', help='interpret given commands as raw (without !1 prefix).')
@@ -151,6 +210,7 @@ class OnkyoRS232(object):
         parser.add_argument('--port', dest='port', metavar='PORT', type=int, help='use the specified serial port number.')
         parser.add_argument('--usbport', dest='usbport', metavar='USBPORT', type=int, help='use the specified USB serial port number.')
         parser.add_argument('--dev', dest='device', metavar='DEV', help='use the specified device file for communication.')
+        parser.add_argument('--list-commands', dest='list_commands', action='store_true', help='shows the list of available commands.')
         parser.add_argument('-H', '--host', dest='host', metavar='HOST', help='use the specified host for communication.')
         parser.add_argument('-P', '--udpport', dest='udpport', default=60128, metavar='PORT', type=int, help='use the specified UDP port number.')
         parser.add_argument('command', metavar='CMD', nargs='*', help='commands to send to the receiver')
@@ -162,6 +222,9 @@ class OnkyoRS232(object):
 
         if args.version:
             return self.version()
+
+        if args.list_commands:
+            return self.list_commands()
 
         if args.discover:
             return self.discover()
@@ -210,8 +273,6 @@ class OnkyoRS232(object):
                                 sys.stdout.write(resp)
                         elif cmd_in_progress + 1 < num_commands:
                             time.sleep(0.2)
-                    else:
-                        sys.stderr.write('Failed to translate command %s\n' % (cmd))
                     cmd_in_progress = cmd_in_progress + 1
                 self.ser.close()             #close port 
         elif self.host:
@@ -223,7 +284,7 @@ class OnkyoRS232(object):
                 num_commands = len(args.command)
                 for cmd in args.command:
                     if self.use_raw_command:
-                        raw_cmd = "!1%s" % cmd
+                        raw_cmd = cmd
                     else:
                         if self._is_special_command(cmd):
                             raw_cmd = self._special_command(cmd)
@@ -240,8 +301,6 @@ class OnkyoRS232(object):
                                 sys.stdout.write(str(response))
                         elif cmd_in_progress + 1 < num_commands:
                             time.sleep(0.2)
-                    else:
-                        sys.stderr.write('Failed to translate command %s\n' % (cmd))
                     cmd_in_progress = cmd_in_progress + 1
                 self.net.disconnect()
             ret = 0
