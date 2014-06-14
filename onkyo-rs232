@@ -74,37 +74,49 @@ SPECIAL_HIGHLEVEL_COMMANDS = [
     ]
 
 ONKYO_HIGHLEVEL_COMMANDS_WITH_ARGS = {
-    re.compile(r'sleep([0-9]{2})'): 'SLP\1',
-    re.compile(r'input([0-9]{2})'): 'SLI\1',
+    re.compile(r'sleep([0-9]{1,2})'): lambda arg: 'SLP%02i' % int(arg),
+    re.compile(r'input([0-9]{2}|[a-zA-Z0-9/]+)'): lambda arg: 'SLI%02X' % onkyo_input_channel_as_num(arg),
     }
 
 ONKYO_INPUT_NUM_STR = {
-    0x01: 'CBL/SAT',
-    0x02: 'GAME',
-    0x03: 'AUX1',
-    0x04: 'AUX2',
-    0x05: 'PC',
-    0x06: 'VIDEO7',
-    0x10: 'BD/DVD',
-    0x20: 'TAPE1',
-    0x21: 'TAPE2',
-    0x22: 'PHONO',
-    0x23: 'CD',
-    0x24: 'FM',
-    0x25: 'AM',
-    0x26: 'TUNER',
-    0x27: 'DLNA',
-    0x28: 'INTERNET RADIO',
-    0x29: 'USB(Front)',
-    0x2A: 'USB(Rear)',
-    0x2B: 'NET',
-    0x2C: 'USB(toggle)',
-    0x40: 'Universal PORT',
-    0x30: 'Multi CH',
-    0x31: 'XM',
-    0x32: 'SERIUS'
+    0x01: ('CBL/SAT', 'CABLE', 'SATELLITE' ),
+    0x02: ('GAME'),
+    0x03: ('AUX1'),
+    0x04: ('AUX2'),
+    0x05: ('PC'),
+    0x06: ('VIDEO7'),
+    0x10: ('BD/DVD', 'BD', 'DVD'),
+    0x20: ('TAPE1'),
+    0x21: ('TAPE2'),
+    0x22: ('PHONO'),
+    0x23: ('CD'),
+    0x24: ('FM'),
+    0x25: ('AM'),
+    0x26: ('TUNER'),
+    0x27: ('DLNA'),
+    0x28: ('INTERNET RADIO'),
+    0x29: ('USB(Front)'),
+    0x2A: ('USB(Rear)'),
+    0x2B: ('NET'),
+    0x2C: ('USB(toggle)'),
+    0x40: ('Universal PORT'),
+    0x30: ('Multi CH'),
+    0x31: ('XM'),
+    0x32: ('SERIUS')
     }
 
+def onkyo_input_channel_as_num(arg):
+    try:
+        ret = int(arg)
+    except ValueError:
+        ret = None
+        arg_lower = arg.lower()
+        for input_num, input_names in ONKYO_INPUT_NUM_STR.items():
+            for name in input_names:
+                if name.lower() == arg_lower:
+                    ret = input_num
+                    break
+    return ret
 
 class OnkyoRS232(object):
     def __init__(self):
@@ -126,8 +138,8 @@ class OnkyoRS232(object):
                 m = re_cmd.match(cmd)
                 if m:
                     if m.groups:
-                        re_raw_cmd = re_raw_cmd.replace('\1', m.group(1))
-                    ret = '!1' + re_raw_cmd if self.ser is not None else re_raw_cmd
+                        raw_cmd = re_raw_cmd(m.group(1))
+                    ret = '!1' + raw_cmd if self.ser is not None else raw_cmd
                     break
         return ret
     
@@ -170,7 +182,8 @@ class OnkyoRS232(object):
             else:
                 input_num = 0
             if input_num in ONKYO_INPUT_NUM_STR:
-                print(ONKYO_INPUT_NUM_STR[input_num])
+                input_names = ONKYO_INPUT_NUM_STR[input_num]
+                print(input_names[0])
             else:
                 print('Unknown %x' % input_num)
             ret = None
