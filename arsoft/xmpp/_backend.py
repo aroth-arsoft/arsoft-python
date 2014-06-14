@@ -3,6 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import json
+import struct
 from arsoft.socket_utils import *
 
 class BackendInfo(object):
@@ -43,17 +44,26 @@ class XMPPInvalidMessage(Exception):
     def __str__(self):
         return 'XMPPInvalidMessage(%s, %s)' % (self._html, self._parser_error)
 
-def daemon_send_message(sender, password, recipient, body, html=None, subject=None, message_type='chat', socket_path='/run/jabber/daemon.sock'):
-    msg_obj = { 'recipient':recipient }
+def daemon_send_message(sender=None, password=None, to=None, cc=None, body=None, html=None, subject=None, message_type=None, socket_path='/run/arsoft-xmpp-daemon/socket'):
+    msg_obj = {}
+    if sender:
+        msg_obj['from'] = sender
+    if to:
+        msg_obj['to'] = to
+    if cc:
+        msg_obj['cc'] = cc
     if html is not None and len(html) > 0:
         msg_obj['html'] = html
     elif body is not None:
         msg_obj['body'] = body
     if subject:
         msg_obj['subject'] = subject
+    if message_type:
+        msg_obj['message_type'] = message_type
+    arsoft_xmpp_daemon_magic = 0x87633bba
     msg = json.dumps(msg_obj) + '\n'
-    if send_unix_socket_message(socket_path,msg) == len(msg):
+    header = struct.pack("@I", arsoft_xmpp_daemon_magic) + struct.pack(">I", len(msg))
+    if send_unix_socket_message(socket_path,header + msg) == len(header) + len(msg):
         return True
     else:
         return False
-

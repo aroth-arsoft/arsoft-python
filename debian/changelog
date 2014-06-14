@@ -1,3 +1,11 @@
+arsoft-python (1.130) trusty; urgency=medium
+
+  * remove obsolete arsoft-jabber-daemo (please use arsoft-xmpp-daemon)
+  * add support for new arsoft-xmpp-daemon
+  * various improvements and new features to onkyo script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 14 Jun 2014 17:28:15 +0200
+
 arsoft-python (1.129) trusty; urgency=medium
 
   * improve timedelta format 

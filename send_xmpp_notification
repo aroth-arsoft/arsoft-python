@@ -8,7 +8,6 @@ import argparse
 import sys
 import logging
 import time
-import json
 
 import arsoft.xmpp
 
@@ -61,6 +60,7 @@ class jabbersend:
         parser.add_argument('-t', '--to', dest='recipient', help='recipient name')
         parser.add_argument('--host', dest='host_notification', default=False, action='store_true', help='send a host nofication')
         parser.add_argument('--server', dest='service_notification', default=False, action='store_true', help='send a service nofication')
+        parser.add_argument('--socket', dest='socket', default='/run/arsoft-xmpp-daemon/socket', help='path to the socket of the arsoft-xmpp-daemon')
 
         args = parser.parse_args()
 
@@ -109,12 +109,12 @@ class jabbersend:
             text_message=self._build_text_message(host_notification)
             html_message=None
 
-        if arsoft.xmpp.send_message(sender=None, password=None, recipient=recipient, body=text_message, 
-                                    subject=subject, html=html_message, 
-                                    use_daemon=True):
+        if arsoft.xmpp.send_message(sender=None, password=None, recipient=recipient, body=text_message,
+                                    subject=subject, html=html_message,
+                                    use_daemon=True, socket_path=args.socket):
             ret = 0
         else:
-            sys.stderr.write('Failed to send message from %s to %s.\n' %(sender, recipient))
+            sys.stderr.write('Failed to send message to %s.\n' %(recipient))
             ret = 1
         return ret
 

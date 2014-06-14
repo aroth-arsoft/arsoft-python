@@ -12,15 +12,15 @@ from _sleekxmpp import sleekxmpp_send_message, sleekxmpp_backend_info, sleekxmpp
 from _backend import daemon_send_message, XMPPInvalidMessage
 from config import xmpp_config
 
-def send_message(sender, password, recipient, body, html=None, subject=None, message_type='chat',
-                           ipv4=True, ipv6=True, use_daemon=False, socket_path='/run/jabber/daemon.sock'):
+def send_message(sender, password, recipient, body, html=None, subject=None, message_type=None,
+                           ipv4=True, ipv6=True, use_daemon=False, socket_path='/run/arsoft-xmpp-daemon/socket'):
     if use_daemon:
-        return daemon_send_message(sender=sender, password=password, recipient=recipient, body=body, 
+        return daemon_send_message(sender=sender, password=password, to=recipient, body=body,
                                         html=html, subject=subject, message_type=message_type, 
                                         socket_path=socket_path)
     else:
         return sleekxmpp_send_message(sender=sender, password=password, recipient=recipient, body=body, 
-                                        html=html, subject=subject, message_type=message_type,
+                                        html=html, subject=subject, message_type=message_type if message_type else 'chat',
                                         ipv4=ipv4, ipv6=ipv6)
 def backend_info():
     return sleekxmpp_backend_info()
