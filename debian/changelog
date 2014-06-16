@@ -1,3 +1,9 @@
+arsoft-python (1.131) trusty; urgency=medium
+
+  * openvpn related fixes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 16 Jun 2014 14:34:53 +0200
+
 arsoft-python (1.130) trusty; urgency=medium
 
   * remove obsolete arsoft-jabber-daemo (please use arsoft-xmpp-daemon)
