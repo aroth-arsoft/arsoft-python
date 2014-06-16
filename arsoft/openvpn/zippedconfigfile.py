@@ -113,43 +113,50 @@ class ZippedConfigFile(object):
     @staticmethod
     def create(cfgfile, output_file, key_passphrase=None):
         zip_cfgfile = cfgfile.clone()
+        zip_ostype = cfgfile.ostype
         try:
             fobj = ZipFileEx(output_file, 'w')
             if fobj:
                 ret = True
+                if zip_ostype == 'windows' or zip_ostype == 'macosx':
+                    # create a flat zip file
+                    zip_private_directory = ''
+                else:
+                    zip_private_directory = cfgfile.suggested_private_directory + '/'
+
                 if ret and cfgfile.cert_filename:
-                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.cert_filename, cfgfile.suggested_private_directory + '/cert.pem')
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.cert_filename, zip_private_directory + 'cert.pem')
                     if ret:
-                        zip_cfgfile.cert_filename = cfgfile.suggested_private_directory + '/cert.pem'
+                        zip_cfgfile.cert_filename = zip_private_directory + 'cert.pem'
                 if ret and cfgfile.key_filename:
                     if key_passphrase:
-                        ret, error = ZippedConfigFile._create_add_key_file_to_zip(fobj, cfgfile, cfgfile.key_filename, key_passphrase, cfgfile.suggested_private_directory + '/key.pem')
+                        ret, error = ZippedConfigFile._create_add_key_file_to_zip(fobj, cfgfile, cfgfile.key_filename, key_passphrase, zip_private_directory + 'key.pem')
                     else:
-                        ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, cfgfile.suggested_private_directory + '/key.pem')
+                        ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, zip_private_directory + 'key.pem')
                     if ret:
-                        zip_cfgfile.key_filename = cfgfile.suggested_private_directory + '/key.pem'
+                        zip_cfgfile.key_filename = zip_private_directory + 'key.pem'
                 if ret and cfgfile.ca_filename:
-                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.ca_filename, cfgfile.suggested_private_directory + '/ca.pem')
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.ca_filename, zip_private_directory + 'ca.pem')
                     if ret:
-                        zip_cfgfile.ca_filename = cfgfile.suggested_private_directory + '/ca.pem'
+                        zip_cfgfile.ca_filename = zip_private_directory + 'ca.pem'
                 if ret and cfgfile.dh_filename:
-                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.dh_filename, cfgfile.suggested_private_directory + '/dh.pem')
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.dh_filename, zip_private_directory + 'dh.pem')
                     if ret:
-                        zip_cfgfile.dh_filename = cfgfile.suggested_private_directory + '/dh.pem'
+                        zip_cfgfile.dh_filename = zip_private_directory + 'dh.pem'
                 if ret and cfgfile.crl_filename:
-                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, cfgfile.suggested_private_directory + '/crl.pem')
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, zip_private_directory + 'crl.pem')
                     if ret:
-                        zip_cfgfile.crl_filename = cfgfile.suggested_private_directory + '/crl.pem'
+                        zip_cfgfile.crl_filename = zip_private_directory + 'crl.pem'
                 if ret and cfgfile.auth_user_pass_file:
-                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, cfgfile.suggested_private_directory + '/auth_pass')
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, zip_private_directory + 'auth_pass')
                     if ret:
-                        zip_cfgfile.auth_user_pass_file = cfgfile.suggested_private_directory + '/auth_pass'
+                        zip_cfgfile.auth_user_pass_file = zip_private_directory + 'auth_pass'
                 if ret and cfgfile.client_config_directory:
                     #print('ccd dir %s' % (cfgfile.client_config_directory))
-                    zip_cfgfile.client_config_directory = cfgfile.suggested_private_directory + '/ccd'
+                    zip_cfgfile.client_config_directory = zip_private_directory + 'ccd'
                     for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():
                         #print('add %s as %s' % (client_config_file, client_name))
-                        ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, client_config_file.filename, cfgfile.suggested_private_directory + '/ccd/' + client_name)
+                        ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, client_config_file.filename, zip_private_directory + 'ccd/' + client_name)
                         if not ret:
                             break
                 if ret:

@@ -689,7 +689,7 @@ class ConfigFile(object):
                 if os.path.isdir(dirname):
                     for item in os.listdir(dirname):
                         fullpath = os.path.join(dirname, item)
-                        if os.path.isfile(fullpath):
+                        if os.path.isfile(fullpath) and item[0] != '.':
                             ccdfile = CCDFile(fullpath, configfile=self)
                             ret[item] = ccdfile
         else:

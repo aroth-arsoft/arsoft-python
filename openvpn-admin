@@ -308,8 +308,8 @@ class OpenVPNAdmin(object):
                 for vpnname in selected_vpns:
                     config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
                     if config_file.valid:
-                        zip_ok = self._compress_config(list_of_changed_zip_files, config_file, output_directory)
-                        if zip_ok:
+                        compress_exit_code = self._compress_config(list_of_changed_zip_files, config_file, output_directory)
+                        if compress_exit_code == self.ExitCode.Success:
                             if config_file.server:
                                 # create a ZIP file for each client of the server
                                 for (clientname, ccdfile) in config_file.client_config_files.iteritems():
@@ -326,6 +326,10 @@ class OpenVPNAdmin(object):
         return ret
     
     def _mail_config(self, zipcfg, recipient=None):
+
+        if self.no_mail:
+            # Mail is disabled, so just return here
+            return False
 
         if not zipcfg.valid:
             sys.stderr.write('Given ZIP configuration %s is invalid.\n' % (zipcfg.filename))
@@ -646,6 +650,7 @@ to use the provided configuration.
         parser.add_argument('--reload', dest='action_reload', metavar='VPNNAME', help='reload the configuration of the specified VPN')
         parser.add_argument('--recipient', dest='recipient', metavar='RECIPIENT', help='override the mail recipient of the VPN configuration.')
         parser.add_argument('--force-notify', dest='force_notify', action='store_true', help='send notification even if the configuration is unchanged.')
+        parser.add_argument('--no-mail', dest='no_mail', action='store_true', help='to not mail notifications.')
         parser.add_argument('--reason', dest='notification_reason', default='', help='specify the reason for the updated VPN configuration.')
         parser.add_argument('--add-ccd', dest='action_add_ccd', metavar='CLIENTNAME', nargs='+', help='add a client to the given VPN')
         parser.add_argument('--remove-ccd', dest='action_remove_ccd', metavar='CLIENTNAME', nargs='+', help='remove a client from given VPN')
@@ -658,6 +663,7 @@ to use the provided configuration.
         else:
             self.output_directory = os.getcwd()
         self.force_notify = args.force_notify
+        self.no_mail = args.no_mail
         self.notfication_recipient = args.recipient
         self.notification_reason = args.notification_reason
 
