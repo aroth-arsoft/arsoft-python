@@ -808,13 +808,13 @@ class ConfigFile(object):
             abspath = os.path.join(self.config_directory, self.crl_filename)
             crl_line = 'crl-verify %s' % abspath
 
-        if 'openvpn-auth-pam.so' in self.plugins:
-            if client_ccdfile and client_ccdfile.auth_user_pass_file:
-                server_auth = "auth-user-pass %s" % (client_ccdfile.auth_user_pass_file)
-            else:
-                server_auth = "auth-user-pass"
-        else:
-            server_auth = ''
+        server_auth = ''
+        for (plugin, plugin_params) in self.plugins:
+            if 'openvpn-auth-pam.so' in plugin:
+                if client_ccdfile and client_ccdfile.auth_user_pass_file:
+                    server_auth = "auth-user-pass %s" % (client_ccdfile.auth_user_pass_file)
+                else:
+                    server_auth = "auth-user-pass"
 
         routes = []
         clientname = 'unknown'
