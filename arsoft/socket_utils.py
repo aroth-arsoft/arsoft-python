@@ -66,6 +66,20 @@ def send_unix_socket_message(path, message, socktype=socket.SOCK_STREAM):
             sock.close()
     return ret
 
+def send_and_recv_unix_socket_message(path, message, socktype=socket.SOCK_STREAM, bufsize=4096):
+    try:
+        sock = connect_unix_socket(path, socktype)
+    except socket.error as e:
+        sock = None
+    ret = None
+    if sock is not None:
+        try:
+            sock.sendall(message)
+            ret = sock.recv(bufsize)
+        finally:
+            sock.close()
+    return ret
+
 def sethostname(new_hostname):
     (sts, stdoutdata, stderrdata) = runcmdAndGetData('/bin/hostname', [new_hostname])
     ret = True if sts == 0 else False

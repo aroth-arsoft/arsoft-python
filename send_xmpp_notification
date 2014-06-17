@@ -95,27 +95,36 @@ class jabbersend:
         if args.html:
             text_message=None
             html_message=self._build_html_message(host_notification)
-
-            if args.debug:
-                f = open('/tmp/send_xmpp_notification', 'w')
-                for key in sorted(os.environ.keys()):
-                    f.write('%s=%s\n' %(key,os.environ[key]))
-                f.write('uid=%i\n' % os.getuid())
-                f.write('host_notification=%s\n' %(str(host_notification)))
-                f.write('text=%s\n' % text_message)
-                f.write('html=%s\n' % html_message)
-                f.close()
         else:
             text_message=self._build_text_message(host_notification)
             html_message=None
 
-        if arsoft.xmpp.send_message(sender=None, password=None, recipient=recipient, body=text_message,
-                                    subject=subject, html=html_message,
-                                    use_daemon=True, socket_path=args.socket):
-            ret = 0
-        else:
-            sys.stderr.write('Failed to send message to %s.\n' %(recipient))
+        if args.debug:
+            f = open('/tmp/send_xmpp_notification', 'w')
+            for key in sorted(os.environ.keys()):
+                f.write('%s=%s\n' %(key,os.environ[key]))
+            f.write('uid=%i\n' % os.getuid())
+            f.write('host_notification=%s\n' %(str(host_notification)))
+            f.write('text=%s\n' % text_message)
+            f.write('html=%s\n' % html_message)
+            f.close()
+
+        ret = 0
+        error_msg = None
+        try:
+            if arsoft.xmpp.send_message(sender=None, password=None, recipient=recipient, body=text_message,
+                                        subject=subject, html=html_message,
+                                        use_daemon=True, socket_path=args.socket):
+                ret = 0
+            else:
+                ret = 1
+                error_msg = 'Failed to send message to %s.\n' %(recipient)
+        except arsoft.xmpp.XMPPException as e:
             ret = 1
+            error_msg = str(e)
+
+        if ret != 0:
+            sys.stderr.write(error_msg)
         return ret
 
 if __name__ == "__main__":
