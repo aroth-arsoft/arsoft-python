@@ -1,3 +1,9 @@
+arsoft-python (1.133) trusty; urgency=medium
+
+  * fixed HTML notifications
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 17 Jun 2014 18:23:45 +0200
+
 arsoft-python (1.132) trusty; urgency=medium
 
   * missing auth-user-pass line
