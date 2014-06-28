@@ -50,7 +50,8 @@ setup(name='arsoft-python',
             'arsoft-mailer',
             'edskmgr',
             'alog',
-            'onkyo-rs232'
+            'onkyo-rs232',
+            'system-info'
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),

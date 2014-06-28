@@ -1,0 +1,248 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import subprocess
+
+from arsoft.utils import *
+
+import struct
+import fcntl
+# constant for linux portability
+_IOC_NRBITS = 8
+_IOC_TYPEBITS = 8
+
+# architecture specific
+_IOC_SIZEBITS = 14
+_IOC_DIRBITS = 2
+
+_IOC_NRMASK = (1 << _IOC_NRBITS) - 1
+_IOC_TYPEMASK = (1 << _IOC_TYPEBITS) - 1
+_IOC_SIZEMASK = (1 << _IOC_SIZEBITS) - 1
+_IOC_DIRMASK = (1 << _IOC_DIRBITS) - 1
+
+_IOC_NRSHIFT = 0
+_IOC_TYPESHIFT = _IOC_NRSHIFT + _IOC_NRBITS
+_IOC_SIZESHIFT = _IOC_TYPESHIFT + _IOC_TYPEBITS
+_IOC_DIRSHIFT = _IOC_SIZESHIFT + _IOC_SIZEBITS
+
+_IOC_NONE = 0
+_IOC_WRITE = 1
+_IOC_READ = 2
+
+
+def _IOC(dir, type, nr, size):
+    if isinstance(size, str) or isinstance(size, unicode):
+        size = struct.calcsize(size)
+    return dir  << _IOC_DIRSHIFT  | \
+           type << _IOC_TYPESHIFT | \
+           nr   << _IOC_NRSHIFT   | \
+           size << _IOC_SIZESHIFT
+
+
+def _IO(type, nr): return _IOC(_IOC_NONE, type, nr, 0)
+def _IOR(type, nr, size): return _IOC(_IOC_READ, type, nr, size)
+def _IOW(type, nr, size): return _IOC(_IOC_WRITE, type, nr, size)
+def _IOWR(type, nr, size): return _IOC(_IOC_READ | _IOC_WRITE, type, nr, size)
+
+BLKSSZGET = _IO(0x12,104)
+
+class system_info_app:
+    def __init__(self):
+        self._verbose = False
+        self._dmiinfo = {}
+        self._block_devices = {}
+
+    class DmiHandle(object):
+        def __init__(self, handle=None):
+            self.handle = handle
+            self.name = None
+            self.data = {}
+        def add(self, key, value):
+            if key in self.data:
+                if isinstance(self.data[key], list):
+                    self.data[key].append(value)
+                else:
+                    self.data[key] = [self.data[key], value]
+            else:
+                self.data[key] = value
+
+    class BlockDevice(object):
+        def __init__(self, major=None, minor=None, blocks=None, name=None):
+            self.major = major
+            self.minor = minor
+            self.blocks = blocks
+            self.name = name
+            self.size = None
+            self.blocksize = 0
+
+        @property
+        def devfile(self):
+            return '/dev/' + self.name
+
+        def __str__(self):
+            return '%i:%i %i %s' % (self.major, self.minor, self.blocks, self.name)
+
+        def load_info(self):
+            with open('/sys/class/block/%s/size' % self.name, 'r') as f:
+                self.size = int(f.read())
+
+            try:
+                with open(self.devfile, 'r') as f:
+                    print('open %s' %self.devfile)
+                    buf = struct.pack('L', 0)
+                    print('send %s' % buf)
+                    if fcntl.ioctl(f, BLKSSZGET, buf) == 0:
+                        print('got %s' % buf)
+                        self.blocksize = struct.unpack('L', buf)
+            except IOError as e:
+                print(e)
+                pass
+
+    def _find_dmi_by_name(self, name):
+        ret = []
+        for (h, obj) in self._dmiinfo.iteritems():
+            if obj.name == name:
+                ret.append(obj)
+        return ret
+
+    def load_dmiinfo(self, num_spaces_per_level=8):
+        ret = False
+        env = os.environ
+        env['LANG'] = 'C'
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData('dmidecode', env=env, verbose=self._verbose)
+        if sts == 0:
+            current_handle = None
+            current_section = None
+            last_key = None
+            for line in stdoutdata.splitlines():
+                if len(line) == 0 or line[0] == '#':
+                    continue
+                if line.startswith('Begin Of Table') or line.startswith('End Of Table'):
+                    continue
+                if line.startswith('Handle'):
+                    current_handle = int(line[9:13], 16)
+                    self._dmiinfo[current_handle] = self.DmiHandle(current_handle)
+                    continue
+                if current_handle is None:
+                    continue
+                leading_tabs = 0
+                for c in line:
+                    if c == '\t':
+                        leading_tabs += 1
+                    else:
+                        break
+                level = leading_tabs
+
+                print('line %s' % line)
+                print('handle %x' % current_handle)
+                print('leading_tabs %i, level %i' % (leading_tabs, level))
+
+                if level == 0:
+                    self._dmiinfo[current_handle].name = line.strip()
+                else:
+                    # continue information
+                    line_no_spaces = line[leading_tabs:]
+                    if level == 1:
+                        if ':' in line_no_spaces:
+                            (key, value) = line_no_spaces.split(':', 1)
+                            self._dmiinfo[current_handle].add(key, value.strip())
+                            last_key = key
+                    elif level == 2:
+                        if ':' in line_no_spaces:
+                            (key, value) = line_no_spaces.split(':', 1)
+                            self._dmiinfo[current_handle].add(key, value.strip())
+                        else:
+                            self._dmiinfo[current_handle].add(last_key, line_no_spaces.strip())
+
+            ret = True
+            #print(stdoutdata)
+        else:
+            print(stderrdata)
+        return ret
+
+    def load_block_devices(self):
+        f = open('/proc/partitions', 'r')
+        lines = f.readlines()
+        f.close()
+
+        for line in lines[2:]:
+            (major, minor, blocks, name) = line.split()
+            obj = self.BlockDevice(int(major), int(minor), int(blocks), name)
+            obj.load_info()
+            self._block_devices[name] = obj
+        return 0
+
+    def show_motherboard_info(self):
+        for obj in self._find_dmi_by_name('Base Board Information'):
+            print('Motherboard information')
+            for (key, value) in obj.data.items():
+                if key == 'Features':
+                    continue
+                print('  %s: %s' % (key, value))
+        return 0
+
+    def show_bios_info(self):
+        for obj in self._find_dmi_by_name('BIOS Information'):
+            print('BIOS/UEFI information')
+            for (key, value) in obj.data.items():
+                if key == 'Characteristics':
+                    continue
+                print('  %s: %s' % (key, value))
+        return 0
+
+    def show_cpu_info(self):
+        for obj in self._find_dmi_by_name('Processor Information'):
+            print('CPU information')
+            for (key, value) in obj.data.items():
+                if key == 'Characteristics':
+                    continue
+                print('  %s: %s' % (key, value))
+        return 0
+
+    def show_memory_info(self):
+        for obj in self._find_dmi_by_name('Memory Device'):
+            if 'Size' in obj.data:
+                if obj.data['Size'] == 'No Module Installed':
+                    continue
+            print('Memory information')
+            for (key, value) in obj.data.items():
+                if key == 'Characteristics':
+                    continue
+                print('  %s: %s' % (key, value))
+        return 0
+
+    def show_block_device_info(self):
+        for (name, dev) in self._block_devices.items():
+            if dev.minor % 16 != 0:
+                continue
+            print('Block device %s' % dev.devfile)
+            print('  Block size: %i' % dev.blocksize)
+        return 0
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='shows the basic information about the system')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+
+        args = parser.parse_args()
+        self._verbose = args.verbose
+
+        self.load_dmiinfo()
+        self.load_block_devices()
+        self.show_motherboard_info()
+        self.show_bios_info()
+        self.show_cpu_info()
+        self.show_memory_info()
+        self.show_block_device_info()
+
+        ret = 0
+        return ret
+
+if __name__ == "__main__":
+    app =  system_info_app()
+    sys.exit(app.main())
