@@ -8,47 +8,6 @@ import subprocess
 
 from arsoft.utils import *
 
-import struct
-import fcntl
-# constant for linux portability
-_IOC_NRBITS = 8
-_IOC_TYPEBITS = 8
-
-# architecture specific
-_IOC_SIZEBITS = 14
-_IOC_DIRBITS = 2
-
-_IOC_NRMASK = (1 << _IOC_NRBITS) - 1
-_IOC_TYPEMASK = (1 << _IOC_TYPEBITS) - 1
-_IOC_SIZEMASK = (1 << _IOC_SIZEBITS) - 1
-_IOC_DIRMASK = (1 << _IOC_DIRBITS) - 1
-
-_IOC_NRSHIFT = 0
-_IOC_TYPESHIFT = _IOC_NRSHIFT + _IOC_NRBITS
-_IOC_SIZESHIFT = _IOC_TYPESHIFT + _IOC_TYPEBITS
-_IOC_DIRSHIFT = _IOC_SIZESHIFT + _IOC_SIZEBITS
-
-_IOC_NONE = 0
-_IOC_WRITE = 1
-_IOC_READ = 2
-
-
-def _IOC(dir, type, nr, size):
-    if isinstance(size, str) or isinstance(size, unicode):
-        size = struct.calcsize(size)
-    return dir  << _IOC_DIRSHIFT  | \
-           type << _IOC_TYPESHIFT | \
-           nr   << _IOC_NRSHIFT   | \
-           size << _IOC_SIZESHIFT
-
-
-def _IO(type, nr): return _IOC(_IOC_NONE, type, nr, 0)
-def _IOR(type, nr, size): return _IOC(_IOC_READ, type, nr, size)
-def _IOW(type, nr, size): return _IOC(_IOC_WRITE, type, nr, size)
-def _IOWR(type, nr, size): return _IOC(_IOC_READ | _IOC_WRITE, type, nr, size)
-
-BLKSSZGET = _IO(0x12,104)
-
 class system_info_app:
     def __init__(self):
         self._verbose = False
@@ -76,7 +35,25 @@ class system_info_app:
             self.blocks = blocks
             self.name = name
             self.size = None
-            self.blocksize = 0
+            self.size_in_bytes = None
+            self.available = True
+            self.vendor = None
+            self.model = None
+            self.hw_sector_size = -1
+            self.physical_block_size = -1
+            self.logical_block_size = -1
+            self.minimum_io_size = -1
+            self.optimal_io_size = -1
+            self.alignment_offset = -1
+            self.has_device_mapper = False
+
+        @property
+        def is_physical_device(self):
+            if self.minor % 16 != 0:
+                return False
+            if self.has_device_mapper:
+                return False
+            return True
 
         @property
         def devfile(self):
@@ -89,17 +66,35 @@ class system_info_app:
             with open('/sys/class/block/%s/size' % self.name, 'r') as f:
                 self.size = int(f.read())
 
-            try:
-                with open(self.devfile, 'r') as f:
-                    print('open %s' %self.devfile)
-                    buf = struct.pack('L', 0)
-                    print('send %s' % buf)
-                    if fcntl.ioctl(f, BLKSSZGET, buf) == 0:
-                        print('got %s' % buf)
-                        self.blocksize = struct.unpack('L', buf)
-            except IOError as e:
-                print(e)
-                pass
+            if os.path.exists('/sys/class/block/%s/device' % self.name):
+                with open('/sys/class/block/%s/device/vendor' % self.name, 'r') as f:
+                    self.vendor = f.read().strip()
+                with open('/sys/class/block/%s/device/model' % self.name, 'r') as f:
+                    self.model = f.read().strip()
+
+            with open('/sys/class/block/%s/alignment_offset' % self.name, 'r') as f:
+                self.alignment_offset = int(f.read())
+
+            self.has_device_mapper = os.path.exists('/sys/class/block/%s/dm' % self.name)
+
+            if os.path.exists('/sys/class/block/%s/queue' % self.name):
+                with open('/sys/class/block/%s/queue/hw_sector_size' % self.name, 'r') as f:
+                    self.hw_sector_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/physical_block_size' % self.name, 'r') as f:
+                    self.physical_block_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/logical_block_size' % self.name, 'r') as f:
+                    self.logical_block_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/minimum_io_size' % self.name, 'r') as f:
+                    self.minimum_io_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/optimal_io_size' % self.name, 'r') as f:
+                    self.optimal_io_size = int(f.read())
+
+            if self.size:
+                self.size_in_bytes = self.size * self.hw_sector_size
 
     def _find_dmi_by_name(self, name):
         ret = []
@@ -136,9 +131,9 @@ class system_info_app:
                         break
                 level = leading_tabs
 
-                print('line %s' % line)
-                print('handle %x' % current_handle)
-                print('leading_tabs %i, level %i' % (leading_tabs, level))
+                #print('line %s' % line)
+                #print('handle %x' % current_handle)
+                #print('leading_tabs %i, level %i' % (leading_tabs, level))
 
                 if level == 0:
                     self._dmiinfo[current_handle].name = line.strip()
@@ -158,9 +153,6 @@ class system_info_app:
                             self._dmiinfo[current_handle].add(last_key, line_no_spaces.strip())
 
             ret = True
-            #print(stdoutdata)
-        else:
-            print(stderrdata)
         return ret
 
     def load_block_devices(self):
@@ -216,10 +208,22 @@ class system_info_app:
 
     def show_block_device_info(self):
         for (name, dev) in self._block_devices.items():
-            if dev.minor % 16 != 0:
+            if not dev.is_physical_device:
                 continue
             print('Block device %s' % dev.devfile)
-            print('  Block size: %i' % dev.blocksize)
+            print('  Vendor: %s' % dev.vendor)
+            print('  Model: %s' % dev.model)
+            print('  Size: %s' % bytes2human(dev.size_in_bytes))
+
+            if dev.available:
+                print('  Hardware sector size: %i' % dev.hw_sector_size)
+                print('  Physical block size: %i' % dev.physical_block_size)
+                print('  Logical block size: %i' % dev.logical_block_size)
+                print('  Minimum I/O size: %i' % dev.minimum_io_size)
+                print('  Optimal I/O size: %i' % dev.optimal_io_size)
+                print('  Alignment offset: %i' % dev.alignment_offset)
+            else:
+                print('  Not available')
         return 0
 
     def main(self):
