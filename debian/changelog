@@ -1,3 +1,9 @@
+arsoft-python (1.134) trusty; urgency=medium
+
+  * add system-info script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 30 Jun 2014 11:30:24 +0200
+
 arsoft-python (1.133) trusty; urgency=medium
 
   * fixed HTML notifications
