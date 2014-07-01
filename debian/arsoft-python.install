@@ -19,6 +19,7 @@ usr/bin/dns-query
 usr/bin/arsoft-backup
 usr/bin/arsoft-mailer
 usr/bin/system-info
+usr/bin/ssdp-discover
 usr/sbin/slapd-config
 usr/sbin/svnbackup
 usr/sbin/efiinfo

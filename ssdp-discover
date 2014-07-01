@@ -1,0 +1,133 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import socket
+import httplib
+import StringIO
+import struct
+
+from arsoft.utils import hexstring_with_length
+from arsoft.socket_utils import *
+
+class SSDPResponse(object):
+    class _FakeSocket(StringIO.StringIO):
+        def makefile(self, *args, **kw):
+            return self
+    def __init__(self, response):
+        r = httplib.HTTPResponse(self._FakeSocket(response))
+        r.begin()
+        self.location = r.getheader("location")
+        self.usn = r.getheader("usn")
+        self.st = r.getheader("st")
+        self.cache = r.getheader("cache-control").split("=")[1]
+    def __repr__(self):
+        return "<SSDPResponse({location}, {st}, {usn})>".format(**self.__dict__)
+
+class MiniSSDPResponse(object):
+    def __init__(self, location=None, st=None, usn=None, cache=None):
+        self.location = location
+        self.usn = usn
+        self.st = st
+        self.cache = cache
+    def __repr__(self):
+        return "<MiniSSDPResponse({location}, {st}, {usn})>".format(**self.__dict__)
+
+def discover(service='ssdp:all', timeout=2, retries=1):
+    group = ("239.255.255.250", 1900)
+    message = "\r\n".join([
+        'M-SEARCH * HTTP/1.1',
+        'HOST: {0}:{1}',
+        'MAN: "ssdp:discover"',
+        'ST: {st}','MX: {timeout}','',''])
+    socket.setdefaulttimeout(timeout)
+    responses = {}
+    for _ in range(retries):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        sock.sendto(message.format(*group, st=service, timeout=timeout / 2), group)
+        while True:
+            try:
+                response = SSDPResponse(sock.recv(1024))
+                responses[response.location] = response
+            except socket.timeout:
+                break
+    return responses.values()
+
+def discover_daemon(service='ssdp:all', timeout=2, retries=1, socket_path='/var/run/minissdpd.sock'):
+    def minissdp_get_string(idx, msg):
+        n = 0
+        #print('msg=%s idx=%i' % (msg, idx))
+        t = struct.unpack('B', msg[idx])
+        n = t[0]
+        idx += 1
+        while t[0] > 127:
+            n = n << 7
+            n = n + t[0]
+            idx += 1
+            t = struct.unpack('B', msg[idx])
+        ret = msg[idx:idx+n]
+        #print('ret=%s nextidx=%i' % (ret, idx + n))
+        return (ret, idx + n)
+    if service == 'ssdp:all':
+        # request type 3 does not really require a service name and length, but
+        # because of a bug in version 1.1 and 1.2 a string is required. Any string
+        # would do, so just send the service name we got so far
+        request_type = 3
+    else:
+        request_type = 1
+    fmt = 'BB%is' % len(service)
+    msg = struct.pack(fmt, request_type, len(service), service)
+    response = send_and_recv_unix_socket_message(path=socket_path, message=msg)
+    #print('got %s' % hexstring_with_length(response))
+    responses = {}
+    if response:
+        (num_services) = struct.unpack('B', response[0])
+        idx = 1
+        for service_no in range(num_services[0]):
+            #print('loc: %i - %i' % (service_no, idx))
+            location, idx = minissdp_get_string(idx, response)
+            #print('st: %i - %i' % (service_no, idx))
+            service, idx = minissdp_get_string(idx, response)
+            #print('mx: %i - %i' % (service_no, idx))
+            usn, idx = minissdp_get_string(idx, response)
+            responses[location] = MiniSSDPResponse(location, service, usn)
+    return responses.values()
+
+class ssdp_discover:
+    def __init__(self):
+        self._verbose = False
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='discovers all UPnP/SSDP devices in the local network')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-s', '--service', dest='service', default='ssdp:all', help='name of the service to discover.')
+        parser.add_argument('-t', '--timeout', dest='timeout', type=int, default=5, help='timeout in seconds.')
+        parser.add_argument('-r', '--retries', dest='retries', type=int, default=1, help='number of scan attemps.')
+        parser.add_argument('-l', '--local', dest='use_local_daemon', action='store_true', help='use local minissdp daemon.')
+
+        args = parser.parse_args()
+        self._verbose = args.verbose
+
+        if args.use_local_daemon:
+            devices = discover_daemon(service=args.service, timeout=args.timeout, retries=args.retries)
+        else:
+            devices = discover(service=args.service, timeout=args.timeout, retries=args.retries)
+        for dev in devices:
+            print(dev.location)
+            print('  USN: %s' % dev.usn)
+            print('  Service: %s' % dev.st)
+            print('  Cache: %s' % dev.cache)
+
+        ret = 0
+        return ret
+
+if __name__ == "__main__":
+    app =  ssdp_discover()
+    sys.exit(app.main())

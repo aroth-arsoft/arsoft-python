@@ -5,7 +5,7 @@
 from distutils.core import setup
 
 setup(name='arsoft-python',
-		version='1.134',
+		version='1.135',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -51,7 +51,8 @@ setup(name='arsoft-python',
             'edskmgr',
             'alog',
             'onkyo-rs232',
-            'system-info'
+            'system-info',
+            'ssdp-discover'
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),

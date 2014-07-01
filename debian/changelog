@@ -1,3 +1,9 @@
+arsoft-python (1.135) trusty; urgency=medium
+
+  * add ssdp-discover script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 01 Jul 2014 17:55:35 +0200
+
 arsoft-python (1.134) trusty; urgency=medium
 
   * add system-info script
