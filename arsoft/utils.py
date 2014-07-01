@@ -368,3 +368,9 @@ class logfile_writer_proxy(object):
             self._writer.write(self.current_timestamp() + '\t' + full)
         else:
             self._writer.write(full)
+
+def hexstring(buf):
+    return ' '.join(x.encode('hex') for x in buf)
+
+def hexstring_with_length(buf):
+    return ' '.join(x.encode('hex') for x in buf) + ' - %i' % len(buf)
