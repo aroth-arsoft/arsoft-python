@@ -58,7 +58,7 @@ class ssdp_discover:
         def __eq__(self, other):
             return (self.location, self.usn, self.st) == (other.location, other.usn, other.st)
 
-    def discover_multicast(self, service='ssdp:all', interfaces=None, timeout=2, retries=1, source_port=None):
+    def discover_multicast(self, service='ssdp:all', interfaces=None, timeout=2, retries=1, source_port=None, receiver=None):
         group = ("239.255.255.250", 1900)
         message = "\r\n".join([
             'M-SEARCH * HTTP/1.1',
@@ -96,7 +96,7 @@ class ssdp_discover:
                 msg = message.format(*group, st=service, timeout=timeout / 2)
                 socket_ok = False
                 try:
-                    sock.sendto(msg, group)
+                    sock.sendto(msg, receiver if receiver else group)
                     socket_ok = True
                 except socket.error:
                     print('Failed to send through interface %s (%s)' % (iface['name'], ifaddr))
@@ -177,6 +177,7 @@ class ssdp_discover:
         parser.add_argument('-r', '--retries', dest='retries', type=int, default=1, help='number of scan attemps.')
         parser.add_argument('-i', '--interface', dest='interfaces', action='append', help='list of interfaces to search.')
         parser.add_argument('-l', '--local', dest='use_local_daemon', action='store_true', help='use local minissdp daemon.')
+        parser.add_argument('-d', '--dest', dest='destination', help='use the given destination address; e.g. host addr.')
 
         args = parser.parse_args()
         self._verbose = args.verbose
@@ -184,7 +185,16 @@ class ssdp_discover:
         if args.use_local_daemon:
             devices = self.discover_daemon(service=args.service, timeout=args.timeout, retries=args.retries)
         else:
-            devices = self.discover_multicast(interfaces=args.interfaces, service=args.service, timeout=args.timeout, retries=args.retries)
+            if args.destination:
+                if ':' in args.destination:
+                    host, port = args.destination.split(':', 1)
+                    receiver = (host, port)
+                else:
+                    receiver = (args.destination, 1900)
+            else:
+                receiver = None
+            devices = self.discover_multicast(interfaces=args.interfaces, receiver=receiver, service=args.service,
+                                              timeout=args.timeout, retries=args.retries)
 
         ret = 0
         return ret
