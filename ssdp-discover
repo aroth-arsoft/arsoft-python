@@ -11,6 +11,7 @@ import struct
 
 from arsoft.utils import hexstring_with_length
 from arsoft.socket_utils import *
+from arsoft.ifconfig import ifconfig
 
 class ssdp_discover:
     def __init__(self):
@@ -34,7 +35,6 @@ class ssdp_discover:
                     if key == 'max-age':
                         value = int(value)
                     self.cache[key] = value
-            print(self.__repr__())
         @property
         def valid(self):
             return self.location is not None
@@ -58,7 +58,7 @@ class ssdp_discover:
         def __eq__(self, other):
             return (self.location, self.usn, self.st) == (other.location, other.usn, other.st)
 
-    def discover_multicast(self, service='ssdp:all', timeout=2, retries=1, source_port=None):
+    def discover_multicast(self, service='ssdp:all', interfaces=None, timeout=2, retries=1, source_port=None):
         group = ("239.255.255.250", 1900)
         message = "\r\n".join([
             'M-SEARCH * HTTP/1.1',
@@ -66,24 +66,50 @@ class ssdp_discover:
             'MAN: "ssdp:discover"',
             'ST: {st}','MX: {timeout}','',''])
         socket.setdefaulttimeout(timeout)
+        ifconfig_obj = ifconfig()
         responses = {}
-        for _ in range(retries):
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            if source_port:
-                sock.bind( ('', source_port) )
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 8)
-            msg = message.format(*group, st=service, timeout=timeout / 2)
-            sock.sendto(msg, group)
-            while True:
+        for iface in ifconfig_obj.getList():
+
+            ifaddr = iface['addr'][0]
+            if interfaces is None:
+                skip_interface = False
+            else:
+                skip_interface = True
+                if iface['name'] in interfaces:
+                    skip_interface = False
+                else:
+                    for i in interfaces:
+                        if i in iface['addr']:
+                            ifaddr = i
+                            skip_interface = False
+                            break
+            if skip_interface:
+                continue
+            if self._verbose:
+                print('Search on interface %s (%s)' % (iface['name'], ifaddr))
+
+            for _ in range(retries):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.bind( (ifaddr, source_port if source_port else 0) )
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 8)
+                msg = message.format(*group, st=service, timeout=timeout / 2)
+                socket_ok = False
                 try:
-                    response = self.SSDPResponse(sock.recv(1024))
-                    if response.valid:
-                        if response not in responses:
-                            self.print_repsonse(response)
-                            responses[response] = response
-                except socket.timeout:
-                    break
+                    sock.sendto(msg, group)
+                    socket_ok = True
+                except socket.error:
+                    print('Failed to send through interface %s (%s)' % (iface['name'], ifaddr))
+                    pass
+                while socket_ok:
+                    try:
+                        response = self.SSDPResponse(sock.recv(1024))
+                        if response.valid:
+                            if response not in responses:
+                                self.print_repsonse(response)
+                                responses[response] = response
+                    except socket.timeout:
+                        break
         return responses.values()
 
     def discover_daemon(self, service='ssdp:all', timeout=2, retries=1, socket_path='/var/run/minissdpd.sock'):
@@ -149,6 +175,7 @@ class ssdp_discover:
         parser.add_argument('-s', '--service', dest='service', default='ssdp:all', help='name of the service to discover.')
         parser.add_argument('-t', '--timeout', dest='timeout', type=int, default=5, help='timeout in seconds.')
         parser.add_argument('-r', '--retries', dest='retries', type=int, default=1, help='number of scan attemps.')
+        parser.add_argument('-i', '--interface', dest='interfaces', action='append', help='list of interfaces to search.')
         parser.add_argument('-l', '--local', dest='use_local_daemon', action='store_true', help='use local minissdp daemon.')
 
         args = parser.parse_args()
@@ -157,7 +184,7 @@ class ssdp_discover:
         if args.use_local_daemon:
             devices = self.discover_daemon(service=args.service, timeout=args.timeout, retries=args.retries)
         else:
-            devices = self.discover_multicast(service=args.service, timeout=args.timeout, retries=args.retries)
+            devices = self.discover_multicast(interfaces=args.interfaces, service=args.service, timeout=args.timeout, retries=args.retries)
 
         ret = 0
         return ret
