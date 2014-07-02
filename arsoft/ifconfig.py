@@ -88,7 +88,7 @@ class ifconfig (object):
 
         # loop over interface names
         data = buf.tostring()
-        iflist = []
+        iflist = {}
         size, ptr = struct.unpack("iP", result)
         i = 0
         
@@ -102,7 +102,10 @@ class ifconfig (object):
             #name, dummy = struct.unpack("16s24s", ifconf)
             #name, dummy = name.split('\0', 1)
             debug("found interface " + name + " ip=" + str(ip) )
-            iflist.append(name)
+            if name in iflist:
+                iflist[name].append(ip)
+            else:
+                iflist[name] = [ip]
             i += ifreq_size
         return iflist
 
@@ -185,13 +188,12 @@ class ifconfig (object):
     def getList(self):
         ret = []
         interfaces = self.getInterfaceList()
-        for i in interfaces:
-            if self.isLoopback(i) == False:
-                ipaddr = self.getAddr(i)
-                netmask = self.getNetmask(i)
-                broadcast = self.getBroadcast(i)
-                hwaddr = self.getHWAddress(i)
-                iface = {'name':i, 'addr':ipaddr, 'netmask':netmask, 'broadcast':broadcast, 'hwaddr':hwaddr }
+        for (ifname, ipaddr_list) in interfaces.items():
+            if self.isLoopback(ifname) == False:
+                netmask = self.getNetmask(ifname)
+                broadcast = self.getBroadcast(ifname)
+                hwaddr = self.getHWAddress(ifname)
+                iface = {'name':ifname, 'addr':ipaddr_list, 'netmask':netmask, 'broadcast':broadcast, 'hwaddr':hwaddr }
                 debug("got interface " + str(iface))
                 ret.append(iface)
         return ret
