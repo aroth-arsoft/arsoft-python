@@ -10,7 +10,7 @@ import sys
 import os
 from arsoft.inifile import *
 from arsoft.crypto import CertificateFile, CRLFile
-from arsoft.utils import replace_invalid_chars, is_quoted_string, unquote_string, quote_string
+from arsoft.utils import replace_invalid_chars, is_quoted_string, unquote_string, quote_string, isProcessRunningByPIDFile, readPIDFromPIDFile
 import config
 from ccdfile import CCDFile
 import StringIO
@@ -418,6 +418,10 @@ class ConfigFile(object):
     def logfile_append(self, value):
         if self._conf is not None:
             ret = self._conf.set(section=None, key='log-append', value=value)
+
+    @property
+    def current_logfile(self):
+        return self.logfile if self.logfile else self.logfile_append
 
     @property
     def cert_filename(self):
@@ -917,6 +921,18 @@ push "persist-tun"
             "client-config-dir: " + str(self.client_config_directory) + "\r\n" +\
             ""
         return ret
+
+    @property
+    def pidfile(self):
+        return os.path.join(config.OpenVPNDefaults.run_directory, 'openvpn', self.name + '.pid')
+
+    @property
+    def running(self):
+        return isProcessRunningByPIDFile(self.pidfile)
+
+    @property
+    def pid(self):
+        return readPIDFromPIDFile(self.pidfile)
 
 if __name__ == '__main__':
     files = sys.argv[1:]

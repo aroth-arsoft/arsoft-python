@@ -150,17 +150,21 @@ class OpenVPNAdmin(object):
                         sys.stderr.write('Failed to open configuration for VPN %s; error %s\n' % (vpnname, config_file.last_error))
                         ret = self.ExitCode.ConfigurationError
                     else:
-                        is_running = self._config.is_running(vpnname)
+                        is_running = config_file.running
                         status_file = arsoft.openvpn.StatusFile(config_file=config_file)
                         autostart = True if vpnname in self._systemconfig.autostart else False
                         print('%s (%s):' % (vpnname, 'server' if config_file.server else 'client') )
                         if config_file.name != vpnname:
                             print('  Configured name mismatch %s != %s' % (vpnname, config_file.name) )
 
-                        print('  Running: %s' % is_running)
+                        if config_file.running:
+                            print('  Running: %s (%s)' % (is_running, str(config_file.pid)) )
+                        else:
+                            print('  Running: %s' % is_running)
                         print('  Autostart: %s' % autostart)
                         print('  State: %s' % status_file.state.long_state)
                         print('  Last updated: %s' % status_file.last_update)
+                        print('  Log file: %s' % config_file.current_logfile)
                         self._print_cert('Certificate file', config_file.cert_file)
                         print('  Key file: %s' % config_file.key_file)
                         self._print_cert('CA file', config_file.ca_file)

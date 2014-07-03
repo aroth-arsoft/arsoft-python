@@ -147,6 +147,7 @@ def isProcessRunning(pid, use_kill=False):
         return os.path.isdir('/proc/' + str(pid))
 
 def isProcessRunningByPIDFile(pidfile):
+    ret = False
     if os.path.isfile(pidfile):
         try:
             f = open(pidfile, 'r')
@@ -156,12 +157,18 @@ def isProcessRunningByPIDFile(pidfile):
             pid = None
         if pid is not None:
             ret = isProcessRunning(pid)
-        else:
-            ret = False
-    else:
-        ret = False
     return ret
-        
+
+def readPIDFromPIDFile(pidfile):
+    ret = None
+    if os.path.isfile(pidfile):
+        try:
+            f = open(pidfile, 'r')
+            ret = int(f.readline())
+            f.close()
+        except IOError:
+            pass
+    return ret
 
 def drop_privileges(uid_name='nobody', gid_name='nogroup'):
     if os.getuid() != 0:

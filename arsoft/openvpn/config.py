@@ -5,9 +5,20 @@
 import os
 import arsoft.utils
 
+class OpenVPNDefaults(object):
+    config_directory = '/etc/openvpn'
+    run_directory = '/run'
+    config_extension = '.conf'
+
+    def __init__(self):
+        pass
+
 class Config(object):
 
-    def __init__(self, configdir='/etc/openvpn', rundir='/run', extension='.conf'):
+    def __init__(self,
+                 configdir=OpenVPNDefaults.config_directory,
+                 rundir=OpenVPNDefaults.run_directory,
+                 extension=OpenVPNDefaults.config_extension):
         self._config_directory = configdir
         self._run_directory = rundir
         self._config_extension = extension
@@ -32,7 +43,7 @@ class Config(object):
 
     def _check_running(self, vpnname):
         if os.path.isdir(self._run_directory):
-            pidfile = os.path.join(self._run_directory, 'openvpn.' + vpnname + '.pid')
+            pidfile = os.path.join(self._run_directory, 'openvpn', vpnname + '.pid')
             ret = arsoft.utils.isProcessRunningByPIDFile(pidfile)
         else:
             ret = False
