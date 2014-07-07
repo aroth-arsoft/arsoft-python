@@ -1,3 +1,9 @@
+arsoft-python (1.138) trusty; urgency=medium
+
+  * alog: read compressed log files
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 07 Jul 2014 17:13:27 +0200
+
 arsoft-python (1.137) trusty; urgency=medium
 
   * improve support for parsing kernel logs

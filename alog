@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 from arsoft.inifile import IniFileDirectory
 import arsoft.timestamp
 import ctypes
+import zipfile
+import gzip
+import bz2
 
 class alog_known_pattern(object):
     def __init__(self, name=None, line_re=None, timestamp=None, logfile_names=[], output_format=None):
@@ -404,6 +407,25 @@ class alog_application(object):
                     sys.exit(0)
                     pass
 
+    def _open_logfile(self, filename):
+        (basename, ext) = os.path.splitext(filename)
+        try:
+            if ext == '.gz':
+                self._logfile_obj = gzip.open(self._logfile, 'rb')
+            elif ext == '.bz2':
+                self._logfile_obj = bz2.BZ2File(self._logfile, 'rb')
+            elif ext == '.xz':
+                raise IOError('XZ compression not yet supported')
+            else:
+                self._logfile_obj = open(self._logfile, 'r')
+        except IOError as e:
+            self._last_error = str(e)
+        except OSError as e:
+            self._last_error = str(e)
+        except KeyboardInterrupt:
+            pass
+        return self._logfile_obj
+
     def main(self):
         #=============================================================================================
         # process command line
@@ -476,15 +498,7 @@ class alog_application(object):
         elif self._logfile == ':klogctl':
             self._logfile_obj = klogctl()
         else:
-            self._logfile_obj = None
-            try:
-                self._logfile_obj = open(self._logfile, 'r')
-            except IOError as e:
-                self._last_error = str(e)
-            except OSError as e:
-                self._last_error = str(e)
-            except KeyboardInterrupt:
-                pass
+            self._logfile_obj = self._open_logfile(self._logfile)
 
         if self._logfile_obj is not None:
             try:
@@ -504,7 +518,10 @@ class alog_application(object):
             print('Pattern: %s' % self._pattern)
 
         if self._logfile_obj is None:
-            sys.stdout.write('Unable to open log file %s or unknown shortcut.\n' % (self._logfile))
+            if self._last_error:
+                sys.stdout.write('Unable to open log file %s; error %s\n' % (self._logfile, self._last_error))
+            else:
+                sys.stdout.write('Unable to open log file %s or unknown shortcut.\n' % (self._logfile))
             ret = 1
         elif not self._first_line:
             sys.stdout.write('Log file %s is empty.\n' % (self._logfile))
