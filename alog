@@ -426,6 +426,25 @@ class alog_application(object):
             pass
         return self._logfile_obj
 
+    def _find_logfile_history(self, filename):
+        all_log_files = []
+        if os.path.exists(filename):
+            filedir = os.path.dirname(filename)
+            base, ext = os.path.splitext(os.path.basename(filename))
+            for f in os.listdir(filedir):
+                fullname = os.path.join(filedir, f)
+                if os.path.isfile(fullname):
+                    if f.startswith(base):
+                        file_revision = 0
+                        for e in f.split('.'):
+                            try:
+                                file_revision = int(e)
+                            except ValueError:
+                                pass
+                        all_log_files.append((file_revision, fullname))
+        all_log_files.sort(cmp=lambda a,b: cmp(a[0], b[0]))
+        return all_log_files
+
     def main(self):
         #=============================================================================================
         # process command line
@@ -498,6 +517,7 @@ class alog_application(object):
         elif self._logfile == ':klogctl':
             self._logfile_obj = klogctl()
         else:
+            self._logfile_history = self._find_logfile_history(self._logfile)
             self._logfile_obj = self._open_logfile(self._logfile)
 
         if self._logfile_obj is not None:
