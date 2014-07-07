@@ -1,3 +1,9 @@
+arsoft-python (1.137) trusty; urgency=medium
+
+  * improve support for parsing kernel logs
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 07 Jul 2014 16:42:30 +0200
+
 arsoft-python (1.136) trusty; urgency=medium
 
   * improvements to ssdp-discover

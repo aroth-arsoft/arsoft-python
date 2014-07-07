@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from arsoft.inifile import IniFileDirectory
 import arsoft.timestamp
+import ctypes
 
 class alog_known_pattern(object):
     def __init__(self, name=None, line_re=None, timestamp=None, logfile_names=[], output_format=None):
@@ -30,6 +31,7 @@ class alog_config(object):
     def __init__(self, config_dir='/etc/arsoft/alog.d'):
         self.config_dir = config_dir
         self._ini_files_dir = IniFileDirectory(config_dir, config_extension='.conf', commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        self._verbose = False
 
     @property
     def known_patterns(self):
@@ -90,9 +92,56 @@ class alog_config(object):
             if ':' in shortcut:
                 key, value = shortcut.split(':', 1)
                 ret[key] = value
+        if self._verbose:
+            print('Shortcuts: %s' % str(ret))
         return ret
 
+    @property
+    def verbose(self):
+        return self._verbose
+
+    @verbose.setter
+    def verbose(self, value):
+        self._verbose = value
+
+class klogctl(object):
+    SYSLOG_ACTION_READ_ALL = ctypes.c_int(3)
+    SYSLOG_ACTION_READ_CLEAR = ctypes.c_int(4)
+    SYSLOG_ACTION_SIZE_BUFFER = ctypes.c_int(10)
+
+    def __init__(self):
+        self._libc = ctypes.CDLL("libc.so.6")
+        self._klogctl = self._libc.klogctl
+        self._klogctl.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
+        self._klogctl.restype = ctypes.c_int
+
+    @property
+    def buffer_size(self):
+        bufsize = self._klogctl(klogctl.SYSLOG_ACTION_SIZE_BUFFER, None, ctypes.c_int(0))
+        return bufsize.value
+
+    def readall(self):
+        bufsize = self._klogctl(klogctl.SYSLOG_ACTION_SIZE_BUFFER, None, 0)
+        buf = ctypes.create_string_buffer(bufsize)
+        self._klogctl(klogctl.SYSLOG_ACTION_READ_ALL, buf, ctypes.c_int(bufsize))
+        return buf.value
+
+    def __iter__(self):
+        lines = self.readall().splitlines()
+        return iter(lines)
+
 class alog_application(object):
+
+    syslog_levels = {
+        0:'FATAL',
+        1:'FATAL',
+        2:'CRITICAL',
+        3:'ERROR',
+        4:'WARN',
+        5:'NOTICE',
+        6:'INFO',
+        7:'DEBUG'
+        }
 
     class MessageObject(object):
         def __init__(self, message=None, timestamp=None, severity=None, loglevel=None, host=None, ident=None, pid=None, filename=None, lineno=0, filtered=False):
@@ -264,6 +313,16 @@ class alog_application(object):
                 return ll
         return loglevel_char
 
+    @staticmethod
+    def _loglevel_from_syslog_priority(priority):
+        try:
+            priority = int(priority)
+        except ValueError:
+            priority = 0
+        loglevel = priority & 7
+        severity = (priority & ~7) >> 3
+        return (alog_application.syslog_levels[loglevel], severity)
+
     def _process_line(self, line_re, find_re, timestamp_format, line):
         ret = None
         mo = line_re.match(line)
@@ -273,12 +332,15 @@ class alog_application(object):
             message_text = mo.group('message') if 'message' in mogrp else None
             severity = mo.group('severity') if 'severity' in mogrp else None
             loglevel = mo.group('loglevel') if 'loglevel' in mogrp else None
+            priority = mo.group('priority') if 'priority' in mogrp else None
             host = mo.group('host') if 'host' in mogrp else None
             ident = mo.group('ident') if 'ident' in mogrp else None
             pid = mo.group('pid') if 'pid' in mogrp else None
             lineno = mo.group('lineno') if 'lineno' in mogrp else None
             filename = mo.group('filename') if 'filename' in mogrp else None
-            
+            if priority and loglevel is None and severity is None:
+                (loglevel, severity) = alog_application._loglevel_from_syslog_priority(priority)
+
             if loglevel:
                 loglevel = loglevel.upper()
                 if len(loglevel) == 1:
@@ -366,11 +428,14 @@ class alog_application(object):
         
         if args.config_dir:
             self._config = alog_config(args.config_dir)
-            
+        self._config.verbose = args.verbose
+
         if args.logfile in self._config.shortcuts:
             self._logfile = self._config.shortcuts[args.logfile]
         else:
             self._logfile = args.logfile
+        if self._verbose:
+            print('%s -> %s' % (args.logfile, self._logfile))
 
         if args.output_level:
             self._loglevel = []
@@ -397,16 +462,17 @@ class alog_application(object):
                     if not found:
                         sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
                         return 1
-                    
+
         if args.pattern != 'auto':
             if args.pattern not in self._config.known_patterns:
                 sys.stdout.write('Given pattern %s is invalid.\n' % (args.pattern))
                 return 1
-                
 
         if self._logfile == '-':
             self._logfile = 'stdin'
             self._logfile_obj = sys.stdin
+        elif self._logfile == ':klogctl':
+            self._logfile_obj = klogctl()
         else:
             self._logfile_obj = None
             try:
@@ -415,6 +481,8 @@ class alog_application(object):
                 self._last_error = str(e)
             except OSError as e:
                 self._last_error = str(e)
+            except KeyboardInterrupt:
+                pass
 
         if self._logfile_obj is not None:
             try:
@@ -426,8 +494,12 @@ class alog_application(object):
                 self._last_error = str(e)
             except OSError as e:
                 self._last_error = str(e)
+            except KeyboardInterrupt:
+                pass
 
         self._pattern = self._select_pattern(args.pattern)
+        if self._verbose:
+            print('Pattern: %s' % self._pattern)
 
         if self._logfile_obj is None:
             sys.stdout.write('Unable to open log file %s or unknown shortcut.\n' % (self._logfile))
@@ -439,10 +511,14 @@ class alog_application(object):
             timestamp_format = self._timestamp_format(self._pattern)
             line_re = self._compile_pattern_re(self._pattern)
             self._output_format = self._prepare_output_format(self._pattern, self._output_format)
+            if self._verbose:
+                print('Output format: %s' % self._output_format)
             if not line_re:
                 sys.stdout.write('Unable to determine log pattern for log file %s\n' % (self._logfile))
                 ret = 1
             else:
+                if self._verbose:
+                    print('Line RE: %s' % line_re.pattern)
                 if args.find_regex:
                     find_re = re.compile(args.find_regex)
                 elif args.find:
