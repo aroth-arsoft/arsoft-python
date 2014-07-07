@@ -1,3 +1,9 @@
+arsoft-python (1.136) trusty; urgency=medium
+
+  * improvements to ssdp-discover
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 07 Jul 2014 13:47:13 +0200
+
 arsoft-python (1.135) trusty; urgency=medium
 
   * add ssdp-discover script
