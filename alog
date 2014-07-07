@@ -295,6 +295,8 @@ class alog_application(object):
                 if ret:
                     ret = ret.replace(year= datetime.now().year)
             elif format == 'full':
+                ret = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+            elif format == 'full_ms':
                 ret = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S,%f")
             elif format == 'daytime':
                 ret = datetime.strptime(timestamp, '%H:%M:%S')
