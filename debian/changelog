@@ -1,3 +1,9 @@
+arsoft-python (1.139) trusty; urgency=medium
+
+  * alog: add capability to read history of log files
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 08 Jul 2014 11:31:41 +0200
+
 arsoft-python (1.138) trusty; urgency=medium
 
   * alog: read compressed log files

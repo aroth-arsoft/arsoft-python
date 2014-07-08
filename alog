@@ -408,16 +408,17 @@ class alog_application(object):
                     pass
 
     def _open_logfile(self, filename):
+        self._logfile_obj = None
         (basename, ext) = os.path.splitext(filename)
         try:
             if ext == '.gz':
-                self._logfile_obj = gzip.open(self._logfile, 'rb')
+                self._logfile_obj = gzip.open(filename, 'rb')
             elif ext == '.bz2':
-                self._logfile_obj = bz2.BZ2File(self._logfile, 'rb')
+                self._logfile_obj = bz2.BZ2File(filename, 'rb')
             elif ext == '.xz':
                 raise IOError('XZ compression not yet supported')
             else:
-                self._logfile_obj = open(self._logfile, 'r')
+                self._logfile_obj = open(filename, 'r')
         except IOError as e:
             self._last_error = str(e)
         except OSError as e:
@@ -431,19 +432,98 @@ class alog_application(object):
         if os.path.exists(filename):
             filedir = os.path.dirname(filename)
             base, ext = os.path.splitext(os.path.basename(filename))
+            print(base, ext)
             for f in os.listdir(filedir):
                 fullname = os.path.join(filedir, f)
                 if os.path.isfile(fullname):
                     if f.startswith(base):
-                        file_revision = 0
-                        for e in f.split('.'):
-                            try:
-                                file_revision = int(e)
-                            except ValueError:
-                                pass
+                        file_revision = -1
+                        if '.' in f:
+                            for e in f.split('.'):
+                                try:
+                                    file_revision = int(e)
+                                    break
+                                except ValueError:
+                                    pass
                         all_log_files.append((file_revision, fullname))
         all_log_files.sort(cmp=lambda a,b: cmp(a[0], b[0]))
         return all_log_files
+
+    def _process_log_file(self, args):
+
+        self._output_format = args.output_format
+        if self._logfile_obj is not None:
+            try:
+                for line in self._logfile_obj:
+                    if len(line.strip()) != 0:
+                        self._first_line = line
+                        break
+            except IOError as e:
+                self._last_error = str(e)
+            except OSError as e:
+                self._last_error = str(e)
+            except KeyboardInterrupt:
+                pass
+
+        self._pattern = self._select_pattern(args.pattern)
+        if self._verbose:
+            print('Pattern: %s' % self._pattern)
+
+        if self._logfile_obj is None:
+            if self._last_error:
+                sys.stdout.write('Unable to open log file %s; error %s\n' % (self._logfile, self._last_error))
+            else:
+                sys.stdout.write('Unable to open log file %s or unknown shortcut.\n' % (self._logfile))
+            ret = 1
+        elif not self._first_line:
+            sys.stdout.write('Log file %s is empty.\n' % (self._logfile))
+            ret = 0
+        else:
+            timestamp_format = self._timestamp_format(self._pattern)
+            line_re = self._compile_pattern_re(self._pattern)
+
+            self._output_format = self._prepare_output_format(self._pattern, self._output_format)
+            if self._verbose:
+                print('Output format: %s' % self._output_format)
+            if not line_re:
+                sys.stdout.write('Unable to determine log pattern for log file %s\n' % (self._logfile))
+                ret = 1
+            else:
+                if self._verbose:
+                    print('Line RE: %s' % line_re.pattern)
+                self._last_msg_obj = None
+                max_outputs = args.limit
+                if self._first_line:
+                    msg_obj = self._process_line(line_re, self._find_re, timestamp_format, self._first_line)
+                    if msg_obj:
+                        if self._last_msg_obj:
+                            self._output_msg(self._last_msg_obj)
+                        self._last_msg_obj = msg_obj
+                    elif self._last_msg_obj:
+                        self._last_msg_obj.append_message(self._first_line.rstrip())
+                num_outputs = 0
+                try:
+                    for line in self._logfile_obj:
+                        msg_obj = self._process_line(line_re, self._find_re, timestamp_format, line)
+                        if msg_obj:
+                            if self._last_msg_obj:
+                                self._output_msg(self._last_msg_obj)
+                                num_outputs += 1
+                                if max_outputs > 0 and num_outputs >= max_outputs:
+                                    self._last_msg_obj = None
+                                    break
+                            self._last_msg_obj = msg_obj
+                        elif self._last_msg_obj:
+                            self._continue_process_line(self._last_msg_obj, line_re, self._find_re, line)
+                except IOError as e:
+                    self._last_error = str(e)
+                    sys.stdout.write('Failed to read log file %s: %s\n' % (self._logfile, str(e)))
+                if self._last_msg_obj:
+                    self._output_msg(self._last_msg_obj)
+                    num_outputs += 1
+
+                ret = 0
+        return ret
 
     def main(self):
         #=============================================================================================
@@ -460,14 +540,15 @@ class alog_application(object):
         parser.add_argument('-o', '--output', dest='output_format', help='specifies the fields to print; separated by comma')
         parser.add_argument('-n', '--limit', dest='limit', default=-1, type=int, help='limit the number of log outputs.')
         parser.add_argument('-L', '--level', dest='output_level', action='append', help='specifies the minimum log level to print')
+        parser.add_argument('-H', '--history', dest='load_history', action='store_true', help='load all available log files for full history')
         parser.add_argument('logfile', default='-', nargs='?', help='log file to parse')
 
         args = parser.parse_args()
 
         self._verbose = args.verbose
-        self._output_format = args.output_format
         self._first_line = None
         self._loglevel = None
+        self._logfile_history = None
         
         if args.config_dir:
             self._config = alog_config(args.config_dir)
@@ -511,91 +592,41 @@ class alog_application(object):
                 sys.stdout.write('Given pattern %s is invalid.\n' % (args.pattern))
                 return 1
 
+        if args.find_regex:
+            self._find_re = re.compile(args.find_regex)
+        elif args.find:
+            self._find_re = re.compile(r'.*' + re.escape(args.find) + r'.*')
+        elif args.wfind:
+            self._find_re = re.compile(re.escape(args.wfind) + r'\b')
+        elif args.ifind:
+            self._find_re = re.compile(r'.*' + re.escape(args.ifind) + r'.*', re.IGNORECASE)
+        else:
+            self._find_re = None
+
         if self._logfile == '-':
             self._logfile = 'stdin'
             self._logfile_obj = sys.stdin
+            ret = self._process_log_file(args)
         elif self._logfile == ':klogctl':
             self._logfile_obj = klogctl()
+            ret = self._process_log_file(args)
         else:
-            self._logfile_history = self._find_logfile_history(self._logfile)
-            self._logfile_obj = self._open_logfile(self._logfile)
-
-        if self._logfile_obj is not None:
-            try:
-                for line in self._logfile_obj:
-                    if len(line.strip()) != 0:
-                        self._first_line = line
-                        break
-            except IOError as e:
-                self._last_error = str(e)
-            except OSError as e:
-                self._last_error = str(e)
-            except KeyboardInterrupt:
-                pass
-
-        self._pattern = self._select_pattern(args.pattern)
-        if self._verbose:
-            print('Pattern: %s' % self._pattern)
-
-        if self._logfile_obj is None:
-            if self._last_error:
-                sys.stdout.write('Unable to open log file %s; error %s\n' % (self._logfile, self._last_error))
-            else:
-                sys.stdout.write('Unable to open log file %s or unknown shortcut.\n' % (self._logfile))
-            ret = 1
-        elif not self._first_line:
-            sys.stdout.write('Log file %s is empty.\n' % (self._logfile))
-            ret = 0
-        else:
-            timestamp_format = self._timestamp_format(self._pattern)
-            line_re = self._compile_pattern_re(self._pattern)
-            self._output_format = self._prepare_output_format(self._pattern, self._output_format)
-            if self._verbose:
-                print('Output format: %s' % self._output_format)
-            if not line_re:
-                sys.stdout.write('Unable to determine log pattern for log file %s\n' % (self._logfile))
-                ret = 1
-            else:
+            if args.load_history:
+                self._logfile_history = self._find_logfile_history(self._logfile)
                 if self._verbose:
-                    print('Line RE: %s' % line_re.pattern)
-                if args.find_regex:
-                    find_re = re.compile(args.find_regex)
-                elif args.find:
-                    find_re = re.compile(r'.*' + re.escape(args.find) + r'.*')
-                elif args.wfind:
-                    find_re = re.compile(re.escape(args.wfind) + r'\b')
-                elif args.ifind:
-                    find_re = re.compile(r'.*' + re.escape(args.ifind) + r'.*', re.IGNORECASE)
-                else:
-                    find_re = None
-                self._last_msg_obj = None
-                max_outputs = args.limit
-                if self._first_line:
-                    msg_obj = self._process_line(line_re, find_re, timestamp_format, self._first_line)
-                    if msg_obj:
-                        if self._last_msg_obj:
-                            self._output_msg(self._last_msg_obj)
-                        self._last_msg_obj = msg_obj
-                    elif self._last_msg_obj:
-                        self._last_msg_obj.append_message(self._first_line.rstrip())
-                num_outputs = 0
-                for line in self._logfile_obj:
-                    msg_obj = self._process_line(line_re, find_re, timestamp_format, line)
-                    if msg_obj:
-                        if self._last_msg_obj:
-                            self._output_msg(self._last_msg_obj)
-                            num_outputs += 1
-                            if max_outputs > 0 and num_outputs >= max_outputs:
-                                self._last_msg_obj = None
-                                break
-                        self._last_msg_obj = msg_obj
-                    elif self._last_msg_obj:
-                        self._continue_process_line(self._last_msg_obj, line_re, find_re, line)
-                if self._last_msg_obj:
-                    self._output_msg(self._last_msg_obj)
-                    num_outputs += 1
-
-                ret = 0
+                    print(self._logfile_history)
+                    for (rev, lf) in self._logfile_history:
+                        print('Logfile: %s' % lf)
+                for (rev, lf) in self._logfile_history:
+                    if self._verbose:
+                        print('Process logfile %s (rev %i)' % (lf, rev))
+                    self._logfile_obj = self._open_logfile(lf)
+                    if self._logfile_obj:
+                        self._logfile = lf
+                        ret = self._process_log_file(args)
+            else:
+                self._logfile_obj = self._open_logfile(self._logfile)
+                ret = self._process_log_file(args)
 
         return ret
 
