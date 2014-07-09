@@ -234,6 +234,9 @@ class dns_update_app(object):
             except dns.zone.NoNS as e:
                 ret = False
                 sys.stderr.write("Zone file %s does not contain a NS record for the SOA record.\n" % (f))
+            except dns.exception.SyntaxError as e:
+                ret = False
+                sys.stderr.write("Zone file %s contains syntax error(s). %s\n" % (f, str(e)))
             if zone is None:
                 continue
             if self.verbose:
