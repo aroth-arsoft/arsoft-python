@@ -102,63 +102,67 @@ class CupsAdminApp(object):
 
         self._conn = CupsConnection(server=server, user=args.user, encryption=args.encryption)
 
-        display_printers = True
-        selected_printer = self.get_printer(args.printer) if args.printer else None
-        ret = 0
-        if args.add_remote_server:
-            display_printers = False
-            self._remote_conn = CupsConnection(args.add_remote_server)
-            if not self._conn.add_remote_printers(self._remote_conn):
-                sys.stderr.write('Unable to add printers from remote server %s\n' % (self._conn.last_error))
-                ret = 1
-        elif args.remove_remote_server:
-            display_printers = False
-            if not self._conn.remove_remote_printers(args.remove_remote_server):
-                sys.stderr.write('Unable to remove printers from remote server %s\n' % (self._conn.last_error))
-                ret = 1
-        elif args.list_ppds:
-            display_printers = False
-            if not self.show_ppds(make_filter=args.list_ppds):
-                ret = 1
+        if not self._conn.valid:
+            sys.stderr.write('Unable to connect to server: %s\n' % (self._conn.last_error))
+            ret = 1
         else:
-            if args.set_option:
+            display_printers = True
+            selected_printer = self.get_printer(args.printer) if args.printer else None
+            ret = 0
+            if args.add_remote_server:
                 display_printers = False
-                print('set opts')
-                for opt in args.set_option:
-                    key, value = opt.split('=', 2)
-                    print(' set %s=%s' %(key, value))
-                    selected_printer.setOption(key, value)
-
-            if args.default_printer:
-                display_printers = False
-                try:
-                    selected_printer.setAsDefault()
-                except cups.IPPError as (status, description):
-                    sys.stderr.write('Unable to set %s as default printer; error %i: %s\n' % (selected_printer.name, status, description))
+                self._remote_conn = CupsConnection(args.add_remote_server)
+                if not self._conn.add_remote_printers(self._remote_conn):
+                    sys.stderr.write('Unable to add printers from remote server %s\n' % (self._conn.last_error))
                     ret = 1
-
-            if args.enable_printer:
+            elif args.remove_remote_server:
                 display_printers = False
-                try:
-                    selected_printer.setEnabled(on=True)
-                except cups.IPPError as (status, description):
-                    sys.stderr.write('Unable to enable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
+                if not self._conn.remove_remote_printers(args.remove_remote_server):
+                    sys.stderr.write('Unable to remove printers from remote server %s\n' % (self._conn.last_error))
                     ret = 1
-            elif args.disable_printer:
+            elif args.list_ppds:
                 display_printers = False
-                try:
-                    selected_printer.setEnabled(on=False)
-                except cups.IPPError as (status, description):
-                    sys.stderr.write('Unable to disable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
-                    ret = 1
-
-        if display_printers:
-            if selected_printer:
-                if not self._show_printer(selected_printer, include_attributes=True if args.debug is True else False):
+                if not self.show_ppds(make_filter=args.list_ppds):
                     ret = 1
             else:
-                if not self.show_printers(include_attributes=True if args.debug is True else False):
-                    ret = 1
+                if args.set_option:
+                    display_printers = False
+                    print('set opts')
+                    for opt in args.set_option:
+                        key, value = opt.split('=', 2)
+                        print(' set %s=%s' %(key, value))
+                        selected_printer.setOption(key, value)
+
+                if args.default_printer:
+                    display_printers = False
+                    try:
+                        selected_printer.setAsDefault()
+                    except cups.IPPError as (status, description):
+                        sys.stderr.write('Unable to set %s as default printer; error %i: %s\n' % (selected_printer.name, status, description))
+                        ret = 1
+
+                if args.enable_printer:
+                    display_printers = False
+                    try:
+                        selected_printer.setEnabled(on=True)
+                    except cups.IPPError as (status, description):
+                        sys.stderr.write('Unable to enable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
+                        ret = 1
+                elif args.disable_printer:
+                    display_printers = False
+                    try:
+                        selected_printer.setEnabled(on=False)
+                    except cups.IPPError as (status, description):
+                        sys.stderr.write('Unable to disable printer %s; error %i: %s\n' % (selected_printer.name, status, description))
+                        ret = 1
+
+            if display_printers:
+                if selected_printer:
+                    if not self._show_printer(selected_printer, include_attributes=True if args.debug is True else False):
+                        ret = 1
+                else:
+                    if not self.show_printers(include_attributes=True if args.debug is True else False):
+                        ret = 1
         return ret
 
 if __name__ == "__main__":

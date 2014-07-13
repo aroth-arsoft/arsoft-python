@@ -28,20 +28,27 @@ class CupsConnection(object):
             cups.setPort(port)
         if user is not None:
             old_user = cups.getUser()
-            print('set user %s' %user)
+            #print('set user %s' %user)
             cups.setUser(user)
         if encryption is not None:
             old_encryption = cups.getEncryption()
-            print('encryption %s' % (encryption))
+            #print('encryption %s' % (encryption))
             real_encryption = CupsConnection._getEncryption(encryption)
-            print('real_encryption %i' % (real_encryption))
+            #print('real_encryption %i' % (real_encryption))
             cups.setEncryption(real_encryption)
         cups.setPasswordCB2(self._password_callback, self)
-        self._conn = cups.Connection ()
+        self._conn = None
+        try:
+            self._conn = cups.Connection ()
+        except RuntimeError as e:
+            self.last_error = str(e)
+
+        # remember the current settings
         self._server = cups.getServer()
         self._serverip = None
         self._port = cups.getPort()
         self._ppds = None
+        # restore the old cups settings
         if server is not None:
             cups.setServer(old_server)
             cups.setPort(old_port)
@@ -75,6 +82,10 @@ class CupsConnection(object):
         else:
             ret = value
         return ret
+
+    @property
+    def valid(self):
+        return True if self._conn else None
 
     @property
     def server(self):
