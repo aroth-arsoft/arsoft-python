@@ -4,6 +4,8 @@ import urllib2
 import xml.etree.ElementTree as ET
 
 from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
+from arsoft.timestamp import strptime_as_datetime, timestamp_from_datetime
+import time
 
 ## Create the plugin option
 np = NagiosPlugin()
@@ -25,6 +27,7 @@ np.add_value('dewpoint_f', 'dewpoint temperature in fahrenheit', 'dewpoint tempe
 
 np.add_value('precip_1hr', 'precipitation in last hour', 'precipitation in last hour', units='cm', has_argument=False, value=0)
 np.add_value('precip_today', 'precipitation today', 'precipitation today', units='cm', has_argument=False, value=0)
+np.add_value('observation_age', 'observation age', 'age of observation in seconds', units='s', has_argument=False, value=0)
 
 station_id = np['station']
 current_observation_url='http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID=' + station_id
@@ -70,13 +73,20 @@ if current_observation:
         else:
             station_full_name = None
         if station_full_name is not None and len(station_full_name) != 0:
+            print(current_observation)
             np.set_value('temp_c', _get_node_float(tree, 'temp_c'))
             np.set_value('temp_f', _get_node_float(tree, 'temp_f'))
             
             np.set_value('wind_degrees', _get_node_float(tree, 'wind_degrees'))
             np.set_value('wind_mph', _get_node_float(tree, 'wind_mph'))
             np.set_value('wind_gust_mph', _get_node_float(tree, 'wind_gust_mph'))
-            
+            observation_time_str = _get_node_str(tree, 'observation_time_rfc822')
+            observation_time = strptime_as_datetime(observation_time_str, "%a, %d %b %Y %H:%M:%S %z")
+            observation_time_time_t = timestamp_from_datetime(observation_time)
+            now = time.time()
+            observation_age = now - observation_time_time_t
+            np.set_value('observation_age', observation_age)
+
             np.set_value('pressure_mb', _get_node_float(tree, 'pressure_mb'))
             np.set_value('dewpoint_c', _get_node_float(tree, 'dewpoint_c'))
             np.set_value('dewpoint_f', _get_node_float(tree, 'dewpoint_f'))
