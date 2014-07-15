@@ -2,7 +2,7 @@ Source: arsoft-python
 Section: admin
 Priority: optional
 Maintainer: Andreas Roth <aroth@arsoft-online.com>
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Build-Depends: debhelper (>= 8), python (>= 2.7)
 X-Python-Version: >=2.7
 
@@ -106,3 +106,28 @@ Architecture: all
 Depends: arsoft-python, python-serial, ${python:Depends}, ${misc:Depends}
 Description: control a Onkyo receiver using RS232
  Uses a RS232 connection to a Onkyo receiver to control it.
+
+Package: arsoft-check-mk-plugins
+Architecture: all
+Depends: arsoft-python, lm-sensors, hddtemp, dnsutils, ${python:Depends}, ${misc:Depends}
+Description: additional check_mk plugins for AR Soft specific services
+ Installs all files and packages required to use the AR Soft check_mk
+ plugins to monitor the following services:
+  - SMART
+  - DMI System information
+  - DMRAID
+  - Apache status
+  - nginx status
+  - MySQL status
+  - PostgreSQL status
+  - nfs exports
+  - APT status
+  - and more
+
+Package: arsoft-check-mk-checks
+Architecture: all
+Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
+Description: additional checks for check_mk
+ Checks include the following:
+  - APT status
+  - and more
