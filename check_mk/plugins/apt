@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/python
+# encoding: utf-8
 #
 # Check_MK APT Plugin - Check for upgradeable packages.
 #
