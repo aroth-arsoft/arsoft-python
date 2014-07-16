@@ -1,3 +1,9 @@
+arsoft-python (1.141) trusty; urgency=medium
+
+  * fixed check_mk package issues
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 16 Jul 2014 07:28:27 +0200
+
 arsoft-python (1.140) trusty; urgency=medium
 
   * add first check-mk plugins/checks

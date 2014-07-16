@@ -109,7 +109,8 @@ Description: control a Onkyo receiver using RS232
 
 Package: arsoft-check-mk-plugins
 Architecture: all
-Depends: python (>= 2.7), arsoft-python, lm-sensors, hddtemp, dnsutils, ${misc:Depends}
+Depends: python (>= 2.7), arsoft-python, check-mk-agent, lm-sensors, hddtemp,
+ dnsutils, ${misc:Depends}
 Description: additional check_mk plugins for AR Soft specific services
  Installs all files and packages required to use the AR Soft check_mk
  plugins to monitor the following services:
