@@ -3,15 +3,28 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import os
+import platform
 import arsoft.utils
+
+(linux_distname,linux_distversion,linux_distcodename) = platform.linux_distribution()
 
 class OpenVPNDefaults(object):
     config_directory = '/etc/openvpn'
-    run_directory = '/run'
+    if linux_distcodename == 'precise':
+        run_directory = '/var/run'
+    else:
+        run_directory = '/run'
     config_extension = '.conf'
 
     def __init__(self):
         pass
+
+    @staticmethod
+    def pidfile(vpnname):
+        if linux_distcodename == 'precise':
+            return os.path.join(OpenVPNDefaults.run_directory, 'openvpn.' + vpnname + '.pid')
+        else:
+            return os.path.join(OpenVPNDefaults.run_directory, 'openvpn', vpnname + '.pid')
 
 class Config(object):
 

@@ -924,7 +924,7 @@ push "persist-tun"
 
     @property
     def pidfile(self):
-        return os.path.join(config.OpenVPNDefaults.run_directory, 'openvpn', self.name + '.pid')
+        return config.OpenVPNDefaults.pidfile(self.name)
 
     @property
     def running(self):
