@@ -73,7 +73,6 @@ if current_observation:
         else:
             station_full_name = None
         if station_full_name is not None and len(station_full_name) != 0:
-            print(current_observation)
             np.set_value('temp_c', _get_node_float(tree, 'temp_c'))
             np.set_value('temp_f', _get_node_float(tree, 'temp_f'))
             
