@@ -1,0 +1,257 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+
+import arsoft.dnsutils
+import dns
+import dns.rdatatype
+
+def _dns_answer_sort(lhs, rhs):
+    if lhs.rdclass == rhs.rdclass and lhs.rdtype == rhs.rdtype:
+        if lhs.rdtype == dns.rdatatype.MX:
+            return cmp(lhs.preference, rhs.preference)
+        elif lhs.rdtype == dns.rdatatype.SRV:
+            if lhs.priority == rhs.priority:
+                return cmp(lhs.weight, rhs.weight)
+            else:
+                return cmp(lhs.priority, rhs.priority)
+        elif lhs.rdtype == dns.rdatatype.TXT:
+            # keep original sort order
+            return 0
+        else:
+            return cmp(lhs, rhs)
+    else:
+        return cmp(lhs, rhs)
+
+class dns_query_app(object):
+
+    DEFAULT_RRTYPE = 'A'
+    DEFAULT_TTL = 86400
+    DEFAULT_SERVER = None
+
+    def __init__(self):
+        self.verbose = False
+        self._updates = {}
+
+    @staticmethod
+    def _split_arg(arg):
+        if '=' in arg:
+            (key, value) = arg.split('=', 1)
+            return (key, value)
+        else:
+            return (arg, None)
+
+    @staticmethod
+    def _split_args(args):
+        ret = []
+        for arg in args:
+            ret.append(dns_update_app._split_arg(arg))
+        return ret
+
+    def _lookup_hosts(self, args):
+        dnsserver = self.dnsserver
+        hosts_to_lookup = []
+
+        for (host, payload) in args:
+            if host[0] == '@':
+                dnsserver = host[1:]
+            else:
+                hosts_to_lookup.append(host)
+
+        ipv6 = True if self.rrtype == 'AAAA' else False
+        ret = True
+        for host in hosts_to_lookup:
+            try:
+                hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=dnsserver, with_cname=True)
+            except dns.resolver.NoAnswer as e:
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (host, dnsserver))
+                hostaddr = None
+            except dns.resolver.NXDOMAIN as e:
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, dnsserver))
+                hostaddr = None
+            if hostaddr:
+                print(('%s %s' % (host, hostaddr)))
+        return ret
+
+    def _parse_query_args(self, args):
+        dnsserver = None
+        query_list = []
+        current_query = []
+        current_rdclass = dns.rdataclass.from_text('IN')
+        current_rdtype = dns.rdatatype.from_text('A')
+        for arg in args:
+            if not arg:
+                continue
+            if arg[0] == '@':
+                dnsserver = arg[1:]
+            else:
+                try:
+                    new_record_type = dns.rdatatype.from_text(arg)
+                except (dns.rdatatype.UnknownRdatatype, ValueError) as e:
+                    new_record_type = None
+                if new_record_type:
+                    if len(current_query):
+                        query_list.append( (current_rdtype, current_query) )
+                    elif current_rdtype != dns.rdatatype.A:
+                        query_list.append( (current_rdtype, [ self.domain.to_text() ]) )
+                    current_rdtype = new_record_type
+                else:
+                    if current_rdtype == dns.rdatatype.SRV:
+                        if arg.startswith('tcp:'):
+                            service_name = arg[4:]
+                            if '/' in service_name:
+                                (service_name, domain) = service_name.split('/',1)
+                                domain = dns.name.from_text(domain)
+                            else:
+                                domain = self.domain
+                            name = dns.name.from_text('_%s._tcp' % service_name, domain)
+                            current_query.append(name.to_text())
+                        elif arg.startswith('udp:'):
+                            service_name = arg[4:]
+                            if '/' in service_name:
+                                (service_name, domain) = service_name.split('/',1)
+                                domain = dns.name.from_text(domain)
+                            else:
+                                domain = self.domain
+                            name = dns.name.from_text('_%s._udp' % service_name, domain)
+                            current_query.append(name.to_text())
+                        else:
+                            if arg[-1] != '.':
+                                name = dns.name.from_text(arg, self.domain)
+                            else:
+                                name = dns.name.from_text(arg)
+                            current_query.append(name.to_text())
+                    elif current_rdtype == dns.rdatatype.TXT:
+                        if '/' in arg:
+                            (record_name, domain) = arg.split('/',1)
+                            domain = dns.name.from_text(domain)
+                        else:
+                            record_name = arg
+                            domain = self.domain
+                        name = dns.name.from_text(record_name, domain)
+                        current_query.append(name.to_text())
+                    else:
+                        name = dns.name.from_text(arg, self.domain)
+                        current_query.append(name.to_text())
+
+        if len(current_query):
+            query_list.append( (current_rdtype, current_query) )
+        elif current_rdtype != dns.rdatatype.A:
+            query_list.append( (current_rdtype, [ self.domain.to_text() ]) )
+        return (dnsserver, query_list)
+
+    def _output_rdata(self, rdata):
+        if rdata.rdtype == dns.rdatatype.SRV:
+            if self.batch:
+                # output in the form of host:port
+                target = str(rdata.target)
+                print(( '%s:%i' % (target[:-1], rdata.port) ))
+            else:
+                print(( '%i %i %i %s' % (rdata.priority, rdata.weight, rdata.port, rdata.target) ))
+        elif rdata.rdtype == dns.rdatatype.TXT:
+            if len(rdata.strings) == 0:
+                pass
+            elif len(rdata.strings) == 1:
+                print(( rdata.strings[0] ))
+            else:
+                print(( rdata.strings ))
+        elif rdata.rdtype == dns.rdatatype.MX:
+            if self.batch:
+                exchange = str(rdata.exchange)
+                print(( '%s' % (exchange[:-1]) ))
+            else:
+                print((rdata.exchange))
+        else:
+            print(( str(rdata) ))
+
+    def _execute_query(self, query_list):
+        if self.verbose:
+            print(('DNS server %s' % (self.dnsserver)))
+        resolver = arsoft.dnsutils._get_resolver(self.dnsserver)
+        if not resolver:
+            ret = False
+        else:
+            ret = False
+            for (record_type, query_args) in query_list:
+                query_string = ' '.join(query_args)
+                if self.verbose:
+                    print(('Record type: %s' % dns.rdatatype.to_text(record_type)))
+                    print(('Query: %s' % query_string))
+                try:
+                    answers = resolver.query(query_string, record_type)
+                    if answers:
+                        ret = True
+                        sorted_answers = sorted(answers, cmp=_dns_answer_sort)
+                        got_answer = None
+                        if self.prefered_value:
+                            for rdata in sorted_answers:
+                                if rdata.rdtype == dns.rdatatype.SRV:
+                                    target = str(rdata.target)
+                                    if target[:-1] == self.prefered_value:
+                                        got_answer = rdata
+                                elif rdata.rdtype == dns.rdatatype.MX:
+                                    exchange = str(rdata.exchange)
+                                    if exchange[:-1] == self.prefered_value:
+                                        got_answer = rdata
+                                elif rdata.rdtype == dns.rdatatype.TXT:
+                                    if len(rdata.strings) == 0:
+                                        continue
+                                    elif len(rdata.strings) == 1:
+                                        if( rdata.strings[0] == self.prefered_value ):
+                                            got_answer = rdata
+                                    else:
+                                        if self.prefered_value in rdata.strings:
+                                            got_answer = rdata
+                        if got_answer:
+                            self._output_rdata(got_answer)
+                        else:
+                            for rdata in sorted_answers:
+                                self._output_rdata(rdata)
+                                if self.first:
+                                    break
+                except dns.resolver.NoAnswer as e:
+                    sys.stderr.write("No answer for query %s (%s) at %s.\n" % (query_string, dns.rdatatype.to_text(record_type), self.dnsserver))
+                except dns.resolver.NXDOMAIN as e:
+                    sys.stderr.write("No record exists for query %s (%s) at %s.\n" % (query_string, dns.rdatatype.to_text(record_type), self.dnsserver))
+
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='update the DNS information')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-b', '--batch', dest='batch', action='store_true', help='enable for batch operation.')
+        parser.add_argument('--prefered-value', dest='prefered_value', help='can be use in combination with batch operation to return the same order of the results as in a previous query.')
+        parser.add_argument('--first', dest='first', action='store_true', help='only output the first value.')
+        parser.add_argument('query', nargs='+', help='query string')
+
+        args = parser.parse_args()
+
+        self.batch = args.batch
+        self.verbose = args.verbose
+        self.first = args.first
+        self.dnsserver = self.DEFAULT_SERVER
+        self.prefered_value = args.prefered_value
+        (fqdn, self.hostname, domain) = arsoft.dnsutils.gethostname_tuple()
+
+        self.domain = dns.name.from_text(domain)
+        self.fqdn = dns.name.from_text(fqdn)
+
+        (dnsserver, query_list) = self._parse_query_args(args.query)
+        if dnsserver:
+            self.dnsserver = dnsserver
+
+        if query_list:
+            ret = self._execute_query(query_list)
+        else:
+            ret = False
+        return 0 if ret else 1
+
+if __name__ == "__main__":
+    app =  dns_query_app()
+    sys.exit(app.main())

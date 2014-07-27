@@ -1,0 +1,252 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import subprocess
+
+from arsoft.utils import *
+
+class system_info_app:
+    def __init__(self):
+        self._verbose = False
+        self._dmiinfo = {}
+        self._block_devices = {}
+
+    class DmiHandle(object):
+        def __init__(self, handle=None):
+            self.handle = handle
+            self.name = None
+            self.data = {}
+        def add(self, key, value):
+            if key in self.data:
+                if isinstance(self.data[key], list):
+                    self.data[key].append(value)
+                else:
+                    self.data[key] = [self.data[key], value]
+            else:
+                self.data[key] = value
+
+    class BlockDevice(object):
+        def __init__(self, major=None, minor=None, blocks=None, name=None):
+            self.major = major
+            self.minor = minor
+            self.blocks = blocks
+            self.name = name
+            self.size = None
+            self.size_in_bytes = None
+            self.available = True
+            self.vendor = None
+            self.model = None
+            self.hw_sector_size = -1
+            self.physical_block_size = -1
+            self.logical_block_size = -1
+            self.minimum_io_size = -1
+            self.optimal_io_size = -1
+            self.alignment_offset = -1
+            self.has_device_mapper = False
+
+        @property
+        def is_physical_device(self):
+            if self.minor % 16 != 0:
+                return False
+            if self.has_device_mapper:
+                return False
+            return True
+
+        @property
+        def devfile(self):
+            return '/dev/' + self.name
+
+        def __str__(self):
+            return '%i:%i %i %s' % (self.major, self.minor, self.blocks, self.name)
+
+        def load_info(self):
+            with open('/sys/class/block/%s/size' % self.name, 'r') as f:
+                self.size = int(f.read())
+
+            if os.path.exists('/sys/class/block/%s/device' % self.name):
+                with open('/sys/class/block/%s/device/vendor' % self.name, 'r') as f:
+                    self.vendor = f.read().strip()
+                with open('/sys/class/block/%s/device/model' % self.name, 'r') as f:
+                    self.model = f.read().strip()
+
+            with open('/sys/class/block/%s/alignment_offset' % self.name, 'r') as f:
+                self.alignment_offset = int(f.read())
+
+            self.has_device_mapper = os.path.exists('/sys/class/block/%s/dm' % self.name)
+
+            if os.path.exists('/sys/class/block/%s/queue' % self.name):
+                with open('/sys/class/block/%s/queue/hw_sector_size' % self.name, 'r') as f:
+                    self.hw_sector_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/physical_block_size' % self.name, 'r') as f:
+                    self.physical_block_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/logical_block_size' % self.name, 'r') as f:
+                    self.logical_block_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/minimum_io_size' % self.name, 'r') as f:
+                    self.minimum_io_size = int(f.read())
+
+                with open('/sys/class/block/%s/queue/optimal_io_size' % self.name, 'r') as f:
+                    self.optimal_io_size = int(f.read())
+
+            if self.size:
+                self.size_in_bytes = self.size * self.hw_sector_size
+
+    def _find_dmi_by_name(self, name):
+        ret = []
+        for (h, obj) in self._dmiinfo.items():
+            if obj.name == name:
+                ret.append(obj)
+        return ret
+
+    def load_dmiinfo(self, num_spaces_per_level=8):
+        ret = False
+        env = os.environ
+        env['LANG'] = 'C'
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData('dmidecode', env=env, verbose=self._verbose)
+        if sts == 0:
+            current_handle = None
+            current_section = None
+            last_key = None
+            for line in stdoutdata.splitlines():
+                if len(line) == 0 or line[0] == '#':
+                    continue
+                if line.startswith('Begin Of Table') or line.startswith('End Of Table'):
+                    continue
+                if line.startswith('Handle'):
+                    current_handle = int(line[9:13], 16)
+                    self._dmiinfo[current_handle] = self.DmiHandle(current_handle)
+                    continue
+                if current_handle is None:
+                    continue
+                leading_tabs = 0
+                for c in line:
+                    if c == '\t':
+                        leading_tabs += 1
+                    else:
+                        break
+                level = leading_tabs
+
+                #print('line %s' % line)
+                #print('handle %x' % current_handle)
+                #print('leading_tabs %i, level %i' % (leading_tabs, level))
+
+                if level == 0:
+                    self._dmiinfo[current_handle].name = line.strip()
+                else:
+                    # continue information
+                    line_no_spaces = line[leading_tabs:]
+                    if level == 1:
+                        if ':' in line_no_spaces:
+                            (key, value) = line_no_spaces.split(':', 1)
+                            self._dmiinfo[current_handle].add(key, value.strip())
+                            last_key = key
+                    elif level == 2:
+                        if ':' in line_no_spaces:
+                            (key, value) = line_no_spaces.split(':', 1)
+                            self._dmiinfo[current_handle].add(key, value.strip())
+                        else:
+                            self._dmiinfo[current_handle].add(last_key, line_no_spaces.strip())
+
+            ret = True
+        return ret
+
+    def load_block_devices(self):
+        f = open('/proc/partitions', 'r')
+        lines = f.readlines()
+        f.close()
+
+        for line in lines[2:]:
+            (major, minor, blocks, name) = line.split()
+            obj = self.BlockDevice(int(major), int(minor), int(blocks), name)
+            obj.load_info()
+            self._block_devices[name] = obj
+        return 0
+
+    def show_motherboard_info(self):
+        for obj in self._find_dmi_by_name('Base Board Information'):
+            print('Motherboard information')
+            for (key, value) in list(obj.data.items()):
+                if key == 'Features':
+                    continue
+                print(('  %s: %s' % (key, value)))
+        return 0
+
+    def show_bios_info(self):
+        for obj in self._find_dmi_by_name('BIOS Information'):
+            print('BIOS/UEFI information')
+            for (key, value) in list(obj.data.items()):
+                if key == 'Characteristics':
+                    continue
+                print(('  %s: %s' % (key, value)))
+        return 0
+
+    def show_cpu_info(self):
+        for obj in self._find_dmi_by_name('Processor Information'):
+            print('CPU information')
+            for (key, value) in list(obj.data.items()):
+                if key == 'Characteristics':
+                    continue
+                print(('  %s: %s' % (key, value)))
+        return 0
+
+    def show_memory_info(self):
+        for obj in self._find_dmi_by_name('Memory Device'):
+            if 'Size' in obj.data:
+                if obj.data['Size'] == 'No Module Installed':
+                    continue
+            print('Memory information')
+            for (key, value) in list(obj.data.items()):
+                if key == 'Characteristics':
+                    continue
+                print(('  %s: %s' % (key, value)))
+        return 0
+
+    def show_block_device_info(self):
+        for (name, dev) in list(self._block_devices.items()):
+            if not dev.is_physical_device:
+                continue
+            print(('Block device %s' % dev.devfile))
+            print(('  Vendor: %s' % dev.vendor))
+            print(('  Model: %s' % dev.model))
+            print(('  Size: %s' % bytes2human(dev.size_in_bytes)))
+
+            if dev.available:
+                print(('  Hardware sector size: %i' % dev.hw_sector_size))
+                print(('  Physical block size: %i' % dev.physical_block_size))
+                print(('  Logical block size: %i' % dev.logical_block_size))
+                print(('  Minimum I/O size: %i' % dev.minimum_io_size))
+                print(('  Optimal I/O size: %i' % dev.optimal_io_size))
+                print(('  Alignment offset: %i' % dev.alignment_offset))
+            else:
+                print('  Not available')
+        return 0
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='shows the basic information about the system')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+
+        args = parser.parse_args()
+        self._verbose = args.verbose
+
+        self.load_dmiinfo()
+        self.load_block_devices()
+        self.show_motherboard_info()
+        self.show_bios_info()
+        self.show_cpu_info()
+        self.show_memory_info()
+        self.show_block_device_info()
+
+        ret = 0
+        return ret
+
+if __name__ == "__main__":
+    app =  system_info_app()
+    sys.exit(app.main())

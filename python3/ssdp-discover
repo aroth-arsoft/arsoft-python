@@ -1,0 +1,214 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import socket
+import http.client
+import io
+import struct
+
+from arsoft.utils import hexstring_with_length
+from arsoft.socket_utils import *
+from arsoft.ifconfig import ifconfig
+
+class ssdp_discover:
+    def __init__(self):
+        self._verbose = False
+
+    class SSDPResponse(object):
+        class _FakeSocket(io.StringIO):
+            def makefile(self, *args, **kw):
+                return self
+        def __init__(self, response):
+            r = http.client.HTTPResponse(self._FakeSocket(response))
+            r.begin()
+            self.location = r.getheader("location")
+            self.usn = r.getheader("usn")
+            self.st = r.getheader("st")
+            cache_control = r.getheader("cache-control")
+            if cache_control:
+                self.cache = {}
+                for entry in cache_control.split(','):
+                    (key, value) = entry.split('=', 1)
+                    if key == 'max-age':
+                        value = int(value)
+                    self.cache[key] = value
+        @property
+        def valid(self):
+            return self.location is not None
+        def __repr__(self):
+            return "<SSDPResponse({location}, {st}, {usn})>".format(**self.__dict__)
+        def __hash__(self):
+            return hash((self.location, self.usn, self.st))
+        def __eq__(self, other):
+            return (self.location, self.usn, self.st) == (other.location, other.usn, other.st)
+
+    class MiniSSDPResponse(object):
+        def __init__(self, location=None, st=None, usn=None, cache=None):
+            self.location = location
+            self.usn = usn
+            self.st = st
+            self.cache = cache
+        def __repr__(self):
+            return "<MiniSSDPResponse({location}, {st}, {usn})>".format(**self.__dict__)
+        def __hash__(self):
+            return hash((self.location, self.usn, self.st))
+        def __eq__(self, other):
+            return (self.location, self.usn, self.st) == (other.location, other.usn, other.st)
+
+    def discover_multicast(self, service='ssdp:all', interfaces=None, timeout=2, retries=1, source_port=None, receiver=None, multicast_ttl=8, ipv6=False):
+        group = ("239.255.255.250", 1900)
+        message = "\r\n".join([
+            'M-SEARCH * HTTP/1.1',
+            'HOST: {0}:{1}',
+            'MAN: "ssdp:discover"',
+            'ST: {st}','MX: {timeout}','',''])
+        socket.setdefaulttimeout(timeout)
+        ifconfig_obj = ifconfig()
+        responses = {}
+        for iface in ifconfig_obj.getList():
+
+            ifaddr = iface['addr'][0]
+            if interfaces is None:
+                skip_interface = False
+            else:
+                skip_interface = True
+                if iface['name'] in interfaces:
+                    skip_interface = False
+                else:
+                    for i in interfaces:
+                        if i in iface['addr']:
+                            ifaddr = i
+                            skip_interface = False
+                            break
+            if skip_interface:
+                continue
+            if self._verbose:
+                print(('Search on interface %s (%s)' % (iface['name'], ifaddr)))
+
+            for _ in range(retries):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.bind( (ifaddr, source_port if source_port else 0) )
+                if ipv6:
+                    sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, multicast_ttl)
+                else:
+                    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, multicast_ttl)
+
+                sock.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_IF, socket.inet_aton(ifaddr))
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+                msg = message.format(*group, st=service, timeout=timeout / 2)
+                socket_ok = False
+                msg_dest = receiver if receiver else group
+                try:
+                    if self._verbose:
+                        print(('Send msg (%i bytes) on interface %s (%s) to %s' % (len(msg), iface['name'], ifaddr, msg_dest)))
+                    sock.sendto(msg, msg_dest)
+                    socket_ok = True
+                except socket.error:
+                    print(('Failed to send through interface %s (%s)' % (iface['name'], ifaddr)))
+                    pass
+                while socket_ok:
+                    try:
+                        response = self.SSDPResponse(sock.recv(1024))
+                        if response.valid:
+                            if response not in responses:
+                                self.print_repsonse(response)
+                                responses[response] = response
+                    except socket.timeout:
+                        break
+                sock.close()
+        return list(responses.values())
+
+    def discover_daemon(self, service='ssdp:all', timeout=2, retries=1, socket_path='/var/run/minissdpd.sock'):
+        def minissdp_get_string(idx, msg):
+            n = 0
+            #print('msg=%s idx=%i' % (msg, idx))
+            t = struct.unpack('B', msg[idx])
+            n = t[0]
+            idx += 1
+            while t[0] > 127:
+                n = n << 7
+                n = n + t[0]
+                idx += 1
+                t = struct.unpack('B', msg[idx])
+            ret = msg[idx:idx+n]
+            #print('ret=%s nextidx=%i' % (ret, idx + n))
+            return (ret, idx + n)
+        if service == 'ssdp:all':
+            # request type 3 does not really require a service name and length, but
+            # because of a bug in version 1.1 and 1.2 a string is required. Any string
+            # would do, so just send the service name we got so far
+            request_type = 3
+        else:
+            request_type = 1
+        fmt = 'BB%is' % len(service)
+        msg = struct.pack(fmt, request_type, len(service), service)
+        response = send_and_recv_unix_socket_message(path=socket_path, message=msg)
+
+        if self._verbose:
+            print(('got %s' % hexstring_with_length(response)))
+        responses = {}
+        if response:
+            (num_services) = struct.unpack('B', response[0])
+            idx = 1
+            for service_no in range(num_services[0]):
+                #print('loc: %i - %i' % (service_no, idx))
+                location, idx = minissdp_get_string(idx, response)
+                #print('st: %i - %i' % (service_no, idx))
+                service, idx = minissdp_get_string(idx, response)
+                #print('mx: %i - %i' % (service_no, idx))
+                usn, idx = minissdp_get_string(idx, response)
+                obj = self.MiniSSDPResponse(location, service, usn)
+                if self._verbose:
+                    print(obj)
+                if obj not in responses:
+                    self.print_repsonse(obj)
+                    responses[obj] = obj
+        return list(responses.values())
+
+    def print_repsonse(self, response):
+        print((response.location))
+        print(('  USN: %s' % response.usn))
+        print(('  Service: %s' % response.st))
+        if response.cache:
+            print(('  Cache: %s' % response.cache))
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='discovers all UPnP/SSDP devices in the local network')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-s', '--service', dest='service', default='ssdp:all', help='name of the service to discover.')
+        parser.add_argument('-t', '--timeout', dest='timeout', type=int, default=5, help='timeout in seconds.')
+        parser.add_argument('-r', '--retries', dest='retries', type=int, default=1, help='number of scan attemps.')
+        parser.add_argument('-i', '--interface', dest='interfaces', action='append', help='list of interfaces to search.')
+        parser.add_argument('-l', '--local', dest='use_local_daemon', action='store_true', help='use local minissdp daemon.')
+        parser.add_argument('-d', '--dest', dest='destination', help='use the given destination address; e.g. host addr.')
+
+        args = parser.parse_args()
+        self._verbose = args.verbose
+
+        if args.use_local_daemon:
+            devices = self.discover_daemon(service=args.service, timeout=args.timeout, retries=args.retries)
+        else:
+            if args.destination:
+                if ':' in args.destination:
+                    host, port = args.destination.split(':', 1)
+                    receiver = (host, port)
+                else:
+                    receiver = (args.destination, 1900)
+            else:
+                receiver = None
+            devices = self.discover_multicast(interfaces=args.interfaces, receiver=receiver, service=args.service,
+                                              timeout=args.timeout, retries=args.retries)
+
+        ret = 0
+        return ret
+
+if __name__ == "__main__":
+    app =  ssdp_discover()
+    sys.exit(app.main())

@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+import os,sys
+
+from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
+from arsoft.fritzbox import *
+import dns.resolver
+import socket
+
+## Create the plugin option
+np = NagiosPlugin(must_threshold=False)
+np.add_value('down', 'defines the range for the down stream speed', guitext='down stream', uom='KB', warning=True)
+np.add_value('up', 'defines the range for the up stream speed', guitext='up stream', uom='KB', warning=True)
+np.add_arg('D', 'ddnsname', 'public DNS name which must point to this host', default=None, required=0)
+
+## This starts the actual plugin activation
+np.activate()
+
+## Use a custom load average file, if specified to
+## This is really only used for debugging purposes, and showing off the
+## 'add_arg' method
+if np['host']:
+    target_host = np['host']
+else:
+    np.nagios_exit(UNKNOWN, 'No hostname for FritzBox specified.')
+
+fritz = FritzBox(target_host)
+if fritz.isPhysicalConnected():
+
+    if fritz.isDSLConnected():
+        if np['ddnsname']:
+            ddnsnames = np['ddnsname'].split(';')
+        else:
+            ddnsnames = None
+        
+        ddnsname_results = {}
+        if ddnsnames:
+            resolver = dns.resolver.Resolver()
+            fritzbox_addresses = []
+            try:
+                socket.inet_aton(target_host)
+                fritzbox_addresses = [target_host]
+            except socket.error:
+                # Not legal
+                try:
+                    # use the FritzBox as DNS resolver (since this our gateway to DNS)
+                    answers = resolver.query(target_host, 'A')
+                    for rdata in answers:
+                        fritzbox_addresses.append(str(rdata))
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                    pass
+
+            if len(fritzbox_addresses) != 0:
+                for ddnsname in ddnsnames:
+                    ddnsname_results[ddnsname] = []
+                    try:
+                        resolver.reset()
+                        resolver.nameservers = fritzbox_addresses
+                        answers = resolver.query(ddnsname, dns.rdatatype.A)
+                        for rdata in answers:
+                            ddnsname_results[ddnsname].append(str(rdata))
+                    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                        pass
+
+        downStream_in_bits = fritz.physicalLinkDownStream()
+        upStream_in_bits = fritz.physicalLinkUpStream()
+        
+        downStream_in_kb = downStream_in_bits / 8 / 1024
+        upStream_in_kb = upStream_in_bits / 8 / 1024
+        
+        wan_ip = fritz.wanAddress()
+
+        ## set the values
+        np.set_value('down', downStream_in_kb)
+        np.set_value('up', upStream_in_kb)
+        
+        (exit_code, exit_message) = np.check_values()
+        
+        if exit_code == OK:
+            ddns_failures = []
+            for (ddnsname, results) in list(ddnsname_results.items()):
+                if fritz.wanAddress() not in results:
+                    if len(results) != 0:
+                        ddns_failures.append( '%s points to %s but should be %s' % (str(ddnsname), ','.join(results), str(fritz.wanAddress())) )
+                    else:
+                        ddns_failures.append( '%s points to <dnserror> but should be %s' % (str(ddnsname), str(fritz.wanAddress())) )
+
+            if len(ddns_failures) != 0:
+                exit_code = WARNING
+                exit_message = 'DDNS failure: %s' % ', '.join(ddns_failures)
+            else:
+                exit_message = 'connected since %s with %s' % (str(fritz.connectTime()), str(fritz.wanAddress()))
+        
+        np.nagios_exit(exit_code, exit_message)
+    else:
+        np.nagios_exit(CRITICAL, 'DSL link is not up! (%s)' % str(fritz.dslLinkStatus()))
+else:
+    np.nagios_exit(CRITICAL, 'Physical link is not up! (%s)' % str(fritz.physicalLinkStatus()))
