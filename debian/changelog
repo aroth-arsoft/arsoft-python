@@ -1,3 +1,9 @@
+arsoft-python (1.144) trusty; urgency=medium
+
+  * first build with python3 packages as well
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 28 Jul 2014 07:46:15 +0200
+
 arsoft-python (1.143) trusty; urgency=medium
 
   * fixed openvpn running state on precise
