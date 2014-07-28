@@ -1,3 +1,9 @@
+arsoft-python (1.145) trusty; urgency=medium
+
+  * python-arsoft replaces arsoft-python
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 28 Jul 2014 11:32:21 +0200
+
 arsoft-python (1.144) trusty; urgency=medium
 
   * first build with python3 packages as well

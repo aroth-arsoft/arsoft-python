@@ -10,6 +10,7 @@ X-Python3-Version: >=3.2
 Package: python-arsoft
 Section: python
 Architecture: all
+Replaces: arsoft-python
 Depends: ${python:Depends}, ${misc:Depends}, python-sleekxmpp, python-daemon, python-magic
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
