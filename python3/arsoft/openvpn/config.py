@@ -56,7 +56,7 @@ class Config(object):
 
     def _check_running(self, vpnname):
         if os.path.isdir(self._run_directory):
-            pidfile = os.path.join(self._run_directory, 'openvpn', vpnname + '.pid')
+            pidfile = OpenVPNDefaults.pidfile(vpnname)
             ret = arsoft.utils.isProcessRunningByPIDFile(pidfile)
         else:
             ret = False
