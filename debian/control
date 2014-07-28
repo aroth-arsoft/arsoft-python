@@ -3,38 +3,47 @@ Section: admin
 Priority: optional
 Maintainer: Andreas Roth <aroth@arsoft-online.com>
 Standards-Version: 3.9.5
-Build-Depends: debhelper (>= 8), python (>= 2.7)
+Build-Depends: debhelper (>= 9), python (>= 2.7), python3 (>= 3.2)
 X-Python-Version: >=2.7
+X-Python3-Version: >=3.2
 
-Package: arsoft-python
+Package: python-arsoft
+Section: python
 Architecture: all
 Depends: ${python:Depends}, ${misc:Depends}, python-sleekxmpp, python-daemon, python-magic
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 
+Package: python3-arsoft
+Section: python
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp, python3-magic
+Description: common files for the AR Soft python scripts
+ This package includes all common files for the AR Soft python scripts.
+
 Package: arsoft-netconfig
 Architecture: all
-Depends: arsoft-python, ${python:Depends}, ${misc:Depends}, ${dhcpserver:Depends}
+Depends: python-arsoft, ${python:Depends}, ${misc:Depends}, ${dhcpserver:Depends}
 Description: common files for the AR Soft netconfig framework
  This package includes all files of the AR Soft netconfig
  framework and all binaries.
 
 Package: arsoft-crypto
 Architecture: all
-Depends: arsoft-python, python-openssl, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-openssl, ${python:Depends}, ${misc:Depends}
 Description: crypto utility scripts
  Some scripts to help with crypto related tasks.
 
 Package: arsoft-python-fritzbox
 Architecture: all
-Depends: arsoft-python, python-pynag, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-pynag, ${python:Depends}, ${misc:Depends}
 Description: python module to access a AVM FritzBox
  Access the AVM FritzBox using Python and retrieve all kind of information
  from your box.
 
 Package: arsoft-python-openvpn
 Architecture: all
-Depends: arsoft-python, arsoft-crypto, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, arsoft-crypto, ${python:Depends}, ${misc:Depends}
 Replaces: arsoft-openvpn
 Description: access the OpenVPN configuration and status
  Includes the openvpn-admin script to control and maintain the OpenVPN 
@@ -43,7 +52,7 @@ Description: access the OpenVPN configuration and status
 
 Package: arsoft-python-nagios
 Architecture: all
-Depends: arsoft-python, arsoft-python-fritzbox, python-yaml, arsoft-python-openvpn, 
+Depends: python-arsoft, arsoft-python-fritzbox, python-yaml, arsoft-python-openvpn,
  ${python:Depends}, ${misc:Depends}
 Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
@@ -52,7 +61,7 @@ Description: nagios plugin module
 
 Package: arsoft-python-git
 Architecture: all
-Depends: arsoft-python, git, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, git, ${python:Depends}, ${misc:Depends}
 Description: utilities for working with GIT
  Some tools to make working with GIT a bit easier:
   - git info: display basic information about a repository
@@ -60,7 +69,7 @@ Description: utilities for working with GIT
 
 Package: arsoft-python-trac
 Architecture: all
-Depends: arsoft-python, trac, arsoft-trac-suid, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, trac, arsoft-trac-suid, ${python:Depends}, ${misc:Depends}
 Description: utilities for trac administration
  Several adminstration helper scripts for trac:
   - convert repository from SVN to GIT
@@ -69,19 +78,19 @@ Description: utilities for trac administration
 
 Package: arsoft-python-kerberos
 Architecture: all
-Depends: arsoft-python, python-pexpect, python-ldap, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-pexpect, python-ldap, ${python:Depends}, ${misc:Depends}
 Description: python module to access and control a Kerberos environment
  Includes functions to change the kerberos password with a simple function call.
 
 Package: arsoft-python-web
 Architecture: all
-Depends: arsoft-python, python-django (>= 1.4), python-flup, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-django (>= 1.4), python-flup, ${python:Depends}, ${misc:Depends}
 Description: base package for Django based web applications
  This package installs all required packages for Django based web applications.
 
 Package: arsoft-edskmgr
 Architecture: all
-Depends: arsoft-python, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, ${python:Depends}, ${misc:Depends}
 Replaces: edskmgr
 Description: external disk management tools
  This package provides scripts and tools to work with external disks.
@@ -103,13 +112,13 @@ Description: suid helpers for the accessing Trac from a web server
 
 Package: arsoft-onkyo
 Architecture: all
-Depends: arsoft-python, python-serial, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-serial, ${python:Depends}, ${misc:Depends}
 Description: control a Onkyo receiver using RS232
  Uses a RS232 connection to a Onkyo receiver to control it.
 
 Package: arsoft-check-mk-plugins
 Architecture: all
-Depends: python (>= 2.7), arsoft-python, check-mk-agent, lm-sensors, hddtemp,
+Depends: python (>= 2.7), python-arsoft, check-mk-agent, lm-sensors, hddtemp,
  dnsutils, ${misc:Depends}
 Description: additional check_mk plugins for AR Soft specific services
  Installs all files and packages required to use the AR Soft check_mk
@@ -127,7 +136,7 @@ Description: additional check_mk plugins for AR Soft specific services
 
 Package: arsoft-check-mk-checks
 Architecture: all
-Depends: python (>= 2.7), arsoft-python, ${misc:Depends}
+Depends: python (>= 2.7), python-arsoft, ${misc:Depends}
 Description: additional checks for check_mk
  Checks include the following:
   - APT status

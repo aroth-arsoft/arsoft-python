@@ -1,0 +1,156 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import os
+import argparse
+from arsoft.disks.edskmgr import ExternalDiskManager
+from arsoft.disks.disk import Disk, Disks
+
+class ExternalDiskManagerApp(object):
+
+    def __init__(self):
+        self._mgr = ExternalDiskManager()
+
+    def show_status(self, show_partitions=True):
+        print('Internal disks:')
+        for disk in self._mgr.internal_disks:
+            print('  ' + disk)
+        print('External disks:')
+        for disk in self._mgr.external_disks:
+            print('  ' + disk)
+
+        e = Disks()
+        print('Available disks:')
+        for disk_obj in e.disks:
+            print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
+            if self._mgr.verbose:
+                print('    Native path: %s'%(disk_obj.nativepath))
+            print('    Path:        %s'%(disk_obj.path))
+            print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
+            print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
+            print('    Internal:    %s'%('yes' if self._mgr.is_internal_disk(disk_obj) else 'no'))
+            disk_tags = self._mgr.get_tags_for_disk(disk_obj)
+            if disk_tags:
+                print('    Tags:        %s'%(','.join(disk_tags)))
+            else:
+                print('    Tags:        None')
+            if show_partitions:
+                if disk_obj.partitions:
+                    print('    Partitions:')
+                for dev_obj in disk_obj.partitions:
+                    print('      %s: %s' % (dev_obj.path, ','.join(dev_obj.mountpaths)))
+
+
+    def main(self, argv=None):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='manages external hard disks.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-C', '--config-directory', dest='configdir', default=self._mgr.config_dir, help='name of the directory containing the external disk manager configuration.')
+        parser.add_argument('--noop', dest='noop', action='store_true', help='just tests and shows what would be done.')
+        parser.add_argument('--load', dest='load', action='store_true', help='rescans all empty host interfaces.')
+        parser.add_argument('--reset-config', dest='reset_config', action='store_true', help='reset configuration and treat all disks as internal ones.')
+        parser.add_argument('--eject', dest='eject', nargs='*', help='removes the given external disks or all present external disks.')
+        parser.add_argument('--udev', dest='udev', action='store_true', help='handles disk or partition event within udev.')
+        parser.add_argument('--trigger', dest='trigger', help='specifies the name of the action; use by other scripts.')
+        parser.add_argument('--register', dest='register', nargs='+', metavar='DISK', help='registers the given disk as external HDD to the system.')
+        parser.add_argument('--unregister', dest='unregister', nargs='+', metavar='DISK', help='unregisters the given disk from the known external HDDs of the system.')
+        parser.add_argument('--tag', dest='tags', action='append', help='sets the tags for the disk to register.')
+        parser.add_argument('--status', dest='status', action='store_true', help='shows the status of all external disks.')
+        parser.add_argument('--wait', dest='wait_for_disk', nargs='*', help='waits for the specified disk to become ready.')
+        parser.add_argument('--hook-dir', dest='hook_dir', help='override the default hook directory from the config.')
+
+        args = parser.parse_args()
+
+        self._mgr.verbose = args.verbose
+        self._mgr.noop = args.noop
+        self._mgr.trigger = args.trigger
+
+        self._mgr.load_config(args.configdir)
+
+        if args.hook_dir:
+            self._mgr.config.hook_dir = os.path.realpath(args.hook_dir)
+
+        if args.reset_config:
+            if self._mgr.reset_config():
+                if not self._mgr.write_config():
+                    sys.stderr.write('Failed to write config')
+                    ret = 2
+                else:
+                    ret = 0
+            else:
+                ret = 1
+        elif args.load:
+            if self._mgr.checkRoot():
+                if not self._mgr.rescan_empty_scsi_hosts():
+                    ret = 1
+                else:
+                    ret = 0
+            else:
+                ret = 1
+        elif args.eject is not None:
+            if self._mgr.checkRoot():
+                if len(args.eject) == 0:
+                    if not self._mgr.remove_external_disks():
+                        ret = 1
+                    else:
+                        ret = 0
+                else:
+                    if not self._mgr.remove_disks(args.eject):
+                        ret = 1
+                    else:
+                        ret = 0
+            else:
+                ret = 1
+        elif args.udev:
+            if self._mgr.checkRoot():
+                if not self._mgr.udev_action():
+                    ret = 1
+                else:
+                    ret = 0
+            else:
+                ret = 1
+        elif args.register is not None:
+            if self._mgr.register_disk(args.register, external=True, tags=args.tags):
+                self._mgr.write_config()
+                ret = 0
+            else:
+                ret = 1
+        elif args.unregister is not None:
+            # do not really unregister the whole disk, just register it as
+            # internal and remove all tags
+            if self._mgr.register_disk(args.unregister, external=False, tags=[]):
+                self._mgr.write_config()
+                ret = 0
+            else:
+                ret = 1
+        elif args.status:
+            ret = self.show_status()
+        elif args.wait_for_disk is not None:
+            try:
+                disk_obj = self._mgr.wait_for_disk(pattern=args.wait_for_disk, tag=args.tags, timeout=10)
+                if disk_obj:
+                    ret = 0
+                else:
+                    ret = 1
+            except ValueError:
+                if args.wait_for_disk:
+                    sys.stderr.write("no disk found for the given pattern %s.\n" % (','.join(args.wait_for_disk)))
+                elif args.tags:
+                    sys.stderr.write("no disk found for the given tags %s.\n" % (','.join(args.tags)))
+                else:
+                    sys.stderr.write("no pattern or tag given to identify disk.\n")
+                ret = 2
+        else:
+            sys.stderr.write("no operation specified.\n")
+            ret = 1
+        self._mgr.cleanup()
+        return ret
+
+
+if __name__ == "__main__":
+    app = ExternalDiskManagerApp()
+    sys.exit(app.main(sys.argv))

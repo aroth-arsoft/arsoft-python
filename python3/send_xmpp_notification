@@ -1,0 +1,138 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import os.path
+import argparse
+import sys
+import logging
+import time
+
+import arsoft.xmpp
+
+# version of this script
+__version__  = '1.0'
+
+def envstr(varname):
+    return os.environ[varname] if varname in os.environ else ''
+
+class jabbersend:
+    def __init__(self):
+        self.verbose = False
+        self._config = None
+
+    def version(self):
+        print(('Version: ' + str(__version__)))
+        print(('arsoft.xmpp Version: ' + str(arsoft.xmpp.__version__)))
+        info = arsoft.xmpp.backend_info()
+        print(('Backend: ' + str(info.name)))
+        print(('Backend Version: ' + str(info.version)))
+        return 0
+    
+    def _build_text_message(self, host_notification=False):
+        if host_notification:
+            ret="Host '%s' is %s - Info : %s" % \
+                ( envstr('ICINGA_HOSTDISPLAYNAME'), envstr('ICINGA_HOSTSTATE'), envstr('ICINGA_HOSTOUTPUT') )
+        else:
+            ret="%s %s on '%s' is %s %s at %s" % \
+                ( envstr('ICINGA_NOTIFICATIONTYPE'), envstr('ICINGA_SERVICEDESC'), envstr('ICINGA_HOSTDISPLAYNAME'), envstr('ICINGA_SERVICESTATE'), envstr('ICINGA_SERVICEOUTPUT'), envstr('ICINGA_LONGDATETIME')  )
+        return ret
+
+    def _build_html_message(self, host_notification=False):
+        if host_notification:
+            ret="<p>Host <a href=\"%s\">%s</a> is <b>%s</b> - Info : %s</p>" % \
+                ( envstr('ICINGA_HOSTNOTESURL'), envstr('ICINGA_HOSTDISPLAYNAME'), envstr('ICINGA_HOSTSTATE'), envstr('ICINGA_HOSTOUTPUT') )
+        else:
+            ret="<p><i>%s</i> <a href=\"%s\">%s on %s</a> is <b>%s</b> %s at <i>%s</i></p>" % \
+                ( envstr('ICINGA_NOTIFICATIONTYPE'), envstr('ICINGA_SERVICENOTESURL'), envstr('ICINGA_SERVICEDESC'), envstr('ICINGA_HOSTDISPLAYNAME'), envstr('ICINGA_SERVICESTATE'), envstr('ICINGA_SERVICEOUTPUT'), envstr('ICINGA_LONGDATETIME')  )
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='send xmpp notification messages using jabber')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('--debug', dest='debug', default=False, action='store_true', help='enable debugging.')
+        parser.add_argument('--version', dest='version', action='store_true', help='enable the version and exits.')
+        parser.add_argument('--html', dest='html', default=False, action='store_true', help='send a HTMl nofication instead of plain text')
+        parser.add_argument('-t', '--to', dest='recipient', help='recipient name')
+        parser.add_argument('--host', dest='host_notification', default=False, action='store_true', help='send a host nofication')
+        parser.add_argument('--server', dest='service_notification', default=False, action='store_true', help='send a service nofication')
+        parser.add_argument('--socket', dest='socket', default='/run/arsoft-xmpp-daemon/socket', help='path to the socket of the arsoft-xmpp-daemon')
+
+        args = parser.parse_args()
+
+        if args.version:
+            return self.version()
+
+        recipient = None
+        subject = None
+        html = args.html
+        self.verbose = args.verbose
+        
+        if self.verbose or args.debug:
+            logger.setLevel(logging.DEBUG) # change to DEBUG for higher verbosity
+
+        if args.recipient:
+            recipient = args.recipient
+
+        if not recipient:
+            sys.stderr.write('No recipient specified.\n') 
+            return 1
+
+        if args.host_notification:
+            host_notification = True
+        elif args.service_notification:
+            host_notification = False
+        else:
+            if len(envstr('ICINGA_SERVICESTATE')) != 0:
+                host_notification = False
+            else:
+                host_notification = True
+
+        if args.html:
+            text_message=None
+            html_message=self._build_html_message(host_notification)
+        else:
+            text_message=self._build_text_message(host_notification)
+            html_message=None
+
+        if args.debug:
+            f = open('/tmp/send_xmpp_notification', 'w')
+            for key in sorted(os.environ.keys()):
+                f.write('%s=%s\n' %(key,os.environ[key]))
+            f.write('uid=%i\n' % os.getuid())
+            f.write('host_notification=%s\n' %(str(host_notification)))
+            f.write('text=%s\n' % text_message)
+            f.write('html=%s\n' % html_message)
+            f.close()
+
+        ret = 0
+        error_msg = None
+        try:
+            if arsoft.xmpp.send_message(sender=None, password=None, recipient=recipient, body=text_message,
+                                        subject=subject, html=html_message,
+                                        use_daemon=True, socket_path=args.socket):
+                ret = 0
+            else:
+                ret = 1
+                error_msg = 'Failed to send message to %s.\n' %(recipient)
+        except arsoft.xmpp.XMPPException as e:
+            ret = 1
+            error_msg = str(e)
+
+        if ret != 0:
+            sys.stderr.write(error_msg)
+        return ret
+
+if __name__ == "__main__":
+    # PyXMPP uses `logging` module for its debug output
+    # applications should set it up as needed
+    logger = logging.getLogger()
+    logger.addHandler(logging.StreamHandler())
+
+    app =  jabbersend()
+    sys.exit(app.main())
+ 

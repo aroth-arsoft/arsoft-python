@@ -1,2 +1,2 @@
-usr/lib/python*/dist-packages/arsoft/kerberos
-usr/sbin/heimdal-password-expire
+usr/lib/python2*/dist-packages/arsoft/kerberos
+usr/bin/heimdal-password-expire

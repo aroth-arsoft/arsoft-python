@@ -1,0 +1,5 @@
+#!/bin/bash
+
+scriptfile=`readlink -f "$0"`
+scriptdir=`dirname "$scriptfile"`
+exec -a "$0" $scriptdir/onkyo-rs232 --remote $*

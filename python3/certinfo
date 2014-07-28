@@ -1,0 +1,230 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import socket, ssl
+
+from arsoft.crypto import *
+
+
+class certinfo:
+    def __init__(self):
+        self._verbose = False
+        self._input_file = None
+        self._certificate_list_filename = None
+        self._certificate_list = None
+        self._key_list = None
+        self._crl_list = None
+
+    def _loadFiles(self, filenames):
+        ret = True
+        self._certificate_list = CertificateList()
+        self._key_list = KeyList()
+        self._crl_list = CRLList()
+        for filename in filenames:
+            if self._verbose:
+                print(('add %s' % str(filename)))
+            filename_result = False
+            num_keys = len(self._key_list)
+            num_certs = len(self._certificate_list)
+            num_crls = len(self._crl_list)
+            if not filename_result and self._key_list.add(filename):
+                if self._verbose:
+                    print(('add keys from %s' % str(filename)))
+                if len(self._key_list) > num_keys:
+                    filename_result = True
+            if not filename_result and self._certificate_list.add(filename):
+                if self._verbose:
+                    print(('add certicates from %s' % str(filename)))
+                if len(self._certificate_list) > num_certs:
+                    filename_result = True
+            if not filename_result and self._crl_list.add(filename):
+                if self._verbose:
+                    print(('add CRL from %s' % str(filename)))
+                if len(self._crl_list) > num_crls:
+                    filename_result = True
+            if not filename_result:
+                ret = False
+                print(("Failed to add " + str(filename)))
+        return ret
+
+    def find(self, term, output_number=True):
+        num_certs = 0
+        for (certfile, cert) in self._certificate_list.find(term):
+            self._certificate_list.printCert(cert, filename=certfile)
+            num_certs = num_certs + 1
+
+        if output_number:
+            print(("Number of certificates: " + str(num_certs)))
+
+    def _addcertfile(self, cert_filename, directory=None, enable=True):
+        (tmp, certs) = self._readCertFile(cert_filename)
+        if len(certs) > 0:
+            basename = os.path.basename(cert_filename)
+            if directory is not None:
+                dest_cert_filename = os.path.join('/usr/share/ca-certificates', directory, basename)
+            else:
+                dest_cert_filename = os.path.join('/usr/share/ca-certificates', basename)
+            ret = self._writeCertFile(dest_cert_filename, certs)
+            if ret:
+                if directory is not None:
+                    short_cert_filename = os.path.join(directory, basename)
+                else:
+                    short_cert_filename = basename
+                    
+                certlist = CertificateListFile(self._certificate_list_filename)
+                if certlist.open():
+                    certlist.addCertificate(short_cert_filename, enable)
+                    ret = self.save()
+                else:
+                    ret = False
+        else:
+            ret = False
+        return ret
+
+    def _removecertfile(self, cert_filename, directory=None, enable=True):
+        basename = os.path.basename(cert_filename)
+        if directory is not None:
+            dest_cert_filename = os.path.join('/usr/share/ca-certificates', directory, basename)
+            short_cert_filename = os.path.join(directory, basename)
+        else:
+            dest_cert_filename = os.path.join('/usr/share/ca-certificates', basename)
+            short_cert_filename = basename
+
+        try:
+            os.unlink(dest_cert_filename)
+            ret = True
+        except IOError:
+            ret = False
+            pass
+        if ret:
+            certlist = CertificateListFile(self._certificate_list_filename)
+            if certlist.open():
+                certlist.removeCertificate(short_cert_filename)
+                ret = self.save()
+            else:
+                ret = False
+        return ret
+        
+    def _getFilenameForCert(self, cert, extension='.pem'):
+        subject = cert.get_subject()
+        serial = cert.get_serial_number() 
+        ret = ('%08x' % serial) + '_' + str(subject.commonName) + extension
+        ret = ret.replace(' ', '_')
+        
+        return ret
+
+    def extract(self, term, outdir, expired_only=False, valid_only=True, output_number=True):
+        if outdir is None:
+            outdir = os.getcwd()
+
+        num_certs = 0
+        for (certfile, cert) in self._certificates:
+            if self._matchCert(cert, term):
+                perform_extract = False
+                if expired_only:
+                    if cert.has_expired():
+                        perform_extract = True
+                elif valid_only:
+                    if not cert.has_expired():
+                        perform_extract = True
+                else:
+                    perform_extract = True
+                    
+                if perform_extract:
+                    cert_basename = self._getFilenameForCert(cert)
+                
+                    certfile = os.path.join(outdir, cert_basename)
+                    print(("extract to " + certfile))
+                    self._writeCertFile(certfile, [cert] )
+                    num_certs = num_certs + 1
+
+        if output_number:
+            print(("Number of certificates: " + str(num_certs)))
+        return False
+        
+    def update(self, outdir, expired_only=False, valid_only=True, output_number=True):
+        if outdir is None:
+            outdir = os.getcwd()
+            
+        #print('outdir=' + outdir)
+        outdir_certificate_list = CertificateList()
+        outdir_certificate_list.add(outdir)
+        
+        #print('current certicates')
+        #self._certificate_list.write(sys.stdout)
+        #print('outdir certicates')
+        #outdir_certificate_list.write(sys.stdout)
+        
+        #print('update certicates')
+        num_updated = self._certificate_list.update(outdir_certificate_list)
+        #print('updated certicates ' + str(num_updated) + ' and list:')
+        #self._certificate_list.write(sys.stdout)
+        
+        ret = self._certificate_list.save()
+        
+        return ret
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='shows information about certificates')
+        parser.add_argument('certfile', help='input certificate/key/crl file or directory', metavar='FILE', nargs='+')
+        parser.add_argument('--listfile', dest='listfile', help='input certificate list file', metavar='listfile')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--find', dest='findbyname', help='find a certificate by name', metavar='term')
+        parser.add_argument('--expired', dest='list_expired', action='store_true', help='lists all expired ceritificates')
+        parser.add_argument('--crl', dest='crl', help='loads the given CRL list')
+        parser.add_argument('--short', dest='short', action='store_true', help='lists only the certificate file names')
+        parser.add_argument('--valid', dest='list_valid', action='store_true', help='lists only valid ceritificates')
+        parser.add_argument('--add', dest='addcertfile', help='add the given certificate file', metavar='certfile')
+        parser.add_argument('--remove', dest='removecertfile', help='remove the given certificate file', metavar='certfile')
+        parser.add_argument('--outdir', dest='outdir', help='specifies the output directory', metavar='dir')
+        parser.add_argument('--extract', dest='extract', help='extracts all matching certicates into separate files', metavar='term')
+        parser.add_argument('--update', dest='update', help='updates all certificates from the specified certificates', metavar='file')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        
+        if args.certfile is None:
+            self._input_file = [ '/etc/ssl/certs/ca-certificates.crt' ]
+        else:
+            self._input_file = args.certfile
+            
+        if args.listfile is None:
+            self._certificate_list_filename = '/etc/ca-certificates.conf'
+        else:
+            self._certificate_list_filename = args.listfile
+        
+        if args.addcertfile:
+            self._addcertificate(args.addcertfile)
+        elif args.removecertfile:
+            self._removeCertificate(args.removecertfile)
+        else:
+            if not self._loadFiles(self._input_file):
+                return 1
+
+        if args.findbyname:
+            self.find(args.findbyname, short=args.short)
+        elif args.extract:
+            self.extract(args.extract, args.outdir)
+        elif args.update:
+            self.update(args.update)
+        else:
+            self._key_list.write(sys.stdout, short=args.short)
+            self._crl_list.write(sys.stdout, short=args.short)
+            if args.list_expired:
+                self._certificate_list.write(sys.stdout, expired_only=True, short=args.short)
+            elif args.list_valid:
+                self._certificate_list.write(sys.stdout, valid_only=True, short=args.short)
+            else:
+                self._certificate_list.write(sys.stdout, short=args.short)
+        return 0
+
+if __name__ == "__main__":
+    app =  certinfo()
+    sys.exit(app.main())

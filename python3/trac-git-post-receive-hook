@@ -1,0 +1,161 @@
+#! /usr/bin/python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2011 Grzegorz Sobański
+#               2012 Juan Fernando Jaramillo
+#
+# Version: 2.1
+#
+# Git post receive script developed for mlabs
+# - adds the commits to trac
+# based on post-receive-email from git-contrib
+#
+
+import re
+import os
+import sys
+import subprocess
+import argparse
+
+# config
+TRAC_ENV = '/var/www/trac/myproject'
+GIT_PATH = '/usr/bin/git'
+TRAC_ADMIN = '/usr/bin/trac-admin'
+REPO_NAME = '"(default)"'   # The original one have no "", I change it and work
+LOG_FILE = None     #"/tmp/traggitplugin.log"
+VERBOSE = False
+
+# if you are using gitolite or sth similar, you can get the repo name from environemt
+# REPO_NAME = os.getenv('GL_REPO')
+
+def log(v):
+    if VERBOSE:
+        print(v)
+    if LOG_FILE is not None:
+        f = open(LOG_FILE, "a+")
+        f.write(str(v) + '\n')
+        f.close()
+
+def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, input=None):
+    all_args = [str(exe)]
+    all_args.extend(args)
+    log("runcmd " + ' '.join(all_args))
+    if stdin is not None:
+        stdin_param = stdin
+    else:
+        stdin_param = subprocess.PIPE
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False)
+    if p:
+        (stdoutdata, stderrdata) = p.communicate(input)
+        if stdoutdata is not None and outputStdOut:
+            if int(python_major) < 3: # check for version < 3
+                sys.stdout.write(stdoutdata)
+                sys.stdout.flush()
+            else:
+                sys.stdout.buffer.write(stdoutdata)
+                sys.stdout.buffer.flush()
+        if stderrdata is not None and outputStdErr:
+            if int(python_major) < 3: # check for version < 3
+                sys.stderr.write(stderrdata)
+                sys.stderr.flush()
+            else:
+                sys.stderr.buffer.write(stderrdata)
+                sys.stderr.buffer.flush()
+        sts = p.returncode
+    else:
+        sts = -1
+        stdoutdata = None
+        stderrdata = None
+    return (sts, stdoutdata, stderrdata)
+
+# communication with git
+def call_git(command, args, input=None):
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(GIT_PATH, [command] + args, input=input)
+    if sts == 0:
+        return stdoutdata
+    else:
+        log(stderrdata)
+        return ''
+
+def call_trac_admin(args, input=None):
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(TRAC_ADMIN, [TRAC_ENV] + args, input=input)
+    if sts == 0:
+        return stdoutdata
+    else:
+        log(stderrdata)
+        return ''
+
+def get_new_commits(ref_updates):
+    """ Gets a list uf updates from git running post-receive,
+    we want the list of new commits to the repo, that are part
+    of the push. Even if the are in more then one ref in the push.
+
+    Basically, we are running:
+    git rev-list new1 ^old1 new2 ^old2 ^everything_else
+
+    It returns a list of commits"""
+
+    all_refs = set(call_git('for-each-ref', ['--format=%(refname)']).splitlines())
+    commands = []
+    for old, new, ref in ref_updates:
+        # branch delete, skip it
+        if re.match('0*$', new):
+            continue
+
+        commands += [new]
+        all_refs.discard(ref)
+
+        if not re.match('0*$', old):
+            # update
+            commands += ["^%s" % old]
+        # else: new - do nothing more
+
+    for ref in all_refs:
+        commands += ["^%s" % ref]
+
+    new_commits = call_git('rev-list', ['--stdin', '--reverse'], '\n'.join(commands)).splitlines()
+    return new_commits
+
+
+def handle_trac(commits):
+    if not (os.path.exists(TRAC_ENV) and os.path.isdir(TRAC_ENV)):
+        print "Trac path (%s) is not a directory." % TRAC_ENV
+
+    if len(commits) == 0:
+        return
+
+    args = ['changeset', 'added', REPO_NAME] + commits 
+    log('handle_trac ' + str(args))
+    msg = call_trac_admin(args)
+    log('handle_trac returned ' + str(msg))
+
+# main
+if __name__ == '__main__':
+    #=============================================================================================
+    # process command line
+    #=============================================================================================
+    parser = argparse.ArgumentParser(description='post receive callback to keep trac in sync with GIT.')
+    parser.add_argument('tracenv', help='specifies the trac environment')
+    parser.add_argument('--trac-admin', dest='trac_admin', default=TRAC_ADMIN, help='path to the trac-admin executable.')
+    parser.add_argument('--repo-name', dest='repo_name', default=REPO_NAME, help='name of the GIT repository within trac.')
+    parser.add_argument('--logfile', dest='logfile', help='name of the logfile for debug purposes.')
+    parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+
+    args = parser.parse_args()
+
+    TRAC_ENV = args.tracenv
+    REPO_NAME = args.repo_name
+    LOG_FILE = args.logfile
+    TRAC_ADMIN = args.trac_admin
+    VERBOSE = args.verbose
+    
+    # gather all commits, to call trac-admin only once
+    lines = sys.stdin.readlines()
+    log('lines=' + str(lines))
+    updates = [line.split() for line in lines]
+    log('updates=' + str(updates))
+    commits = get_new_commits(updates)
+    log('commits=' + str(commits))
+
+    # call trac-admin
+    handle_trac(commits)
