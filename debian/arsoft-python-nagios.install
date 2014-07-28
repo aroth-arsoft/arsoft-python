@@ -1,4 +1,4 @@
-usr/lib/python*/dist-packages/arsoft/nagios/*.py
+usr/lib/python2*/dist-packages/arsoft/nagios/*.py
 etc/nagios-plugins/config
 usr/lib/nagios
 usr/lib/nagios/plugins

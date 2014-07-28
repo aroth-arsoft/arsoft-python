@@ -56,6 +56,9 @@ override_dh_auto_install:
 	  python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/python3; \
 	done
 
+	install -d $(CURDIR)/debian/tmp/usr/lib/python3
+	cp -a $(CURDIR)/debian/python3/usr/lib/python3/* $(CURDIR)/debian/tmp/usr/lib/python3
+
 	dh_auto_install
 
 override_dh_fixperms:
