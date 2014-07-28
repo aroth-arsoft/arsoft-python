@@ -108,13 +108,13 @@ class DirectoryBackupPlugin(BackupPlugin):
                         if backup_dest_dir[-1] != '/':
                             backup_dest_dir += '/'
                         if self.backup_app._verbose:
-                            print('backup %s to %s' % (source_dir, backup_dest_dir))
+                            print(('backup %s to %s' % (source_dir, backup_dest_dir)))
                         if Rsync.sync_directories(source_dir, backup_dest_dir, exclude=item_exclude_list, stdout=my_stdout, stderr_to_stdout=True, verbose=self.backup_app.verbose):
                             dir_backup_filelist.append(backup_dest_dir)
                     elif os.path.isfile(source_dir):
                         backup_dest_dir = os.path.join(backup_dest_dir, os.path.basename(source_dir))
                         if self.backup_app._verbose:
-                            print('backup %s to %s' % (source_dir, backup_dest_dir))
+                            print(('backup %s to %s' % (source_dir, backup_dest_dir)))
                         if Rsync.sync_file(source_dir, backup_dest_dir, exclude=item_exclude_list, stdout=my_stdout, stderr_to_stdout=True, verbose=self.backup_app.verbose):
                             dir_backup_filelist.append(backup_dest_dir)
                     else:

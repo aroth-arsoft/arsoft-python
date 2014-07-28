@@ -41,8 +41,8 @@ class RepositoryFactory:
         return ret
  
 if __name__ == "__main__":
-    print sys.argv[1]
+    print(sys.argv[1])
     repo = RepositoryFactory.create(sys.argv[1], verbose=True)
-    print repo
-    print repo.path
-    print repo.current_revision
+    print(repo)
+    print(repo.path)
+    print(repo.current_revision)

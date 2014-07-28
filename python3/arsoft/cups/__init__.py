@@ -7,7 +7,7 @@ import sys
 import socket
 import cups
 import cupshelpers
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 def _get_dict_value(dict, key, default_value=None):
     return dict[key] if key in dict else default_value
@@ -58,11 +58,11 @@ class CupsConnection(object):
             cups.setEncryption(old_encryption)
 
     def _password_callback(self, context):
-        print('_password_callback %s' % (context))
+        print(('_password_callback %s' % (context)))
         return None
 
     def __del__(self):
-        for (printername, ppdfile) in self._temp_ppds.items():
+        for (printername, ppdfile) in list(self._temp_ppds.items()):
             if os.path.exists(ppdfile):
                 os.remove(ppdfile)
 
@@ -122,11 +122,11 @@ class CupsConnection(object):
             cupsppds = None
             try:
                 cupsppds = self._conn.getPPDs2()
-                print "Using getPPDs2()"
+                print("Using getPPDs2()")
             except AttributeError:
                 # Need pycups >= 1.9.52 for getPPDs2
                 cupsppds = self._conn.getPPDs ()
-                print "Using getPPDs()"
+                print("Using getPPDs()")
             if cupsppds:
                 self._ppds = cupshelpers.ppds.PPDs(cupsppds)
         return self._ppds
@@ -176,9 +176,9 @@ class CupsConnection(object):
                 models = all_ppds.getModels (make)
                 models_count += len (models)
                 if list_models:
-                    print make
+                    print(make)
                     for model in models:
-                        print "  " + model
+                        print("  " + model)
         else:
             ret = False
         return ret
@@ -193,7 +193,7 @@ class CupsConnection(object):
         ret = True
         printers_to_remove = set()
         remote_server = conn_remote.server
-        for (printername, printer_obj) in self.printers.iteritems():
+        for (printername, printer_obj) in self.printers.items():
             # only add the printer from the remote connection
             # to the set of printers to remove (so all local
             # printers and printers from other remote locations
@@ -201,7 +201,7 @@ class CupsConnection(object):
             if conn_remote._equal_printer(printer_obj):
                 printers_to_remove.add(printername)
 
-        for (printername, printer_obj) in conn_remote.printers.iteritems():
+        for (printername, printer_obj) in conn_remote.printers.items():
             if printername in printers_to_remove:
                 printers_to_remove.remove(printername)
             else:
@@ -234,7 +234,7 @@ class CupsConnection(object):
     def remove_remote_printers_conn(self, conn_remote):
         ret = True
         printers_to_remove = set()
-        for (printername, printer_obj) in self.printers.iteritems():
+        for (printername, printer_obj) in self.printers.items():
             # only add the printer from the remote connection
             # to the set of printers to remove (so all local
             # printers and printers from other remote locations
@@ -261,7 +261,7 @@ class CupsConnection(object):
             port = 631
             server = remote_server
         serverip = socket.gethostbyname(server)
-        for (printername, printer_obj) in self.printers.iteritems():
+        for (printername, printer_obj) in self.printers.items():
             # only add the printer from the remote connection
             # to the set of printers to remove (so all local
             # printers and printers from other remote locations

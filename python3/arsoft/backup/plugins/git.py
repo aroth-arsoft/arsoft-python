@@ -55,7 +55,7 @@ class GitBackupPlugin(BackupPlugin):
                 ret = bundle.update()
                 if ret:
                     if self.backup_app._verbose:
-                        print('backup %s to %s - Updated' % (repository.root_directory, bundle.filename))
+                        print(('backup %s to %s - Updated' % (repository.root_directory, bundle.filename)))
                 else:
                     sys.stderr.write('backup %s to %s - Failed\n' % (repository.root_directory, bundle.filename))
             except (GitRepositoryError, GitBundleError) as e:
@@ -64,7 +64,7 @@ class GitBackupPlugin(BackupPlugin):
             try:
                 bundle = repository.create_bundle(bundle_file, all=True)
                 if self._verbose:
-                    print('backup %s to %s - Created' % (repository.root_directory, bundle.filename))
+                    print(('backup %s to %s - Created' % (repository.root_directory, bundle.filename)))
                 ret = True
             except (GitRepositoryError, GitBundleError) as e:
                 sys.stderr.write('Failed to create bundle from repository %s; error %s\n' % (repository.root_directory, str(e)))
@@ -87,7 +87,7 @@ class GitBackupPlugin(BackupPlugin):
                         else:
                             bundle_file = os.path.join(backup_dir, repo.name + '.git_bundle')
                             if self.backup_app._verbose:
-                                print('backup %s to %s' % (repo_path, bundle_file))
+                                print(('backup %s to %s' % (repo_path, bundle_file)))
                             if not self._git_backup_to_bundle(repo, bundle_file):
                                 ret = False
                             else:

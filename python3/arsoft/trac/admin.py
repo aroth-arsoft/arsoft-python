@@ -123,8 +123,8 @@ class TracAdmin(object):
         for p in self._plugin_info:
             if p['name'] == plugin:
                 ret = []
-                for (name, m) in p['modules'].items():
-                    for (compname, compdetails) in m['components'].items():
+                for (name, m) in list(p['modules'].items()):
+                    for (compname, compdetails) in list(m['components'].items()):
                         ret.append(compdetails['full_name'])
                 return ret
         return None
@@ -288,7 +288,7 @@ class TracAdmin(object):
         if plugin_components is not None:
             for comp in plugin_components:
                 if self._verbose:
-                    print('enable ' + comp)
+                    print(('enable ' + comp))
                 self._env.enable_component(comp)
                 self._env.config.set('components', comp, 'enabled')
             ret = True
@@ -305,7 +305,7 @@ class TracAdmin(object):
             if self._env:
                 self._env.config.save()
             ret = True
-        except Exception, e:
+        except Exception as e:
             self._last_error = 'Error writing to trac.ini: ' + exception_to_unicode(e)
             ret = False
         return ret
@@ -316,12 +316,12 @@ class TracAdmin(object):
 
 if __name__ == '__main__':
     t = TracAdmin(tracenv=sys.argv[1])
-    print(t.plugins)
-    print(t.get_plugin_info('AdvancedTicketWorkflowPlugin'))
-    print(t.get_plugin_components('AdvancedTicketWorkflowPlugin'))
+    print((t.plugins))
+    print((t.get_plugin_info('AdvancedTicketWorkflowPlugin')))
+    print((t.get_plugin_components('AdvancedTicketWorkflowPlugin')))
     for repo in t.repositories:
         repo_dir = repo.params['dir']
         repo_type = repo.params['type'] if 'type' in repo.params else 'svn'
         repo_name = '(default)' if not repo.name else repo.name
-        print(repo_type + ': ' + repo_name + ' ' + repo_dir)
+        print((repo_type + ': ' + repo_name + ' ' + repo_dir))
  

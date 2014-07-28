@@ -50,8 +50,8 @@ def kpasswd(principal, oldpassword, newpassword, verbose=False):
 
 if __name__ == '__main__':
     (ret, error_message) = kpasswd('tux', 'tuxer0', 'tuxedo', verbose=True)
-    print(ret, error_message)
+    print((ret, error_message))
     (ret, error_message) = kpasswd('tux', 'tuxedo', 'tuxer0', verbose=True)
-    print(ret, error_message)
+    print((ret, error_message))
     (ret, error_message) = kpasswd('tux', 'tuxedo', 'tuxer0', verbose=True)
-    print(ret, error_message)
+    print((ret, error_message))
