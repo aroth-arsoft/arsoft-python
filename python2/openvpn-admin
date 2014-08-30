@@ -160,7 +160,7 @@ class OpenVPNAdmin(object):
                         if config_file.running:
                             print('  Running: %s (PID %s)' % (is_running, str(config_file.pid)) )
                         else:
-                            print('  Running: %s (PID file %s)' % (is_running, str(config_file.pidfile))
+                            print('  Running: %s (PID file %s)' % (is_running, str(config_file.pidfile)) )
                         print('  Autostart: %s' % autostart)
                         print('  State: %s' % status_file.state.long_state)
                         print('  Last updated: %s' % status_file.last_update)
