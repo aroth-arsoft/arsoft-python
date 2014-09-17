@@ -406,3 +406,16 @@ def get_dns_cname_record(query=None, hostname=None, domain=None, default_value=N
     else:
         ret = None
     return ret
+
+def get_dns_ptr_record(address=None, default_value=None, dnsserver=None):
+    resolver = _get_resolver(dnsserver)
+    if resolver:
+        query = dns.reversename.from_address(address)
+        ret = []
+        answers = resolver.query(query, 'PTR')
+        for rdata in answers:
+            if isinstance(rdata, dns.rdtypes.ANY.PTR.PTR):
+                ret.append( rdata.target )
+    else:
+        ret = None
+    return ret
