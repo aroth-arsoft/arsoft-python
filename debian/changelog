@@ -1,3 +1,10 @@
+arsoft-python (1.146) trusty; urgency=medium
+
+  * puppet-setup now works with ip addr
+  * dns-update script handles DNS timeout
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 17 Sep 2014 19:00:44 +0200
+
 arsoft-python (1.145) trusty; urgency=medium
 
   * python-arsoft replaces arsoft-python
