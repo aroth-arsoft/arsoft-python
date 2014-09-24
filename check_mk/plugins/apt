@@ -33,42 +33,45 @@ try:
 except ImportError:
     sys.exit
 
-
 class AptCache(apt.Cache):
 
     # apt-cache update interval in seconds
     update_interval = 3600
 
-    # file to check against
-    update_last_file = "/var/tmp/checkmk_apt_timestamp"
+    # path to the apt cache directory
+    cache_dir = '/var/cache/apt'
 
-    def __init__(self):
+    def _get_mtime(self):
+        mtime = 0
+        for f in ['pkgcache.bin', 'srcpkgcache.bin']:
+            path = self.cache_dir + '/' + f
+            if not os.path.isfile(path):
+                continue
+            f_mtime = os.path.getmtime(path)
+            if f_mtime > mtime:
+                mtime = f_mtime
+
+        now = datetime.datetime.now()
+        self.cache_mtime = datetime.datetime.fromtimestamp(mtime)
+        self.cache_age   = now - self.cache_mtime
+        #print('cache age %s' %  self.cache_age)
+
+        return self.cache_age
+
+    def __init__(self, update_if_not_up_to_date=False):
         apt.Cache.__init__(self)
-        self.update_cache()
+        self._get_mtime()
+        if update_if_not_up_to_date:
+            self.update_cache()
+        self.open(None)
 
     # automatically update the apt cache once a hour
     def update_cache(self):
-        delta = self.last_cache_update(self.update_last_file)
-        if not delta or delta.seconds > self.update_interval:
-            self.update()
-            self.open(None)
-            # update the timestamp
-            self.update_timestamp(self.update_last_file)
-
-    def last_cache_update(self, file):
-        # return false, if we don't have the file yet
-        if not os.path.isfile(file):
-            return False
-
-        now     = datetime.datetime.now()
-        mtime   = datetime.datetime.fromtimestamp(os.path.getmtime(file))
-        delta   = now - mtime
-
-        return delta
-
-    def update_timestamp(self, file):
-        open(file, 'w').close()
-        return True
+        if not self.cache_age or self.cache_age > self.update_interval:
+            try:
+                self.update()
+            except apt.cache.FetchFailedException as e:
+                pass
 
 
 def get_upgradeable():
@@ -100,25 +103,25 @@ def get_upgradeable():
             #print candidate.origins
             #pkgs_to_upgrade.append(pkg.name.rstrip("\n"))
 
-    return [pkgs_to_upgrade, pkgs_to_sec_upgrade]
+    return [cache.cache_age.seconds, pkgs_to_upgrade, pkgs_to_sec_upgrade]
 
 
 
 def main():
-    upgrades, secupgrades = get_upgradeable()
+    age, upgrades, secupgrades = get_upgradeable()
 
     # print the beginning of the plugin header
-    print "<<<apt>>>"
-
+    print("<<<apt>>>")
+    print("cache_age %i" % age)
     if len(upgrades) > 0:
-    print "upgrades \"%s\"" % ",".join(upgrades)
+        print("upgrades \"%s\"" % ",".join(upgrades))
     else:
-    print "upgrades"
+        print("upgrades")
 
     if len(secupgrades) > 0:
-    print "secupgrades \"%s\"" % ",".join(secupgrades)
+        print("secupgrades \"%s\"" % ",".join(secupgrades))
     else:
-    print "secupgrades"
+        print("secupgrades")
 
 
 if __name__ == "__main__":

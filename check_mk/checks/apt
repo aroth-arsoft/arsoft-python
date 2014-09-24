@@ -29,6 +29,7 @@ def check_apt_upgrades(item, params, info):
 
     level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
     updates = []
+    perfdata = []
 
     for line in info:
 
@@ -59,9 +60,12 @@ def check_apt_upgrades(item, params, info):
     elif level == 2:
         msg = "%s packages available for upgrade: %s" % (len(updates), ",".join(updates))
 
-    return (level, msg)
+    return (level, msg, perfdata)
 
-# declare the check to Check_MK. Dict format:
-#  ( check_function, "service name", perf_data_provided?(0:1), inventory_function)
-check_info['apt.upgrades'] = \
-      (check_apt_upgrades, "apt.upgrades", 0, inventory_apt_upgrades)
+# declare the check to Check_MK.
+check_info['apt.upgrades'] = {
+    'check_function':            check_apt_upgrades,
+    'inventory_function':        inventory_apt_upgrades,
+    'service_description':       'APT package updates',
+    'has_perfdata':              True,
+}
