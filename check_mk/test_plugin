@@ -1,0 +1,140 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os, sys
+import argparse
+import tempfile
+
+from arsoft.utils import runcmd, runcmdAndGetData
+
+class check_mk_test_plugin_app(object):
+
+    def __init__(self):
+        self._verbose = False
+        self._dir = os.path.realpath(os.path.dirname(__file__))
+        self._plugin_data = {}
+
+    def run_plugin(self, name):
+        ret = False
+        plugin_exec = os.path.join(self._dir, 'plugins', name)
+        if os.path.isfile(plugin_exec) and os.access(plugin_exec, os.X_OK):
+            (sts, stdoutdata, stderrdata) = runcmdAndGetData(plugin_exec)
+            if sts == 0:
+                ret = True
+            self._plugin_data[name] = (sts, stdoutdata, stderrdata)
+        else:
+            print('Plugin %s (%s) does not exist' % (name, plugin_exec))
+        return ret
+
+    def run_check(self, name):
+        ret = False
+        check_file = os.path.join(self._dir, 'checks', name)
+        if os.path.isfile(check_file) and os.access(check_file, os.X_OK):
+            hostname = 'localhost'
+            ipaddress = '127.0.0.1'
+            (sts, stdoutdata, stderrdata) = self._plugin_data[name]
+            stdoutdata = stdoutdata.splitlines()
+            with tempfile.NamedTemporaryFile(delete=False) as output:
+                output.write("#!/usr/bin/python\n")
+                output.write("# encoding: utf-8\n")
+
+                # initialize global variables
+                output.write("""
+import sys
+# very simple commandline parsing: only -v and -d are supported
+opt_verbose = '-v' in sys.argv
+opt_debug   = '-d' in sys.argv
+
+# make sure these names are defined (even if never needed)
+no_inventory_possible = None
+debug_log = None
+""")
+
+                output.write("check_info = {}\n" +
+                            "check_includes = {}\n" +
+                            "precompile_params = {}\n" +
+                            "factory_settings = {}\n" +
+                            "checkgroup_of = {}\n" +
+                            "check_config_variables = []\n" +
+                            "check_default_levels = {}\n" +
+                            "snmp_info = {}\n" +
+                            "snmp_scan_functions = {}\n")
+
+                output.write("# %s\n" % check_file)
+                with open(check_file, 'r') as f:
+                    output.write(f.read())
+                output.write("\n\n")
+
+                output.write("def do_check(hostname, ipaddress, only_check_types = None):\n")
+                output.write("    checkname = \"%s\"\n" % name)
+                output.write("    params = {}\n")
+                output.write("    info = [\n")
+                for l in stdoutdata:
+                    output.write("    r\'%s\',\n" % l)
+                output.write("    ]\n")
+                output.write("    for name, inf in check_info.items():\n")
+                output.write("        check_function = inf[\"check_function\"]\n")
+                output.write("        (level, msg, perfdata) = check_function(name, params, info)\n")
+                output.write("        print((level, msg, perfdata))\n")
+
+                # perform actual check with a general exception handler
+                output.write("try:\n")
+                output.write("    do_check(%r, %r)\n" % (hostname, ipaddress))
+                output.write("except SystemExit, e:\n")
+                output.write("    sys.exit(e.code)\n")
+                output.write("except Exception, e:\n")
+                output.write("    import traceback, pprint\n")
+
+                # status output message
+                output.write("    sys.stdout.write(\"UNKNOWN - Exception in precompiled check: %s (details in long output)\\n\" % e)\n")
+
+                # generate traceback for long output
+                output.write("    sys.stdout.write(\"Traceback: %s\\n\" % traceback.format_exc())\n")
+
+                # debug logging
+                output.write("    if debug_log:\n")
+                output.write("        l = file(debug_log, \"a\")\n")
+                output.write("        l.write((\"Exception in precompiled check:\\n\"\n")
+                output.write("                \"  Check_MK Version: %s\\n\"\n")
+                output.write("                \"  Date:             %s\\n\"\n")
+                output.write("                \"  Host:             %s\\n\"\n")
+                output.write("                \"  %s\\n\") % (\n")
+                output.write("                check_mk_version,\n")
+                output.write("                time.strftime(\"%Y-%d-%m %H:%M:%S\"),\n")
+                output.write("                \"%s\",\n" % hostname)
+                output.write("                traceback.format_exc().replace('\\n', '\\n      ')))\n")
+                output.write("        l.close()\n")
+
+                output.write("    sys.exit(3)\n")
+                output.flush()
+                print(output.name)
+
+                runcmd(sys.executable, [output.name])
+
+        else:
+            print('Check %s (%s) does not exist' % (name, check_file))
+        return ret
+
+    def main(self, argv=None):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='runs the check_mk plugin and verify the check for it')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('check', nargs='*', help='name of the check.')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+
+        for chk in args.check:
+            self.run_plugin(chk)
+            self.run_check(chk)
+        ret = 0
+        return ret
+
+if __name__ == "__main__":
+    app = check_mk_test_plugin_app()
+    sys.exit(app.main(sys.argv))
+
