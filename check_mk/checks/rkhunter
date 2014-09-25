@@ -97,7 +97,7 @@ def check_rkhunter(item, params, info):
     if item == 'status':
         # Construct a the status message.
         if level == 0:
-            msg = "OK - Cache is up to date."
+            msg = "OK - last check %s ago" % format_timedelta(check_age)
         elif level == 1:
             msg = "rkhunter has not been run for %s" % format_timedelta(check_age)
         elif level == 2:
@@ -111,7 +111,7 @@ def check_rkhunter(item, params, info):
         perfdata.append( ('num_file_properties_changed', num_file_properties_changed, 1, 0) )
         # Construct a the status message.
         if level == 0:
-            msg = "OK - All packages are up to date."
+            msg = "OK - No issues detected."
         elif level == 1:
             msg = "Issues detected"
         elif level == 2:
