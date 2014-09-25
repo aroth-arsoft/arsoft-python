@@ -247,7 +247,8 @@ class dns_update_app(object):
                 level = 1
                 indent = ' ' * (2*level)
                 rdatasets = node.rdatasets
-                print(indent + "node %s" % name)
+                if self.verbose:
+                    print(indent + "node %s" % name)
                 for rdataset in rdatasets:
                     if rdataset.rdtype == dns.rdatatype.SOA:
                         # skip SOA
