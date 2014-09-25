@@ -24,13 +24,16 @@
 # to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
 # Boston, MA 02110-1301 USA.
 
+mysql_cfg_file="$MK_CONFDIR/mysql.cfg"
+[ -f '/etc/mysql/debian.cnf' ] && mysql_cfg_file='/etc/mysql/debian.cnf'
+
 if which mysqladmin > /dev/null
 then
   # Check if mysqld is running and root password setup
   echo "<<<mysql_ping>>>"
-  mysqladmin --defaults-extra-file=$MK_CONFDIR/mysql.cfg ping 2>&1
+  mysqladmin --defaults-extra-file=$mysql_cfg_file ping 2>&1
 
-  mysql --defaults-extra-file=$MK_CONFDIR/mysql.cfg -sN \
+  mysql --defaults-extra-file=$mysql_cfg_file -sN \
      -e "select '<<<mysql>>>' ;
          show global status ; show global variables ;
 
@@ -38,6 +41,6 @@ then
          SELECT table_schema, sum(data_length + index_length), sum(data_free)
          FROM information_schema.TABLES GROUP BY table_schema"
 
-  mysql --defaults-extra-file=$MK_CONFDIR/mysql.cfg -s \
+  mysql --defaults-extra-file=$mysql_cfg_file -sN \
      -e "SELECT '<<<mysql_slave>>>' ; show slave status\G"
 fi
