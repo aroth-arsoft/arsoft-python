@@ -113,7 +113,10 @@ def parse_timedelta(time_str):
     return timedelta(**time_params)
 
 def format_timedelta(delta):
-    secs = abs(delta.total_seconds())
+    if isinstance(delta, timedelta):
+        secs = abs(delta.total_seconds())
+    else:
+        secs = delta
     if secs >= SECONDS_ONE_WEEK:
         days = int(secs / SECONDS_ONE_DAY)
         ret = '%i days' % (days)
@@ -133,7 +136,7 @@ def format_timedelta(delta):
         ret = '%i minutes, %i seconds' % (minutes, remain)
     else:
         ret = '%i seconds' % (secs)
-    if delta.total_seconds() < 0:
+    if secs < 0:
         ret += ' ago'
     return ret
 
