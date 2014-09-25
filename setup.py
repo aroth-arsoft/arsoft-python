@@ -106,8 +106,14 @@ setup(name='arsoft-python',
 			('/usr/lib/nagios/plugins/test_data', ['test_data/check_ipp.test', 'test_data/check_ipp_jobs.test', 'test_data/check_ipp_completed_jobs.test']),
 			('/lib/udev', [ 'edskmgr-support/external-disk' ]),
 			('/lib/udev/rules.d', [ 'edskmgr-support/88-external-disk.rules' ]),
-            ('/usr/share/check_mk/checks', ['check_mk/checks/apt'] ),
-            ('/usr/lib/check_mk_agent/plugins', [ 'check_mk/plugins/apache_status',
+            ('/usr/share/check_mk/checks', [
+                'check_mk/checks/apt',
+                'check_mk/checks/mysql_slave',
+                'check_mk/checks/nginx_status',
+                'check_mk/checks/rkhunter',
+                    ] ),
+            ('/usr/lib/check_mk_agent/plugins', [
+                    'check_mk/plugins/apache_status',
                     'check_mk/plugins/apt',
                     'check_mk/plugins/dmi_sysinfo',
                     'check_mk/plugins/dmraid',
@@ -115,7 +121,8 @@ setup(name='arsoft-python',
                     'check_mk/plugins/mk_postgres',
                     'check_mk/plugins/nfsexports',
                     'check_mk/plugins/nginx_status',
-                    'check_mk/plugins/smart'
+                    'check_mk/plugins/smart',
+                    'check_mk/plugins/rkhunter',
                 ] )
             ]
 		)
