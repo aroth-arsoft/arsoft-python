@@ -1,0 +1,152 @@
+#!/usr/bin/env python
+#
+# Check_MK APT Plugin - Check for upgradeable packages.
+#
+# Copyright 2010, Stefan Schlesinger <sts@ono.at>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+from arsoft.timestamp import format_timedelta
+
+warn_time_threshold = 30
+crit_time_threshold = 14
+
+def inventory_openvpn(checkname, info):
+
+    openvpn_configs = set()
+    for line in info:
+        if line:
+            openvpn_configs.add(line[0])
+
+    ret = []
+    for cfgname in openvpn_configs:
+        ret.append( ('%s.status' % cfgname, None) )
+        ret.append( ('%s.certs' % cfgname, None) )
+    return ret
+
+def check_openvpn(item, params, info):
+
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    perfdata = []
+
+    (cfgname, check_name) = item.split('.', 1)
+    cfgdata = {}
+
+    for line in info:
+        # if we don't have any upgrades listed, the line list
+        # will only contain one element, eg. "upgrades\n"
+        if len(line) < 2:
+            continue
+
+        if line[0] != cfgname:
+            continue
+
+        value = ' '.join(line[2:])
+        if value[0] == '\"' and value[-1] == '\"':
+            value = value[1:-1]
+        cfgdata[line[1]] = value
+
+    if check_name == 'status':
+
+        for stat_key in ['device_read',
+                            'device_write',
+                            'connection_read',
+                            'connection_write',
+                            'auth_read',
+                            'auth_write',
+                            'pre_compress',
+                            'post_compress',
+                            'compress_ratio',
+                            'pre_decompress',
+                            'post_decompress',
+                            'decompress_ratio',
+                        ]:
+            if 'statistics.%s' % stat_key in cfgdata:
+                value = cfgdata['statistics.%s' % stat_key]
+                perfdata.append( (stat_key, value) )
+
+        if 'connected_clients' in cfgdata:
+            connected_clients = cfgdata['connected_clients'].split(',')
+            perfdata.append( ('numclients', len(connected_clients) ) )
+        if 'configured_clients' in cfgdata:
+            configured_clients = cfgdata['configured_clients'].split(',')
+            perfdata.append( ('confclients', len(configured_clients) ) )
+
+        if cfgdata['state'] != 'CONNECTED':
+            if level < 1:
+                level = 1
+                msg = '%s != CONNECTED' % cfgdata['state']
+        if cfgdata['autostart'] != cfgdata['running']:
+            if level < 2:
+                level = 2
+                msg = 'VPN running' if cfgdata['running'] != 0 else 'VPN not running'
+
+        if cfgdata['running'] != 0:
+            last_updated_age = saveint(cfgdata['last_updated_age'])
+            if last_updated_age > 600:
+                if level < 1:
+                    level = 1
+                    msg = 'Status has not been updated for %s' % format_timedelta(last_updated_age)
+        if level == 0:
+            msg = 'OK - %s' % cfgdata['state']
+    elif check_name == 'certs':
+        now = saveint(time.time())
+        warn_time = now + (warn_time_threshold * 86400)
+        crit_time = now + (crit_time_threshold * 86400)
+        cert_expire = saveint(cfgdata['cert_expire'])
+        ca_expire = saveint(cfgdata['ca_expire'])
+        crl_expire = saveint(cfgdata['crl_expire'])
+        perfdata.append( ('cert_expire', (cert_expire - now)/86400 if cert_expire else 0, warn_time_threshold, crit_time_threshold) )
+        perfdata.append( ('ca_expire', (ca_expire - now)/86400 if ca_expire else 0, warn_time_threshold, crit_time_threshold) )
+        perfdata.append( ('crl_expire', (crl_expire - now)/86400 if crl_expire else 0, warn_time_threshold, crit_time_threshold) )
+
+        if level == 0 and cert_expire != 0:
+            if cert_expire <= warn_time:
+                level = 1
+                msg = 'Certificate expires in %s' % format_timedelta(cert_expire - now)
+            elif cert_expire <= crit_time:
+                level = 2
+                msg = 'Certificate expires in %s' % format_timedelta(cert_expire - now)
+        if level == 0 and ca_expire != 0:
+            if ca_expire <= warn_time:
+                level = 1
+                msg = 'CA Certificate expires in %s' % format_timedelta(ca_expire - now)
+            elif ca_expire <= crit_time:
+                level = 2
+                msg = 'CA Certificate expires in %s' % format_timedelta(ca_expire - now)
+        if level == 0 and crl_expire != 0:
+            if crl_expire <= warn_time:
+                level = 1
+                msg = 'CRL expires in %s' % format_timedelta(crl_expire - now)
+            elif crl_expire <= crit_time:
+                level = 2
+                msg = 'CRL expires in %s' % format_timedelta(crl_expire - now)
+        if level == 0:
+            if ca_expire > cert_expire:
+                msg = 'OK - Certificate expires in %s' % format_timedelta(cert_expire - now)
+            else:
+                msg = 'OK - CA Certificate expires in %s' % format_timedelta(ca_expire - now)
+    else:
+        level = 3
+        msg = "Unknown check"
+    return (level, msg, perfdata)
+
+# declare the check to Check_MK.
+check_info['openvpn'] = {
+    'check_function':            check_openvpn,
+    'inventory_function':        inventory_openvpn,
+    'service_description':       'openvpn',
+    'has_perfdata':              True,
+}

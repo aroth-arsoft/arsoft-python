@@ -26,7 +26,7 @@ class MessageObject(object):
         else:
             self.loglevel = None
         self.message = message
-        
+
 class rkhunter_mk_check_plugin(object):
     def __init__(self, logfile='/var/log/rkhunter.log'):
         self.start_date = None

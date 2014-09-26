@@ -1,0 +1,85 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import arsoft.openvpn
+import os.path
+from arsoft.timestamp import timestamp_from_datetime
+import time
+
+class openvpn_mk_check_plugin(object):
+
+    def __init__(self):
+        self._config = arsoft.openvpn.Config()
+        self._systemconfig = arsoft.openvpn.SystemConfig()
+        self._selected_vpns = self._config.names
+
+    def _get_cert_expire(self, cert):
+        ret = 0
+        if cert:
+            cert_file = str(cert.filename)
+            if os.path.isfile(cert_file):
+                num_certs = len(cert.certificates)
+                if num_certs:
+                    min_expire_cert = None
+                    for cert in cert.certificates:
+                        if min_expire_cert is None:
+                            min_expire_cert = cert.expire_date
+                        elif cert.expire_date < min_expire_cert:
+                            min_expire_cert = cert.expire_date
+                    if min_expire_cert:
+                        ret = timestamp_from_datetime(min_expire_cert)
+        return ret
+
+    def _get_crl_expire(self, crl):
+        ret = 0
+        if crl:
+            crl_file = str(crl.filename)
+            if os.path.isfile(crl_file):
+                if not crl.valid:
+                    pass
+                else:
+                    num_revoked = len(crl.revoked)
+        return ret
+
+    def status(self):
+        for vpnname in self._selected_vpns:
+            config_file = arsoft.openvpn.ConfigFile(config_name=vpnname)
+            if not config_file.valid:
+                sys.stderr.write('Failed to open configuration for VPN %s; error %s\n' % (vpnname, config_file.last_error))
+                ret = self.ExitCode.ConfigurationError
+            else:
+                is_running = config_file.running
+                status_file = arsoft.openvpn.StatusFile(config_file=config_file)
+                autostart = True if vpnname in self._systemconfig.autostart else False
+                last_update = timestamp_from_datetime(status_file.last_update)
+                now = time.time()
+                print('%s autostart %i' % (vpnname, autostart))
+                print('%s running %i' % (vpnname, is_running))
+                print('%s state \"%s\"' % (vpnname, status_file.state.name))
+                print('%s state_text \"%s\"' % (vpnname, status_file.state.long_state))
+                print('%s last_updated %i' % (vpnname, last_update))
+                print('%s last_updated_age %i' % (vpnname, now - last_update))
+                print('%s cert_expire %i' % (vpnname, self._get_cert_expire(config_file.cert_file)))
+                print('%s ca_expire %i' % (vpnname, self._get_cert_expire(config_file.ca_file)))
+                print('%s crl_expire %i' % (vpnname, self._get_crl_expire(config_file.crl_file)))
+                if config_file.server:
+                    if config_file.client_config_files is not None:
+                        print('%s configured_clients \"%s\"' % (vpnname, ','.join(config_file.client_config_files.keys())))
+                    if status_file.connected_clients is not None:
+                        print('%s connected_clients \"%s\"' % (vpnname, ','.join(status_file.connected_clients.keys())))
+                if len(config_file.routes):
+                    print('%s routes \"%s\"' % (vpnname, ','.join([ '%s/%s' % (network, netmask) for (network, netmask) in config_file.routes ])))
+                if status_file.routing_table:
+                    print('%s routing_table \"%s\"' % (vpnname, ','.join(status_file.routing_table.values())))
+                if status_file.statistics:
+                    for name in status_file.statistics:
+                        print('%s statistics.%s \"%s\"' % (vpnname, name, getattr(status_file.statistics, name)))
+
+if __name__ == "__main__":
+    print("<<<openvpn>>>")
+    pl = openvpn_mk_check_plugin()
+    pl.status()
+
+
+

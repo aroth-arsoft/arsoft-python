@@ -111,6 +111,7 @@ setup(name='arsoft-python',
                 'check_mk/checks/mysql_slave',
                 'check_mk/checks/nginx_status',
                 'check_mk/checks/rkhunter',
+                'check_mk/checks/openvpn',
                     ] ),
             ('/usr/lib/check_mk_agent/plugins', [
                     'check_mk/plugins/apache_status',
@@ -123,6 +124,7 @@ setup(name='arsoft-python',
                     'check_mk/plugins/nginx_status',
                     'check_mk/plugins/smart',
                     'check_mk/plugins/rkhunter',
+                    'check_mk/plugins/openvpn',
                 ] )
             ]
 		)

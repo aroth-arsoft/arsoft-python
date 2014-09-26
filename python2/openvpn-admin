@@ -174,7 +174,7 @@ class OpenVPNAdmin(object):
                         if config_file.server:
                             print('  Client config directory: %s' % config_file.client_config_directory)
                             print('  Configured clients:')
-                            if config_file.client_config_files:
+                            if config_file.client_config_files is not None:
                                 for (clientname, ccdfile) in config_file.client_config_files.iteritems():
                                     
                                     if status_file.connected_clients:
@@ -191,7 +191,7 @@ class OpenVPNAdmin(object):
                                         for (option, value) in ccdfile.push_options:
                                             print('      %s %s' % (option, value))
                             print('  Connected clients:')
-                            if status_file.connected_clients:
+                            if status_file.connected_clients is not None:
                                 for (clientname, clientinfo) in status_file.connected_clients.iteritems():
                                     print('    %s' % (clientinfo))
                         if len(config_file.routes):
