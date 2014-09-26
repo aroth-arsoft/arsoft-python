@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+#
+# Check_MK APT Plugin - Check for upgradeable packages.
+#
+# Copyright 2010, Stefan Schlesinger <sts@ono.at>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+from arsoft.timestamp import format_timedelta
+
+warn_time_threshold = 30
+crit_time_threshold = 14
+
+def inventory_nginx_cert(checkname, info):
+
+    ret = []
+    if len(info) > 1:
+        ret.append( ('certs', None) )
+    return ret
+
+def check_nginx_cert(item, params, info):
+
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    perfdata = []
+
+    now = saveint(time.time())
+    warn_time = now + (warn_time_threshold * 86400)
+    crit_time = now + (crit_time_threshold * 86400)
+    min_time = None
+
+    for line in info:
+        # if we don't have any upgrades listed, the line list
+        # will only contain one element, eg. "upgrades\n"
+        if len(line) < 2:
+            continue
+
+        key = line[0]
+        value = saveint(line[1])
+
+        perfdata.append( (key, (value - now)/86400 if value else 0, warn_time_threshold, crit_time_threshold) )
+        if level == 0 and value != 0:
+            if value <= warn_time:
+                level = 1
+                msg = 'Certificate expires in %s' % format_timedelta(value - now)
+            elif value <= crit_time:
+                level = 2
+                msg = 'Certificate expires in %s' % format_timedelta(value - now)
+            if min_time is None or value < min_time:
+                min_time = value
+
+    if level == 0:
+        msg = 'OK - Certificate expires in %s' % format_timedelta(min_time - now)
+
+    return (level, msg, perfdata)
+
+# declare the check to Check_MK.
+check_info['nginx_cert'] = {
+    'check_function':            check_nginx_cert,
+    'inventory_function':        inventory_nginx_cert,
+    'service_description':       'nginx Certificate',
+    'has_perfdata':              True,
+}

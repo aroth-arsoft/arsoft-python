@@ -1,0 +1,103 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+from arsoft.crypto import CertificateFile
+import os
+from arsoft.timestamp import timestamp_from_datetime
+from arsoft.utils import runcmdAndGetData
+import time
+import re
+
+class nginx_cert_mk_check_plugin(object):
+
+    def __init__(self):
+        self.re_key_value = re.compile(r'\s*(?P<key>[a-zA-Z_]+)\s+(?P<value>.+);$')
+        self.certificate_files = {}
+        self.certificate_files[None] = []
+
+        sites_enabled_dir = '/etc/nginx/sites-enabled'
+        for f in os.listdir(sites_enabled_dir):
+            (base, ext) = os.path.splitext(f)
+            if ext != '.conf':
+                continue
+            fullname = os.path.join(sites_enabled_dir, f)
+            self._parse_config_file(fullname)
+
+    def _parse_config_file(self, filename):
+        server_name = None
+        server_port = None
+        with open(filename, 'r') as f:
+            for line in f:
+                m = self.re_key_value.match(line)
+                if m:
+                    key = m.group('key')
+                    value = m.group('value')
+                    if key == 'server_name':
+                        server_name = value
+                    elif key == 'listen':
+                        if ' ' in value:
+                            elems = value.split(' ')
+                        else:
+                            elems = [value]
+                        for v in elems:
+                            if ':' in v:
+                                (addr, port) = v.split(':',1)
+                                try:
+                                    server_port = int(port)
+                                except ValueError:
+                                    pass
+                            else:
+                                try:
+                                    server_port = int(v)
+                                except ValueError:
+                                    pass
+                    elif key == 'ssl_certificate':
+                        server_key = '%s:%i' % (server_name if server_name else 'localhost', server_port if server_port else 80)
+                        if not server_key in self.certificate_files:
+                            self.certificate_files[server_key] = []
+                        self.certificate_files[server_key].append(value)
+            f.close()
+
+    def _get_cert_expire(self, cert):
+        ret = 0
+        if cert:
+            cert_file = str(cert.filename)
+            if os.path.isfile(cert_file):
+                num_certs = len(cert.certificates)
+                if num_certs:
+                    min_expire_cert = None
+                    for cert in cert.certificates:
+                        if min_expire_cert is None:
+                            min_expire_cert = cert.expire_date
+                        elif cert.expire_date < min_expire_cert:
+                            min_expire_cert = cert.expire_date
+                    if min_expire_cert:
+                        ret = timestamp_from_datetime(min_expire_cert)
+        return ret
+
+    def _get_crl_expire(self, crl):
+        ret = 0
+        if crl:
+            crl_file = str(crl.filename)
+            if os.path.isfile(crl_file):
+                if not crl.valid:
+                    pass
+                else:
+                    num_revoked = len(crl.revoked)
+        return ret
+
+    def status(self):
+        for name, cert_files in self.certificate_files.iteritems():
+            for cert_file in cert_files:
+                if os.path.isfile(cert_file):
+                    cert = CertificateFile(cert_file)
+                    print('%s %i' % (name, self._get_cert_expire(cert)))
+
+if __name__ == "__main__":
+    print("<<<nginx_cert>>>")
+    pl = nginx_cert_mk_check_plugin()
+    pl.status()
+
+
+
