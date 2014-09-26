@@ -48,7 +48,7 @@ class postfix_cert_mk_check_plugin(object):
                 (key, value) = line.split('=',1)
                 value = value.lstrip()
                 key = key.rstrip()
-                if 'cert_file' in key or 'CAfile' in key:
+                if 'cert_file' in key:
                     if os.path.isfile(value):
                         cert = CertificateFile(value)
                         print('%s %i' % (key, self._get_cert_expire(cert)))
