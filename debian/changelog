@@ -1,3 +1,9 @@
+arsoft-python (1.149) trusty; urgency=medium
+
+  * minor bug fixes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 28 Sep 2014 17:45:53 +0200
+
 arsoft-python (1.148) trusty; urgency=medium
 
   * new check_mk checks: nginx_cert, postfix_cert, openvpn
