@@ -103,6 +103,21 @@ def check_rkhunter(item, params, info):
         elif level == 2:
             msg = "rkhunter has not been run for %s" % format_timedelta(check_age)
     else:
+        details = []
+        if num_infects:
+            details.append('%i infected' % num_infects)
+        if num_criticals:
+            details.append('%i critical' % num_criticals)
+        if num_errors:
+            details.append('%i errors' % num_errors)
+        if num_warnings:
+            details.append('%i warnings' % num_warnings)
+        if num_infos:
+            details.append('%i infos' % num_infos)
+        if num_file_properties_changed:
+            details.append('%i changed files %s' % (num_file_properties_changed, ','.join(changed_file_properties) )
+        if len(details) == 0:
+            details.append('No issues detected.')
         perfdata.append( ('num_infects', num_infects, 1, 1) )
         perfdata.append( ('num_criticals', num_criticals, 1, 1) )
         perfdata.append( ('num_errors', num_errors, 1, 1) )
@@ -111,11 +126,11 @@ def check_rkhunter(item, params, info):
         perfdata.append( ('num_file_properties_changed', num_file_properties_changed, 1, 0) )
         # Construct a the status message.
         if level == 0:
-            msg = "OK - No issues detected."
+            msg = "OK - %s" % (','.join(details))
         elif level == 1:
-            msg = "Issues detected"
+            msg = "WARN - %s" % (','.join(details))
         elif level == 2:
-            msg = "Critical issues detected"
+            msg = "CRIT - %s" % (','.join(details))
 
     return (level, msg, perfdata)
 

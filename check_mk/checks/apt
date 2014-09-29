@@ -34,7 +34,8 @@ def inventory_apt(checkname, info):
 def check_apt(item, params, info):
 
     level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    updates = []
+    secupgrades = []
+    upgrades = []
     perfdata = []
     cache_age = 0
 
@@ -50,7 +51,6 @@ def check_apt(item, params, info):
         if type == 'cache_age':
             if item == 'cache':
                 cache_age = saveint(line[1])
-                perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
                 if cache_age > cache_age_critical_level:
                     level = 2
                 elif cache_age > cache_age_warn_level:
@@ -65,12 +65,13 @@ def check_apt(item, params, info):
                     if type == "secupgrades":
                         if level < 2:
                             level = 2
-                        updates.extend(pkgs)
+                        secupgrades.extend(pkgs)
                     elif type == "upgrades":
                         if level < 1:
                             level = 1
-                        updates.extend(pkgs)
+                        upgrades.extend(pkgs)
     if item == 'cache':
+        perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
         # Construct a the status message.
         if level == 0:
             msg = "OK - Cache is up to date."
@@ -79,13 +80,23 @@ def check_apt(item, params, info):
         elif level == 2:
             msg = "Cache has not been updated for %s" % format_timedelta(cache_age)
     else:
+        perfdata.append( ('secupgrades', len(secupgrades) ) )
+        perfdata.append( ('upgrades', len(upgrades) ) )
+
+        details = []
+        if secupgrades:
+            details.append('%i security upgrades: %s' % (len(secupgrades), ",".join(secupgrades))
+        if upgrades:
+            details.append('%i upgrades: %s' % (len(upgrades), ",".join(upgrades))
+        if len(details) == 0:
+            details.append('All packages are up to date.')
         # Construct a the status message.
         if level == 0:
-            msg = "OK - All packages are up to date."
+            msg = "OK - %s" % (','.join(details))
         elif level == 1:
-            msg = "%i packages available for upgrade: %s" % (len(updates), ",".join(updates))
+            msg = "WARN - %s" % (','.join(details))
         elif level == 2:
-            msg = "%i packages available for upgrade: %s" % (len(updates), ",".join(updates))
+            msg = "CRIT - %s" % (','.join(details))
 
     return (level, msg, perfdata)
 
