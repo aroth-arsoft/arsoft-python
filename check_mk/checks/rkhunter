@@ -112,10 +112,10 @@ def check_rkhunter(item, params, info):
             details.append('%i errors' % num_errors)
         if num_warnings:
             details.append('%i warnings' % num_warnings)
-        if num_infos:
-            details.append('%i infos' % num_infos)
+#        if num_infos:
+#            details.append('%i infos' % num_infos)
         if num_file_properties_changed:
-            details.append('%i changed files %s' % (num_file_properties_changed, ','.join(changed_file_properties) )
+            details.append('%i changed files %s' % (num_file_properties_changed, ','.join(changed_file_properties) ) )
         if len(details) == 0:
             details.append('No issues detected.')
         perfdata.append( ('num_infects', num_infects, 1, 1) )
