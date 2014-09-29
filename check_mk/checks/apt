@@ -85,9 +85,9 @@ def check_apt(item, params, info):
 
         details = []
         if secupgrades:
-            details.append('%i security upgrades: %s' % (len(secupgrades), ",".join(secupgrades))
+            details.append('%i security upgrades: %s' % (len(secupgrades), ",".join(secupgrades)))
         if upgrades:
-            details.append('%i upgrades: %s' % (len(upgrades), ",".join(upgrades))
+            details.append('%i upgrades: %s' % (len(upgrades), ",".join(upgrades)))
         if len(details) == 0:
             details.append('All packages are up to date.')
         # Construct a the status message.
