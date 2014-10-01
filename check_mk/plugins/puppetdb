@@ -1,0 +1,129 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import urllib2
+import json
+import os.path
+from arsoft.inifile import IniFile
+
+def check_pid(pid):
+    """ Check For the existence of a unix pid. """
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH == No such process
+            return False
+        elif err.errno == errno.EPERM:
+            # EPERM clearly means there's a process to deny access to
+            return True
+        else:
+            # According to "man 2 kill" possible error values are
+            # (EINVAL, EPERM, ESRCH)
+            raise
+    else:
+        return True
+
+def saveint(v):
+    if v is None:
+        return 0
+    try:
+        return int(v)
+    except ValueError:
+        return 0
+
+class puppetdb_check_mk_plugin(object):
+
+    JETTY_INI = '/etc/puppetdb/conf.d/jetty.ini'
+    PIDFILE = '/var/run/puppetdb.pid'
+
+    def __init__(self):
+        self._hostname = 'localhost'
+        self._port = 0
+        self._sslport = 0
+        self._https = False
+        self._version = ''
+        self._pid = 0
+        self._running = False
+        self._beans = {}
+
+        self._get_config()
+
+        if self._port:
+            self._check_running()
+            self._beans['memory'] = '/v2/metrics/mbean/java.lang:type=Memory'
+            self._beans['catalogs_dups'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.scf.storage:type=default,name=duplicate-pct'
+            self._beans['resources_dups'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.query.population:type=default,name=pct-resource-dupes'
+            self._beans['num_resources'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.query.population:type=default,name=num-resources'
+            self._beans['num_nodes'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.query.population:type=default,name=num-nodes'
+            self._beans['processed'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.command:type=global,name=processed'
+            self._beans['queued'] = '/v2/metrics/mbean/org.apache.activemq:BrokerName=localhost,Type=Queue,Destination=com.puppetlabs.puppetdb.commands'
+            self._beans['version'] = '/v4/version'
+
+    def _get_config(self):
+        if os.path.isfile(self.JETTY_INI):
+            inifile = IniFile(commentPrefix='#', keyValueSeperator='=')
+            if inifile.open(self.JETTY_INI):
+                try:
+                    self._port = int(inifile.get('jetty', 'port', 8080))
+                    self._sslport = int(inifile.get('jetty', 'ssl-port', 8081))
+                except ValueError:
+                    pass
+
+    def _check_running(self):
+        if os.path.isfile(self.PIDFILE):
+            content = ''
+            try:
+                with open(self.PIDFILE) as f:
+                    content = f.readlines()
+            except IOError:
+                pass
+            try:
+                self._pid = saveint(content[0].strip())
+            except ValueError:
+                pass
+            self._running = check_pid(self._pid)
+
+    def _get_bean(self, bean):
+        url = 'http%s://%s:%d%s' % ('s' if self._https else '', self._hostname, self._port, bean)
+        headers = { 'Accept': 'application/json' }
+
+        ret = None
+        req = urllib2.Request(url, None, headers)
+        try:
+            response = urllib2.urlopen(req)
+            ret = json.loads(response.read())
+        except urllib2.URLError:
+            pass
+        return ret
+
+    def status(self):
+        print('port %i' % self._port)
+        print('sslport %i' % self._sslport)
+        print('pid %i' % self._pid)
+        print('running %i' % self._running)
+        for bean in self._beans:
+            v = self._get_bean(self._beans[bean])
+            if v:
+                if isinstance(v, dict):
+                    if len(v) == 1:
+                        value = v.values()[0]
+                        print('%s %s' % (bean, value))
+                    else:
+                        for (key, value) in v.iteritems():
+                            if isinstance(value, dict):
+                                for (value_key, value_value) in value.iteritems():
+                                    print('%s_%s_%s %s' % (bean, key.lower(), value_key.lower(), value_value))
+                            else:
+                                print('%s_%s %s' % (bean, key.lower(), value))
+
+if __name__ == "__main__":
+    print("<<<puppetdb>>>")
+    pl = puppetdb_check_mk_plugin()
+    pl.status()
+
+
+

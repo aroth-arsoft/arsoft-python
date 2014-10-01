@@ -9,7 +9,7 @@ from distutils.core import setup
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 
 setup(name='arsoft-python',
-		version='1.150',
+		version='1.151',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -116,6 +116,7 @@ setup(name='arsoft-python',
                 'check_mk/checks/postfix_cert',
                 'check_mk/checks/samba_status',
                 'check_mk/checks/puppet_agent',
+                'check_mk/checks/puppetdb',
                     ] ),
             ('/usr/lib/check_mk_agent/plugins', [
                     'check_mk/plugins/apache_status',
@@ -133,6 +134,7 @@ setup(name='arsoft-python',
                     'check_mk/plugins/postfix_cert',
                     'check_mk/plugins/samba_status',
                     'check_mk/plugins/puppet_agent',
+                    'check_mk/plugins/puppetdb',
                 ] )
             ]
 		)
