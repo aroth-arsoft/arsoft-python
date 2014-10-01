@@ -57,11 +57,11 @@ def check_samba_status(item, params, info):
 
     if item_class == 'status':
         details = []
-        if data['smbd_process'] == 0:
+        if data['process_smbd'] == 0:
             if level < 2:
                 level = 2
             details.append('smbd process not running')
-        if data['nmbd_process'] == 0:
+        if data['process_nmbd'] == 0:
             if level < 2:
                 level = 2
             details.append('nmbd process not running')
@@ -77,9 +77,9 @@ def check_samba_status(item, params, info):
             msg = "CRIT - %s" % (','.join(details))
     elif item_class == 'share':
         if item_name in data['shares']:
-            msg = "OK - %s ok" % (item_name))
+            msg = "OK - %s ok" % (item_name)
         else:
-            msg = "CRIT - %s is missing" % (item_name))
+            msg = "CRIT - %s is missing" % (item_name)
             level = 2
     return (level, msg, perfdata)
 

@@ -32,7 +32,7 @@ class samba_status_check_mk_plugin(object):
     SMBSTATUS = '/usr/bin/smbstatus'
     TESTPARM = '/usr/bin/testparm'
     VERSION_RE = re.compile(r'^Version\s+(?P<version>[0-9]+\.[0-9]+\.[0-9]+)-?(?P<version_info>[A-Za-z0-9]+)?$')
-    SYSTEM_SECTIONS = ['global', 'IPC$']
+    SYSTEM_SECTIONS = ['global', 'IPC$', 'print$']
     PROCESSES = ['smbd', 'nmbd']
 
     def __init__(self):
@@ -101,8 +101,11 @@ class samba_status_check_mk_plugin(object):
         for p in self.PROCESSES:
             fname = '/run/samba/%s.pid' % p
             content = ''
-            with open(fname) as f:
-                content = f.readlines()
+            try:
+                with open(fname) as f:
+                    content = f.readlines()
+            except IOError:
+                pass
             try:
                 pid = int(content[0].strip())
             except ValueError:
