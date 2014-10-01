@@ -115,6 +115,7 @@ setup(name='arsoft-python',
                 'check_mk/checks/openvpn',
                 'check_mk/checks/postfix_cert',
                 'check_mk/checks/samba_status',
+                'check_mk/checks/puppet_agent',
                     ] ),
             ('/usr/lib/check_mk_agent/plugins', [
                     'check_mk/plugins/apache_status',
@@ -131,6 +132,7 @@ setup(name='arsoft-python',
                     'check_mk/plugins/openvpn',
                     'check_mk/plugins/postfix_cert',
                     'check_mk/plugins/samba_status',
+                    'check_mk/plugins/puppet_agent',
                 ] )
             ]
 		)

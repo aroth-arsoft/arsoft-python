@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+from arsoft.timestamp import format_timedelta
+
+# times in hours
+warn_time_threshold = 24
+crit_time_threshold = 48
+
+def inventory_puppet_agent(checkname, info):
+
+    ret = []
+    if len(info) > 1:
+        ret.append( ('daemon', {}) )
+        ret.append( ('config', {}) )
+    return ret
+
+def check_puppet_agent(item, params, info):
+
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    details = []
+    perfdata = []
+    data = {}
+
+    for line in info:
+        # if we don't have any upgrades listed, the line list
+        # will only contain one element, eg. "upgrades\n"
+        if len(line) < 2:
+            continue
+
+        key = line[0]
+        value = ' '.join(line[1:])
+        if value[0] == '\"' and value[-1] == '\"':
+            value = value[1:-1]
+        if key != 'version':
+            value = saveint(value)
+        data[key] = value
+
+    if item == 'daemon':
+        must_be_running = params.get('running', True)
+        if must_be_running:
+            if data['running'] == 0 or data['pid'] == 0:
+                if level < 2:
+                    level = 2
+                details.append('Agent not running')
+        else:
+            if data['running'] != 0 or data['pid'] != 0:
+                if level < 2:
+                    level = 2
+                details.append('Agent is running')
+
+        if len(details) == 0:
+            details.append('Version %s' % (data['version']))
+    elif item == 'config':
+
+        now = saveint(time.time())
+        warn_time = now - (warn_time_threshold * 3600)
+        crit_time = now - (crit_time_threshold * 3600)
+        time_last_run = saveint(data['time_last_run'])
+
+        perfdata.append( ('config_age', (time_last_run - now)/3600 if time_last_run else 0, warn_time_threshold, crit_time_threshold) )
+        perfdata.append( ('num_failed', data['num_failed']) )
+        perfdata.append( ('num_failed_to_restart', data['num_failed_to_restart']) )
+        perfdata.append( ('num_changed', data['num_changed']) )
+        perfdata.append( ('num_skipped', data['num_skipped']) )
+        perfdata.append( ('num_restarted', data['num_restarted']) )
+        perfdata.append( ('num_out_of_sync', data['num_out_of_sync']) )
+        perfdata.append( ('num_total', data['num_total']) )
+
+        if level == 0 and time_last_run != 0:
+            if time_last_run < crit_time:
+                level = 2
+                msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
+            elif time_last_run < warn_time:
+                level = 1
+                msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
+
+        if data['num_failed'] != 0:
+            if level < 2:
+                level = 2
+            details.append('%i resources failed' % data['num_failed'])
+        if data['num_failed_to_restart'] != 0:
+            if level < 2:
+                level = 2
+            details.append('%i services failed to restart' % data['num_failed_to_restart'])
+        if len(details) == 0:
+            details.append('Config has been updated %s' % format_timedelta(time_last_run - now))
+
+    # Construct a the status message.
+    if level == 0:
+        msg = "OK - %s" % (','.join(details))
+    elif level == 1:
+        msg = "WARN - %s" % (','.join(details))
+    elif level == 2:
+        msg = "CRIT - %s" % (','.join(details))
+    return (level, msg, perfdata)
+
+# declare the check to Check_MK.
+check_info['puppet_agent'] = {
+    'check_function':            check_puppet_agent,
+    'inventory_function':        inventory_puppet_agent,
+    'service_description':       'Puppet agent',
+    'has_perfdata':              True,
+}

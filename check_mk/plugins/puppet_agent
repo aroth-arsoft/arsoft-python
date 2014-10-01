@@ -1,0 +1,120 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os
+import errno
+import time
+import yaml
+
+def check_pid(pid):
+    """ Check For the existence of a unix pid. """
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH == No such process
+            return False
+        elif err.errno == errno.EPERM:
+            # EPERM clearly means there's a process to deny access to
+            return True
+        else:
+            # According to "man 2 kill" possible error values are
+            # (EINVAL, EPERM, ESRCH)
+            raise
+    else:
+        return True
+
+def saveint(v):
+    if v is None:
+        return 0
+    try:
+        return int(v)
+    except ValueError:
+        return 0
+
+class puppet_agent_check_mk_plugin(object):
+
+    STATEFILE = '/var/lib/puppet/state/last_run_summary.yaml'
+    PIDFILE = '/var/run/puppet/agent.pid'
+
+    def __init__(self):
+        self._time_last_run = 0
+        self._config_num = 0
+        self._version = ''
+        self._num_failed = 0
+        self._num_failed_to_restart = 0
+        self._num_changed = 0
+        self._num_skipped = 0
+        self._num_restarted = 0
+        self._num_out_of_sync = 0
+        self._num_total = 0
+        self._last_run_summary = {}
+        self._pid = 0
+        self._running = False
+
+        self._check_running()
+        self._load_last_run_summary()
+
+    def _check_running(self):
+        if os.path.isfile(self.PIDFILE):
+            content = ''
+            try:
+                with open(self.PIDFILE) as f:
+                    content = f.readlines()
+            except IOError:
+                pass
+            try:
+                self._pid = saveint(content[0].strip())
+            except ValueError:
+                pass
+            self._running = check_pid(self._pid)
+
+    def _load_last_run_summary(self):
+        now = time.time()
+        try:
+            with open(self.STATEFILE, 'r') as f:
+                self._last_run_summary = yaml.load(f)
+        except IOError:
+            pass
+
+        try:
+            self._time_last_run = saveint(self._last_run_summary['time']['last_run'])
+            self._config_num = saveint(self._last_run_summary['version']['config'])
+            self._version = self._last_run_summary['version']['puppet']
+            if 'resources' in self._last_run_summary:
+                self._num_failed = saveint(self._last_run_summary['resources']['failed'])
+                self._num_failed_to_restart = saveint(self._last_run_summary['resources']['failed_to_restart'])
+                self._num_changed = saveint(self._last_run_summary['resources']['changed'])
+                self._num_skipped = saveint(self._last_run_summary['resources']['skipped'])
+                self._num_restarted = saveint(self._last_run_summary['resources']['restarted'])
+                self._num_out_of_sync = saveint(self._last_run_summary['resources']['out_of_sync'])
+                self._num_total = saveint(self._last_run_summary['resources']['total'])
+        except KeyError:
+            pass
+
+        self._time_since_last = now - self._time_last_run
+
+    def status(self):
+        print('time_last_run %i' % self._time_last_run)
+        print('version %s' % self._version)
+        print('config %i' % self._config_num)
+        print('num_failed %i' % self._num_failed)
+        print('num_failed_to_restart %i' % self._num_failed_to_restart)
+        print('num_changed %i' % self._num_changed)
+        print('num_skipped %i' % self._num_skipped)
+        print('num_restarted %i' % self._num_restarted)
+        print('num_out_of_sync %i' % self._num_out_of_sync)
+        print('num_total %i' % self._num_total)
+        print('pid %i' % self._pid)
+        print('running %i' % self._running)
+
+if __name__ == "__main__":
+    print("<<<puppet_agent>>>")
+    pl = puppet_agent_check_mk_plugin()
+    pl.status()
+
+
+
