@@ -55,13 +55,13 @@ def check_mysql_slave(_unused, params, info):
     perfdata = []
     output = []
 
-    if data['Slave_IO_Running']:
+    if 'Slave_IO_Running' in data and data['Slave_IO_Running']:
         output.append('Slave-IO: running')
     else:
         output.append('Slave-IO: not running(!!)')
         state = 2
 
-    if data['Slave_SQL_Running']:
+    if 'Slave_SQL_Running' in data and data['Slave_SQL_Running']:
         output.append('Slave-SQL: running')
 
         # Makes only sense to monitor the age when the SQL slave is running
