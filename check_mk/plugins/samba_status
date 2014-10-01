@@ -1,0 +1,128 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+from arsoft.utils import runcmdAndGetData
+import re
+import os
+import errno
+
+def check_pid(pid):
+    """ Check For the existence of a unix pid. """
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH == No such process
+            return False
+        elif err.errno == errno.EPERM:
+            # EPERM clearly means there's a process to deny access to
+            return True
+        else:
+            # According to "man 2 kill" possible error values are
+            # (EINVAL, EPERM, ESRCH)
+            raise
+    else:
+        return True
+
+class samba_status_check_mk_plugin(object):
+
+    SMBSTATUS = '/usr/bin/smbstatus'
+    TESTPARM = '/usr/bin/testparm'
+    VERSION_RE = re.compile(r'^Version\s+(?P<version>[0-9]+\.[0-9]+\.[0-9]+)-?(?P<version_info>[A-Za-z0-9]+)?$')
+    SYSTEM_SECTIONS = ['global', 'IPC$']
+    PROCESSES = ['smbd', 'nmbd']
+
+    def __init__(self):
+        self._version = ''
+        self._version_info = ''
+        self._config = {}
+        self._server_role = ''
+        self._shares = []
+        self._processes = {}
+
+        self._get_version()
+        self._get_config()
+        self._get_processes()
+
+    def _get_version(self):
+        if not os.path.isfile(self.SMBSTATUS):
+            return
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(self.SMBSTATUS, ['-V'])
+
+        if sts == 0:
+            mo = self.VERSION_RE.match(stdoutdata)
+            if mo:
+                mogrp = mo.groupdict()
+                self._version = mo.group('version')
+                self._version_info = mo.group('version_info') if 'version_info' in mogrp else None
+
+    def _get_config(self):
+        if not os.path.isfile(self.TESTPARM):
+            return
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(self.TESTPARM, ['-s'])
+
+        if sts == 0:
+            for line in stderrdata.splitlines():
+                if not line:
+                    continue
+                if ':' in line:
+                    idx = line.find(':')
+                    if idx >= 0:
+                        key = line[0:idx].strip()
+                        value = line[idx+1:].lstrip()
+                        if key == 'Server role':
+                            self._server_role = value
+
+            current_section = None
+            for line in stdoutdata.splitlines():
+                if not line:
+                    continue
+                if line[0] == '[' and line[-1] == ']':
+                    current_section = line[1:-1]
+                    self._config[current_section] = {}
+                else:
+                    idx = line.find('=')
+                    if idx >= 0:
+                        key = line[0:idx].strip()
+                        value = line[idx+1:].lstrip()
+                        self._config[current_section][key] = value
+            self._shares = self._config.keys()
+            for k in self.SYSTEM_SECTIONS:
+                if k in self._shares:
+                    self._shares.remove(k)
+
+    def _get_processes(self):
+        if not os.path.isdir('/run/samba'):
+            return
+
+        for p in self.PROCESSES:
+            fname = '/run/samba/%s.pid' % p
+            content = ''
+            with open(fname) as f:
+                content = f.readlines()
+            try:
+                pid = int(content[0].strip())
+            except ValueError:
+                pid = None
+            self._processes[p] = { 'pid': pid, 'running': check_pid(pid) }
+
+    def status(self):
+        print('version %s' % self._version)
+        print('version_info %s' % self._version_info)
+        print('server_role %s' % self._server_role)
+        print('workgroup %s' % self._config['global']['workgroup'])
+        print('shares \"%s\"' % ','.join(self._shares))
+        for p in self._processes:
+            p_stat = self._processes[p]
+            print('process_%s %i' % (p, p_stat['pid'] if p_stat['running'] else 0))
+
+if __name__ == "__main__":
+    print("<<<samba_status>>>")
+    pl = samba_status_check_mk_plugin()
+    pl.status()
+
+
+

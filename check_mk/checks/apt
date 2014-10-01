@@ -74,7 +74,7 @@ def check_apt(item, params, info):
         perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
         # Construct a the status message.
         if level == 0:
-            msg = "OK - Cache is up to date."
+            msg = "OK - Cache has been updated %s" % format_timedelta(cache_age)
         elif level == 1:
             msg = "Cache has not been updated for %s" % format_timedelta(cache_age)
         elif level == 2:
