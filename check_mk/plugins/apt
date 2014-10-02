@@ -22,11 +22,7 @@
 
 import sys
 import os
-import datetime
-import warnings
-warnings.filterwarnings("ignore")
-
-from pprint import pprint
+import time
 
 try:
     import apt
@@ -51,8 +47,8 @@ class AptCache(apt.Cache):
             if f_mtime > mtime:
                 mtime = f_mtime
 
-        now = datetime.datetime.now()
-        self.cache_mtime = datetime.datetime.fromtimestamp(mtime)
+        now = time.time()
+        self.cache_mtime = mtime
         self.cache_age   = now - self.cache_mtime
         #print('cache age %s' %  self.cache_age)
 
@@ -103,9 +99,7 @@ def get_upgradeable():
             #print candidate.origins
             #pkgs_to_upgrade.append(pkg.name.rstrip("\n"))
 
-    return [cache.cache_age.seconds, pkgs_to_upgrade, pkgs_to_sec_upgrade]
-
-
+    return [cache.cache_age, pkgs_to_upgrade, pkgs_to_sec_upgrade]
 
 def main():
     age, upgrades, secupgrades = get_upgradeable()
@@ -122,7 +116,6 @@ def main():
         print("secupgrades \"%s\"" % ",".join(secupgrades))
     else:
         print("secupgrades")
-
 
 if __name__ == "__main__":
     main()
