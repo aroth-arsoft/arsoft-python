@@ -66,7 +66,7 @@ def check_puppet_agent(item, params, info):
         perfdata.append( ('num_out_of_sync', data['num_out_of_sync']) )
         perfdata.append( ('num_total', data['num_total']) )
 
-        if level == 0 and time_last_run != 0:
+        if level == 0 and time_last_run != 0 and data['start']:
             if time_last_run < crit_time:
                 level = 2
                 msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
