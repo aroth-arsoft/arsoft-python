@@ -1,3 +1,9 @@
+arsoft-python (1.154) trusty; urgency=medium
+
+  * disable puppetdb checks on machine where it's not installed
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 03 Oct 2014 09:15:04 +0200
+
 arsoft-python (1.153) trusty; urgency=medium
 
   * fixed onkyo remote script
