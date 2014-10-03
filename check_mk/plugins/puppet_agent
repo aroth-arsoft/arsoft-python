@@ -58,6 +58,7 @@ class puppet_agent_check_mk_plugin(object):
         self._running = False
         self._start = True
 
+        self._get_config()
         self._check_running()
         self._load_last_run_summary()
 

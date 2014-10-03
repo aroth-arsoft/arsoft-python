@@ -1,3 +1,9 @@
+arsoft-python (1.155) trusty; urgency=medium
+
+  * fixed puppet_agent config
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 03 Oct 2014 09:58:33 +0200
+
 arsoft-python (1.154) trusty; urgency=medium
 
   * disable puppetdb checks on machine where it's not installed
