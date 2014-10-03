@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-memory_usage_warn_threshold = 0.7
-memory_usage_crit_threshold = 0.85
+memory_usage_warn_threshold = 0.9
+memory_usage_crit_threshold = 0.95
 
 queuesize_warn_threshold = 2
 queuesize_crit_threshold = 5
