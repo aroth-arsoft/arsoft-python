@@ -6,6 +6,7 @@ import os
 import errno
 import time
 import yaml
+from arsoft.inifile import IniFile
 
 def check_pid(pid):
     """ Check For the existence of a unix pid. """
@@ -37,6 +38,7 @@ def saveint(v):
 
 class puppet_agent_check_mk_plugin(object):
 
+    DEFAULTS = '/etc/default/puppet'
     STATEFILE = '/var/lib/puppet/state/last_run_summary.yaml'
     PIDFILE = '/var/run/puppet/agent.pid'
 
@@ -54,9 +56,20 @@ class puppet_agent_check_mk_plugin(object):
         self._last_run_summary = {}
         self._pid = 0
         self._running = False
+        self._start = True
 
         self._check_running()
         self._load_last_run_summary()
+
+    def _get_config(self):
+        if os.path.isfile(self.DEFAULTS):
+            inifile = IniFile(commentPrefix='#', keyValueSeperator='=')
+            if inifile.open(self.DEFAULTS):
+                try:
+                    s = inifile.get(None, 'START', 'yes')
+                    self._start = True if s == 'yes' else False
+                except ValueError:
+                    pass
 
     def _check_running(self):
         if os.path.isfile(self.PIDFILE):
@@ -109,6 +122,7 @@ class puppet_agent_check_mk_plugin(object):
         print('num_out_of_sync %i' % self._num_out_of_sync)
         print('num_total %i' % self._num_total)
         print('pid %i' % self._pid)
+        print('start %i' % self._start)
         print('running %i' % self._running)
 
 if __name__ == "__main__":

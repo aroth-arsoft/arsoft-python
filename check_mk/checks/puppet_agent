@@ -36,7 +36,7 @@ def check_puppet_agent(item, params, info):
         data[key] = value
 
     if item == 'daemon':
-        must_be_running = params.get('running', True)
+        must_be_running = True if data['start'] != 0 else False
         if must_be_running:
             if data['running'] == 0 or data['pid'] == 0:
                 if level < 2:
@@ -46,7 +46,7 @@ def check_puppet_agent(item, params, info):
             if data['running'] != 0 or data['pid'] != 0:
                 if level < 2:
                     level = 2
-                details.append('Agent is running')
+                details.append('Agent is running, but it should be stopped')
 
         if len(details) == 0:
             details.append('Version %s' % (data['version']))
