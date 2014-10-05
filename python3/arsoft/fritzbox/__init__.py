@@ -8,10 +8,15 @@ from datetime import datetime, timedelta
 
 class FritzBox(object):
 
-    def __init__(self, hostname='fritz.box', port=49000):
+    def __init__(self, hostname='fritz.box', port=49000, pre_os6=False):
         self._hostname = hostname
         self._port = port
         self._status = None
+        self._pre_os6 = pre_os6
+        if self._pre_os6:
+            self._baseurl = '/upnp'
+        else:
+            self._baseurl = '/igdupnp'
         self._wanAddress = None
         self._addonInfo = None
         self._dslLinkInfo = None
@@ -45,8 +50,8 @@ class FritzBox(object):
             data = request.data()
             try:
                 if verbose:
-                    print(('C: ' + url))
-                    print(('C: ' + data))
+                    print('C: ' + url)
+                    print('C: ' + data)
                 c.setopt(pycurl.URL, url)
                 c.setopt(pycurl.POST, 1)
                 c.setopt(pycurl.POSTFIELDS, data)
@@ -57,7 +62,7 @@ class FritzBox(object):
                 c.setopt(pycurl.HTTPHEADER, ['SOAPACTION: "urn:' + request._urn + '#' + request._action + '"', 'CONTENT-TYPE: text/xml;', 'User-Agent: nagios'])
                 c.perform()
                 if verbose:
-                    print(('S: ' + resp.contents))
+                    print('S: ' + resp.contents)
                 ret = True
             except Exception as e:
                 print("ERROR - HTTP request to UPNP server not possible " + str(e))
@@ -71,7 +76,7 @@ class FritzBox(object):
             return None
 
     def _retrieveStatusInfo(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetStatusInfo') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetStatusInfo') )
         if response is not None:
             self._status = {}
             ret = False
@@ -79,13 +84,13 @@ class FritzBox(object):
                 namespaces = { 's':"http://schemas.xmlsoap.org/soap/envelope/", 'u':"urn:schemas-upnp-org:service:WANIPConnection:1" }
                 tree = etree.fromstring(response.contents)
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetStatusInfoResponse/NewConnectionStatus', namespaces=namespaces)
-                self._status['connectionstatus'] = elements[0].text
+                self._status['connectionstatus'] = elements[0].text if elements else None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetStatusInfoResponse/NewLastConnectionError', namespaces=namespaces)
-                self._status['lastConnectionError'] = elements[0].text
+                self._status['lastConnectionError'] = elements[0].text if elements else None
                 if self._status['lastConnectionError'] == 'ERROR_NONE':
                     self._status['lastConnectionError'] = None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetStatusInfoResponse/NewUptime', namespaces=namespaces)
-                self._status['connectDuration'] = int(elements[0].text)
+                self._status['connectDuration'] = int(elements[0].text) if elements else 0
                 self._status['connectTime'] = datetime.now() - timedelta(seconds=self._status['connectDuration'])
                 ret = True
             finally:
@@ -96,10 +101,10 @@ class FritzBox(object):
         return ret
 
     def _retrieveWANAddress(self, pre_os6=False):
-        if pre_os6:
-            request = FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANPPPConnection:1', 'GetExternalIPAddress')
+        if self._pre_os6:
+            request = FritzBox.Request(self._baseurl + '/control/WANCommonIFC1', 'schemas-upnp-org:service:WANPPPConnection:1', 'GetExternalIPAddress')
         else:
-            request = FritzBox.Request('/upnp/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetExternalIPAddress')
+            request = FritzBox.Request(self._baseurl + '/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetExternalIPAddress')
         response = self._sendRequest( request )
         if response is not None:
             self._wanAddress = ''
@@ -107,7 +112,7 @@ class FritzBox(object):
             try:
                 tree = etree.fromstring(response.contents)
                 namespaces = { 's':"http://schemas.xmlsoap.org/soap/envelope/" }
-                if pre_os6:
+                if self._pre_os6:
                     namespaces['u'] = "urn:schemas-upnp-org:service:WANPPPConnection:1"
                 else:
                     namespaces['u'] = "urn:schemas-upnp-org:service:WANIPConnection:1"
@@ -126,7 +131,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveAddonInfo(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetAddonInfos') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetAddonInfos') )
         if response is not None:
             self._addonInfo = {}
             ret = False
@@ -134,31 +139,31 @@ class FritzBox(object):
                 tree = etree.fromstring(response.contents)
                 namespaces = { 's':"http://schemas.xmlsoap.org/soap/envelope/", 'u':"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" }
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewDNSServer1', namespaces=namespaces)
-                dnsserver1 = elements[0].text
+                dnsserver1 = elements[0].text if elements else None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewDNSServer2', namespaces=namespaces)
-                dnsserver2 = elements[0].text
+                dnsserver2 = elements[0].text if elements else None
                 self._addonInfo['dnsserver'] = [ dnsserver1, dnsserver2 ]
 
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewVoipDNSServer1', namespaces=namespaces)
-                dnsserver1 = elements[0].text
+                dnsserver1 = elements[0].text if elements else None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewVoipDNSServer2', namespaces=namespaces)
-                dnsserver2 = elements[0].text
+                dnsserver2 = elements[0].text if elements else None
                 self._addonInfo['voipdnsserver'] = [ dnsserver1, dnsserver2 ]
 
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewByteSendRate', namespaces=namespaces)
-                self._addonInfo['sendRateByte'] = int(elements[0].text)
+                self._addonInfo['sendRateByte'] = int(elements[0].text) if elements else 0
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewByteReceiveRate', namespaces=namespaces)
-                self._addonInfo['receiveRateByte'] = int(elements[0].text)
+                self._addonInfo['receiveRateByte'] = int(elements[0].text) if elements else 0
                 
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewPacketSendRate', namespaces=namespaces)
-                self._addonInfo['sendRatePacket'] = int(elements[0].text)
+                self._addonInfo['sendRatePacket'] = int(elements[0].text) if elements else 0
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewPacketReceiveRate', namespaces=namespaces)
-                self._addonInfo['receiveRatePacket'] = int(elements[0].text)
+                self._addonInfo['receiveRatePacket'] = int(elements[0].text) if elements else 0
 
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewTotalBytesSent', namespaces=namespaces)
-                self._addonInfo['sendTotalRateByte'] = int(elements[0].text)
+                self._addonInfo['sendTotalRateByte'] = int(elements[0].text) if elements else 0
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewTotalBytesReceived', namespaces=namespaces)
-                self._addonInfo['receiveTotalByte'] = int(elements[0].text)
+                self._addonInfo['receiveTotalByte'] = int(elements[0].text) if elements else 0
                 ret = True
             finally:
                 pass
@@ -168,7 +173,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveCallLists(self, user):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetCallLists') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetCallLists') )
         if response is not None:
             self._callLists[user] = []
             ret = False
@@ -186,11 +191,10 @@ class FritzBox(object):
         return ret
 
     def _retrieveUserList(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetUserList'), True )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetUserList'), True )
         if response is not None:
             self._userList = []
             ret = False
-            print((response.contents))
             try:
                 tree = etree.fromstring(response.contents)
                 namespaces = { 's':"http://schemas.xmlsoap.org/soap/envelope/", 'u':"urn:schemas-upnp-org:service:device:foncontrol:1" }
@@ -205,7 +209,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveDSLLinkInfo(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANDSLLinkC1', 'schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDSLLinkInfo') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANDSLLinkC1', 'schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDSLLinkInfo') )
         if response is not None:
             self._dslLinkInfo = {}
             ret = False
@@ -213,9 +217,9 @@ class FritzBox(object):
                 tree = etree.fromstring(response.contents)
                 namespaces = { 's':"http://schemas.xmlsoap.org/soap/envelope/", 'u':"urn:schemas-upnp-org:service:WANDSLLinkConfig:1" }
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetDSLLinkInfoResponse/NewLinkType', namespaces=namespaces)
-                self._dslLinkInfo['linktype'] = elements[0].text
+                self._dslLinkInfo['linktype'] = elements[0].text if elements else None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetDSLLinkInfoResponse/NewLinkStatus', namespaces=namespaces)
-                self._dslLinkInfo['status'] = elements[0].text
+                self._dslLinkInfo['status'] = elements[0].text if elements else None
                 ret = True
             finally:
                 pass
@@ -225,7 +229,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveCommonLinkProperties(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetCommonLinkProperties') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetCommonLinkProperties') )
         if response is not None:
             self._commonLinkProperties = {}
             ret = False
@@ -233,13 +237,13 @@ class FritzBox(object):
                 tree = etree.fromstring(response.contents)
                 namespaces = { 's':"http://schemas.xmlsoap.org/soap/envelope/", 'u':"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1" }
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewWANAccessType', namespaces=namespaces)
-                self._commonLinkProperties['wanaccesstype'] = elements[0].text
+                self._commonLinkProperties['wanaccesstype'] = elements[0].text if elements else None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewLayer1UpstreamMaxBitRate', namespaces=namespaces)
-                self._commonLinkProperties['upstreammaxbiterate'] = int(elements[0].text)
+                self._commonLinkProperties['upstreammaxbiterate'] = int(elements[0].text) if elements else None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewLayer1DownstreamMaxBitRate', namespaces=namespaces)
-                self._commonLinkProperties['downstreammaxbitrate'] = int(elements[0].text)
+                self._commonLinkProperties['downstreammaxbitrate'] = int(elements[0].text) if elements else None
                 elements = tree.xpath('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewPhysicalLinkStatus', namespaces=namespaces)
-                self._commonLinkProperties['physicallinkstatus'] = elements[0].text
+                self._commonLinkProperties['physicallinkstatus'] = elements[0].text if elements else None
                 ret = True
             finally:
                 pass

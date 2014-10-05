@@ -141,6 +141,7 @@ class FritxBoxStatusApp(NagiosPluginApp):
             print('Physical link up: ' + str(fritz.physicalLinkUpStream()) + ' bit/sec')
             print('DSL link status: ' + str(fritz.dslLinkStatus()))
             print('WAN connection status: ' + str(fritz.connectionStatus()))
+            print('WAN connection error: ' + str(fritz.lastConnectionError()))
             print('WAN connect time: ' + str(fritz.connectTime()))
             print('WAN connect duration: ' + str(fritz.connectDuration()))
             print('WAN address: ' + str(fritz.wanAddress()))

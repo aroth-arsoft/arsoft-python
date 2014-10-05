@@ -8,16 +8,22 @@ from datetime import datetime, timedelta
 
 class FritzBox(object):
 
-    def __init__(self, hostname='fritz.box', port=49000):
+    def __init__(self, hostname='fritz.box', port=49000, pre_os6=False):
         self._hostname = hostname
         self._port = port
         self._status = None
+        self._pre_os6 = pre_os6
+        if self._pre_os6:
+            self._baseurl = '/upnp'
+        else:
+            self._baseurl = '/igdupnp'
         self._wanAddress = None
         self._addonInfo = None
         self._dslLinkInfo = None
         self._commonLinkProperties = None
         self._userList = None
         self._callLists = {}
+
 
     class Request:
         def __init__(self, uri, urn, action):
@@ -26,13 +32,10 @@ class FritzBox(object):
             self._action = action
             
         def data(self):
-            return '<?xml version="1.0" encoding="utf-8"?>' +\
-                    '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" ' +\
-                    's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">' +\
-                    '<s:Body>' +\
-                    '<u:' + self._action + ' xmlns:u="urn:' + self._urn + '" />' +\
-                    '</s:Body>' +\
-                    '</s:Envelope>'
+            return """<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<s:Body><u:%s xmlns:u="urn:%s"/></s:Body>
+</s:Envelope>""" % (self._action, self._urn)
 
     class Response:
         def __init__(self):
@@ -63,7 +66,7 @@ class FritzBox(object):
                     print('S: ' + resp.contents)
                 ret = True
             except Exception as e:
-                print "ERROR - HTTP request to UPNP server not possible " + str(e)
+                print("ERROR - HTTP request to UPNP server not possible " + str(e))
                 ret = False
         finally:
             c.close()
@@ -74,7 +77,7 @@ class FritzBox(object):
             return None
 
     def _retrieveStatusInfo(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetStatusInfo') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetStatusInfo') )
         if response is not None:
             self._status = {}
             ret = False
@@ -84,9 +87,13 @@ class FritzBox(object):
                 ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
                 ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANIPConnection:1")
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetStatusInfoResponse/NewConnectionStatus')
-                self._status['connectionstatus'] = elements[0].content
+                self._status['connectionstatus'] = elements[0].content if elements else None
+                elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetStatusInfoResponse/NewLastConnectionError')
+                self._status['lastConnectionError'] = elements[0].content if elements else None
+                if self._status['lastConnectionError'] == 'ERROR_NONE':
+                    self._status['lastConnectionError'] = None
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetStatusInfoResponse/NewUptime')
-                self._status['connectDuration'] = int(elements[0].content)
+                self._status['connectDuration'] = int(elements[0].content) if elements else 0
                 self._status['connectTime'] = datetime.now() - timedelta(seconds=self._status['connectDuration'])
                 ret = True
             finally:
@@ -96,11 +103,11 @@ class FritzBox(object):
             ret = False
         return ret
 
-    def _retrieveWANAddress(self, pre_os6=False):
-        if pre_os6:
-            request = FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANPPPConnection:1', 'GetExternalIPAddress')
+    def _retrieveWANAddress(self):
+        if self._pre_os6:
+            request = FritzBox.Request(self._baseurl + '/control/WANCommonIFC1', 'schemas-upnp-org:service:WANPPPConnection:1', 'GetExternalIPAddress')
         else:
-            request = FritzBox.Request('/upnp/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetExternalIPAddress')
+            request = FritzBox.Request(self._baseurl + '/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'GetExternalIPAddress')
         response = self._sendRequest( request )
         if response is not None:
             self._wanAddress = ''
@@ -109,7 +116,7 @@ class FritzBox(object):
                 doc = libxml2.parseDoc(response.contents)
                 ctxt = doc.xpathNewContext()
                 ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
-                if pre_os6:
+                if self._pre_os6:
                     ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANPPPConnection:1")
                 else:
                     ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANIPConnection:1")
@@ -128,7 +135,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveAddonInfo(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetAddonInfos') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetAddonInfos') )
         if response is not None:
             self._addonInfo = {}
             ret = False
@@ -138,31 +145,31 @@ class FritzBox(object):
                 ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
                 ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1")
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewDNSServer1')
-                dnsserver1 = elements[0].content
+                dnsserver1 = elements[0].content if elements else None
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewDNSServer2')
-                dnsserver2 = elements[0].content
+                dnsserver2 = elements[0].content if elements else None
                 self._addonInfo['dnsserver'] = [ dnsserver1, dnsserver2 ]
 
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewVoipDNSServer1')
-                dnsserver1 = elements[0].content
+                dnsserver1 = elements[0].content if elements else None
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewVoipDNSServer2')
-                dnsserver2 = elements[0].content
+                dnsserver2 = elements[0].content if elements else None
                 self._addonInfo['voipdnsserver'] = [ dnsserver1, dnsserver2 ]
 
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewByteSendRate')
-                self._addonInfo['sendRateByte'] = int(elements[0].content)
+                self._addonInfo['sendRateByte'] = int(elements[0].content) if elements else 0
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewByteReceiveRate')
-                self._addonInfo['receiveRateByte'] = int(elements[0].content)
+                self._addonInfo['receiveRateByte'] = int(elements[0].content) if elements else 0
                 
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewPacketSendRate')
-                self._addonInfo['sendRatePacket'] = int(elements[0].content)
+                self._addonInfo['sendRatePacket'] = int(elements[0].content) if elements else 0
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewPacketReceiveRate')
-                self._addonInfo['receiveRatePacket'] = int(elements[0].content)
+                self._addonInfo['receiveRatePacket'] = int(elements[0].content) if elements else 0
 
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewTotalBytesSent')
-                self._addonInfo['sendTotalRateByte'] = int(elements[0].content)
+                self._addonInfo['sendTotalRateByte'] = int(elements[0].content) if elements else 0
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetAddonInfosResponse/NewTotalBytesReceived')
-                self._addonInfo['receiveTotalByte'] = int(elements[0].content)
+                self._addonInfo['receiveTotalByte'] = int(elements[0].content) if elements else 0
                 ret = True
             finally:
                 doc.freeDoc()
@@ -172,7 +179,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveCallLists(self, user):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetCallLists') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetCallLists') )
         if response is not None:
             self._callLists[user] = []
             ret = False
@@ -192,11 +199,10 @@ class FritzBox(object):
         return ret
 
     def _retrieveUserList(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetUserList'), True )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/foncontrol', 'schemas-upnp-org:service:device:foncontrol:1', 'GetUserList'), True )
         if response is not None:
             self._userList = []
             ret = False
-            print(response.contents)
             try:
                 doc = libxml2.parseDoc(response.contents)
                 ctxt = doc.xpathNewContext()
@@ -213,7 +219,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveDSLLinkInfo(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANDSLLinkC1', 'schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDSLLinkInfo') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANDSLLinkC1', 'schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDSLLinkInfo') )
         if response is not None:
             self._dslLinkInfo = {}
             ret = False
@@ -223,9 +229,9 @@ class FritzBox(object):
                 ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
                 ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANDSLLinkConfig:1")
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetDSLLinkInfoResponse/NewLinkType')
-                self._dslLinkInfo['linktype'] = elements[0].content
+                self._dslLinkInfo['linktype'] = elements[0].content if elements else None
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetDSLLinkInfoResponse/NewLinkStatus')
-                self._dslLinkInfo['status'] = elements[0].content
+                self._dslLinkInfo['status'] = elements[0].content if elements else None
                 ret = True
             finally:
                 doc.freeDoc()
@@ -235,7 +241,7 @@ class FritzBox(object):
         return ret
 
     def _retrieveCommonLinkProperties(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetCommonLinkProperties') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANCommonIFC1', 'schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetCommonLinkProperties') )
         if response is not None:
             self._commonLinkProperties = {}
             ret = False
@@ -245,13 +251,13 @@ class FritzBox(object):
                 ctxt.xpathRegisterNs('s',"http://schemas.xmlsoap.org/soap/envelope/")
                 ctxt.xpathRegisterNs('u',"urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1")
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewWANAccessType')
-                self._commonLinkProperties['wanaccesstype'] = elements[0].content
+                self._commonLinkProperties['wanaccesstype'] = elements[0].content if elements else None
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewLayer1UpstreamMaxBitRate')
-                self._commonLinkProperties['upstreammaxbiterate'] = int(elements[0].content)
+                self._commonLinkProperties['upstreammaxbiterate'] = int(elements[0].content) if elements else None
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewLayer1DownstreamMaxBitRate')
-                self._commonLinkProperties['downstreammaxbitrate'] = int(elements[0].content)
+                self._commonLinkProperties['downstreammaxbitrate'] = int(elements[0].content) if elements else None
                 elements = ctxt.xpathEval('/s:Envelope/s:Body/u:GetCommonLinkPropertiesResponse/NewPhysicalLinkStatus')
-                self._commonLinkProperties['physicallinkstatus'] = elements[0].content
+                self._commonLinkProperties['physicallinkstatus'] = elements[0].content if elements else None
                 ret = True
             finally:
                 doc.freeDoc()
@@ -283,7 +289,15 @@ class FritzBox(object):
             return self._status['connectionstatus']
         else:
             return None
-            
+
+    def lastConnectionError(self):
+        if self._status is None:
+            self._retrieveStatusInfo()
+        if self._status is not None:
+            return self._status['lastConnectionError']
+        else:
+            return None
+
     def dslLinkStatus(self):
         if self._dslLinkInfo is None:
             self._retrieveDSLLinkInfo()
@@ -318,7 +332,8 @@ class FritzBox(object):
     
     def isConnected(self):
         cxnstat = self.connectionStatus()
-        return True if cxnstat == 'Connected' else False
+        cxnerr = self.lastConnectionError()
+        return True if cxnstat == 'Connected' or (cxnstat == 'Connecting' and cxnerr is None) else False
         
     def isDSLConnected(self):
         cxnstat = self.dslLinkStatus()
@@ -365,7 +380,7 @@ class FritzBox(object):
 
 
     def reconnect(self):
-        response = self._sendRequest( FritzBox.Request('/upnp/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'ForceTermination') )
+        response = self._sendRequest( FritzBox.Request(self._baseurl + '/control/WANIPConn1', 'schemas-upnp-org:service:WANIPConnection:1', 'ForceTermination') )
         if response is not None:
             ret = True
         else:
