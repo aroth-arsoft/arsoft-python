@@ -569,7 +569,7 @@ class alog_application(object):
                     if filter in self._config.loglevel_names:
                         self._loglevel.append(filter.upper())
                     else:
-                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        sys.stderr.write('Unrecognized log level pattern %s\n' % (filter))
                         return 1
                 else:
                     filter = filter.upper()
@@ -584,12 +584,14 @@ class alog_application(object):
                                 found = True
                         i = i + 1
                     if not found:
-                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        sys.stderr.write('Unrecognized log level pattern %s\n' % (filter))
                         return 1
+            if self._verbose:
+                print('Selected output levels: %s\n' % (','.join(self._loglevel)))
 
         if args.pattern != 'auto':
             if args.pattern not in self._config.known_patterns:
-                sys.stdout.write('Given pattern %s is invalid.\n' % (args.pattern))
+                sys.stderr.write('Given pattern %s is invalid.\n' % (args.pattern))
                 return 1
 
         if args.find_regex:
