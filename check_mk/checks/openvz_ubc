@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+
+def inventory_openvz_ubc(checkname, info):
+
+    ret = []
+    if len(info) > 1:
+        ret.append( ('counters', None) )
+
+    return ret
+
+def check_openvz_ubc(item, params, info):
+
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    perfdata = []
+    data = {}
+
+    if '.' in item:
+        item_class, item_name = item.split('.', 1)
+    else:
+        item_class = item
+        item_name = None
+
+    for line in info:
+        # if we don't have any upgrades listed, the line list
+        # will only contain one element, eg. "upgrades\n"
+        if len(line) < 2:
+            continue
+
+        key = line[0]
+        value = ' '.join(line[1:])
+        if value[0] == '\"' and value[-1] == '\"':
+            value = value[1:-1]
+        if key == 'shares':
+            value = value.split(',')
+        if 'process' in key:
+            value = saveint(value)
+        data[key] = value
+
+    if item == 'counters':
+        details = []
+        if data['process_smbd'] == 0:
+            if level < 2:
+                level = 2
+            details.append('smbd process not running')
+        if data['process_nmbd'] == 0:
+            if level < 2:
+                level = 2
+            details.append('nmbd process not running')
+        if len(details) == 0:
+            details.append('Version %s, Workgroup %s' % (data['version'], data['workgroup']))
+
+        # Construct a the status message.
+        if level == 0:
+            msg = "OK - %s" % (','.join(details))
+        elif level == 1:
+            msg = "WARN - %s" % (','.join(details))
+        elif level == 2:
+            msg = "CRIT - %s" % (','.join(details))
+    elif item_class == 'share':
+        if item_name in data['shares']:
+            msg = "OK - %s ok" % (item_name)
+        else:
+            msg = "CRIT - %s is missing" % (item_name)
+            level = 2
+    return (level, msg, perfdata)
+
+# declare the check to Check_MK.
+check_info['openvz_ubc'] = {
+    'check_function':            check_openvz_ubc,
+    'inventory_function':        inventory_openvz_ubc,
+    'service_description':       'OpenVZ',
+    'has_perfdata':              True,
+}

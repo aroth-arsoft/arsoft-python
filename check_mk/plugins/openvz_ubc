@@ -1,0 +1,4 @@
+#!/bin/sh
+echo '<<<openvz_ubc>>>'
+
+[ -f /proc/user_beancounters ] && cat /proc/user_beancounters

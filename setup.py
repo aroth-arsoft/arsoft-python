@@ -117,6 +117,7 @@ setup(name='arsoft-python',
                 'check_mk/checks/samba_status',
                 'check_mk/checks/puppet_agent',
                 'check_mk/checks/puppetdb',
+                'check_mk/checks/openvz_ubc',
                     ] ),
             ('/usr/lib/check_mk_agent/plugins', [
                     'check_mk/plugins/apache_status',
@@ -135,6 +136,7 @@ setup(name='arsoft-python',
                     'check_mk/plugins/samba_status',
                     'check_mk/plugins/puppet_agent',
                     'check_mk/plugins/puppetdb',
+                    'check_mk/plugins/openvz_ubc',
                 ] ),
             ('/usr/share/check_mk/special', [
                     'check_mk/special_agent/agent_fritzbox'
