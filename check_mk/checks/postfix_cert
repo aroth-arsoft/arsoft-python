@@ -60,6 +60,10 @@ def check_postfix_cert(item, params, info):
             if min_time is None or value < min_time:
                 min_time = value
 
+    if min_time is None:
+        if level < 2:
+            level = 2
+        msg = 'CRIT - No certificate found'
     if level == 0:
         msg = 'OK - Certificate expires in %s' % format_timedelta(min_time - now)
 

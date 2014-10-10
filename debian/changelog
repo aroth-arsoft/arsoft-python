@@ -1,3 +1,9 @@
+arsoft-python (1.159) trusty; urgency=medium
+
+  * fixed checks for certs when cert is gone
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 10 Oct 2014 07:49:13 +0200
+
 arsoft-python (1.158) trusty; urgency=medium
 
   * add openvz ubc check
