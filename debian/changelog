@@ -1,3 +1,9 @@
+arsoft-python (1.160) trusty; urgency=medium
+
+  * get number of changes services from rkhunter check
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 10 Oct 2014 08:08:55 +0200
+
 arsoft-python (1.159) trusty; urgency=medium
 
   * fixed checks for certs when cert is gone

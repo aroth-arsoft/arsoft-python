@@ -38,6 +38,8 @@ class rkhunter_mk_check_plugin(object):
         self.num_infos = 0
         self.num_file_properties_changed = 0
         self.changed_file_properties = []
+        self.num_services_changed = 0
+        self.changed_services = []
         self.current_message = None
         self.check_time = 0
         self.check_age = 0
@@ -54,6 +56,14 @@ class rkhunter_mk_check_plugin(object):
                     f_end = msgobj.message.find('\n', f_start)
                     f_name = msgobj.message[f_start:f_end]
                     self.changed_file_properties.append(f_name)
+            elif 'Found enabled xinetd service:' in msgobj.message:
+                self.num_services_changed += 1
+                f_start = msgobj.message.find('service:')
+                if f_start > 0:
+                    f_start += 9
+                    f_end = msgobj.message.find('\n', f_start)
+                    f_name = msgobj.message[f_start:f_end]
+                    self.changed_services.append(f_name)
             else:
                 self.num_warnings += 1
         elif msgobj.loglevel == 'ERROR':
@@ -112,6 +122,8 @@ class rkhunter_mk_check_plugin(object):
         print('num_infos %i' % self.num_infos)
         print('num_file_properties_changed %i' % self.num_file_properties_changed)
         print('changed_file_properties %s' % ','.join(self.changed_file_properties))
+        print('num_services_changed %i' % self.num_services_changed)
+        print('changed_services %s' % ','.join(self.changed_services))
 
 if __name__ == "__main__":
     print("<<<rkhunter>>>")

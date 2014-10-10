@@ -43,6 +43,8 @@ def check_rkhunter(item, params, info):
     num_infos = 0
     num_file_properties_changed = 0
     changed_file_properties = []
+    num_services_changed = 0
+    changed_services = []
 
     for line in info:
         # if we don't have any upgrades listed, the line list
@@ -94,6 +96,13 @@ def check_rkhunter(item, params, info):
                             level = 1
                 elif type == "changed_file_properties":
                     changed_file_properties = line[1].strip("\"").split(",")
+                elif type == "num_services_changed":
+                    num_services_changed = saveint(line[1])
+                    if num_services_changed > 0:
+                        if level < 1:
+                            level = 1
+                elif type == "changed_services":
+                    changed_services = line[1].strip("\"").split(",")
     if item == 'status':
         # Construct a the status message.
         if level == 0:
@@ -116,6 +125,8 @@ def check_rkhunter(item, params, info):
 #            details.append('%i infos' % num_infos)
         if num_file_properties_changed:
             details.append('%i changed files %s' % (num_file_properties_changed, ','.join(changed_file_properties) ) )
+        if num_services_changed:
+            details.append('%i changed services %s' % (num_services_changed, ','.join(changed_services) ) )
         if len(details) == 0:
             details.append('No issues detected.')
         perfdata.append( ('num_infects', num_infects, 1, 1) )
@@ -124,6 +135,7 @@ def check_rkhunter(item, params, info):
         perfdata.append( ('num_warnings', num_warnings, 1, 0) )
         perfdata.append( ('num_infos', num_infos) )
         perfdata.append( ('num_file_properties_changed', num_file_properties_changed, 1, 0) )
+        perfdata.append( ('num_services_changed', num_services_changed, 1, 0) )
         # Construct a the status message.
         if level == 0:
             msg = "OK - %s" % (','.join(details))
