@@ -1,3 +1,9 @@
+arsoft-python (1.161) trusty; urgency=medium
+
+  * fixed trouble with non-ascii chars
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 12 Oct 2014 17:46:11 +0200
+
 arsoft-python (1.160) trusty; urgency=medium
 
   * get number of changes services from rkhunter check
