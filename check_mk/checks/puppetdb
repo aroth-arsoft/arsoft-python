@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-memory_usage_warn_threshold = 0.9
-memory_usage_crit_threshold = 0.95
+memory_usage_warn_threshold = None
+memory_usage_crit_threshold = None
 
 queuesize_warn_threshold = 2
 queuesize_crit_threshold = 5
@@ -76,22 +76,26 @@ def check_puppetdb(item, params, info):
         nonheapmemoryusage = float(nonheapmemoryusage_used) / float(nonheapmemoryusage_max)
         heapmemoryusage = float(heapmemoryusage_used) / float(heapmemoryusage_max)
 
-        if nonheapmemoryusage >= memory_usage_crit_threshold:
-            if level < 2:
-                level = 2
-            details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
-        elif nonheapmemoryusage >= memory_usage_warn_threshold:
-            if level < 1:
-                level = 1
-            details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
-        if heapmemoryusage >= memory_usage_crit_threshold:
-            if level < 2:
-                level = 2
-            details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
-        elif heapmemoryusage >= memory_usage_warn_threshold:
-            if level < 1:
-                level = 1
-            details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
+        perfdata.append( ('nonheapmemoryusage', nonheapmemoryusage) )
+        perfdata.append( ('heapmemoryusage', heapmemoryusage) )
+
+        if memory_usage_crit_threshold is not None and memory_usage_warn_threshold is not None:
+            if nonheapmemoryusage >= memory_usage_crit_threshold:
+                if level < 2:
+                    level = 2
+                details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
+            elif nonheapmemoryusage >= memory_usage_warn_threshold:
+                if level < 1:
+                    level = 1
+                details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
+            if heapmemoryusage >= memory_usage_crit_threshold:
+                if level < 2:
+                    level = 2
+                details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
+            elif heapmemoryusage >= memory_usage_warn_threshold:
+                if level < 1:
+                    level = 1
+                details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
         if len(details) == 0:
             details.append('Non-Heap %i %%, Heap %i %%' % (int(nonheapmemoryusage * 100), int(heapmemoryusage * 100)))
     elif item == 'queue':
