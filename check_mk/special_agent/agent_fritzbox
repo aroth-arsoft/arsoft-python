@@ -64,16 +64,18 @@ OPTIONS:
                                 applied to the whole check, instead it is used for
                                 each API query.
   --debug                       Debug mode: let Python exceptions come through
+  -o, --pre-v6                  Use old uPNP URL for device with Fritz OS < 6
 """)
 
-short_options = 'h:t:d'
+short_options = 'h:t:d:o'
 long_options  = [
-    'help', 'timeout=', 'debug'
+    'help', 'timeout=', 'debug', 'pre-v6'
 ]
 
 host_address      = None
 opt_debug         = False
 opt_timeout       = 10
+opt_pre_v6        = False
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
@@ -86,6 +88,8 @@ for o,a in opts:
         opt_debug = True
     elif o in [ '-t', '--timeout' ]:
         opt_timeout = int(a)
+    elif o in [ '-o', '--pre-v6' ]:
+        opt_pre_v6 = True
     elif o in [ '-h', '--help' ]:
         usage()
         sys.exit(0)
@@ -107,10 +111,13 @@ class RequestError(Exception):
 g_device  = None
 g_version = None
 
-def get_upnp_info(control, namespace, action):
+def get_upnp_info(control, namespace, action, pre_v6=False):
     global g_device, g_version
-    url = 'http://%s:49000/igdupnp/control/%s' % (host_address, control)
-    #url = 'http://%s:49000/upnp/control/%s' % (host_address, control)
+
+    if opt_pre_v6:
+        url = 'http://%s:49000/upnp/control/%s' % (host_address, control)
+    else:
+        url = 'http://%s:49000/igdupnp/control/%s' % (host_address, control)
 
     headers = {
         'User-agent':   'Check_MK agent_fritzbox',
@@ -180,7 +187,7 @@ try:
         ('WANDSLLinkC1', 'urn:schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDSLLinkInfo'),
         ]:
         try:
-            status.update(get_upnp_info(control, namespace, action))
+            status.update(get_upnp_info(control, namespace, action, opt_pre_v6))
         except:
             if opt_debug:
                 raise

@@ -9,7 +9,7 @@ from distutils.core import setup
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 
 setup(name='arsoft-python',
-		version='1.163',
+		version='1.164',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',

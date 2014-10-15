@@ -1,3 +1,9 @@
+arsoft-python (1.164) trusty; urgency=medium
+
+  * add option to use agent_fritzbox with older FritzOS versions
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 15 Oct 2014 14:21:54 +0200
+
 arsoft-python (1.163) trusty; urgency=medium
 
   * minor check_mk bug fixes
