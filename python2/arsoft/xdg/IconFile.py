@@ -28,8 +28,10 @@ class IconFile(xdg_file):
     def context(self):
         return self._context
 
-    def install(self, verbose=False):
+    def install(self, verbose=False, noUpdate=False):
         args = ['install', '--size', str(self._size)]
+        if noUpdate:
+            args.append('--noupdate')
         if self._theme is not None:
             args.extend(['--theme', self._theme])
         if self._context is not None:
@@ -42,4 +44,20 @@ class IconFile(xdg_file):
         else:
             ret = False
         return ret
- 
+
+    def uninstall(self, verbose=False, noUpdate=False):
+        args = ['uninstall', '--size', str(self._size)]
+        if noUpdate:
+            args.append('--noupdate')
+        if self._theme is not None:
+            args.extend(['--theme', self._theme])
+        if self._context is not None:
+            args.extend(['--context', self._context])
+        args.append(self.suggested_basename)
+
+        if runcmd('xdg-icon-resource', args, verbose=verbose) == 0:
+            ret = True
+        else:
+            ret = False
+        return ret
+
