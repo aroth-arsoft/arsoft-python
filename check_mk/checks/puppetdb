@@ -106,19 +106,19 @@ def check_puppetdb(item, params, info):
         perfdata.append( ('dispatchcount', data['queued_dispatchcount']) )
         perfdata.append( ('averageenqueuetime', data['queued_averageenqueuetime']) )
 
-        if queuesize > memory_usage_crit_threshold:
+        if queuesize > queuesize_crit_threshold:
             if level < 2:
                 level = 2
-            details.append('Queue size %i %%' % (queuesize))
+            details.append('Queue size %i' % (queuesize))
         elif queuesize > queuesize_warn_threshold:
             if level < 1:
                 level = 1
-            details.append('Queue size %i %%' % (queuesize))
+            details.append('Queue size %i' % (queuesize))
         if len(details) == 0:
             if queuesize == 0:
                 details.append('Queue is empty')
             else:
-                details.append('Queue size %i %%' % (queuesize))
+                details.append('Queue size %i' % (queuesize))
 
     # Construct a the status message.
     if level == 0:

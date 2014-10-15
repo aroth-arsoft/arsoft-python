@@ -1,3 +1,9 @@
+arsoft-python (1.163) trusty; urgency=medium
+
+  * minor check_mk bug fixes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 15 Oct 2014 12:03:36 +0200
+
 arsoft-python (1.162) trusty; urgency=medium
 
   * several check_mk improvements
