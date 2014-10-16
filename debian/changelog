@@ -1,3 +1,9 @@
+arsoft-python (1.165) trusty; urgency=medium
+
+  * add jenkins tests for check_mk
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 16 Oct 2014 10:58:59 +0200
+
 arsoft-python (1.164) trusty; urgency=medium
 
   * add option to use agent_fritzbox with older FritzOS versions
