@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+
+def inventory_jenkins(checkname, info):
+
+    ret = []
+    if len(info) > 1:
+        ret.append( ('status', None) )
+        data = {}
+        slaves = set()
+        jobs = set()
+        for line in info:
+            # if we don't have any upgrades listed, the line list
+            # will only contain one element, eg. "upgrades\n"
+            if len(line) < 2:
+                continue
+
+            if line[0] == 'slave':
+                slaves.add(line[1])
+            elif line[0] == 'job':
+                jobs.add(line[1])
+
+        for slave in slaves:
+            ret.append( ('slave.%s' % slave, None) )
+
+        for job in jobs:
+            ret.append( ('job.%s' % job, None) )
+
+    return ret
+
+def check_jenkins(item, params, info):
+
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    perfdata = []
+    details = []
+    data = { 'slaves': {}, 'jobs': {} }
+
+    if '.' in item:
+        item_class, item_name = item.split('.', 1)
+    else:
+        item_class = item
+        item_name = None
+
+    for line in info:
+        # if we don't have any upgrades listed, the line list
+        # will only contain one element, eg. "upgrades\n"
+        if len(line) < 2:
+            continue
+
+        if line[0] == 'slave':
+            slave_name = line[1]
+            key = line[2]
+            value = ' '.join(line[3:])
+        elif line[0] == 'job':
+            job_name = line[1]
+            key = line[2]
+            value = ' '.join(line[3:])
+        else:
+            key = line[0]
+            value = ' '.join(line[1:])
+
+        if value[0] == '\"' and value[-1] == '\"':
+            value = value[1:-1]
+
+        if line[0] == 'slave':
+            if not slave_name in data['slaves']:
+                data['slaves'][slave_name] = {}
+            data['slaves'][slave_name][key] = value
+        elif line[0] == 'job':
+            if not job_name in data['jobs']:
+                data['jobs'][job_name] = {}
+            data['jobs'][job_name][key] = value
+        else:
+            data[key] = value
+
+    if item_class == 'status':
+        details = []
+        if data['pid'] == 0:
+            if level < 2:
+                level = 2
+            details.append('Jenkins process not running')
+        if len(details) == 0:
+            details.append('Version %s' % (data['version']))
+    elif item_class == 'slave':
+        if item_name in data['slaves']:
+            slave_data = data['slaves'][item_name]
+            details.append('%s ok' % (item_name))
+        else:
+            details.append('%s not available' % (item_name))
+            level = 2
+    elif item_class == 'job':
+        if item_name in data['jobs']:
+            job_data = data['jobs'][item_name]
+            details.append('%s ok' % (item_name))
+            perfdata.append( ('buildnumber', job_data['last_build_number']) )
+            perfdata.append( ('duration', job_data['last_build_duration']) )
+        else:
+            details.append('%s not available' % (item_name))
+            level = 2
+
+    # Construct a the status message.
+    if level == 0:
+        msg = "OK - %s" % (','.join(details))
+    elif level == 1:
+        msg = "WARN - %s" % (','.join(details))
+    elif level == 2:
+        msg = "CRIT - %s" % (','.join(details))
+    return (level, msg, perfdata)
+
+# declare the check to Check_MK.
+check_info['jenkins'] = {
+    'check_function':            check_jenkins,
+    'inventory_function':        inventory_jenkins,
+    'service_description':       'Jenkins',
+    'has_perfdata':              True,
+}

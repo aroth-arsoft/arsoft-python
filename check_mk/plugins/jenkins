@@ -1,0 +1,152 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import re
+import os
+import errno
+import urllib2
+import json
+
+def check_pid(pid):
+    """ Check For the existence of a unix pid. """
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH == No such process
+            return False
+        elif err.errno == errno.EPERM:
+            # EPERM clearly means there's a process to deny access to
+            return True
+        else:
+            # According to "man 2 kill" possible error values are
+            # (EINVAL, EPERM, ESRCH)
+            raise
+    else:
+        return True
+
+class jenkins_check_mk_plugin(object):
+
+    URI_BASE = '/jenkins'
+    API_SUFFIX = '/api/json'
+    PLUGIN_MANAGER_URI = '/pluginManager';
+    COMPUTER_URI = '/computer'
+    HOSTNAME = '127.0.0.1'
+    PORT = 8080
+
+    def __init__(self):
+        self._version = ''
+        self._version_info = ''
+        self._pid = 0
+        self._running = False
+        self._base_url = 'http://%s:%i%s' % (self.HOSTNAME, self.PORT, self.URI_BASE)
+        self._plugins = []
+        self._plugin_updates = []
+        self._disabled_plugins = []
+        self._slaves = []
+        self._jobs = []
+
+        self._get_process_state()
+        if self._pid:
+            self._get_plugin_info()
+            self._get_slaves()
+            self._get_jobs()
+
+
+    def _get_plugin_info(self):
+        url = self._base_url + self.PLUGIN_MANAGER_URI + self.API_SUFFIX + '?tree=plugins[active,enabled,hasUpdate,longName,version]'
+        response = urllib2.urlopen(url)
+        if response:
+            headers = response.info()
+            self._version = headers.get('X-Jenkins')
+            plugin_tree = json.loads(response.read())
+            for plugin in plugin_tree['plugins']:
+                plugin_name = plugin['longName']
+                if not plugin['enabled']:
+                    self._disabled_plugins.append(plugin_name)
+                else:
+                    self._plugins.append(plugin_name)
+                    if plugin['hasUpdate']:
+                        self._plugin_updates.append(plugin_name)
+
+    def _get_slaves(self):
+        url = self._base_url + self.COMPUTER_URI + self.API_SUFFIX + '?tree=computer[displayName,executors[idle],idle,offline,offlineCause[description],temporarilyOffline]'
+        response = urllib2.urlopen(url)
+        if response:
+            computers_tree = json.loads(response.read())
+            for computer in computers_tree['computer']:
+                computer_name = computer['displayName']
+                if computer_name == 'master':
+                    continue
+                offline = computer['offline']
+                offlineCause = computer['offlineCause']
+                idle = computer['idle']
+                item = (computer_name,offline,offlineCause, idle)
+                self._slaves.append(item)
+
+    def _get_jobs(self):
+        url = self._base_url + self.API_SUFFIX + '?tree=jobs[name,url,buildable,lastBuild[number,building,timestamp,estimatedDuration]]';
+        response = urllib2.urlopen(url)
+        if response:
+            job_tree = json.loads(response.read())
+            print(job_tree)
+            for job in job_tree['jobs']:
+                job_name = job['name']
+                job_url = job['url']
+                buildable = job['buildable']
+                lastBuild = job['lastBuild']
+                last_build_building = lastBuild['building'] if lastBuild else False
+                last_build_number = lastBuild['number'] if lastBuild else 0
+                last_build_timestamp = lastBuild['timestamp'] if lastBuild else 0
+                last_build_duration = lastBuild['estimatedDuration'] if lastBuild else 0
+                item = (job_name,job_url,buildable, last_build_building, last_build_number, last_build_timestamp, last_build_duration)
+                self._jobs.append(item)
+
+    def _get_process_state(self):
+        if not os.path.isdir('/run/jenkins'):
+            return
+
+        content = ''
+        try:
+            with open('/run/jenkins/jenkins.pid') as f:
+                content = f.readlines()
+        except IOError:
+            pass
+        try:
+            pid = int(content[0].strip())
+        except ValueError:
+            pid = None
+        self._pid = pid
+        self._running = check_pid(pid)
+
+    def status(self):
+        print('version %s' % self._version)
+        print('base_url %s' % self._base_url)
+        print('pid %i' % self._pid)
+        print('running %i' % self._running)
+        print('plugins "%s"' % ','.join(self._plugins))
+        print('plugin_updates "%s"' % ','.join(self._plugin_updates))
+        print('disabled_plugins "%s"' % ','.join(self._disabled_plugins))
+        for slave in self._slaves:
+            (computer_name,offline,offlineCause, idle) = slave
+            print('slave %s offline %i' % (computer_name, offline))
+            print('slave %s offline_cause "%s"' % (computer_name, offlineCause))
+            print('slave %s idle %i' % (computer_name, idle))
+        for job in self._jobs:
+            (job_name,job_url,buildable, last_build_building, last_build_number, last_build_timestamp, last_build_duration) = job
+            print('job %s url "%s"' % (job_name, job_url))
+            print('job %s buildable %i' % (job_name, buildable))
+            print('job %s last_build_building %i' % (job_name, last_build_building))
+            print('job %s last_build_number %i' % (job_name, last_build_number))
+            print('job %s last_build_timestamp %i' % (job_name, last_build_timestamp))
+            print('job %s last_build_duration %i' % (job_name, last_build_duration))
+
+
+if __name__ == "__main__":
+    print("<<<jenkins>>>")
+    pl = jenkins_check_mk_plugin()
+    pl.status()
+
