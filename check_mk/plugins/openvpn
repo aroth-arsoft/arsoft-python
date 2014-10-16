@@ -52,7 +52,7 @@ class openvpn_mk_check_plugin(object):
                 is_running = config_file.running
                 status_file = arsoft.openvpn.StatusFile(config_file=config_file)
                 autostart = True if vpnname in self._systemconfig.autostart else False
-                last_update = timestamp_from_datetime(status_file.last_update)
+                last_update = timestamp_from_datetime(status_file.last_update) if status_file.last_update else 0
                 now = time.time()
                 print('%s autostart %i' % (vpnname, autostart))
                 print('%s running %i' % (vpnname, is_running))
@@ -71,7 +71,7 @@ class openvpn_mk_check_plugin(object):
                 if len(config_file.routes):
                     print('%s routes \"%s\"' % (vpnname, ','.join([ '%s/%s' % (network, netmask) for (network, netmask) in config_file.routes ])))
                 if status_file.routing_table:
-                    print('%s routing_table \"%s\"' % (vpnname, ','.join(status_file.routing_table.values())))
+                    print('%s routing_table \"%s\"' % (vpnname, ','.join([ str(entry) for entry in status_file.routing_table.values() ])))
                 if status_file.statistics:
                     for name in status_file.statistics:
                         print('%s statistics.%s \"%s\"' % (vpnname, name, getattr(status_file.statistics, name)))
