@@ -53,11 +53,16 @@ class openvpn_mk_check_plugin(object):
                 status_file = arsoft.openvpn.StatusFile(config_file=config_file)
                 autostart = True if vpnname in self._systemconfig.autostart else False
                 last_update = timestamp_from_datetime(status_file.last_update) if status_file.last_update else 0
+                last_state_change = timestamp_from_datetime(status_file.state.timestamp) if status_file.state and status_file.state.timestamp else 0
                 now = time.time()
                 print('%s autostart %i' % (vpnname, autostart))
                 print('%s running %i' % (vpnname, is_running))
                 print('%s state \"%s\"' % (vpnname, status_file.state.name))
                 print('%s state_text \"%s\"' % (vpnname, status_file.state.long_state))
+                print('%s last_state_change %i' % (vpnname, last_state_change))
+                print('%s state_age %i' % (vpnname, now - last_state_change))
+                print('%s localip \"%s\"' % (vpnname, status_file.state.localip))
+                print('%s remoteip \"%s\"' % (vpnname, status_file.state.remoteip))
                 print('%s last_updated %i' % (vpnname, last_update))
                 print('%s last_updated_age %i' % (vpnname, now - last_update))
                 print('%s cert_expire %i' % (vpnname, self._get_cert_expire(config_file.cert_file)))
