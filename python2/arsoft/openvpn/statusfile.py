@@ -528,6 +528,8 @@ if __name__ == '__main__':
         print("="*79)
         print("Last updated")
         pprint.pprint(parser.last_update)
+        print("State")
+        pprint.pprint(str(parser.state))
         print("Connected clients")
         pprint.pprint(parser.connected_clients)
         print("-"*79)

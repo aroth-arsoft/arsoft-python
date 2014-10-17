@@ -163,6 +163,7 @@ class OpenVPNAdmin(object):
                             print('  Running: %s (PID file %s)' % (is_running, str(config_file.pidfile)) )
                         print('  Autostart: %s' % autostart)
                         print('  State: %s' % status_file.state.long_state)
+                        print('  Last state change: %s' % status_file.state.timestamp)
                         print('  Last updated: %s' % status_file.last_update)
                         print('  Log file: %s' % config_file.current_logfile)
                         self._print_cert('Certificate file', config_file.cert_file)
@@ -172,6 +173,7 @@ class OpenVPNAdmin(object):
                         print('  DH file: %s' % config_file.dh_file)
                         
                         if config_file.server:
+                            print('  Local address: %s' % status_file.state.localip)
                             print('  Client config directory: %s' % config_file.client_config_directory)
                             print('  Configured clients:')
                             if config_file.client_config_files is not None:
@@ -194,6 +196,10 @@ class OpenVPNAdmin(object):
                             if status_file.connected_clients is not None:
                                 for (clientname, clientinfo) in status_file.connected_clients.iteritems():
                                     print('    %s' % (clientinfo))
+                        else:
+                            print('  Remote address: %s' % status_file.state.remoteip)
+                            print('  Local address: %s' % status_file.state.localip)
+
                         if len(config_file.routes):
                             print('  Routes:')
                             for (network, netmask) in config_file.routes:
