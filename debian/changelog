@@ -1,3 +1,9 @@
+arsoft-python (1.168) trusty; urgency=medium
+
+  * improvements for certifcate checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 17 Oct 2014 16:55:25 +0200
+
 arsoft-python (1.167) trusty; urgency=medium
 
   * some fixes for openvpn and nginx_cert check_mk
