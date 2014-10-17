@@ -17,12 +17,13 @@ class nginx_cert_mk_check_plugin(object):
         self.certificate_files[None] = []
 
         sites_enabled_dir = '/etc/nginx/sites-enabled'
-        for f in os.listdir(sites_enabled_dir):
-            (base, ext) = os.path.splitext(f)
-            if ext != '.conf':
-                continue
-            fullname = os.path.join(sites_enabled_dir, f)
-            self._parse_config_file(fullname)
+        if os.path.isdir(sites_enabled_dir):
+            for f in os.listdir(sites_enabled_dir):
+                (base, ext) = os.path.splitext(f)
+                if ext != '.conf':
+                    continue
+                fullname = os.path.join(sites_enabled_dir, f)
+                self._parse_config_file(fullname)
 
     def _parse_config_file(self, filename):
         server_name = None
