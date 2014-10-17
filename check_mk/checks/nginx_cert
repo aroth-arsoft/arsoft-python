@@ -56,7 +56,11 @@ def check_nginx_cert(item, params, info):
                 msg = 'WARN - Certificate expires in %s' % format_timedelta(value - now)
             elif value <= crit_time:
                 level = 2
-                msg = 'CRIT - Certificate expires in %s' % format_timedelta(value - now)
+                diff = value - now
+                if diff > 0:
+                    msg = 'CRIT - Certificate expires in %s' % format_timedelta(diff)
+                else:
+                    msg = 'CRIT - Certificate expired %s' % format_timedelta(diff)
             if min_time is None or value < min_time:
                 min_time = value
 

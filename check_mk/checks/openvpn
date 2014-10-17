@@ -135,21 +135,33 @@ def check_openvpn(item, params, info):
                 details.append('Certificate expires in %s' % format_timedelta(cert_expire - now))
             elif cert_expire <= crit_time:
                 level = 2
-                details.append('Certificate expires in %s' % format_timedelta(cert_expire - now))
+                diff = cert_expire - now
+                if diff > 0:
+                    details.append('Certificate expires in %s' % format_timedelta(diff))
+                else:
+                    details.append('Certificate expired %s' % format_timedelta(diff))
         if level == 0 and ca_expire != 0:
             if ca_expire <= warn_time:
                 level = 1
                 details.append('CA Certificate expires in %s' % format_timedelta(ca_expire - now))
             elif ca_expire <= crit_time:
                 level = 2
-                details.append('CA Certificate expires in %s' % format_timedelta(ca_expire - now))
+                diff = ca_expire - now
+                if diff > 0:
+                    details.append('CA Certificate expires in %s' % format_timedelta(diff))
+                else:
+                    details.append('CA Certificate expired %s' % format_timedelta(diff))
         if level == 0 and crl_expire != 0:
             if crl_expire <= warn_time:
                 level = 1
                 details.append('CRL expires in %s' % format_timedelta(crl_expire - now))
             elif crl_expire <= crit_time:
                 level = 2
-                details.append('CRL expires in %s' % format_timedelta(crl_expire - now))
+                diff = crl_expire - now
+                if diff > 0:
+                    details.append('CRL expires in %s' % format_timedelta(diff))
+                else:
+                    details.append('CRL expired %s' % format_timedelta(diff))
         if level == 0:
             if ca_expire > cert_expire:
                 details.append('Certificate expires in %s' % format_timedelta(cert_expire - now))
