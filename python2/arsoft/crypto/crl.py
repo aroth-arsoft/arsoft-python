@@ -25,10 +25,13 @@ class CRL(PEMItem):
     def revoked(self):
         if self._rev_list is None:
             self._rev_list = []
-            for rev in self.crl.get_revoked():
-                self._rev_list.append(CRL.RevokeItem(rev))
+            if self.crl:
+                l = self.crl.get_revoked()
+                if l is not None:
+                    for rev in l:
+                        self._rev_list.append(CRL.RevokeItem(rev))
         return self._rev_list
-    
+
     @property
     def next_update(self):
         return None
