@@ -8,7 +8,7 @@ import argparse
 import sys
 import tempfile
 import socket
-from arsoft.dnsutils import get_dns_srv_record, get_dns_host_record, gethostname_tuple
+from arsoft.dnsutils import get_dns_srv_record, get_dns_host_record, get_dns_ptr_record, gethostname_tuple, is_valid_ipv4
 from arsoft.utils import rmtree
 from arsoft.sshutils import *
 import arsoft.openvpn
@@ -34,11 +34,11 @@ class PuppetSetupApp(object):
             rmtree(self._temp_directory)
 
     def version(self):
-        print(('Version: %s' % str(__version__)))
-        print(('SSH: %s' % str(SSH_EXECUTABLE)))
-        print(('SSH keygen: %s' % str(SSH_KEYGEN_EXECUTABLE)))
-        print(('SSH copy id: %s' % str(SSH_COPY_ID_EXECUTABLE)))
-        print(('SCP: %s' % str(SCP_EXECUTABLE)))
+        print('Version: %s' % str(__version__))
+        print('SSH: %s' % str(SSH_EXECUTABLE))
+        print('SSH keygen: %s' % str(SSH_KEYGEN_EXECUTABLE))
+        print('SSH copy id: %s' % str(SSH_COPY_ID_EXECUTABLE))
+        print('SCP: %s' % str(SCP_EXECUTABLE))
         return 0
     
     def _generate_key(self):
@@ -67,7 +67,7 @@ class PuppetSetupApp(object):
     def _remove_key(self):
         if self._public_key_comment:
             if self.verbose:
-                print(('remove key %s' % self._public_key_comment))
+                print('remove key %s' % self._public_key_comment)
             commandline = 'sed \'/%(public_key_comment)s/d\' -i.old ~/.ssh/authorized_keys' % { 'public_key_comment':self._public_key_comment }
             ret = self._runssh(commandline=commandline)
         else:
@@ -139,7 +139,7 @@ exit $RES
        'sourcename':sourcename,
        'sourcefilename':sourcefilename }
         (sts, stdout, stderr) = self._runssh(script)
-        print(('_add_apt_source %s sts=%i' % (sourcename, sts)))
+        print('_add_apt_source %s sts=%i' % (sourcename, sts))
         if sts == 0:
             self._apt_update_required = True
             ret = True
@@ -230,9 +230,14 @@ exit $RES
         return ret
 
     def _enforce_fqdn(self):
-        if self.verbose:
-            print(('_enforce_fqdn %s' % self.target_hostname_full))
-        script = """
+        if is_valid_ipv4(self.target_hostname_full) or is_valid_ipv6(self.target_hostname_full):
+            if self.verbose:
+                print('_enforce_fqdn %s (skip  because ip address)' % self.target_hostname_full)
+            ret = True
+        else:
+            if self.verbose:
+                print('_enforce_fqdn %s' % self.target_hostname_full)
+            script = """
 current_fqdn=`hostname -f`
 if [ "$current_fqdn" != "%(fqdn)s" ]; then
     %(sudo_command)smanagehosts set-hostname "%(fqdn)s"; RES=$?
@@ -241,10 +246,10 @@ else
 fi
 exit $RES
 """ % { 'sudo_command': self.sudo_command, 'fqdn':self.target_hostname_full }
-        (sts, stdout, stderr) = self._runssh(script)
-        ret = True if sts == 0 else False
-        if not ret:
-            sys.stderr.write('Failed to enforce full qualified hostname %s.\n%s\n%s\n' % (self.target_hostname_full, stdout, stderr))
+            (sts, stdout, stderr) = self._runssh(script)
+            ret = True if sts == 0 else False
+            if not ret:
+                sys.stderr.write('Failed to enforce full qualified hostname %s.\n%s\n%s\n' % (self.target_hostname_full, stdout, stderr))
         return ret
 
     def _add_puppet_server_host_entry(self):
@@ -402,7 +407,7 @@ exit $RES
             self.sudo_askpass_script = stdout.strip()
             self.sudo_command = 'SUDO_ASKPASS=\'%s\' sudo -A ' % self.sudo_askpass_script
             if self.verbose:
-                print(('sudo command %s' % self.sudo_command))
+                print('sudo command %s' % self.sudo_command)
         return ret
 
     def _deinitialize_sudo(self):
@@ -452,6 +457,7 @@ exit $RES
         args = parser.parse_args()
         self.verbose = args.verbose
         self.target_hostname = args.hostname
+        self.target_hostname_full = None
         self.target_domainname = None
         self.username = args.username
         self.password = args.password
@@ -476,18 +482,31 @@ exit $RES
         if self.puppet_server:
             self.puppet_server_ip = socket.gethostbyname(self.puppet_server)
 
-        (self.target_fqdn, tmp, self.target_domainname) = gethostname_tuple(self.target_hostname)
-        if self.target_domainname is None or self.target_domainname == 'localdomain':
-            query_hostname = self.target_hostname + '.' + self.local_domainname
-            target_host_record = get_dns_host_record(query_hostname)
-            if len(target_host_record) > 0:
-                (self.target_hostname_full, hostname, self.target_domainname) = gethostname_tuple(query_hostname)
-            else:
-                self.target_hostname_full = None
-                self.target_domainname = None
+        if is_valid_ipv4(self.target_hostname) or is_valid_ipv6(self.target_hostname):
+            self.target_hostname_full = self.target_hostname
+            target_ptr_record = get_dns_ptr_record(self.target_hostname)
+            if target_ptr_record:
+                target_ptr_record_str = str(target_ptr_record[0])
+                if '.' in target_ptr_record_str:
+                    (hostname, domain) = target_ptr_record_str.split('.', 1)
+                    self.target_domainname = domain
+                    self.target_hostname = hostname
+        else:
+            (self.target_fqdn, tmp, self.target_domainname) = gethostname_tuple(self.target_hostname)
+            if self.target_domainname is None or self.target_domainname == 'localdomain':
+                query_hostname = self.target_hostname + '.' + self.local_domainname
+                target_host_record = get_dns_host_record(query_hostname)
+                if len(target_host_record) > 0:
+                    (self.target_hostname_full, hostname, self.target_domainname) = gethostname_tuple(query_hostname)
+                else:
+                    self.target_hostname_full = None
+                    self.target_domainname = None
 
         if self.target_domainname is None:
-            sys.stderr.write('Unable to determine full qualified domain name for target host %s. Unable to continue without it. Make sure\nthe hostname is correct and DNS is working.' % self.target_hostname)
+            sys.stderr.write("""Unable to determine full qualified domain name for target host %s.
+Unable to continue without it. Make sure the hostname is correct and DNS is working properly.
+""" % self.target_hostname)
+            return 1
 
         self.sudo_askpass_script = None
         if self.use_sudo and self.username != 'root':

@@ -103,7 +103,7 @@ def initialize_settings(settings_module, setttings_file):
 
     # Absolute filesystem path to the directory that will hold user-uploaded files.
     # Example: "/home/media/media.lawrence.com/media/"
-    settings_obj.MEDIA_ROOT = ''
+    settings_obj.MEDIA_ROOT = app_data_dir
 
     # URL that handles the media served from MEDIA_ROOT. Make sure to use a
     # trailing slash.

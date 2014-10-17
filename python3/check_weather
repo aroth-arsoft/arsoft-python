@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from arsoft.nagios import NagiosPlugin, OK, WARNING, CRITICAL, UNKNOWN
 from arsoft.timestamp import strptime_as_datetime, timestamp_from_datetime
 import time
+import string
 
 ## Create the plugin option
 np = NagiosPlugin()
@@ -60,6 +61,9 @@ def _get_node_str(root, name, default=''):
         ret = default
     return ret
 
+def _clean_string(s):
+    return filter(lambda x: x in string.printable, s)
+
 if current_observation:
     tree = ET.fromstring(current_observation)
     if tree is not None:
@@ -67,7 +71,7 @@ if current_observation:
         if location_node is not None:
             station_full_name = _get_node_str(location_node, 'full')
             if station_full_name is not None:
-                station_full_name = station_full_name.strip()
+                station_full_name = _clean_string(station_full_name.strip())
                 while station_full_name[-1] in ',.':
                     station_full_name = station_full_name[:-1]
         else:
@@ -95,7 +99,7 @@ if current_observation:
             
             (exit_code, exit_message) = np.check_values()
             if exit_code == OK:
-                exit_message = station_full_name
+                exit_message = '%s' % (station_full_name)
         else:
             exit_code = CRITICAL
             exit_message = 'invalid station id %s' % (station_id)

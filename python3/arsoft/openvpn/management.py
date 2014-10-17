@@ -96,7 +96,7 @@ class ManagementInterface(object):
                 s_args = s_reply + (timeout-elapsed,)
         return ret
 
-    def _read_response(self, timeout):
+    def _read_response(self, timeout, has_end_marker=False):
         data = ''
         s_reply = ([self._socket], [], [])
         s_args = s_reply
@@ -113,8 +113,16 @@ class ManagementInterface(object):
             else:
                 data = data + buf
 
-            if data.endswith("END\r\n"):
+            if has_end_marker:
+                if data.endswith("END\r\n"):
+                    ret = data.split('\r\n')
+                    if len(ret) > 0 and not ret[-1]:
+                        del ret[-1]
+                    break
+            elif data.endswith("\r\n"):
                 ret = data.split('\r\n')
+                if len(ret) > 0 and not ret[-1]:
+                    del ret[-1]
                 break
             if timeout is not None:
                 elapsed = time() - time_start
@@ -123,9 +131,9 @@ class ManagementInterface(object):
                 s_args = s_reply + (timeout-elapsed,)
         return ret
 
-    def _send_command(self, command):
+    def _send_command(self, command, has_end_marker=True):
         self._socket.sendall(command + '\n')
-        return self._read_response(self._timeout)
+        return self._read_response(self._timeout, has_end_marker=has_end_marker)
 
     def status(self, version=3):
         return self._send_command('status ' + str(version))
@@ -133,12 +141,46 @@ class ManagementInterface(object):
     def state(self):
         return self._send_command('state')
 
+    def pid(self):
+        return self._send_command('pid', has_end_marker=False)
+
+    def openvpn_version(self):
+        raw = self._send_command('version')
+        if raw is None:
+            return None
+        version_num = None
+        arch = None
+        build_date = None
+        features = []
+        for line in raw:
+            if line.startswith('OpenVPN Version: '):
+                line_elems = line[17:].split(' ')
+                idx = line.find('built on')
+                if idx > 0:
+                    build_date = line[idx+9:]
+                ver_idx = line_elems.index('OpenVPN')
+                if ver_idx >= 0:
+                    version_num = line_elems[ver_idx+1]
+                    arch = line_elems[ver_idx+2]
+                for item in line_elems:
+                    if not item:
+                        continue
+                    if item[0] == '[' and item[-1] == ']':
+                        features.append(item[1:-1])
+        return (version_num, arch, build_date, features)
+
 if __name__ == '__main__':
     m = ManagementInterface('unix:/run/openvpn.' + sys.argv[1] + '.socket')
     if m.open():
-        print((m.version))
+        print('mgmt iface=%s' % m.version)
+        r = m.pid()
+        print ('pid=%s' % r)
+        r = m.state()
+        print ('state=%s' % r)
+        r = m.openvpn_version()
+        print ('openvpn_version=%s' % str(r))
         r = m.status()
-        print (r)
+        print ('status=%s' % r)
         m.close()
     else:
-        print(('failed to open openvpn management socket ' + sys.argv[1]))
+        print('failed to open openvpn management socket ' + sys.argv[1])

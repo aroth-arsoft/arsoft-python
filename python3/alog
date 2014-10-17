@@ -96,7 +96,7 @@ class alog_config(object):
                 key, value = shortcut.split(':', 1)
                 ret[key] = value
         if self._verbose:
-            print(('Shortcuts: %s' % str(ret)))
+            print('Shortcuts: %s' % str(ret))
         return ret
 
     @property
@@ -401,7 +401,7 @@ class alog_application(object):
             output = True if not msg_obj.filtered else False
         if output:
             try:
-                print(( self._output_format % msg_obj.__dict__))
+                print( self._output_format % msg_obj.__dict__)
             except IOError as e:
                 if e.errno == errno.EPIPE:
                     sys.exit(0)
@@ -432,7 +432,7 @@ class alog_application(object):
         if os.path.exists(filename):
             filedir = os.path.dirname(filename)
             base, ext = os.path.splitext(os.path.basename(filename))
-            print((base, ext))
+            print(base, ext)
             for f in os.listdir(filedir):
                 fullname = os.path.join(filedir, f)
                 if os.path.isfile(fullname):
@@ -467,7 +467,7 @@ class alog_application(object):
 
         self._pattern = self._select_pattern(args.pattern)
         if self._verbose:
-            print(('Pattern: %s' % self._pattern))
+            print('Pattern: %s' % self._pattern)
 
         if self._logfile_obj is None:
             if self._last_error:
@@ -484,13 +484,13 @@ class alog_application(object):
 
             self._output_format = self._prepare_output_format(self._pattern, self._output_format)
             if self._verbose:
-                print(('Output format: %s' % self._output_format))
+                print('Output format: %s' % self._output_format)
             if not line_re:
                 sys.stdout.write('Unable to determine log pattern for log file %s\n' % (self._logfile))
                 ret = 1
             else:
                 if self._verbose:
-                    print(('Line RE: %s' % line_re.pattern))
+                    print('Line RE: %s' % line_re.pattern)
                 self._last_msg_obj = None
                 max_outputs = args.limit
                 if self._first_line:
@@ -559,7 +559,7 @@ class alog_application(object):
         else:
             self._logfile = args.logfile
         if self._verbose:
-            print(('%s -> %s' % (args.logfile, self._logfile)))
+            print('%s -> %s' % (args.logfile, self._logfile))
 
         if args.output_level:
             self._loglevel = []
@@ -569,7 +569,7 @@ class alog_application(object):
                     if filter in self._config.loglevel_names:
                         self._loglevel.append(filter.upper())
                     else:
-                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        sys.stderr.write('Unrecognized log level pattern %s\n' % (filter))
                         return 1
                 else:
                     filter = filter.upper()
@@ -584,12 +584,14 @@ class alog_application(object):
                                 found = True
                         i = i + 1
                     if not found:
-                        sys.stdout.write('Unrecognized log level pattern %s\n' % (filter))
+                        sys.stderr.write('Unrecognized log level pattern %s\n' % (filter))
                         return 1
+            if self._verbose:
+                print('Selected output levels: %s\n' % (','.join(self._loglevel)))
 
         if args.pattern != 'auto':
             if args.pattern not in self._config.known_patterns:
-                sys.stdout.write('Given pattern %s is invalid.\n' % (args.pattern))
+                sys.stderr.write('Given pattern %s is invalid.\n' % (args.pattern))
                 return 1
 
         if args.find_regex:
@@ -614,12 +616,12 @@ class alog_application(object):
             if args.load_history:
                 self._logfile_history = self._find_logfile_history(self._logfile)
                 if self._verbose:
-                    print((self._logfile_history))
+                    print(self._logfile_history)
                     for (rev, lf) in self._logfile_history:
-                        print(('Logfile: %s' % lf))
+                        print('Logfile: %s' % lf)
                 for (rev, lf) in self._logfile_history:
                     if self._verbose:
-                        print(('Process logfile %s (rev %i)' % (lf, rev)))
+                        print('Process logfile %s (rev %i)' % (lf, rev))
                     self._logfile_obj = self._open_logfile(lf)
                     if self._logfile_obj:
                         self._logfile = lf
