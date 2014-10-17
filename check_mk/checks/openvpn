@@ -84,10 +84,11 @@ def check_openvpn(item, params, info):
             configured_clients = cfgdata['configured_clients'].split(',')
             perfdata.append( ('confclients', len(configured_clients) ) )
 
-        if cfgdata['state'] != 'CONNECTED':
+        expected_state = 'CONNECTED' if cfgdata['autostart'] != 0 else 'DOWN'
+        if cfgdata['state'] != expected_state:
             if level < 1:
                 level = 1
-                msg = '%s != CONNECTED' % cfgdata['state']
+                msg = '%s != %s' % (cfgdata['state'], expected_state)
         if cfgdata['autostart'] != cfgdata['running']:
             if level < 2:
                 level = 2
