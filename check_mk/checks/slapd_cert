@@ -2,16 +2,16 @@
 #
 from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
 
-def inventory_postfix_cert(checkname, info):
+def inventory_slapd_cert(checkname, info):
     return check_mk_cert_inventory(checkname, info, warn_time=30, crit_time=14)
 
-def check_postfix_cert(item, params, info):
+def check_slapd_cert(item, params, info):
     return check_mk_cert_check(item, params, info)
 
 # declare the check to Check_MK.
-check_info['postfix_cert'] = {
-    'check_function':            check_postfix_cert,
-    'inventory_function':        inventory_postfix_cert,
-    'service_description':       'Postfix Certificate',
+check_info['slapd_cert'] = {
+    'check_function':            check_slapd_cert,
+    'inventory_function':        inventory_slapd_cert,
+    'service_description':       'OpenLDAP Certificate',
     'has_perfdata':              True,
 }

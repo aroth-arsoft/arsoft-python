@@ -1,3 +1,9 @@
+arsoft-python (1.169) trusty; urgency=medium
+
+  * use common utils function for check_mk cert checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 19 Oct 2014 18:17:05 +0200
+
 arsoft-python (1.168) trusty; urgency=medium
 
   * improvements for certifcate checks

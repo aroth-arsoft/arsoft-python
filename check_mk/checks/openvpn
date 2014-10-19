@@ -18,9 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 from arsoft.timestamp import format_timedelta
-
-warn_time_threshold = 30
-crit_time_threshold = 14
+from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
 
 def inventory_openvpn(checkname, info):
 
@@ -31,8 +29,10 @@ def inventory_openvpn(checkname, info):
 
     ret = []
     for cfgname in openvpn_configs:
-        ret.append( ('%s.status' % cfgname, None) )
-        ret.append( ('%s.certs' % cfgname, None) )
+        ret.append( ('%s status' % cfgname, None) )
+
+    cert_checks = check_mk_cert_inventory(checkname, info, prefix=True, warn_time=30, crit_time=14)
+    ret.extend(cert_checks)
     return ret
 
 def check_openvpn(item, params, info):
@@ -42,7 +42,7 @@ def check_openvpn(item, params, info):
     details = []
     perfdata = []
 
-    (cfgname, check_name) = item.split('.', 1)
+    (cfgname, check_name) = item.split(' ', 1)
     cfgdata = {}
 
     for line in info:
@@ -54,10 +54,7 @@ def check_openvpn(item, params, info):
         if line[0] != cfgname:
             continue
 
-        value = ' '.join(line[2:])
-        if value[0] == '\"' and value[-1] == '\"':
-            value = value[1:-1]
-        cfgdata[line[1]] = value
+        cfgdata[line[1]] = line[2]
 
     if check_name == 'status':
 
@@ -96,7 +93,7 @@ def check_openvpn(item, params, info):
         if cfgdata['state'] != expected_state:
             if level < 1:
                 level = 1
-                details.append('%s != %s' % (cfgdata['state'], expected_state))
+            details.append('%s != %s' % (cfgdata['state'], expected_state))
         else:
             state_age = saveint(cfgdata['state_age']) if 'state_age' in cfgdata else 0
             if state_age:
@@ -106,7 +103,7 @@ def check_openvpn(item, params, info):
         if autostart != running:
             if level < 2:
                 level = 2
-                details.append('VPN running' if running != 0 else 'VPN not running')
+            details.append('VPN running' if running != 0 else 'VPN not running')
 
         if running != 0:
             if 'localip' in cfgdata and cfgdata['localip']:
@@ -117,59 +114,9 @@ def check_openvpn(item, params, info):
             if last_updated_age > 600:
                 if level < 1:
                     level = 1
-                    details.append('Status has not been updated for %s' % format_timedelta(last_updated_age))
-    elif check_name == 'certs':
-        now = saveint(time.time())
-        warn_time = now + (warn_time_threshold * 86400)
-        crit_time = now + (crit_time_threshold * 86400)
-        cert_expire = saveint(cfgdata['cert_expire'])
-        ca_expire = saveint(cfgdata['ca_expire'])
-        crl_expire = saveint(cfgdata['crl_expire'])
-        perfdata.append( ('cert_expire', (cert_expire - now)/86400 if cert_expire else 0, warn_time_threshold, crit_time_threshold) )
-        perfdata.append( ('ca_expire', (ca_expire - now)/86400 if ca_expire else 0, warn_time_threshold, crit_time_threshold) )
-        perfdata.append( ('crl_expire', (crl_expire - now)/86400 if crl_expire else 0, warn_time_threshold, crit_time_threshold) )
-
-        if level == 0 and cert_expire != 0:
-            if cert_expire <= warn_time:
-                level = 1
-                details.append('Certificate expires in %s' % format_timedelta(cert_expire - now))
-            elif cert_expire <= crit_time:
-                level = 2
-                diff = cert_expire - now
-                if diff > 0:
-                    details.append('Certificate expires in %s' % format_timedelta(diff))
-                else:
-                    details.append('Certificate expired %s' % format_timedelta(diff))
-        if level == 0 and ca_expire != 0:
-            if ca_expire <= warn_time:
-                level = 1
-                details.append('CA Certificate expires in %s' % format_timedelta(ca_expire - now))
-            elif ca_expire <= crit_time:
-                level = 2
-                diff = ca_expire - now
-                if diff > 0:
-                    details.append('CA Certificate expires in %s' % format_timedelta(diff))
-                else:
-                    details.append('CA Certificate expired %s' % format_timedelta(diff))
-        if level == 0 and crl_expire != 0:
-            if crl_expire <= warn_time:
-                level = 1
-                details.append('CRL expires in %s' % format_timedelta(crl_expire - now))
-            elif crl_expire <= crit_time:
-                level = 2
-                diff = crl_expire - now
-                if diff > 0:
-                    details.append('CRL expires in %s' % format_timedelta(diff))
-                else:
-                    details.append('CRL expired %s' % format_timedelta(diff))
-        if level == 0:
-            if ca_expire > cert_expire:
-                details.append('Certificate expires in %s' % format_timedelta(cert_expire - now))
-            else:
-                details.append('CA Certificate expires in %s' % format_timedelta(ca_expire - now))
+                details.append('Status has not been updated for %s' % format_timedelta(last_updated_age))
     else:
-        level = 3
-        details.append("Unknown check %s" % check_name)
+        return check_mk_cert_check(item, params, info, prefix=True)
 
     # Construct a the status message.
     if level == 0:

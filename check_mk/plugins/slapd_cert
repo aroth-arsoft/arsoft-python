@@ -1,0 +1,72 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
+import os.path
+from arsoft.ldap import *
+
+# ldapsearch -b cn=config -D cn=admin,cn=config -w PW -x
+
+class slapd_cert_mk_check_plugin(object):
+
+    def __init__(self):
+        self._uri = 'ldapi:///'
+        self._base = 'cn=config'
+        self._binddn = 'cn=admin,%s' % self._base
+        self._bindpw = ''
+        self._saslmech = 'simple'
+
+        if os.path.isdir('/etc/ldap/slapd.d') and os.path.isfile('/etc/check_mk/slapd_cert'):
+            f = open('/etc/check_mk/slapd_cert', 'r')
+            self._bindpw = f.read().strip()
+            f.close()
+
+        self._cert_files = []
+        self._ca_files = []
+        self._crl_files = []
+        if self._bindpw:
+            self._get_config()
+
+    def _get_config(self):
+        self._cxn = LdapConnection(self._uri, self._binddn, self._bindpw, self._saslmech)
+        if self._cxn.connect():
+            searchFilter = '(objectclass=*)'
+            attrsFilter = ['olcTLSCACertificateFile', 'olcTLSCertificateFile', 'olcTLSCRLFile']
+            result_set = self._cxn.search(self._base, searchFilter, attrsFilter, ldap.SCOPE_BASE)
+            if result_set is not None:
+                for rec in result_set:
+                    (dn, values) = rec[0]
+                    if 'olcTLSCACertificateFile' in values:
+                        self._ca_files = values['olcTLSCACertificateFile']
+                    if 'olcTLSCertificateFile' in values:
+                        self._cert_files = values['olcTLSCertificateFile']
+                    if 'olcTLSCRLFile' in values:
+                        self._crl_files = values['olcTLSCRLFile']
+
+    def _get_crl_expire(self, crl):
+        ret = 0
+        if crl:
+            crl_file = str(crl.filename)
+            if os.path.isfile(crl_file):
+                if not crl.valid:
+                    pass
+                else:
+                    num_revoked = len(crl.revoked)
+        return ret
+
+    def status(self):
+        for cert_file in self._cert_files:
+            check_mk_cert_file_info(cert_file)
+        for cert_file in self._ca_files:
+            check_mk_cert_file_info(cert_file, ca=True)
+        for crl_file in self._crl_files:
+            check_mk_crl_file_info(crl_file)
+
+if __name__ == "__main__":
+    print("<<<slapd_cert:sep(59)>>>")
+    pl = slapd_cert_mk_check_plugin()
+    pl.status()
+
+
+
