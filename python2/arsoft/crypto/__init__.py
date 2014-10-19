@@ -9,5 +9,4 @@ from cert import Certificate, CertificateList, CertificateListFile, CertificateP
 from key import KeyItem, KeyList, KeyPEMFile, compare_pem_key
 from crl import CRL, CRLList, CRLPEMFile, CRLFile
 from pwgen import pwgen
-
-#print "netconfig %s" % __name__
+from utils import *

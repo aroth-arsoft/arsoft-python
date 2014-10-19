@@ -74,7 +74,11 @@ class Certificate(PEMItem):
 
     def _is_identical_cert(self, rhs_cert):
         return self.is_same_cert(rhs_cert) and self.get_serial_number() == rhs_cert.get_serial_number()
-        
+
+    @property
+    def valid(self):
+        return True if self.cert is not None else False
+
     def get_subject(self):
         return self.cert.get_subject()
 
@@ -88,6 +92,10 @@ class Certificate(PEMItem):
     @property
     def issuer(self):
         return self.cert.get_issuer()
+
+    @property
+    def self_signed(self):
+        return True if self.cert.get_subject() == self.cert.get_issuer() else False
 
     def get_version(self):
         return self.cert.get_version()
@@ -555,6 +563,10 @@ class CertificateFile(object):
         if self._impl:
             self._impl.close()
             self._impl = None
+
+    @property
+    def valid(self):
+        return True if self._impl is not None else False
 
     @property
     def last_error(self):
