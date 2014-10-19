@@ -30,7 +30,7 @@ class openvpn_mk_check_plugin(object):
                 now = time.time()
                 print('%s;autostart;%i' % (vpnname, autostart))
                 print('%s;running;%i' % (vpnname, is_running))
-                print('%s;state;%s;' % (vpnname, status_file.state.name))
+                print('%s;state;%s' % (vpnname, status_file.state.name))
                 print('%s;state_text;%s' % (vpnname, status_file.state.long_state))
                 print('%s;last_state_change;%i' % (vpnname, last_state_change))
                 print('%s;state_age;%i' % (vpnname, now - last_state_change))
