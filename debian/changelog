@@ -1,3 +1,9 @@
+arsoft-python (1.173) trusty; urgency=medium
+
+  * build errors
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 20 Oct 2014 19:21:36 +0200
+
 arsoft-python (1.172) trusty; urgency=medium
 
   * add one more missing check: cyrus_imapd

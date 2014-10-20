@@ -9,7 +9,7 @@ from distutils.core import setup
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 
 setup(name='arsoft-python',
-		version='1.172',
+		version='1.173',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -146,7 +146,7 @@ setup(name='arsoft-python',
                     'check_mk/plugins/cyrus_imapd',
                 ] ),
             ('/usr/share/check_mk/special', [
-                    'check_mk/special_agent/agent_fritzbox'
+                    'check_mk/special_agent/agent_fritzbox',
                     'check_mk/special_agent/agent_eiscp'
                 ] )
             ]
