@@ -29,9 +29,7 @@ def check_puppetdb(item, params, info):
             continue
 
         key = line[0]
-        value = ' '.join(line[1:])
-        if value[0] == '\"' and value[-1] == '\"':
-            value = value[1:-1]
+        value = line[1]
         if key != 'version':
             value = saveint(value)
         data[key] = value

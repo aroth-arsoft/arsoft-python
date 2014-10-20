@@ -65,7 +65,7 @@ class puppetdb_check_mk_plugin(object):
 
     def _get_config(self):
         if os.path.isfile(self.JETTY_INI):
-            inifile = IniFile(commentPrefix='#', keyValueSeperator='=')
+            inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
             if inifile.open(self.JETTY_INI):
                 try:
                     self._port = int(inifile.get('jetty', 'port', 8080))
@@ -102,27 +102,27 @@ class puppetdb_check_mk_plugin(object):
 
     def status(self):
         if self._port or self._sslport:
-            print('port %i' % self._port)
-            print('sslport %i' % self._sslport)
-            print('pid %i' % self._pid)
-            print('running %i' % self._running)
+            print('port;%i' % self._port)
+            print('sslport;%i' % self._sslport)
+            print('pid;%i' % self._pid)
+            print('running;%i' % self._running)
             for bean in self._beans:
                 v = self._get_bean(self._beans[bean])
                 if v:
                     if isinstance(v, dict):
                         if len(v) == 1:
                             value = v.values()[0]
-                            print('%s %s' % (bean, value))
+                            print('%s;%s' % (bean, value))
                         else:
                             for (key, value) in v.iteritems():
                                 if isinstance(value, dict):
                                     for (value_key, value_value) in value.iteritems():
-                                        print('%s_%s_%s %s' % (bean, key.lower(), value_key.lower(), value_value))
+                                        print('%s_%s_%s;%s' % (bean, key.lower(), value_key.lower(), value_value))
                                 else:
-                                    print('%s_%s %s' % (bean, key.lower(), value))
+                                    print('%s_%s;%s' % (bean, key.lower(), value))
 
 if __name__ == "__main__":
-    print("<<<puppetdb>>>")
+    print("<<<puppetdb:sep(59)>>>")
     pl = puppetdb_check_mk_plugin()
     pl.status()
 
