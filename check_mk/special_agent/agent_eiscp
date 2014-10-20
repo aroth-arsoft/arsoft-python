@@ -112,6 +112,13 @@ def status_master_volume(response):
         volume = 0
     return volume
 
+def status_sleep(response):
+    if response:
+        volume = int(response[3:5], 16)
+    else:
+        volume = 0
+    return volume
+
 def status_power(response):
     if response:
         power = int(response[3:5], 16)
@@ -145,6 +152,7 @@ status_maps = {
     'power': ('PWRQSTN', status_power),
     'input': ('SLIQSTN', status_input),
     'mute': ('AMTQSTN', status_mute),
+    'sleep': ('SLPQSTN', status_sleep),
     'master_volume': ('MVLQSTN', status_master_volume),
     #'audio': ('IFAQSTN', status_audio),
     #'video': ('IFVQSTN', status_video),
@@ -154,8 +162,8 @@ sys.stdout.write('<<<check_mk>>>\n')
 sys.stdout.write('Version: 1.0\n')
 sys.stdout.write('AgentOS: eISCP\n')
 
-sys.stdout.write('<<<eiscp>>>\n')
+sys.stdout.write('<<<eiscp:sep(59)>>>\n')
 net = eISCP(host_address, opt_port)
 for key, (cmd, resp_func) in status_maps.iteritems():
     response = net.raw(cmd + '\r\n')      #write a string
-    sys.stdout.write('%s: %s\n' % (key, resp_func(response)))
+    sys.stdout.write('%s;%s\n' % (key, resp_func(response)))

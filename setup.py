@@ -118,6 +118,9 @@ setup(name='arsoft-python',
                 'check_mk/checks/puppet_agent',
                 'check_mk/checks/puppetdb',
                 'check_mk/checks/openvz_ubc',
+                'check_mk/checks/jenkins',
+                'check_mk/checks/slapd_cert',
+                'check_mk/checks/eiscp',
                     ] ),
             ('/usr/lib/check_mk_agent/plugins', [
                     'check_mk/plugins/apache_status',
@@ -137,9 +140,12 @@ setup(name='arsoft-python',
                     'check_mk/plugins/puppet_agent',
                     'check_mk/plugins/puppetdb',
                     'check_mk/plugins/openvz_ubc',
+                    'check_mk/plugins/jenkins',
+                    'check_mk/plugins/slapd_cert',
                 ] ),
             ('/usr/share/check_mk/special', [
                     'check_mk/special_agent/agent_fritzbox'
+                    'check_mk/special_agent/agent_eiscp'
                 ] )
             ]
 		)
