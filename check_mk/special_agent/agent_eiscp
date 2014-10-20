@@ -1,0 +1,161 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+import getopt, sys
+from arsoft.eiscp.core import eISCP, command_to_iscp, iscp_to_command
+
+def usage():
+    sys.stderr.write("""Check_MK eISCP Agent
+
+USAGE: agent_eiscp [OPTIONS] HOST
+       agent_eiscp -h
+
+ARGUMENTS:
+  HOST                          Host name or IP address of your Fritz!Box
+
+OPTIONS:
+  -h, --help                    Show this help message and exit
+  -t, --timeout SEC             Set the network timeout to <SEC> seconds.
+                                Default is 10 seconds. Note: the timeout is not
+                                applied to the whole check, instead it is used for
+                                each API query.
+  --debug                       Debug mode: let Python exceptions come through
+""")
+
+short_options = 'h:t:d'
+long_options  = [
+    'help', 'timeout=', 'debug'
+]
+
+host_address      = None
+opt_debug         = False
+opt_timeout       = 10
+opt_port          = 60128
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+except getopt.GetoptError, err:
+    sys.stderr.write("%s\n" % err)
+    sys.exit(1)
+
+for o,a in opts:
+    if o in [ '--debug' ]:
+        opt_debug = True
+    elif o in [ '-t', '--timeout' ]:
+        opt_timeout = int(a)
+    elif o in [ '-h', '--help' ]:
+        usage()
+        sys.exit(0)
+
+if len(args) == 1:
+    host_address = args[0]
+elif not args:
+    sys.stderr.write("ERROR: No host given.\n")
+    sys.exit(1)
+else:
+    sys.stderr.write("ERROR: Please specify exactly one host.\n")
+    sys.exit(1)
+
+g_device  = None
+g_version = None
+
+
+ONKYO_INPUT_NUM_STR = {
+    0x01: ('CBL/SAT', 'CABLE', 'SATELLITE' ),
+    0x02: ('GAME', ),
+    0x03: ('AUX1', ),
+    0x04: ('AUX2', ),
+    0x05: ('PC', ),
+    0x06: ('VIDEO7', ),
+    0x10: ('BD/DVD', 'BD', 'DVD'),
+    0x20: ('TAPE1', ),
+    0x21: ('TAPE2', ),
+    0x22: ('PHONO', ),
+    0x23: ('CD', ),
+    0x24: ('FM', ),
+    0x25: ('AM', ),
+    0x26: ('TUNER', ),
+    0x27: ('DLNA', ),
+    0x28: ('INTERNET RADIO', 'NETRADIO'),
+    0x29: ('USB(Front)', ),
+    0x2A: ('USB(Rear)', ),
+    0x2B: ('NET', ),
+    0x2C: ('USB(toggle)',),
+    0x40: ('Universal PORT', ),
+    0x30: ('Multi CH', 'MCH'),
+    0x31: ('XM', ),
+    0x32: ('SERIUS', )
+    }
+
+def status_input(response):
+    if response:
+        input_num = int(response[3:5], 16)
+    else:
+        input_num = 0
+    if input_num in ONKYO_INPUT_NUM_STR:
+        input_names = ONKYO_INPUT_NUM_STR[input_num]
+        return input_names[0]
+    else:
+        return 'Unknown %x' % input_num
+
+def status_mute(response):
+    if response:
+        mute_is_off = True if int(response[4]) == 0 else False
+    else:
+        mute_is_off = False
+    return 1 if not mute_is_off else 0
+
+def status_master_volume(response):
+    if response:
+        volume = int(response[3:5], 16)
+    else:
+        volume = 0
+    return volume
+
+def status_power(response):
+    if response:
+        power = int(response[3:5], 16)
+    else:
+        power = 0
+    return power
+
+def status_device(response):
+    if response:
+        info = response[3:]
+    else:
+        info = ''
+    return info
+
+def status_audio(response):
+    if response:
+        info = response[3:]
+    else:
+        info = ''
+    return info
+
+def status_video(response):
+    if response:
+        info = response[3:]
+    else:
+        info = ''
+    return info
+
+status_maps = {
+    #'device': ('!xECNQSTN', status_device),
+    'power': ('PWRQSTN', status_power),
+    'input': ('SLIQSTN', status_input),
+    'mute': ('AMTQSTN', status_mute),
+    'master_volume': ('MVLQSTN', status_master_volume),
+    #'audio': ('IFAQSTN', status_audio),
+    #'video': ('IFVQSTN', status_video),
+}
+
+sys.stdout.write('<<<check_mk>>>\n')
+sys.stdout.write('Version: 1.0\n')
+sys.stdout.write('AgentOS: eISCP\n')
+
+sys.stdout.write('<<<eiscp>>>\n')
+net = eISCP(host_address, opt_port)
+for key, (cmd, resp_func) in status_maps.iteritems():
+    response = net.raw(cmd + '\r\n')      #write a string
+    sys.stdout.write('%s: %s\n' % (key, resp_func(response)))
