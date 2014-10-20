@@ -9,7 +9,7 @@ from distutils.core import setup
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 
 setup(name='arsoft-python',
-		version='1.171',
+		version='1.172',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -121,6 +121,7 @@ setup(name='arsoft-python',
                 'check_mk/checks/jenkins',
                 'check_mk/checks/slapd_cert',
                 'check_mk/checks/eiscp',
+                'check_mk/checks/cyrus_imapd',
                     ] ),
             ('/usr/lib/check_mk_agent/plugins', [
                     'check_mk/plugins/apache_status',
@@ -142,6 +143,7 @@ setup(name='arsoft-python',
                     'check_mk/plugins/openvz_ubc',
                     'check_mk/plugins/jenkins',
                     'check_mk/plugins/slapd_cert',
+                    'check_mk/plugins/cyrus_imapd',
                 ] ),
             ('/usr/share/check_mk/special', [
                     'check_mk/special_agent/agent_fritzbox'
