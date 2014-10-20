@@ -202,7 +202,7 @@ def command_to_iscp(command, arguments=None, zone=None):
                 if isinstance(possible_arg, xrange):
                     if int(argument) in possible_arg:
                         # We need to send the format "FF", hex() gives us 0xff
-                        value = hex(int(argument))[2:].zfill(2).upper()
+                        value = hex(int(argument))[2:].upper()
                     break
 
             # TODO: patterns not yet supported
@@ -277,28 +277,21 @@ class eISCP(object):
         onkyo_magic = str(eISCPPacket('!xECNQSTN'))
 
         # Broadcast magic
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        #sock.bind(('0.0.0.0', 0))
-        sock.bind(('192.168.193.14', 1717))
+        sock = socket.socket(
+            socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setblocking(0)   # So we can use select()
-        #sock.sendto(onkyo_magic, ('255.255.255.255', onkyo_port))
-        #sock.sendto(onkyo_magic, ('192.168.193.255', onkyo_port))
-        sock.sendto(onkyo_magic, ('192.168.193.29', onkyo_port))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.bind(('0.0.0.0', 0))
+        sock.sendto(onkyo_magic, ('255.255.255.255', onkyo_port))
 
         found_receivers = []
         while True:
-            rlist, wlist, xlist = select.select([sock], [], [], timeout)
-            print('got %s' % str(rlist))
-            if not rlist:
-                print('timeout')
+            ready = select.select([sock], [], [], timeout)
+            if not ready[0]:
                 break
-            data, addr = rlist[0].recvfrom(1024)
+            data, addr = sock.recvfrom(1024)
 
-            print(data)
             response = eISCPPacket.parse(data)
-            print(response)
             # Return string looks something like this:
             # !1ECNTX-NR609/60128/DX
             info = re.match(r'''
@@ -337,7 +330,7 @@ class eISCP(object):
 
     def _ensure_socket_connected(self):
         if self.command_socket is None:
-            self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+            self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.command_socket.connect((self.host, self.port))
             self.command_socket.setblocking(0)
 
@@ -371,8 +364,8 @@ class eISCP(object):
         """
         self._ensure_socket_connected()
 
-        rlist, wlist, xlist = select.select([self.command_socket], [], [], timeout or 0)
-        if rlist:
+        ready = select.select([self.command_socket], [], [], timeout or 0)
+        if ready[0]:
             header_bytes = self.command_socket.recv(16)
             header = eISCPPacket.parse_header(header_bytes)
             message = self.command_socket.recv(header.data_size)
