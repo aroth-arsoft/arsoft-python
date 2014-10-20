@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+#
+from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
+
+def inventory_cyrus_imapd(checkname, info):
+    ret = []
+    if len(info) > 1:
+        ret.append( ('status', None) )
+
+    cert_checks = check_mk_cert_inventory(checkname, info, warn_time=30, crit_time=14)
+    ret.extend(cert_checks)
+    return ret
+
+def check_cyrus_imapd(item, params, info):
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    details = []
+    perfdata = []
+
+    if item == 'status':
+        data = {}
+        for line in info:
+            # if we don't have any upgrades listed, the line list
+            # will only contain one element, eg. "upgrades\n"
+            if len(line) < 2:
+                continue
+
+            key = line[0]
+            value = line[1]
+            data[key] = value
+        must_be_running = params.get('running', True)
+        if must_be_running:
+            if data['running'] == 0 or data['pid'] == 0:
+                if level < 2:
+                    level = 2
+                details.append('Not running')
+        else:
+            if data['running'] != 0 or data['pid'] != 0:
+                if level < 2:
+                    level = 2
+                details.append('Running')
+
+        if len(details) == 0:
+            details.append('Ready')
+    else:
+        return check_mk_cert_check(item, params, info)
+
+    # Construct a the status message.
+    if level == 0:
+        msg = "OK - %s" % (','.join(details))
+    elif level == 1:
+        msg = "WARN - %s" % (','.join(details))
+    elif level == 2:
+        msg = "CRIT - %s" % (','.join(details))
+    return (level, msg, perfdata)
+
+
+# declare the check to Check_MK.
+check_info['cyrus_imapd'] = {
+    'check_function':            check_cyrus_imapd,
+    'inventory_function':        inventory_cyrus_imapd,
+    'service_description':       'Cyrus-IMAP',
+    'has_perfdata':              True,
+}

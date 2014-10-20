@@ -1,0 +1,71 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
+import os.path
+from arsoft.inifile import IniFile
+
+class cyrus_imapd_mk_check_plugin(object):
+
+    IMAPD_CONF = '/etc/imapd.conf'
+    CYRMASTER_PID = '/run/cyrmaster.pid'
+
+    def __init__(self):
+        self._config_dir = None
+        self._certificate_files = []
+        self._ca_files = []
+        self._pid = 0
+        self._running = False
+
+        self._get_config()
+
+    def _get_config(self):
+        if os.path.exists(self.IMAPD_CONF):
+            inifile = IniFile(commentPrefix='#', keyValueSeperator=':', disabled_values=False)
+            if inifile.open(self.IMAPD_CONF):
+                self._config_dir = inifile.get(None, 'configdirectory', '/var/spool/cyrus')
+                for k in ['tls_cert_file', 'imap_tls_cert_file', 'pop3_tls_cert_file', 'lmtp_tls_cert_file', 'sieve_tls_cert_file']:
+                    f = inifile.get(None, k)
+                    if f:
+                        idx = k.find('tls_')
+                        name = k[0:idx-1] if idx > 0 else None
+                        self._certificate_files.append((name, f))
+
+                for k in ['tls_ca_file', 'imap_tls_ca_file', 'pop3_tls_ca_file', 'lmtp_tls_ca_file', 'sieve_tls_ca_file']:
+                    f = inifile.get(None, k)
+                    if f:
+                        idx = k.find('tls_')
+                        name = k[0:idx-1] if idx > 0 else None
+                        self._ca_files.append((name, f))
+
+    def _check_running(self):
+        if os.path.isfile(self.CYRMASTER_PID):
+            content = ''
+            try:
+                with open(self.CYRMASTER_PID) as f:
+                    content = f.readlines()
+            except IOError:
+                pass
+            try:
+                self._pid = saveint(content[0].strip())
+            except ValueError:
+                pass
+            self._running = check_pid(self._pid)
+
+    def status(self):
+        if self._config_dir:
+            print('pid %i' % self._pid)
+            print('running %i' % self._running)
+            for (name, f) in self._certificate_files:
+                check_mk_cert_file_info(f, prefix=name)
+            for (name, f) in self._ca_files:
+                check_mk_cert_file_info(f, prefix=name, ca=True)
+
+if __name__ == "__main__":
+    print("<<<cyrus_imapd:sep(59)>>>")
+    pl = cyrus_imapd_mk_check_plugin()
+    pl.status()
+
+
+
