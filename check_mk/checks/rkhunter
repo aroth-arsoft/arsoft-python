@@ -65,7 +65,7 @@ def check_rkhunter(item, params, info):
         data[line[0]] = value
 
     if item == 'status':
-        (warn_time_hours, crit_time_hours) = params
+        (warn_time_hours, crit_time_hours) = params if params is not None else (48, 96)
         warn_time = (warn_time_hours * 3600)
         crit_time = (crit_time_hours * 3600)
         check_age = data['check_age']
