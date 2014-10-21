@@ -114,8 +114,8 @@ Description: suid helpers for the accessing Trac from a web server
 Package: arsoft-onkyo
 Architecture: all
 Depends: python-arsoft, python-serial, ${python:Depends}, ${misc:Depends}
-Description: control a Onkyo receiver using RS232
- Uses a RS232 connection to a Onkyo receiver to control it.
+Description: control a Onkyo receiver using eISCP or RS232
+ Uses LAN or a RS232 connection to a Onkyo receiver to control it.
 
 Package: arsoft-check-mk-plugins
 Architecture: all
