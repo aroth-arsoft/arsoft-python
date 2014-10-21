@@ -40,6 +40,10 @@ class rkhunter_mk_check_plugin(object):
         self.changed_file_properties = []
         self.num_services_changed = 0
         self.changed_services = []
+        self.num_users_changed = 0
+        self.changed_users = []
+        self.num_groups_changed = 0
+        self.changed_groups = []
         self.current_message = None
         self.check_time = 0
         self.check_age = 0
@@ -64,6 +68,22 @@ class rkhunter_mk_check_plugin(object):
                     f_end = msgobj.message.find('\n', f_start)
                     f_name = msgobj.message[f_start:f_end] if f_end > 0 else msgobj.message[f_start:]
                     self.changed_services.append(f_name)
+            elif msgobj.message.startswith('User '):
+                self.num_users_changed += 1
+                f_start = msgobj.message.find('\'')
+                if f_start > 0:
+                    f_start += 1
+                    f_end = msgobj.message.find('\'', f_start)
+                    f_name = msgobj.message[f_start:f_end] if f_end > 0 else msgobj.message[f_start:]
+                    self.changed_users.append(f_name)
+            elif msgobj.message.startswith('Group '):
+                self.num_groups_changed += 1
+                f_start = msgobj.message.find('\'')
+                if f_start > 0:
+                    f_start += 1
+                    f_end = msgobj.message.find('\'', f_start)
+                    f_name = msgobj.message[f_start:f_end] if f_end > 0 else msgobj.message[f_start:]
+                    self.changed_groups.append(f_name)
             else:
                 self.num_warnings += 1
         elif msgobj.loglevel == 'ERROR':
@@ -104,8 +124,7 @@ class rkhunter_mk_check_plugin(object):
                 self._process_message(self.current_message)
 
         except IOError as e:
-            exit_code = CRITICAL
-            exit_message = str(e)
+            pass
 
         if self.start_date is not None and self.end_date is not None:
             now = datetime.datetime.now()
@@ -113,20 +132,24 @@ class rkhunter_mk_check_plugin(object):
             self.check_age = (now - self.end_date).total_seconds()
 
     def output(self):
-        print('check_time %i' % self.check_time)
-        print('check_age %i' % self.check_age)
-        print('num_infects %i' % self.num_infects)
-        print('num_criticals %i' % self.num_criticals)
-        print('num_errors %i' % self.num_errors)
-        print('num_warnings %i' % self.num_warnings)
-        print('num_infos %i' % self.num_infos)
-        print('num_file_properties_changed %i' % self.num_file_properties_changed)
-        print('changed_file_properties %s' % ','.join(self.changed_file_properties))
-        print('num_services_changed %i' % self.num_services_changed)
-        print('changed_services %s' % ','.join(self.changed_services))
+        print('check_time;%i' % self.check_time)
+        print('check_age;%i' % self.check_age)
+        print('num_infects;%i' % self.num_infects)
+        print('num_criticals;%i' % self.num_criticals)
+        print('num_errors;%i' % self.num_errors)
+        print('num_warnings;%i' % self.num_warnings)
+        print('num_infos;%i' % self.num_infos)
+        print('num_file_properties_changed;%i' % self.num_file_properties_changed)
+        print('changed_file_properties;%s' % ','.join(self.changed_file_properties))
+        print('num_services_changed;%i' % self.num_services_changed)
+        print('changed_services;%s' % ','.join(self.changed_services))
+        print('num_users_changed;%i' % self.num_users_changed)
+        print('changed_users;%s' % ','.join(self.changed_users))
+        print('num_groups_changed;%i' % self.num_groups_changed)
+        print('changed_groups;%s' % ','.join(self.changed_groups))
 
 if __name__ == "__main__":
-    print("<<<rkhunter>>>")
+    print("<<<rkhunter:sep(59)>>>")
     pl = rkhunter_mk_check_plugin()
     pl.output()
 

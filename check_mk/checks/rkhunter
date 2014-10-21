@@ -19,14 +19,11 @@
 #
 from arsoft.timestamp import format_timedelta
 
-check_age_warn_level = 2 * (24 * (60 * 60))
-check_age_critical_level = 4 * (24 * (60 * 60))
-
 def inventory_rkhunter(checkname, info):
 
     ret = []
     if len(info) >= 1:
-        ret.append( ('status', None) )
+        ret.append( ('status', (48, 96) ) )
         ret.append( ('result', None) )
 
     return ret
@@ -35,16 +32,23 @@ def check_rkhunter(item, params, info):
 
     level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
     perfdata = []
-    check_age = 0
-    num_infects = 0
-    num_criticals = 0
-    num_errors = 0
-    num_warnings = 0
-    num_infos = 0
-    num_file_properties_changed = 0
-    changed_file_properties = []
-    num_services_changed = 0
-    changed_services = []
+    details = []
+    data = {
+        'check_age':0,
+        'num_infects':0,
+        'num_criticals':0,
+        'num_errors':0,
+        'num_warnings':0,
+        'num_infos':0,
+        'num_file_properties_changed':0,
+        'num_services_changed':0,
+        'num_users_changed':0,
+        'num_groups_changed':0,
+        'changed_file_properties':[],
+        'changed_services':[],
+        'changed_users':[],
+        'changed_groups':[],
+        }
 
     for line in info:
         # if we don't have any upgrades listed, the line list
@@ -54,96 +58,85 @@ def check_rkhunter(item, params, info):
 
         # there are upgrades availiable, evaluate the importency.
         # secupgrades return CRITICAL, normal upgrades only WARNING.
-        type = line[0]
-        if type == 'check_age':
-            if item == 'status':
-                check_age = saveint(line[1])
-                perfdata.append( ('check_age', check_age, check_age_warn_level, check_age_critical_level ) )
-                if check_age > check_age_critical_level:
-                    level = 2
-                elif check_age > check_age_warn_level:
-                    level = 1
-                else:
-                    level = 0
+        if line[0].startswith('num_') or line[0].startswith('check_'):
+            value = saveint(line[1])
         else:
-            if item == 'result':
-                if type == "num_infects":
-                    num_infects = saveint(line[1])
-                    if num_infects > 0:
-                        if level < 2:
-                            level = 2
-                elif type == "num_criticals":
-                    num_criticals = saveint(line[1])
-                    if num_criticals > 0:
-                        if level < 2:
-                            level = 2
-                elif type == "num_errors":
-                    num_errors = saveint(line[1])
-                    if num_errors > 0:
-                        if level < 2:
-                            level = 2
-                elif type == "num_warnings":
-                    num_warnings = saveint(line[1])
-                    if num_warnings > 0:
-                        if level < 1:
-                            level = 1
-                elif type == "num_infos":
-                    num_infos = saveint(line[1])
-                elif type == "num_file_properties_changed":
-                    num_file_properties_changed = saveint(line[1])
-                    if num_file_properties_changed > 0:
-                        if level < 1:
-                            level = 1
-                elif type == "changed_file_properties":
-                    changed_file_properties = line[1].strip("\"").split(",")
-                elif type == "num_services_changed":
-                    num_services_changed = saveint(line[1])
-                    if num_services_changed > 0:
-                        if level < 1:
-                            level = 1
-                elif type == "changed_services":
-                    changed_services = line[1].strip("\"").split(",")
+            value = line[1].split(",")
+        data[line[0]] = value
+
     if item == 'status':
-        # Construct a the status message.
-        if level == 0:
-            msg = "OK - last check %s ago" % format_timedelta(check_age)
-        elif level == 1:
-            msg = "rkhunter has not been run for %s" % format_timedelta(check_age)
-        elif level == 2:
-            msg = "rkhunter has not been run for %s" % format_timedelta(check_age)
+        (warn_time_hours, crit_time_hours) = params
+        warn_time = (warn_time_hours * 3600)
+        crit_time = (crit_time_hours * 3600)
+        check_age = data['check_age']
+        perfdata.append( ('check_age', int(check_age/3600), warn_time_hours, crit_time_hours ) )
+        if check_age > crit_time:
+            level = 2
+        elif check_age > warn_time:
+            level = 1
+        else:
+            level = 0
+        details.append('last check %s ago' % format_timedelta(check_age))
     else:
-        details = []
-        if num_infects:
-            details.append('%i infected' % num_infects)
-        if num_criticals:
-            details.append('%i critical' % num_criticals)
-        if num_errors:
-            details.append('%i errors' % num_errors)
-        if num_warnings:
-            details.append('%i warnings' % num_warnings)
-#        if num_infos:
-#            details.append('%i infos' % num_infos)
-        if num_file_properties_changed:
-            details.append('%i changed files %s' % (num_file_properties_changed, ','.join(changed_file_properties) ) )
-        if num_services_changed:
-            details.append('%i changed services %s' % (num_services_changed, ','.join(changed_services) ) )
+        num_infects = data['num_infects']
+
+        if data['num_infects'] > 0:
+            if level < 2:
+                level = 2
+            details.append('%i infected' % data['num_infects'])
+        if data['num_criticals'] > 0:
+            if level < 2:
+                level = 2
+            details.append('%i critical' % data['num_criticals'])
+        if data['num_errors'] > 0:
+            if level < 2:
+                level = 2
+            details.append('%i errors' % data['num_errors'])
+        if data['num_warnings'] > 0:
+            if level < 1:
+                level = 1
+            details.append('%i warnings' % data['num_warnings'])
+
+        if data['num_file_properties_changed'] > 0:
+            if level < 1:
+                level = 1
+            details.append('%i changed files %s' % (data['num_file_properties_changed'], ','.join(data['changed_file_properties']) ) )
+
+        if data['num_services_changed'] > 0:
+            if level < 1:
+                level = 1
+            details.append('%i changed services %s' % (data['num_services_changed'], ','.join(data['changed_services']) ) )
+
+        if data['num_users_changed'] > 0:
+            if level < 1:
+                level = 1
+            details.append('%i changed users %s' % (data['num_users_changed'], ','.join(data['changed_users']) ) )
+
+        if data['num_groups_changed'] > 0:
+            if level < 1:
+                level = 1
+            details.append('%i changed groups %s' % (data['num_groups_changed'], ','.join(data['changed_group']) ) )
+
         if len(details) == 0:
             details.append('No issues detected.')
-        perfdata.append( ('num_infects', num_infects, 1, 1) )
-        perfdata.append( ('num_criticals', num_criticals, 1, 1) )
-        perfdata.append( ('num_errors', num_errors, 1, 1) )
-        perfdata.append( ('num_warnings', num_warnings, 1, 0) )
-        perfdata.append( ('num_infos', num_infos) )
-        perfdata.append( ('num_file_properties_changed', num_file_properties_changed, 1, 0) )
-        perfdata.append( ('num_services_changed', num_services_changed, 1, 0) )
-        # Construct a the status message.
-        if level == 0:
-            msg = "OK - %s" % (','.join(details))
-        elif level == 1:
-            msg = "WARN - %s" % (','.join(details))
-        elif level == 2:
-            msg = "CRIT - %s" % (','.join(details))
 
+        perfdata.append( ('num_infects', data['num_infects'], 1, 1) )
+        perfdata.append( ('num_criticals', data['num_criticals'], 1, 1) )
+        perfdata.append( ('num_errors', data['num_errors'], 1, 1) )
+        perfdata.append( ('num_warnings', data['num_warnings'], 1, 0) )
+        perfdata.append( ('num_infos', data['num_infos']) )
+        perfdata.append( ('num_file_properties_changed', data['num_file_properties_changed'], 1, 0) )
+        perfdata.append( ('num_services_changed', data['num_services_changed'], 1, 0) )
+        perfdata.append( ('num_users_changed', data['num_users_changed'], 1, 0) )
+        perfdata.append( ('num_groups_changed', data['num_groups_changed'], 1, 0) )
+
+    # Construct a the status message.
+    if level == 0:
+        msg = "OK - %s" % (','.join(details))
+    elif level == 1:
+        msg = "WARN - %s" % (','.join(details))
+    elif level == 2:
+        msg = "CRIT - %s" % (','.join(details))
     return (level, msg, perfdata)
 
 # declare the check to Check_MK.
