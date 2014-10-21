@@ -1,3 +1,9 @@
+arsoft-python (1.176) trusty; urgency=medium
+
+  * fixed for cyrus_imapd checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 21 Oct 2014 18:30:46 +0200
+
 arsoft-python (1.175) trusty; urgency=medium
 
   * enhance rkhunter checks to report changed users and groups
