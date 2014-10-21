@@ -120,7 +120,7 @@ Description: control a Onkyo receiver using eISCP or RS232
 Package: arsoft-check-mk-plugins
 Architecture: all
 Depends: python (>= 2.7), python-arsoft, check-mk-agent, lm-sensors, hddtemp,
- dnsutils, python-yaml, arsoft-python-fritzbox, arsoft-python-openvpn,
+ dnsutils, python-yaml, arsoft-python-fritzbox, arsoft-python-openvpn, arsoft-onkyo,
  ${python:Depends}, ${misc:Depends}
 Description: additional check_mk plugins for AR Soft specific services
  Installs all files and packages required to use the AR Soft check_mk
