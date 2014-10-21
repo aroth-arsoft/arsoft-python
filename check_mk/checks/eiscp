@@ -10,6 +10,7 @@ def check_eiscp_status(item, params, info):
 
     level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
     msg = None
+    details = []
     perfdata = []
     data = {}
 
@@ -19,20 +20,20 @@ def check_eiscp_status(item, params, info):
         key = line[0]
         data[key] = line[1]
 
-    if item_class == 'status':
+    if item == 'status':
         if 'power' in data:
-            details.append('Power %s' % ('on' if data['power'] != 0 else 'off'))
+            details.append('Power %s' % ('on' if saveint(data['power']) != 0 else 'off'))
         if 'mute' in data:
-            details.append('Mute %s' % ('on' if data['mute'] != 0 else 'off'))
+            details.append('Mute %s' % ('on' if saveint(data['mute']) != 0 else 'off'))
         if 'input' in data:
             details.append('Input %s' % (data['input']))
         if 'volume' in data:
-            details.append('Volume %i' % (data['volume']))
+            details.append('Volume %i' % (saveint(data['volume'])))
         if 'sleep' in data:
-            if data['sleep'] == 0:
+            if saveint(data['sleep']) == 0:
                 details.append('Sleep off')
             else:
-                details.append('Sleep %i minutes' % data['sleep'])
+                details.append('Sleep %i minutes' % saveint(data['sleep']))
         if len(details) == 0:
             level = 1
             details.append('Unknown status')
