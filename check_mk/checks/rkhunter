@@ -115,7 +115,7 @@ def check_rkhunter(item, params, info):
         if data['num_groups_changed'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i changed groups %s' % (data['num_groups_changed'], ','.join(data['changed_group']) ) )
+            details.append('%i changed groups %s' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
 
         if len(details) == 0:
             details.append('No issues detected.')
