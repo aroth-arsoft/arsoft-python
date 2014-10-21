@@ -132,6 +132,8 @@ def check_mk_cert_check(item, params, info, prefix=False):
         line_item_count = 4 if not prefix else 5
     elif itemtype == 'crl':
         line_item_count = 2 if not prefix else 3
+    else:
+        line_item_count = 2 if not prefix else 3
 
     level = 3
     msg = 'UNKNOWN - %s' % item

@@ -1,3 +1,9 @@
+arsoft-python (1.174) trusty; urgency=medium
+
+  * only check jenkins when installed
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 21 Oct 2014 07:46:47 +0200
+
 arsoft-python (1.173) trusty; urgency=medium
 
   * build errors
