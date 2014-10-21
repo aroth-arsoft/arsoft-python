@@ -5,7 +5,7 @@ from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
 def inventory_cyrus_imapd(checkname, info):
     ret = []
     if len(info) > 1:
-        ret.append( ('status', None) )
+        ret.append( ('daemon', {}) )
 
     cert_checks = check_mk_cert_inventory(checkname, info, warn_time=30, crit_time=14)
     ret.extend(cert_checks)
@@ -16,8 +16,9 @@ def check_cyrus_imapd(item, params, info):
     msg = None
     details = []
     perfdata = []
+    int_props = ['running', 'pid']
 
-    if item == 'status':
+    if item == 'daemon':
         data = {}
         for line in info:
             # if we don't have any upgrades listed, the line list
@@ -26,7 +27,10 @@ def check_cyrus_imapd(item, params, info):
                 continue
 
             key = line[0]
-            value = line[1]
+            if key in int_props:
+                value = saveint(line[1])
+            else:
+                value = line[1]
             data[key] = value
         must_be_running = params.get('running', True)
         if must_be_running:
@@ -41,7 +45,10 @@ def check_cyrus_imapd(item, params, info):
                 details.append('Running')
 
         if len(details) == 0:
-            details.append('Ready')
+            if must_be_running:
+                details.append('Ready PID %i' % data['pid'])
+            else:
+                details.append('Not running')
     else:
         return check_mk_cert_check(item, params, info)
 

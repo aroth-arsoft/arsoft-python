@@ -6,6 +6,34 @@ from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
 import os.path
 from arsoft.inifile import IniFile
 
+def check_pid(pid):
+    """ Check For the existence of a unix pid. """
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH == No such process
+            return False
+        elif err.errno == errno.EPERM:
+            # EPERM clearly means there's a process to deny access to
+            return True
+        else:
+            # According to "man 2 kill" possible error values are
+            # (EINVAL, EPERM, ESRCH)
+            raise
+    else:
+        return True
+
+def saveint(v):
+    if v is None:
+        return 0
+    try:
+        return int(v)
+    except ValueError:
+        return 0
+
 class cyrus_imapd_mk_check_plugin(object):
 
     IMAPD_CONF = '/etc/imapd.conf'
@@ -38,6 +66,7 @@ class cyrus_imapd_mk_check_plugin(object):
                         idx = k.find('tls_')
                         name = k[0:idx-1] if idx > 0 else None
                         self._ca_files.append((name, f))
+            self._check_running()
 
     def _check_running(self):
         if os.path.isfile(self.CYRMASTER_PID):
@@ -55,8 +84,8 @@ class cyrus_imapd_mk_check_plugin(object):
 
     def status(self):
         if self._config_dir:
-            print('pid %i' % self._pid)
-            print('running %i' % self._running)
+            print('pid;%i' % self._pid)
+            print('running;%i' % self._running)
             for (name, f) in self._certificate_files:
                 check_mk_cert_file_info(f, prefix=name)
             for (name, f) in self._ca_files:
