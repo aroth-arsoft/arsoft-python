@@ -4,7 +4,7 @@ def inventory_jenkins(checkname, info):
 
     ret = []
     if len(info) > 1:
-        ret.append( ('status', None) )
+        ret.append( ('daemon', None) )
         data = {}
         slaves = set()
         jobs = set()
@@ -50,17 +50,14 @@ def check_jenkins(item, params, info):
         if line[0] == 'slave':
             slave_name = line[1]
             key = line[2]
-            value = ' '.join(line[3:])
+            value = line[3]
         elif line[0] == 'job':
             job_name = line[1]
             key = line[2]
-            value = ' '.join(line[3:])
+            value = line[3]
         else:
             key = line[0]
-            value = ' '.join(line[1:])
-
-        if value[0] == '\"' and value[-1] == '\"':
-            value = value[1:-1]
+            value = line[1]
 
         if line[0] == 'slave':
             if not slave_name in data['slaves']:
@@ -73,7 +70,7 @@ def check_jenkins(item, params, info):
         else:
             data[key] = value
 
-    if item_class == 'status':
+    if item_class == 'daemon':
         details = []
         if data['pid'] == 0:
             if level < 2:

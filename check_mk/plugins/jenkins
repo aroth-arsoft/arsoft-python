@@ -128,30 +128,30 @@ class jenkins_check_mk_plugin(object):
 
     def status(self):
         if self._installed:
-            print('version %s' % self._version)
-            print('base_url %s' % self._base_url)
-            print('pid %i' % self._pid)
-            print('running %i' % self._running)
-            print('plugins "%s"' % ','.join(self._plugins))
-            print('plugin_updates "%s"' % ','.join(self._plugin_updates))
-            print('disabled_plugins "%s"' % ','.join(self._disabled_plugins))
+            print('version;%s' % self._version)
+            print('base_url;%s' % self._base_url)
+            print('pid;%i' % self._pid)
+            print('running;%i' % self._running)
+            print('plugins;%s' % ','.join(self._plugins))
+            print('plugin_updates;%s' % ','.join(self._plugin_updates))
+            print('disabled_plugins;%s' % ','.join(self._disabled_plugins))
             for slave in self._slaves:
                 (computer_name,offline,offlineCause, idle) = slave
-                print('slave %s offline %i' % (computer_name, offline))
-                print('slave %s offline_cause "%s"' % (computer_name, offlineCause))
-                print('slave %s idle %i' % (computer_name, idle))
+                print('slave;%s;offline;%i' % (computer_name, offline))
+                print('slave;%s;offline_cause;%s' % (computer_name, offlineCause))
+                print('slave;%s;idle;%i' % (computer_name, idle))
             for job in self._jobs:
                 (job_name,job_url,buildable, last_build_building, last_build_number, last_build_timestamp, last_build_duration) = job
-                print('job %s url "%s"' % (job_name, job_url))
-                print('job %s buildable %i' % (job_name, buildable))
-                print('job %s last_build_building %i' % (job_name, last_build_building))
-                print('job %s last_build_number %i' % (job_name, last_build_number))
-                print('job %s last_build_timestamp %i' % (job_name, last_build_timestamp))
-                print('job %s last_build_duration %i' % (job_name, last_build_duration))
+                print('job;%s;url;%s' % (job_name, job_url))
+                print('job;%s;buildable;%i' % (job_name, buildable))
+                print('job;%s;last_build_building;%i' % (job_name, last_build_building))
+                print('job;%s;last_build_number;%i' % (job_name, last_build_number))
+                print('job;%s;last_build_timestamp;%i' % (job_name, last_build_timestamp))
+                print('job;%s;last_build_duration;%i' % (job_name, last_build_duration))
 
 
 if __name__ == "__main__":
-    print("<<<jenkins>>>")
+    print("<<<jenkins:sep(59)>>>")
     pl = jenkins_check_mk_plugin()
     pl.status()
 
