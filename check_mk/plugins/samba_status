@@ -106,21 +106,24 @@ class samba_status_check_mk_plugin(object):
                     content = f.readlines()
             except IOError:
                 pass
+            pid = None
             try:
-                pid = int(content[0].strip())
+                if content:
+                    pid = int(content[0].strip())
             except ValueError:
-                pid = None
+                pass
             self._processes[p] = { 'pid': pid, 'running': check_pid(pid) }
 
     def status(self):
-        print('version %s' % self._version)
-        print('version_info %s' % self._version_info)
-        print('server_role %s' % self._server_role)
-        print('workgroup %s' % self._config['global']['workgroup'])
-        print('shares \"%s\"' % ','.join(self._shares))
-        for p in self._processes:
-            p_stat = self._processes[p]
-            print('process_%s %i' % (p, p_stat['pid'] if p_stat['running'] else 0))
+        if self._version:
+            print('version %s' % self._version)
+            print('version_info %s' % self._version_info)
+            print('server_role %s' % self._server_role)
+            print('workgroup %s' % self._config['global']['workgroup'])
+            print('shares \"%s\"' % ','.join(self._shares))
+            for p in self._processes:
+                p_stat = self._processes[p]
+                print('process_%s %i' % (p, p_stat['pid'] if p_stat['running'] else 0))
 
 if __name__ == "__main__":
     print("<<<samba_status>>>")
