@@ -3,29 +3,10 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.utils import runcmdAndGetData
+from arsoft.check_mk import *
 import re
 import os
 import errno
-
-def check_pid(pid):
-    """ Check For the existence of a unix pid. """
-    if pid is None:
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError as err:
-        if err.errno == errno.ESRCH:
-            # ESRCH == No such process
-            return False
-        elif err.errno == errno.EPERM:
-            # EPERM clearly means there's a process to deny access to
-            return True
-        else:
-            # According to "man 2 kill" possible error values are
-            # (EINVAL, EPERM, ESRCH)
-            raise
-    else:
-        return True
 
 class samba_status_check_mk_plugin(object):
 
@@ -99,20 +80,8 @@ class samba_status_check_mk_plugin(object):
             return
 
         for p in self.PROCESSES:
-            fname = '/run/samba/%s.pid' % p
-            content = ''
-            try:
-                with open(fname) as f:
-                    content = f.readlines()
-            except IOError:
-                pass
-            pid = None
-            try:
-                if content:
-                    pid = int(content[0].strip())
-            except ValueError:
-                pass
-            self._processes[p] = { 'pid': pid, 'running': check_pid(pid) }
+            pid, running = check_running('/run/samba/%s.pid' % p)
+            self._processes[p] = { 'pid': pid, 'running': running }
 
     def status(self):
         if self._version:
