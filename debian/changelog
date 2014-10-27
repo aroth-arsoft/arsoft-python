@@ -1,3 +1,9 @@
+arsoft-python (1.178) utopic; urgency=medium
+
+  * use common check_mk function
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 27 Oct 2014 16:37:42 +0100
+
 arsoft-python (1.177) trusty; urgency=medium
 
   * fixed rkhunter checks
