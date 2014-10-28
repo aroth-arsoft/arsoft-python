@@ -364,8 +364,8 @@ class eISCP(object):
         """
         self._ensure_socket_connected()
 
-        ready = select.select([self.command_socket], [], [], timeout or 0)
-        if ready[0]:
+        rlist, wlist, xlist = select.select([self.command_socket], [], [], timeout or 0)
+        if rlist:
             header_bytes = self.command_socket.recv(16)
             header = eISCPPacket.parse_header(header_bytes)
             message = self.command_socket.recv(header.data_size)
@@ -506,7 +506,7 @@ class Receiver(eISCP):
                             # to get() them. Maybe use a queue after all.
                             response = filter_for_message(
                                 super(Receiver, self).get, message)
-                        except ValueError, e:
+                        except ValueError as e:
                             # No response received within timeout
                             result.append(e)
                         else:

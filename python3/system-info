@@ -173,7 +173,7 @@ class system_info_app:
             for (key, value) in list(obj.data.items()):
                 if key == 'Features':
                     continue
-                print(('  %s: %s' % (key, value)))
+                print('  %s: %s' % (key, value))
         return 0
 
     def show_bios_info(self):
@@ -191,7 +191,7 @@ class system_info_app:
             for (key, value) in list(obj.data.items()):
                 if key == 'Characteristics':
                     continue
-                print(('  %s: %s' % (key, value)))
+                print('  %s: %s' % (key, value))
         return 0
 
     def show_memory_info(self):
@@ -210,18 +210,18 @@ class system_info_app:
         for (name, dev) in list(self._block_devices.items()):
             if not dev.is_physical_device:
                 continue
-            print(('Block device %s' % dev.devfile))
-            print(('  Vendor: %s' % dev.vendor))
-            print(('  Model: %s' % dev.model))
-            print(('  Size: %s' % bytes2human(dev.size_in_bytes)))
+            print('Block device %s' % dev.devfile)
+            print('  Vendor: %s' % dev.vendor)
+            print('  Model: %s' % dev.model)
+            print('  Size: %s' % bytes2human(dev.size_in_bytes))
 
             if dev.available:
-                print(('  Hardware sector size: %i' % dev.hw_sector_size))
-                print(('  Physical block size: %i' % dev.physical_block_size))
-                print(('  Logical block size: %i' % dev.logical_block_size))
-                print(('  Minimum I/O size: %i' % dev.minimum_io_size))
-                print(('  Optimal I/O size: %i' % dev.optimal_io_size))
-                print(('  Alignment offset: %i' % dev.alignment_offset))
+                print('  Hardware sector size: %i' % dev.hw_sector_size)
+                print('  Physical block size: %i' % dev.physical_block_size)
+                print('  Logical block size: %i' % dev.logical_block_size)
+                print('  Minimum I/O size: %i' % dev.minimum_io_size)
+                print('  Optimal I/O size: %i' % dev.optimal_io_size)
+                print('  Alignment offset: %i' % dev.alignment_offset)
             else:
                 print('  Not available')
         return 0

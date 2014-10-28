@@ -57,7 +57,7 @@ class arsoft_daemon_runner(runner.DaemonRunner):
         """ Emit a usage message, then exit.
             """
         usage_exit_code = 2
-        action_usage = "|".join(self.action_funcs.keys())
+        action_usage = "|".join(list(self.action_funcs.keys()))
         message = "usage: %(progname)s %(action_usage)s" % (self.progname, action_usage)
         runner.emit_message(message)
         sys.exit(usage_exit_code)

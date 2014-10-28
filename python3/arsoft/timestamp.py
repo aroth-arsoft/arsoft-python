@@ -19,6 +19,8 @@ SECONDS_ONE_MINUTE = 60
 SECONDS_ONE_HOUR = 60 * SECONDS_ONE_MINUTE
 SECONDS_ONE_DAY = 24 * SECONDS_ONE_HOUR
 SECONDS_ONE_WEEK = 7 * SECONDS_ONE_DAY
+SECONDS_ONE_MONTH = 30 * SECONDS_ONE_DAY
+SECONDS_ONE_YEAR = 365 * SECONDS_ONE_DAY
 
 class ParseError(Exception):
     """Raised when there is a problem parsing a date string"""
@@ -120,7 +122,19 @@ def format_timedelta(delta):
     else:
         secs = abs(delta)
         is_negative = delta < 0
-    if secs >= SECONDS_ONE_WEEK:
+    if secs >= SECONDS_ONE_YEAR:
+        years = int(secs / SECONDS_ONE_YEAR)
+        remain = math.fmod(secs, SECONDS_ONE_YEAR)
+        months = int(remain / SECONDS_ONE_MONTH)
+        remain = math.fmod(remain, SECONDS_ONE_MONTH)
+        days = int(remain / SECONDS_ONE_DAY)
+        ret = '%i years, %i months, %i days' % (years, months, days)
+    elif secs >= SECONDS_ONE_MONTH:
+        months = int(secs / SECONDS_ONE_MONTH)
+        remain = math.fmod(secs, SECONDS_ONE_MONTH)
+        days = int(remain / SECONDS_ONE_DAY)
+        ret = '%i months, %i days' % (months, days)
+    elif secs >= SECONDS_ONE_WEEK:
         days = int(secs / SECONDS_ONE_DAY)
         ret = '%i days' % (days)
     elif secs >= SECONDS_ONE_DAY:
@@ -317,3 +331,14 @@ def strptime_as_datetime(timestamp, format):
     else:
         ret = datetime.fromtimestamp(time.mktime(t))
     return ret
+
+if __name__ == "__main__":
+
+    now = time.time()
+    begin_of_time = 0
+    last_month = - SECONDS_ONE_MONTH - SECONDS_ONE_DAY
+    last_week = - SECONDS_ONE_WEEK - SECONDS_ONE_DAY
+
+    for t in [0, -1, 1, now - begin_of_time, begin_of_time - now, last_month, last_week, SECONDS_ONE_WEEK - SECONDS_ONE_DAY]:
+        print('timedelta=%s => %s' % (str(t), format_timedelta(t)))
+

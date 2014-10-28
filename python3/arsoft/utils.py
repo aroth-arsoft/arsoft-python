@@ -23,7 +23,7 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=No
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
-        print(("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else '')))
+        print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
     if stdin is not None:
         stdin_param = stdin
     else:
@@ -69,11 +69,11 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
         else:
             stderr_param = stdout if stdout is not None else subprocess.PIPE
     if verbose:
-        print(("runcmd " + ' '.join(all_args) +
+        print("runcmd " + ' '.join(all_args) +
                 ' <' + str(stdin_param) +
                 ' 1>' + str(stdout_param) +
                 ' 2>' + str(stderr_param)
-                    ))
+                    )
 
     p = subprocess.Popen(all_args, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:

@@ -33,7 +33,7 @@ class ZipFileEx(zipfile.ZipFile):
             if self.date_time and selfinfo.date_time != otherinfo.date_time:
                 ret = False
             if self.content and selfinfo.CRC != otherinfo.CRC:
-                print(('%s changed' % (selfinfo.filename)))
+                print('%s changed' % (selfinfo.filename))
                 ret = False
             return ret
 

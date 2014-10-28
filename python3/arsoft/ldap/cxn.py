@@ -8,7 +8,7 @@ import ldap.modlist as modlist
 from utils import *
 
 class LdapConnection(object):
-    def __init__(self, uri=None, username=None, password=None, saslmech=None, logger=None):
+    def __init__(self, uri=None, username=None, password=None, saslmech='simple', logger=None):
         self._cxn = None
         self._uri = uri
         self._username = username
@@ -67,18 +67,18 @@ class LdapConnection(object):
                 # or related exception so you can ignore the result
                 if saslmech == 'simple':
                     if ldapusername != '':
-                        self._verbose("simple_bind user:" + ldapusername + " pwd:" + ldappassword)
+                        self._verbose("simple_bind user:%s pwd:%s" % (ldapusername,ldappassword))
                     else:
                         self._verbose("simple_bind anonymous")
                     self._cxn.simple_bind_s(ldapusername, ldappassword)
                     ret = True
                 else:
-                    self._verbose('bind ' + saslmech + " user:" + ldapusername + " pwd:" + ldappassword)
+                    self._verbose('bind mech:%s user:%s pwd:%s' % (saslmech, ldapusername,ldappassword))
                     self._cxn.bind_s(ldapusername, ldappassword, saslmech)
                     ret = True
             except ldap.LDAPError as e:
                 msg = LdapConnection._ldap_error_message(e)
-                self._error("Failed to bind to ldap server as " + ldapusername + ". " + msg)
+                self._error("Failed to bind to ldap server as %s: %s" % (ldapusername, msg))
                 ret = False
         return ret
         
@@ -105,7 +105,7 @@ class LdapConnection(object):
                         result_set.append(result_data)
         except ldap.LDAPError as e:
             msg = LdapConnection._ldap_error_message(e)
-            self._error('ldap search on ' + searchBase + ' for ' + searchFilter + ' failed: '  + msg)
+            self._error('ldap search on %s for %s failed: %s' (searchBase, searchFilter, msg))
             result_set = None
             pass
         return result_set
