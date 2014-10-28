@@ -1,3 +1,9 @@
+arsoft-python (1.179) utopic; urgency=medium
+
+  * fixed hostname with dash
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 28 Oct 2014 11:25:37 +0100
+
 arsoft-python (1.178) utopic; urgency=medium
 
   * use common check_mk function
