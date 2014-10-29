@@ -1,3 +1,9 @@
+arsoft-python (1.180) utopic; urgency=medium
+
+  * edskmgr: avoid hooks for virtual devices
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 29 Oct 2014 19:31:01 +0100
+
 arsoft-python (1.179) utopic; urgency=medium
 
   * fixed hostname with dash

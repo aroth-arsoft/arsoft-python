@@ -343,32 +343,36 @@ class ExternalDiskManager(object):
         devpath = udev_env['DEVPATH']
         devtype = udev_env['DEVTYPE']
         if action == 'add' or action == 'remove':
-            child_pid = os.fork()
-            if child_pid == 0:
-                disk_mgr = Disks()
-                disk_obj = None
-                dev_obj = None
-                num_attempt = 0
-                while dev_obj is None and num_attempt < 10:
-                    num_attempt = num_attempt + 1
-                    dev_obj = disk_mgr.find_device(devpath=devpath)
-                    if dev_obj is None:
-                        time.sleep(1.0)
-                        disk_mgr.rescan()
-                if dev_obj:
-                    if isinstance(dev_obj, Disk):
-                        disk_obj = dev_obj
+            if devpath.startswith('/devices/virtual'):
+                # DO not run any hooks for virtual devices
+                ret = True
+            else:
+                child_pid = os.fork()
+                if child_pid == 0:
+                    disk_mgr = Disks()
+                    disk_obj = None
+                    dev_obj = None
+                    num_attempt = 0
+                    while dev_obj is None and num_attempt < 10:
+                        num_attempt = num_attempt + 1
+                        dev_obj = disk_mgr.find_device(devpath=devpath)
+                        if dev_obj is None:
+                            time.sleep(1.0)
+                            disk_mgr.rescan()
+                    if dev_obj:
+                        if isinstance(dev_obj, Disk):
+                            disk_obj = dev_obj
+                        else:
+                            disk_obj = disk_mgr.find_disk_for_device(dev_obj)
+                    if disk_obj:
+                        if action == 'add':
+                            cmd = 'disk-loaded'
+                        else:
+                            cmd = 'disk-ejected'
+                        ret = self.run_hooks(cmd, dev_obj, disk_obj)
                     else:
-                        disk_obj = disk_mgr.find_disk_for_device(dev_obj)
-                if disk_obj:
-                    if action == 'add':
-                        cmd = 'disk-loaded'
-                    else:
-                        cmd = 'disk-ejected'
-                    ret = self.run_hooks(cmd, dev_obj, disk_obj)
-                else:
-                    self.err('Unable to find device %s for %s (%s)\n'%(devpath, action, devtype))
-                    ret = False
+                        self.err('Unable to find device %s for %s (%s)\n'%(devpath, action, devtype))
+                        ret = False
         else:
             self.err('Unhandled udev action %s for %s (%s)\n'%(action, devpath, devtype))
             ret = False
