@@ -46,14 +46,12 @@ def check_samba_status(item, params, info):
             continue
 
         key = line[0]
-        value = ' '.join(line[1:])
-        if value[0] == '\"' and value[-1] == '\"':
-            value = value[1:-1]
         if key == 'shares':
-            value = value.split(',')
-        if 'process' in key:
-            value = saveint(value)
-        data[key] = value
+            data[key] = line[1].split(',')
+        elif 'process' in key:
+            data[key] = saveint(line[1])
+        else:
+            data[key] = line[1]
 
     if item_class == 'status':
         details = []
