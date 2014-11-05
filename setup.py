@@ -9,7 +9,7 @@ from distutils.core import setup
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 
 setup(name='arsoft-python',
-		version='1.180',
+		version='1.181',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -67,7 +67,7 @@ setup(name='arsoft-python',
             ],
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
-			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients']),
+			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients', 'check_mk/cron/check_mk_agent_apt' ]),
 			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
                            'config/default_pattern.conf', 'config/default_shortcuts.conf']),
             ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),

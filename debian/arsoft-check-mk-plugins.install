@@ -1,1 +1,2 @@
 usr/lib/check_mk_agent/plugins
+etc/cron.hourly/check_mk_agent_apt
