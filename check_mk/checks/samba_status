@@ -5,24 +5,18 @@ def inventory_samba_status(checkname, info):
     ret = []
     if len(info) > 1:
         ret.append( ('status', None) )
-        data = {}
+        shares = []
         for line in info:
             # if we don't have any upgrades listed, the line list
             # will only contain one element, eg. "upgrades\n"
             if len(line) < 2:
                 continue
 
-            key = line[0]
-            value = ' '.join(line[1:])
-            if value[0] == '\"' and value[-1] == '\"':
-                value = value[1:-1]
-            if key == 'shares':
-                value = value.split(',')
-            data[key] = value
+            if line[0] == 'shares':
+                shares = line[1].split(',')
 
-        if 'shares' in data:
-            for share in data['shares']:
-                ret.append( ('share.%s' % share, None) )
+        for share in shares:
+            ret.append( ('share.%s' % share, None) )
 
     return ret
 

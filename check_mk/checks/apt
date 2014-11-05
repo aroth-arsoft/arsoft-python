@@ -54,8 +54,12 @@ def check_apt(item, params, info):
             data[key] = saveint(line[1])
 
     if item == 'cache':
-        check_age = time.time() - data['check_time']
-        cache_age = time.time() - data['cache_time']
+        if 'cache_age' in data:
+            check_age = 0
+            cache_age = data['cache_age']
+        else:
+            check_age = time.time() - data['check_time']
+            cache_age = time.time() - data['cache_time']
         perfdata.append( ('check_age', check_age, check_age_warn_level, check_age_critical_level ) )
         perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
         if cache_age > cache_age_critical_level or check_age > check_age_critical_level:
@@ -64,20 +68,24 @@ def check_apt(item, params, info):
             level = 1
 
         details.append("Cache has been updated %s, last check %s" % (format_timedelta(cache_age), format_timedelta(check_age)) )
-    else:
+    elif item == 'upgrades':
         perfdata.append( ('secupgrades', len(data['secupgrades']) ) )
         perfdata.append( ('upgrades', len(data['upgrades']) ) )
 
-        if secupgrades:
+        if data['secupgrades']:
             if level < 2:
                 level = 2
             details.append('%i security upgrades: %s' % (len(data['secupgrades']), ",".join(data['secupgrades'])))
-        if upgrades:
+        if data['upgrades']:
             if level < 1:
                 level = 1
             details.append('%i upgrades: %s' % (len(data['upgrades']), ",".join(data['upgrades'])))
         if len(details) == 0:
             details.append('All packages are up to date.')
+    else:
+        level = 3
+        msg = 'UNKNOWN - %s' % item
+
     # Construct a the status message.
     if level == 0:
         msg = "OK - %s" % (','.join(details))
