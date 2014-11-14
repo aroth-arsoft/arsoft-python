@@ -59,9 +59,10 @@ class HostsFile(object):
     def __init__(self, filename=DEFAULT_HOSTS_FILE):
         self.filename = filename
         self._content = []
+        self.valid = False
         self.last_error = None
         if filename is not None:
-            self.open(filename)
+            self.valid = self.open(filename)
 
     @property
     def name(self):
@@ -228,9 +229,9 @@ class HostsFile(object):
 if __name__ == "__main__":
     hosts = HostsFile()
     print(hosts)
-    print((hosts.hosts))
+    print(hosts.hosts)
     hosts['blubb'] = '12.1.1.1'
     hosts['127.0.0.1'] = '10.1.1.1'
-    print((hosts.hosts))
+    print(hosts.hosts)
     hosts.save('/tmp/hosts')
 

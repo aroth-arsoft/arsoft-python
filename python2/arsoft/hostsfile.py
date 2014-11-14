@@ -59,9 +59,10 @@ class HostsFile(object):
     def __init__(self, filename=DEFAULT_HOSTS_FILE):
         self.filename = filename
         self._content = []
+        self.valid = False
         self.last_error = None
         if filename is not None:
-            self.open(filename)
+            self.valid = self.open(filename)
 
     @property
     def name(self):
