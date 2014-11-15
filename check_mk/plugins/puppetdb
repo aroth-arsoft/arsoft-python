@@ -4,7 +4,8 @@
 
 import urllib2
 import json
-import os.path
+import os
+import errno
 from arsoft.inifile import IniFile
 
 def check_pid(pid):
