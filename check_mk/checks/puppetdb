@@ -50,73 +50,79 @@ def check_puppetdb(item, params, info):
         if len(details) == 0:
             details.append('Version %s' % (data['version']))
     elif item == 'memory':
+        if data['running'] == 0 or data['pid'] == 0:
+            level = 3
+            details.append('puppetdb not running')
+        else:
+            perfdata.append( ('nonheapmemoryusage_max', data['memory_nonheapmemoryusage_max']) )
+            perfdata.append( ('nonheapmemoryusage_init', data['memory_nonheapmemoryusage_init']) )
+            perfdata.append( ('nonheapmemoryusage_used', data['memory_nonheapmemoryusage_used']) )
+            perfdata.append( ('nonheapmemoryusage_committed', data['memory_nonheapmemoryusage_committed']) )
 
-        perfdata.append( ('nonheapmemoryusage_max', data['memory_nonheapmemoryusage_max']) )
-        perfdata.append( ('nonheapmemoryusage_init', data['memory_nonheapmemoryusage_init']) )
-        perfdata.append( ('nonheapmemoryusage_used', data['memory_nonheapmemoryusage_used']) )
-        perfdata.append( ('nonheapmemoryusage_committed', data['memory_nonheapmemoryusage_committed']) )
+            perfdata.append( ('heapmemoryusage_max', data['memory_heapmemoryusage_max']) )
+            perfdata.append( ('heapmemoryusage_init', data['memory_heapmemoryusage_init']) )
+            perfdata.append( ('heapmemoryusage_used', data['memory_heapmemoryusage_used']) )
+            perfdata.append( ('heapmemoryusage_committed', data['memory_heapmemoryusage_committed']) )
 
-        perfdata.append( ('heapmemoryusage_max', data['memory_heapmemoryusage_max']) )
-        perfdata.append( ('heapmemoryusage_init', data['memory_heapmemoryusage_init']) )
-        perfdata.append( ('heapmemoryusage_used', data['memory_heapmemoryusage_used']) )
-        perfdata.append( ('heapmemoryusage_committed', data['memory_heapmemoryusage_committed']) )
+            heapmemoryusage_max = data['memory_heapmemoryusage_max']
+            heapmemoryusage_init = data['memory_heapmemoryusage_init']
+            heapmemoryusage_used = data['memory_heapmemoryusage_used']
+            heapmemoryusage_committed = data['memory_heapmemoryusage_committed']
 
-        heapmemoryusage_max = data['memory_heapmemoryusage_max']
-        heapmemoryusage_init = data['memory_heapmemoryusage_init']
-        heapmemoryusage_used = data['memory_heapmemoryusage_used']
-        heapmemoryusage_committed = data['memory_heapmemoryusage_committed']
+            nonheapmemoryusage_max = data['memory_nonheapmemoryusage_max']
+            nonheapmemoryusage_init = data['memory_nonheapmemoryusage_init']
+            nonheapmemoryusage_used = data['memory_nonheapmemoryusage_used']
+            nonheapmemoryusage_committed = data['memory_nonheapmemoryusage_committed']
 
-        nonheapmemoryusage_max = data['memory_nonheapmemoryusage_max']
-        nonheapmemoryusage_init = data['memory_nonheapmemoryusage_init']
-        nonheapmemoryusage_used = data['memory_nonheapmemoryusage_used']
-        nonheapmemoryusage_committed = data['memory_nonheapmemoryusage_committed']
+            nonheapmemoryusage = float(nonheapmemoryusage_used) / float(nonheapmemoryusage_max)
+            heapmemoryusage = float(heapmemoryusage_used) / float(heapmemoryusage_max)
 
-        nonheapmemoryusage = float(nonheapmemoryusage_used) / float(nonheapmemoryusage_max)
-        heapmemoryusage = float(heapmemoryusage_used) / float(heapmemoryusage_max)
+            perfdata.append( ('nonheapmemoryusage', nonheapmemoryusage) )
+            perfdata.append( ('heapmemoryusage', heapmemoryusage) )
 
-        perfdata.append( ('nonheapmemoryusage', nonheapmemoryusage) )
-        perfdata.append( ('heapmemoryusage', heapmemoryusage) )
-
-        if memory_usage_crit_threshold is not None and memory_usage_warn_threshold is not None:
-            if nonheapmemoryusage >= memory_usage_crit_threshold:
-                if level < 2:
-                    level = 2
-                details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
-            elif nonheapmemoryusage >= memory_usage_warn_threshold:
-                if level < 1:
-                    level = 1
-                details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
-            if heapmemoryusage >= memory_usage_crit_threshold:
-                if level < 2:
-                    level = 2
-                details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
-            elif heapmemoryusage >= memory_usage_warn_threshold:
-                if level < 1:
-                    level = 1
-                details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
-        if len(details) == 0:
-            details.append('Non-Heap %i %%, Heap %i %%' % (int(nonheapmemoryusage * 100), int(heapmemoryusage * 100)))
+            if memory_usage_crit_threshold is not None and memory_usage_warn_threshold is not None:
+                if nonheapmemoryusage >= memory_usage_crit_threshold:
+                    if level < 2:
+                        level = 2
+                    details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
+                elif nonheapmemoryusage >= memory_usage_warn_threshold:
+                    if level < 1:
+                        level = 1
+                    details.append('Non-Heap memory usage %i %%' % (int(nonheapmemoryusage * 100)))
+                if heapmemoryusage >= memory_usage_crit_threshold:
+                    if level < 2:
+                        level = 2
+                    details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
+                elif heapmemoryusage >= memory_usage_warn_threshold:
+                    if level < 1:
+                        level = 1
+                    details.append('Heap memory usage %i %%' % (int(heapmemoryusage * 100)))
+            if len(details) == 0:
+                details.append('Non-Heap %i %%, Heap %i %%' % (int(nonheapmemoryusage * 100), int(heapmemoryusage * 100)))
     elif item == 'queue':
+        if data['running'] == 0 or data['pid'] == 0:
+            level = 3
+            details.append('puppetdb not running')
+        else:
+            queuesize = data['queued_queuesize']
 
-        queuesize = data['queued_queuesize']
+            perfdata.append( ('queuesize', data['queued_queuesize']) )
+            perfdata.append( ('dispatchcount', data['queued_dispatchcount']) )
+            perfdata.append( ('averageenqueuetime', data['queued_averageenqueuetime']) )
 
-        perfdata.append( ('queuesize', data['queued_queuesize']) )
-        perfdata.append( ('dispatchcount', data['queued_dispatchcount']) )
-        perfdata.append( ('averageenqueuetime', data['queued_averageenqueuetime']) )
-
-        if queuesize > queuesize_crit_threshold:
-            if level < 2:
-                level = 2
-            details.append('Queue size %i' % (queuesize))
-        elif queuesize > queuesize_warn_threshold:
-            if level < 1:
-                level = 1
-            details.append('Queue size %i' % (queuesize))
-        if len(details) == 0:
-            if queuesize == 0:
-                details.append('Queue is empty')
-            else:
+            if queuesize > queuesize_crit_threshold:
+                if level < 2:
+                    level = 2
                 details.append('Queue size %i' % (queuesize))
+            elif queuesize > queuesize_warn_threshold:
+                if level < 1:
+                    level = 1
+                details.append('Queue size %i' % (queuesize))
+            if len(details) == 0:
+                if queuesize == 0:
+                    details.append('Queue is empty')
+                else:
+                    details.append('Queue size %i' % (queuesize))
 
     # Construct a the status message.
     if level == 0:
@@ -125,6 +131,8 @@ def check_puppetdb(item, params, info):
         msg = "WARN - %s" % (','.join(details))
     elif level == 2:
         msg = "CRIT - %s" % (','.join(details))
+    elif level == 3:
+        msg = "UNKNOWN - %s" % (','.join(details))
     return (level, msg, perfdata)
 
 # declare the check to Check_MK.
