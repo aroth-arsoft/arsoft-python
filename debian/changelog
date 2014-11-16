@@ -1,3 +1,9 @@
+arsoft-python (1.184) utopic; urgency=medium
+
+  * fixed path
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 16 Nov 2014 18:33:15 +0100
+
 arsoft-python (1.183) utopic; urgency=medium
 
   * some performance optimizations

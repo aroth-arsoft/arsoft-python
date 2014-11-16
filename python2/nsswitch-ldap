@@ -5,7 +5,7 @@ action=''
 nsswitch_ldap_modify() {
 	local enable="$1"
 	if [ $enable -eq 0 ]; then
-		/usr/sbin/nsswitch-config \
+		/usr/bin/nsswitch-config \
 			--set passwd files \
 			--set group files \
 			--set shadow files \
@@ -14,7 +14,7 @@ nsswitch_ldap_modify() {
 			--set sudoers files
 		RES=$?
 	else
-		/usr/sbin/nsswitch-config \
+		/usr/bin/nsswitch-config \
 			--set passwd files ldap \
 			--set group files ldap \
 			--set shadow files ldap \
