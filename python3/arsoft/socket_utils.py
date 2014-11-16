@@ -5,7 +5,6 @@
 import os
 import sys
 import socket
-from .utils import runcmdAndGetData
 
 def create_unix_socket(path, mode, socktype=socket.SOCK_STREAM):
     # Make sure the socket does not already exist
@@ -81,6 +80,34 @@ def send_and_recv_unix_socket_message(path, message, socktype=socket.SOCK_STREAM
     return ret
 
 def sethostname(new_hostname):
+    from utils import runcmdAndGetData
     (sts, stdoutdata, stderrdata) = runcmdAndGetData('/bin/hostname', [new_hostname])
     ret = True if sts == 0 else False
+    return ret
+
+def gethostname_tuple(fqdn=None):
+    if fqdn is None:
+        fqdn = socket.getfqdn().lower()
+    else:
+        fqdn = fqdn.lower()
+    if '.' in fqdn:
+        (hostname, domain) = fqdn.split('.', 1)
+    else:
+        hostname = fqdn
+        domain = 'localdomain'
+    return (fqdn, hostname, domain)
+
+def gethostname(fqdn=True):
+    ret = socket.getfqdn()
+    if not fqdn:
+        if '.' in ret:
+            (ret, domain) = ret.split('.', 1)
+    return ret
+
+def getdomainname():
+    fqdn = socket.getfqdn()
+    if '.' in fqdn:
+        (hostname, ret) = fqdn.split('.', 1)
+    else:
+        ret = 'localdomain'
     return ret

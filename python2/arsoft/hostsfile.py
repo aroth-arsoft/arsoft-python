@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from utils import platform_is_windows
-
 import os
+import platform
 import sys
 import socket
+
+
+platform_is_windows = True if platform.system() == 'Windows' else False
 
 if platform_is_windows:
     DEFAULT_HOSTS_FILE = 'windows/system32/etc/hosts'

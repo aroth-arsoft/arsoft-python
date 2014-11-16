@@ -15,6 +15,7 @@ import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
 import dns.name
 from arsoft.utils import enum
+from arsoft.socketutils import gethostname_tuple, gethostname, getdomainname
 
 ALGORITHM_ID_TO_NAME = {
     157: dns.tsig.HMAC_MD5,
@@ -258,33 +259,6 @@ def use_key_file(update_obj, keyfile, format=KeyFileFormat.Zone):
             ret = True
     else:
         ret = False
-    return ret
-
-def gethostname_tuple(fqdn=None):
-    if fqdn is None:
-        fqdn = socket.getfqdn().lower()
-    else:
-        fqdn = fqdn.lower()
-    if '.' in fqdn:
-        (hostname, domain) = fqdn.split('.', 1)
-    else:
-        hostname = fqdn
-        domain = 'localdomain'
-    return (fqdn, hostname, domain)
-
-def gethostname(fqdn=True):
-    ret = socket.getfqdn()
-    if not fqdn:
-        if '.' in ret:
-            (ret, domain) = ret.split('.', 1)
-    return ret
-
-def getdomainname():
-    fqdn = socket.getfqdn()
-    if '.' in fqdn:
-        (hostname, ret) = fqdn.split('.', 1)
-    else:
-        ret = 'localdomain'
     return ret
 
 def _get_resolver(dnsserver=None):

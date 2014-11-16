@@ -6,8 +6,7 @@ import sys
 import os
 import argparse
 from arsoft.hostsfile import HostsFile, HostnameFile, DEFAULT_HOSTS_FILE
-from arsoft.dnsutils import gethostname_tuple
-from arsoft.socket_utils import sethostname
+from arsoft.socket_utils import sethostname, gethostname_tuple
 
 class ManageHostsApp(object):
 

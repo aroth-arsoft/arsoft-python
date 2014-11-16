@@ -4,8 +4,8 @@
 
 import sys
 import argparse
-from arsoft.inifile import IniFile
 import re
+from arsoft.inifile import IniFile
 
 class CmdFile(object):
     CMDLINE_RE = re.compile(

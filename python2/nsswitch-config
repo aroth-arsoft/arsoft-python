@@ -6,7 +6,7 @@ import sys
 import argparse
 import subprocess
 
-from arsoft.config import *
+from arsoft.config.nsswitch import Nsswitch
 
 class nsswitch_config:
     def __init__(self):

@@ -1,3 +1,9 @@
+arsoft-python (1.183) utopic; urgency=medium
+
+  * some performance optimizations
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 16 Nov 2014 12:39:00 +0100
+
 arsoft-python (1.182) utopic; urgency=medium
 
   * managehosts now can handle multiple updates in one call
