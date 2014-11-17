@@ -15,7 +15,7 @@ import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
 import dns.name
 from arsoft.utils import enum
-from arsoft.socketutils import gethostname_tuple, gethostname, getdomainname
+from arsoft.socket_utils import gethostname_tuple, gethostname, getdomainname
 
 ALGORITHM_ID_TO_NAME = {
     157: dns.tsig.HMAC_MD5,
