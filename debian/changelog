@@ -1,3 +1,9 @@
+arsoft-python (1.186) utopic; urgency=medium
+
+  * check_mk: apt fixes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 18 Nov 2014 07:35:49 +0100
+
 arsoft-python (1.185) utopic; urgency=medium
 
   * fixed typo
