@@ -49,7 +49,8 @@ def check_apt(item, params, info):
 
         key = line[0]
         if key == 'upgrades' or key == 'secupgrades':
-            data[key] = line[1].split(',')
+            if line[1]:
+                data[key] = line[1].split(',')
         else:
             data[key] = saveint(line[1])
 
@@ -69,17 +70,19 @@ def check_apt(item, params, info):
 
         details.append("Cache has been updated %s, last check %s" % (format_timedelta(cache_age), format_timedelta(check_age)) )
     elif item == 'upgrades':
-        perfdata.append( ('secupgrades', len(data['secupgrades']) ) )
-        perfdata.append( ('upgrades', len(data['upgrades']) ) )
+        num_secupgrades = len(data['secupgrades'])
+        num_upgrades = len(data['upgrades'])
+        perfdata.append( ('secupgrades', num_secupgrades) )
+        perfdata.append( ('upgrades', num_upgrades) )
 
-        if data['secupgrades']:
+        if num_secupgrades:
             if level < 2:
                 level = 2
-            details.append('%i security upgrades: %s' % (len(data['secupgrades']), ",".join(data['secupgrades'])))
-        if data['upgrades']:
+            details.append('%i security upgrades: %s' % (num_secupgrades, ",".join(data['secupgrades'])))
+        if num_upgrades:
             if level < 1:
                 level = 1
-            details.append('%i upgrades: %s' % (len(data['upgrades']), ",".join(data['upgrades'])))
+            details.append('%i upgrades: %s' % (num_upgrades, ",".join(data['upgrades'])))
         if len(details) == 0:
             details.append('All packages are up to date.')
     else:
