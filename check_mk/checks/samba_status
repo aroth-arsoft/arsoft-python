@@ -4,8 +4,9 @@ def inventory_samba_status(checkname, info):
 
     ret = []
     if len(info) > 1:
-        ret.append( ('status', None) )
         shares = []
+        server_role = None
+        workgroup = None
         for line in info:
             # if we don't have any upgrades listed, the line list
             # will only contain one element, eg. "upgrades\n"
@@ -14,7 +15,12 @@ def inventory_samba_status(checkname, info):
 
             if line[0] == 'shares':
                 shares = line[1].split(',')
+            elif line[0] == 'server_role':
+                server_role = line[1]
+            elif line[0] == 'workgroup':
+                workgroup = line[1]
 
+        ret.append( ('status', (server_role, workgroup)) )
         for share in shares:
             ret.append( ('share.%s' % share, None) )
 
@@ -25,7 +31,15 @@ def check_samba_status(item, params, info):
     level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
     msg = None
     perfdata = []
-    data = {}
+    details = []
+    data = { 'server_role':'',
+            'shares':[],
+            'version':'',
+            'version_info':'',
+            'workgroup':'',
+            'process_smbd':0,
+            'process_nmbd':0
+            }
 
     if '.' in item:
         item_class, item_name = item.split('.', 1)
@@ -48,31 +62,49 @@ def check_samba_status(item, params, info):
             data[key] = line[1]
 
     if item_class == 'status':
-        details = []
+        if params is not None:
+            (expected_server_role, expected_workgroup) = params
+            if expected_server_role != data['server_role']:
+                if level < 1:
+                    level = 1
+                details.append('Server role %s!=%s' % (data['server_role'], expected_server_role))
+            if expected_workgroup != data['workgroup']:
+                if level < 1:
+                    level = 1
+                details.append('Workgroup %s!=%s' % (data['workgroup'], expected_workgroup))
+
         if data['process_smbd'] == 0:
             if level < 2:
                 level = 2
             details.append('smbd process not running')
-        if data['process_nmbd'] == 0:
-            if level < 2:
-                level = 2
-            details.append('nmbd process not running')
+
+        expect_nmbd_running = False if expected_server_role == 'ROLE_ACTIVE_DIRECTORY_DC' else True
+        if expect_nmbd_running:
+            if data['process_nmbd'] == 0:
+                if level < 2:
+                    level = 2
+                details.append('nmbd process not running')
+        else:
+            if data['process_nmbd'] != 0:
+                if level < 2:
+                    level = 2
+                details.append('nmbd process is running')
         if len(details) == 0:
             details.append('Version %s, Workgroup %s' % (data['version'], data['workgroup']))
 
-        # Construct a the status message.
-        if level == 0:
-            msg = "OK - %s" % (','.join(details))
-        elif level == 1:
-            msg = "WARN - %s" % (','.join(details))
-        elif level == 2:
-            msg = "CRIT - %s" % (','.join(details))
     elif item_class == 'share':
         if item_name in data['shares']:
-            msg = "OK - %s ok" % (item_name)
+            details.append('%s ok' % (item_name))
         else:
-            msg = "CRIT - %s is missing" % (item_name)
+            details.append('%s is missing' % (item_name))
             level = 2
+    # Construct a the status message.
+    if level == 0:
+        msg = "OK - %s" % (','.join(details))
+    elif level == 1:
+        msg = "WARN - %s" % (','.join(details))
+    elif level == 2:
+        msg = "CRIT - %s" % (','.join(details))
     return (level, msg, perfdata)
 
 # declare the check to Check_MK.
