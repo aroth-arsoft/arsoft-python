@@ -9,7 +9,7 @@ import time
 import string
 
 ## Create the plugin option
-np = NagiosPlugin()
+np = NagiosPlugin(must_threshold = False, has_host_argument=False)
 np.add_arg('s', 'station', 'station id')
 
 ## This starts the actual plugin activation
@@ -31,10 +31,13 @@ np.add_value('precip_today', 'precipitation today', 'precipitation today', units
 np.add_value('observation_age', 'observation age', 'age of observation in seconds', units='s', has_argument=False, value=0)
 
 station_id = np['station']
-current_observation_url='http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID=' + station_id
+current_observation_url='http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID=' + str(station_id)
 
-response = urllib2.urlopen(current_observation_url)
-current_observation = response.read()
+if station_id:
+    response = urllib2.urlopen(current_observation_url)
+    current_observation = response.read()
+else:
+    current_observation = None
 
 def _get_node_float(root, name, default=0):
     node = root.find(name)
@@ -107,4 +110,4 @@ if current_observation:
     else:
         np.nagios_exit("CRITICAL", 'Unable to parse observeration data for station %s' % str(station_id))
 else:
-    np.nagios_exit("CRITICAL", 'Unable to get current observeration data for station %s from ' % str(station_id, current_observation_url))
+    np.nagios_exit("CRITICAL", 'Unable to get current observeration data for station %s from %s' % (str(station_id), current_observation_url))

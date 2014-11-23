@@ -1,3 +1,5 @@
 usr/bin/openvpn-admin
 usr/bin/openvpn-status
+etc/nagios-plugins/config/openvpn.cfg
+usr/lib/nagios/plugins/check_openvpn
 usr/lib/python2*/dist-packages/arsoft/openvpn/*.py
