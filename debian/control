@@ -53,7 +53,7 @@ Description: access the OpenVPN configuration and status
 
 Package: arsoft-python-nagios
 Architecture: all
-Depends: python-arsoft, arsoft-python-fritzbox, python-yaml, arsoft-python-openvpn,
+Depends: python-arsoft, arsoft-python-fritzbox, python-yaml,
  ${python:Depends}, ${misc:Depends}
 Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
