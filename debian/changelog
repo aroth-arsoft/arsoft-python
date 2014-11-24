@@ -1,3 +1,9 @@
+arsoft-python (1.188) utopic; urgency=medium
+
+  * fixed variable usage
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 24 Nov 2014 09:25:50 +0100
+
 arsoft-python (1.187) utopic; urgency=medium
 
   * put openvpn related scripts into arsoft-python-openvpn

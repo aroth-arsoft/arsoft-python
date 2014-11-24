@@ -72,6 +72,9 @@ def check_samba_status(item, params, info):
                 if level < 1:
                     level = 1
                 details.append('Workgroup %s!=%s' % (data['workgroup'], expected_workgroup))
+        else:
+            expected_server_role = None
+            expected_workgroup = None
 
         if data['process_smbd'] == 0:
             if level < 2:
