@@ -12,7 +12,7 @@ def inventory_cups(checkname, info):
                 continue
             data[line[0]] = line[1]
 
-        ret.append(('status', (data['version_CUPS'], data['version_IPP']))
+        ret.append(('status', (data['version_CUPS'], data['version_IPP'])))
         cert_checks = check_mk_cert_inventory(checkname, info, prefix=False, warn_time=30, crit_time=14)
         ret.extend(cert_checks)
     return ret
@@ -31,7 +31,7 @@ def check_cups(item, params, info):
 
         data[line[0]] = line[1]
 
-    if check_name == 'status':
+    if item == 'status':
         (expected_cups_version, expected_ipp_version) = params
 
         if data['version_CUPS'] != expected_cups_version:
