@@ -1,3 +1,9 @@
+arsoft-python (1.189) utopic; urgency=medium
+
+  * check_mk: add check for cups certificate and status
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 27 Nov 2014 07:50:34 +0100
+
 arsoft-python (1.188) utopic; urgency=medium
 
   * fixed variable usage
