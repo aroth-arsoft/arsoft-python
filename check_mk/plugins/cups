@@ -1,0 +1,60 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import os.path
+from arsoft.crypto.utils import check_mk_cert_file_info
+import re
+import urllib2
+class cups_check_mk_plugin(object):
+
+    def __init__(self):
+        self.re_key_value = re.compile(r'\s*(?P<key>[a-zA-Z_]+)\s+(?P<value>.+)$')
+        self.certificate_files = []
+        self._version_info = { 'IPP':'', 'CUPS':''}
+        self._installed = False
+        self.listen = []
+        cups_config_dir = '/etc/cups'
+        if os.path.isdir(cups_config_dir):
+            for f in ['cupsd.conf', 'cups-files.conf']:
+                fullname = os.path.join(cups_config_dir, f)
+                if not os.path.isfile(fullname):
+                    continue
+                self._installed = True
+                self._parse_config_file(fullname)
+            if self._installed:
+                self._get_info()
+
+    def _get_info(self):
+        response = urllib2.urlopen('http://localhost:631')
+        if response:
+            for (key, value) in response.info().items():
+                if key == 'server':
+                    for e in value.split(' '):
+                        (item, version) = e.split('/', 1)
+                        self._version_info[item] = version
+
+    def _parse_config_file(self, filename):
+        with open(filename, 'r') as f:
+            dir = os.path.dirname(filename)
+            for line in f:
+                m = self.re_key_value.match(line)
+                if m:
+                    key = m.group('key')
+                    value = m.group('value')
+                    if key == 'ServerCertificate':
+                        fullname = os.path.join(dir, value)
+                        self.certificate_files.append(fullname)
+            f.close()
+
+    def status(self):
+        if self._installed:
+            print("<<<cups:sep(59)>>>")
+            for cert_file in self.certificate_files:
+                check_mk_cert_file_info(cert_file)
+            for (item, version) in self._version_info.items():
+                print('version_%s;%s' % (item, version))
+
+if __name__ == "__main__":
+    pl = cups_check_mk_plugin()
+    pl.status()
