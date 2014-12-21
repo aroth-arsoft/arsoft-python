@@ -128,6 +128,7 @@ class jenkins_check_mk_plugin(object):
 
     def status(self):
         if self._installed:
+            print("<<<jenkins:sep(59)>>>")
             print('version;%s' % self._version)
             print('base_url;%s' % self._base_url)
             print('pid;%i' % self._pid)
@@ -151,7 +152,6 @@ class jenkins_check_mk_plugin(object):
 
 
 if __name__ == "__main__":
-    print("<<<jenkins:sep(59)>>>")
     pl = jenkins_check_mk_plugin()
     pl.status()
 

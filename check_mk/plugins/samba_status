@@ -85,6 +85,7 @@ class samba_status_check_mk_plugin(object):
 
     def status(self):
         if self._version:
+            print("<<<samba_status:sep(59)>>>")
             print('version;%s' % self._version)
             print('version_info;%s' % self._version_info)
             print('server_role;%s' % self._server_role)
@@ -95,7 +96,6 @@ class samba_status_check_mk_plugin(object):
                 print('process_%s;%i' % (p, p_stat['pid'] if p_stat['running'] else 0))
 
 if __name__ == "__main__":
-    print("<<<samba_status:sep(59)>>>")
     pl = samba_status_check_mk_plugin()
     pl.status()
 

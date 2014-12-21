@@ -1,3 +1,9 @@
+arsoft-python (1.190) utopic; urgency=medium
+
+  * do not report via check_mk when software is not installed
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 21 Dec 2014 15:57:00 +0100
+
 arsoft-python (1.189) utopic; urgency=medium
 
   * check_mk: add check for cups certificate and status
