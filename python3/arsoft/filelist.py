@@ -112,7 +112,7 @@ class FileListItem(FileListItemBase):
         FileListItemBase.__init__(self, filename, base_directory, use_glob)
 
     def append(self, item):
-        fullname = os.path.join(self._base_directory, item)
+        fullname = os.path.join(self._base_directory, item) if self._base_directory else item
         if self._use_glob:
             newitems = glob.glob(fullname)
             if newitems:

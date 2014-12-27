@@ -42,6 +42,14 @@ class GitBackupPluginConfig(BackupPluginConfig):
             inifile.set(None, 'Repositories', [])
         return True
 
+    def __str__(self):
+        ret = BackupPluginConfig.__str__(self)
+        if self._repository_list:
+            ret = ret + 'repositories: ' + ','.join(self._repository_list.items) + '\n'
+        else:
+            ret = ret + 'repositories: []\n'
+        return ret
+
 class GitBackupPlugin(BackupPlugin):
     def __init__(self, backup_app):
         self.config = GitBackupPluginConfig(backup_app)
@@ -49,6 +57,9 @@ class GitBackupPlugin(BackupPlugin):
 
     def _git_backup_to_bundle(self, repository, bundle_file):
         ret = False
+        if self.backup_app._verbose:
+            print('git backup %s to %s' % (repository.root_directory, bundle_file))
+
         if GitBundle.is_bundle(bundle_file):
             bundle = GitBundle(bundle_file, repository=repository, verbose=self.backup_app._verbose)
             try:
@@ -63,11 +74,36 @@ class GitBackupPlugin(BackupPlugin):
         else:
             try:
                 bundle = repository.create_bundle(bundle_file, all=True)
-                if self._verbose:
+                if self.backup_app._verbose:
                     print('backup %s to %s - Created' % (repository.root_directory, bundle.filename))
                 ret = True
             except (GitRepositoryError, GitBundleError) as e:
                 sys.stderr.write('Failed to create bundle from repository %s; error %s\n' % (repository.root_directory, str(e)))
+        return ret
+
+    @staticmethod
+    def is_remote_repository(repo_url):
+        idx = repo_url.find('://')
+        ret = True if idx > 0 else False
+        return ret
+
+    def update_remote_repo(self, local_path, remote_url):
+        ret = True
+        if os.path.isdir(local_path):
+            repo = GitRepository(local_path, bare=True, verbose=self.backup_app._verbose)
+            # only update the origin remote (which should be always the case)
+            (sts, stdoutdata, stderrdata) = repo.fetch(remote='origin', quiet=True, recursive=True, outputStdErr=True, outputStdOut=True)
+            if sts != 0:
+                sys.stderr.write('Failed to pull latest from %s to %s\n' % (remote_url, local_path))
+                ret = False
+        else:
+            if self.backup_app._verbose:
+                print('git clone %s to %s' % (remote_url, local_path))
+            repo = GitRepository(local_path, bare=True, verbose=self.backup_app._verbose)
+            (sts, stdoutdata, stderrdata) = repo.clone(remote_url, local_path, recursive=True)
+            if sts != 0:
+                sys.stderr.write('Failed to clone %s to %s\n' % (remote_url, local_path))
+                ret = False
         return ret
 
     def perform_backup(self, **kwargs):
@@ -78,7 +114,14 @@ class GitBackupPlugin(BackupPlugin):
         if ret:
             repo_backup_filelist = FileListItem(base_directory=self.config.base_directory)
             for repo_path in self.config.repository_list:
-                repo = GitRepository(repo_path, verbose=self.backup_app._verbose)
+                if GitBackupPlugin.is_remote_repository(repo_path):
+                    local_repo_name = GitRepository.suggested_name(repo_path)
+                    local_repo_path = os.path.join(backup_dir, local_repo_name + '.git')
+                    if self.update_remote_repo(local_repo_path, repo_path):
+                        repo_path = local_repo_path
+                    else:
+                        repo_path = None
+                repo = GitRepository(repo_path, verbose=self.backup_app._verbose) if repo_path else None
                 if repo:
                     if repo.valid:
                         if repo.empty:

@@ -17,7 +17,7 @@ class BackupStateDefaults(object):
     TIMESTAMP_FORMAT = '%Y%m%d%H%M%S'
 
 class BackupJobHistoryItem(object):
-    def __init__(self, parent, filename):
+    def __init__(self, parent, filename, temporary=False):
         self.parent = parent
         self.filename = filename
         (self.state_dir, basename) = os.path.split(self.filename)
@@ -26,6 +26,7 @@ class BackupJobHistoryItem(object):
         self.date = datetime.datetime.strptime(history_date_str, BackupStateDefaults.TIMESTAMP_FORMAT)
         self.timestamp = timestamp_from_datetime(self.date)
         self.logfile = os.path.join(self.state_dir, self.basename + BackupStateDefaults.LOG_FILE_EXTENSION)
+        self.temporary = temporary
         self._success = False
         self._failure_message = None
         self._startdate = None
@@ -37,11 +38,11 @@ class BackupJobHistoryItem(object):
         self._backup_disk = None
 
     @staticmethod
-    def create(parent, state_dir):
+    def create(parent, state_dir, temporary=False):
         now = datetime.datetime.utcnow()
         itemname = BackupStateDefaults.HISTORY_FILE_PREFIX + now.strftime(BackupStateDefaults.TIMESTAMP_FORMAT) + BackupStateDefaults.HISTORY_FILE_EXTENSION
         fullpath = os.path.join(state_dir, itemname)
-        item = BackupJobHistoryItem(parent, fullpath)
+        item = BackupJobHistoryItem(parent, fullpath, temporary)
         item._startdate = now
         item._write_state()
         return item
@@ -105,31 +106,37 @@ class BackupJobHistoryItem(object):
             raise ValueError("invalid value for backup_disk %s" % value)
 
     def _read_state(self):
-        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-        ret = inifile.open(self.filename)
-        self._success = inifile.getAsBoolean(None, 'Success', False)
-        self._failure_message = inifile.get(None, 'FailureMessage', None)
-        self._startdate = inifile.getAsTimestamp(None, 'Start', None)
-        self._enddate = inifile.getAsTimestamp(None, 'End', None)
-        self._backup_dir = inifile.get(None, 'BackupDir', None)
-        self._backup_disk = inifile.get(None, 'BackupDisc', None)
-        self._require_read = False
+        if self.temporary:
+            ret = True
+        else:
+            inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+            ret = inifile.open(self.filename)
+            self._success = inifile.getAsBoolean(None, 'Success', False)
+            self._failure_message = inifile.get(None, 'FailureMessage', None)
+            self._startdate = inifile.getAsTimestamp(None, 'Start', None)
+            self._enddate = inifile.getAsTimestamp(None, 'End', None)
+            self._backup_dir = inifile.get(None, 'BackupDir', None)
+            self._backup_disk = inifile.get(None, 'BackupDisc', None)
+            self._require_read = False
         return ret
 
     def _write_state(self):
-        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-        # read existing file
-        inifile.open(self.filename)
-        inifile.setAsBoolean(None, 'Success', self._success)
-        inifile.set(None, 'FailureMessage', self._failure_message)
-        inifile.setAsTimestamp(None, 'Start', self._startdate)
-        inifile.setAsTimestamp(None, 'End', self._enddate)
-        inifile.set(None, 'BackupDir', self._backup_dir)
-        inifile.set(None, 'BackupDisc', self._backup_disk)
-        ret = inifile.save(self.filename)
-        if ret:
-            self.parent._item_changed(self)
-            self._require_read = False
+        if self.temporary:
+            ret = True
+        else:
+            inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+            # read existing file
+            inifile.open(self.filename)
+            inifile.setAsBoolean(None, 'Success', self._success)
+            inifile.set(None, 'FailureMessage', self._failure_message)
+            inifile.setAsTimestamp(None, 'Start', self._startdate)
+            inifile.setAsTimestamp(None, 'End', self._enddate)
+            inifile.set(None, 'BackupDir', self._backup_dir)
+            inifile.set(None, 'BackupDisc', self._backup_disk)
+            ret = inifile.save(self.filename)
+            if ret:
+                self.parent._item_changed(self)
+                self._require_read = False
         return ret
 
     def closelog(self):
@@ -195,7 +202,7 @@ class BackupJobHistory(object):
         return item
 
     def create_temporary_item(self):
-        item = BackupJobHistoryItem.create(self, '/tmp')
+        item = BackupJobHistoryItem.create(self, '/tmp', True)
         return item
     
     @property
@@ -228,7 +235,8 @@ class BackupJobHistory(object):
         return '[' + ','.join([str(item) for item in self._items]) + ']'
 
 class BackupJobState(object):
-    def __init__(self, state_dir=None):
+    def __init__(self, state_dir=None, root_dir=None):
+        self.root_dir = root_dir
         self.state_dir = state_dir
         if state_dir:
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
@@ -243,10 +251,13 @@ class BackupJobState(object):
         self.last_success = None
         self.last_failure = None
 
-    def open(self, state_dir=None):
+    def open(self, state_dir=None, root_dir=None):
+        self.root_dir = root_dir
         if state_dir is None:
             state_dir = self.state_dir
         else:
+            if self.root_dir is not None:
+                state_dir = self.root_dir + state_dir
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
             self.history = BackupJobHistory(self, state_dir)
             self.state_dir = state_dir
@@ -306,6 +317,8 @@ class BackupJobState(object):
         ret = inifile.open(filename)
         self.last_success = inifile.getAsTimestamp(None, 'LastSuccess', None)
         self.last_failure = inifile.getAsTimestamp(None, 'LastFailure', None)
+        print('last_success=%s' % (self.last_success))
+        print('last_failure=%s' % (self.last_failure))
         return ret
         
     def _write_state_conf(self, filename):

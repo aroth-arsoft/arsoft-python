@@ -143,7 +143,22 @@ class BackupApp(object):
             self.name = plugin_name
             self.module = plugin_module
             self.impl = plugin_impl
-    
+
+        @property
+        def config(self):
+            if self.impl:
+                return self.impl.config
+            else:
+                return None
+
+    class PluginLoadException(Exception):
+        def __init__(self, plugin_name, original_exception):
+            self.name = plugin_name
+            self.original_exception = original_exception
+
+        def __str__(self):
+            return 'PluginLoadException(%s, %s)' % (self.name, str(self.original_exception))
+
     def __init__(self, name=None):
         self.name = name
         self.filelist_include = FileList()
@@ -157,10 +172,15 @@ class BackupApp(object):
         self._disk_obj = None
         self._real_backup_dir = None
         self._verbose = False
+        self.root_dir = None
 
     @property
     def verbose(self):
         return self._verbose
+
+    @property
+    def config_dir(self):
+        return self.config.config_dir
 
     def cleanup(self):
         self.job_state.save()
@@ -168,17 +188,20 @@ class BackupApp(object):
         if self._diskmgr:
             self._diskmgr.cleanup()
 
-    def reinitialize(self, configdir=None, statedir=None):
-        self.config.open(configdir)
-        self.job_state.open(statedir)
+    def reinitialize(self, config_dir=None, state_dir=None, root_dir=None):
+        self.root_dir = root_dir
+        self.config.open(config_dir, root_dir=root_dir)
+        self.job_state.open(state_dir, root_dir=root_dir)
 
         # in any case continue with the config we got
         self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag)
 
         plugins_to_load = self.config.active_plugins
         for plugin in plugins_to_load:
-            if not self._load_plugin(plugin):
-                sys.stderr.write('Failed to load plugin %s\n' % plugin)
+            try:
+                self._load_plugin(plugin)
+            except PluginLoadException as e:
+                sys.stderr.write('Failed to load plugin %s: error %s\n' % (plugin, str(e)))
         return True
 
     def _load_plugin(self, plugin_name):
@@ -186,8 +209,7 @@ class BackupApp(object):
         try:
             mod = __import__(plugin_module_name)
         except Exception as e:
-            print(e)
-            mod = None
+            raise BackupApp.PluginLoadException(plugin_module_name, e)
 
         subclasses=[]
         if mod:
@@ -216,7 +238,8 @@ class BackupApp(object):
             ret = True
         return ret
         
-    def _mkdir(self, dir):
+    @staticmethod
+    def _mkdir(dir):
         ret = True
         if os.path.exists(dir):
             if not os.path.isdir(dir):
@@ -249,7 +272,7 @@ class BackupApp(object):
                 # remote backups
                 pass
             else:
-                if not self._mkdir(backup_dir):
+                if not BackupApp._mkdir(backup_dir):
                     self.session.writelog('Failed to create backup directory %s' % backup_dir)
                     ret = False
                 else:
@@ -258,7 +281,7 @@ class BackupApp(object):
                 self.session.backup_dir = backup_dir
                 self.session.backup_disk = backup_disk
                 if self.config.intermediate_backup_directory:
-                    if not self._mkdir(self.config.intermediate_backup_directory):
+                    if not BackupApp._mkdir(self.config.intermediate_backup_directory):
                         self.session.writelog('Failed to create intermediate backup directory %s' % self.config.intermediate_backup_directory)
                         ret = False
         return ret

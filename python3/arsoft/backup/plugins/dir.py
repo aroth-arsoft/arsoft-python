@@ -86,6 +86,11 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
                 ret = False
         return ret
 
+    def __str__(self):
+        ret = BackupPluginConfig.__str__(self)
+        ret = ret + 'items: ' + ','.join(self.items) + '\n'
+        return ret
+
 class DirectoryBackupPlugin(BackupPlugin):
     def __init__(self, backup_app):
         self.config = DirectoryBackupPluginConfig(backup_app)

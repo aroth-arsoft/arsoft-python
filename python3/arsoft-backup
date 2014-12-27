@@ -173,6 +173,12 @@ class ARSoftBackupApp(BackupApp):
 
         print('Last success:     %s' % (self.job_state.last_success))
         print('Last failure:     %s' % (self.job_state.last_failure))
+        if self.previous_backups:
+            if self.previous_backups.last_full_backup:
+                print('Last backup:      %s in %s' % (self.previous_backups.last_full_backup.timestamp, self.previous_backups.last_full_backup.fullpath))
+            else:
+                print('Last backup:      None')
+
         for item in self.job_state.history:
             print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))
             print('  Log file:  %s' % (item.logfile))
@@ -189,10 +195,6 @@ class ARSoftBackupApp(BackupApp):
                     print('  %s in %s' % (bak.timestamp, bak.fullpath))
                 else:
                     print('  %s in %s (got session)' % (bak.timestamp, bak.fullpath))
-            if self.previous_backups.last_full_backup:
-                print('Last backup:      %s in %s' % (self.previous_backups.last_full_backup.timestamp, self.previous_backups.last_full_backup.fullpath))
-            else:
-                print('Last backup:      None')
 
         if load_disk:
             if not BackupApp.shutdown_destination(self):
@@ -261,9 +263,9 @@ class ARSoftBackupApp(BackupApp):
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-n', '--dry-run', dest='dryrun', action='store_true', help='Don\'t actually run any commands; just print them.')
 
-        parser.add_argument('-R', '--root-directory', dest='rootdir', default='/', help='specifies the root directory for operations.')
-        parser.add_argument('-C', '--config-directory', dest='configdir', default='/etc/arsoft-backup', help='name of the directory containing the backup configuration.')
-        parser.add_argument('-S', '--state-directory', dest='statedir', default='/var/lib/arsoft-backup', help='name of the directory containing the state of all backup jobs.')
+        parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
+        parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft-backup', help='name of the directory containing the backup configuration.')
+        parser.add_argument('-S', '--state-directory', dest='state_dir', default='/var/lib/arsoft-backup', help='name of the directory containing the state of all backup jobs.')
         parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
         parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
         parser.add_argument('--status', dest='show_status', action='store_true', help='shows the status of the backup.')
@@ -275,20 +277,21 @@ class ARSoftBackupApp(BackupApp):
         self._verbose = args.verbose
         self._dryrun = args.dryrun
         
-        rootdir = os.path.abspath(args.rootdir)
-        if not os.path.isdir(rootdir):
-            sys.stderr.write('Given root directory %s does not exist.\n' % (rootdir))
+        root_dir = os.path.abspath(args.root_dir)
+        if not os.path.isdir(root_dir):
+            sys.stderr.write('Given root directory %s does not exist.\n' % (root_dir))
             ret = 2
         else:
-            configdir = os.path.realpath(rootdir + args.configdir)
-            statedir = os.path.realpath(rootdir + args.statedir)
-
-            if not self.reinitialize(configdir, statedir):
-                sys.stderr.write('Failed to load configuration from %s.\n' % (args.configdir)) 
+            if not self.reinitialize(args.config_dir, args.state_dir, root_dir):
+                sys.stderr.write('Failed to load configuration from %s.\n' % (self.config_dir))
                 ret = 1
             else:
                 if self._verbose:
                     print(self.config)
+                    for plugin in self.plugins:
+                        print('Plugin %s:' % (plugin.name))
+                        print(plugin.config)
+
                 if args.system_startup:
                     ret = self._on_system_startup()
                 elif args.perform_backup:

@@ -8,6 +8,7 @@ from arsoft.inifile import IniFile
 from arsoft.filelist import *
 
 class BackupConfigDefaults(object):
+    ROOT_DIR = None
     CONFIG_DIR = '/etc/arsoft-backup'
     MAIN_CONF = 'main.conf'
     CONFIG_FILE_EXTENSTION = '.conf'
@@ -16,9 +17,9 @@ class BackupConfigDefaults(object):
     FILESYSTEM = 'ext4'
     RETENTION_TIME_S = 86400 * 7
     RETENTION_COUNT = 7
-    BACKUP_DIR = None
+    BACKUP_DIR = '/var/backups/arsoft-backup'
     RESTORE_DIR = None
-    INTERMEDIATE_BACKUP_DIR = None
+    INTERMEDIATE_BACKUP_DIR = '/var/cache/arsoft-backup'
     EJECT_UNUSED_BACKUP_DISCS = True
     USE_FILESYSTEM_SNAPSHOTS = False
     USE_FILESYSTEM_HARDLINKS = True
@@ -31,7 +32,9 @@ class BackupConfigDefaults(object):
     DISK_TIMEOUT = 60.0
 
 class BackupConfig(object):
-    def __init__(self, config_dir=BackupConfigDefaults.CONFIG_DIR, 
+    def __init__(self,
+                 root_dir=BackupConfigDefaults.ROOT_DIR,
+                 config_dir=BackupConfigDefaults.CONFIG_DIR,
                  retention_time=BackupConfigDefaults.RETENTION_TIME_S, 
                  retention_count=BackupConfigDefaults.RETENTION_COUNT,
                  backup_directory=BackupConfigDefaults.BACKUP_DIR, 
@@ -52,13 +55,14 @@ class BackupConfig(object):
                  disk_timeout=BackupConfigDefaults.DISK_TIMEOUT,
                  filelist_include=None, 
                  filelist_exclude=None):
+        self.root_dir = root_dir
         self.config_dir = config_dir
         self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
         self.filesystem = filesystem
         self.retention_time = retention_time
         self.retention_count = retention_count
         self.backup_directory = backup_directory
-        self.intermediate_backup_directory = intermediate_backup_directory
+        self._intermediate_backup_directory = intermediate_backup_directory
         self.filelist_include = filelist_include
         self.filelist_exclude = filelist_exclude
         self.filelist_include_dir = filelist_include_dir
@@ -75,12 +79,13 @@ class BackupConfig(object):
         self.disk_timeout = disk_timeout
 
     def clear(self):
+        self.root_dir = BackupConfigDefaults.ROOT_DIR
         self.config_dir = BackupConfigDefaults.CONFIG_DIR
         self.filesystem = BackupConfigDefaults.FILESYSTEM
         self.retention_time = BackupConfigDefaults.RETENTION_TIME_S
         self.retention_count = BackupConfigDefaults.RETENTION_COUNT
         self.backup_directory = BackupConfigDefaults.BACKUP_DIR
-        self.intermediate_backup_directory = BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR
+        self._intermediate_backup_directory = BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR
         self.filelist_include = None
         self.filelist_exclude = None
         self.filelist_include_dir = BackupConfigDefaults.INCLUDE_DIR
@@ -115,6 +120,14 @@ class BackupConfig(object):
             self._retention_time = None
 
     @property
+    def intermediate_backup_directory(self):
+        return self._intermediate_backup_directory if self._intermediate_backup_directory else self.backup_directory
+
+    @intermediate_backup_directory.setter
+    def intermediate_backup_directory(self, value):
+        self._intermediate_backup_directory = value
+
+    @property
     def filelist_include(self):
         return self._filelist_include
 
@@ -144,10 +157,13 @@ class BackupConfig(object):
         else:
             self._filelist_exclude = None
 
-    def open(self, config_dir=None):
+    def open(self, config_dir=None, root_dir=None):
+        self.root_dir = root_dir
         if config_dir is None:
             config_dir = self.config_dir
         else:
+            if self.root_dir is not None:
+                config_dir = self.root_dir + config_dir
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
             self.config_dir = config_dir
 
@@ -179,7 +195,8 @@ class BackupConfig(object):
 
         return ret
 
-    def save(self, config_dir=None):
+    def save(self, config_dir=None, root_dir=None):
+        self.root_dir = root_dir
         if config_dir is None:
             config_dir = self.config_dir
         else:
@@ -217,15 +234,31 @@ class BackupConfig(object):
             ret = False
         return (ret, timestamp)
 
+    def _chroot_dir(self, path):
+        if path is None:
+            return None
+        if self.root_dir is not None:
+            return self.root_dir + path
+        return path
+
+    def _unchroot_dir(self, path):
+        if path is None:
+            return None
+        if self.root_dir is not None:
+            root_dir_len = len(self.root_dir)
+            if path.startswith(self.root_dir):
+                return path[root_dir_len:]
+        return path
+
     def _read_main_conf(self, filename):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(filename)
         self.filesystem = inifile.get(None, 'Filesystem', BackupConfigDefaults.FILESYSTEM)
         self.retention_time = datetime.timedelta(seconds=float(inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)))
         self.retention_count = int(inifile.get(None, 'RetentionCount', BackupConfigDefaults.RETENTION_COUNT))
-        self.backup_directory = inifile.get(None, 'BackupDirectory', BackupConfigDefaults.BACKUP_DIR)
-        self.restore_directory = inifile.get(None, 'RestoreDirectory', BackupConfigDefaults.RESTORE_DIR)
-        self.intermediate_backup_directory = inifile.get(None, 'IntermediateBackupDirectory', BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR)
+        self.backup_directory = self._chroot_dir(inifile.get(None, 'BackupDirectory', BackupConfigDefaults.BACKUP_DIR))
+        self.restore_directory = self._chroot_dir(inifile.get(None, 'RestoreDirectory', BackupConfigDefaults.RESTORE_DIR))
+        self.intermediate_backup_directory = self._chroot_dir(inifile.get(None, 'IntermediateBackupDirectory', BackupConfigDefaults.INTERMEDIATE_BACKUP_DIR))
         self.eject_unused_backup_discs = inifile.getAsBoolean(None, 'EjectUnusedBackupDiscs', BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS)
         self.use_filesystem_snapshots = inifile.getAsBoolean(None, 'UseFilesystemSnapshots', BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS)
         self.use_filesystem_hardlinks = inifile.getAsBoolean(None, 'UseFilesystemHardlinks', BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS)
@@ -248,9 +281,9 @@ class BackupConfig(object):
         inifile.set(None, 'Filesystem', self.filesystem)
         inifile.set(None, 'RetentionTime', self.retention_time.total_seconds())
         inifile.set(None, 'RetentionCount', self.retention_count)
-        inifile.set(None, 'BackupDirectory', self.backup_directory)
-        inifile.set(None, 'RestoreDirectory', self.restore_directory)
-        inifile.set(None, 'IntermediateBackupDirectory', self.intermediate_backup_directory)
+        inifile.set(None, 'BackupDirectory', self._unchroot_dir(self.backup_directory))
+        inifile.set(None, 'RestoreDirectory', self._unchroot_dir(self.restore_directory))
+        inifile.set(None, 'IntermediateBackupDirectory', self._unchroot_dir(self._intermediate_backup_directory))
         inifile.setAsBoolean(None, 'EjectUnusedBackupDiscs', self.eject_unused_backup_discs)
         inifile.setAsBoolean(None, 'UseFilesystemSnapshots', self.use_filesystem_snapshots)
         inifile.setAsBoolean(None, 'UseFilesystemHardlinks', self.use_filesystem_hardlinks)
@@ -269,6 +302,7 @@ class BackupConfig(object):
 
     def __str__(self):
         ret = ''
+        ret = ret + 'root directory: ' + str(self.root_dir) + '\n'
         ret = ret + 'filesystem: ' + str(self.filesystem) + '\n'
         ret = ret + 'backup directory: ' + str(self.backup_directory) + '\n'
         ret = ret + 'restore directory: ' + str(self.restore_directory) + '\n'
@@ -339,18 +373,12 @@ class BackupPluginConfig(object):
 
     @property
     def intermediate_backup_directory(self):
-        ret = self.parent.intermediate_backup_directory
-        if ret is None:
-            ret = self.parent.backup_directory
-        ret = os.path.join(ret, self.plugin_name)
+        ret = os.path.join(self.parent.intermediate_backup_directory, self.plugin_name)
         return ret
     
     @property
     def base_directory(self):
-        ret = self.parent.intermediate_backup_directory
-        if ret is None:
-            ret = self.parent.backup_directory
-        return ret
+        return self.parent.intermediate_backup_directory
     
     def _read_conf(self, inifile):
         return True
