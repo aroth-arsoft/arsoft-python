@@ -109,11 +109,11 @@ class SystemConfig(object):
 
 if __name__ == '__main__':
     syscfg = SystemConfig(filename=sys.argv[1])
-    print((syscfg.autostart))
-    print((syscfg.optional_arguments))
-    print((syscfg.statusrefresh))
-    print((syscfg.omit_sendsigs))
+    print(syscfg.autostart)
+    print(syscfg.optional_arguments)
+    print(syscfg.statusrefresh)
+    print(syscfg.omit_sendsigs)
     
     syscfg.autostart = ['None']
-    print((syscfg.autostart))
+    print(syscfg.autostart)
     print(syscfg)

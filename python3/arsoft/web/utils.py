@@ -313,7 +313,33 @@ def django_request_info_view(request):
     body += '}\n'
     body += '</style></head>\n'
     body += _django_request_info_view_impl(request, ['META', 'GET', 'POST', 'REQUEST', 'FILES', 'COOKIES',
-                                                     'scheme', 'method', 'path', 'path_info', 'user', 'session', 'urlconf'])
+                                                     'scheme', 'method', 'path', 'path_info', 'user', 'session', 'urlconf', 'resolver_match'])
+    body += '</html>\n'
+    return HttpResponse(body, content_type='text/html')
+
+def django_env_info_view(request):
+    from django.http import HttpResponse
+    body = ''
+    body += '<html><head><style>\n'
+    body += 'table { border-collapse:collapse; vertical-align:top; }\n'
+    body += 'tr, th, td, tbody {\n'
+    body += 'border-style: inherit;\n'
+    body += 'border-color: inherit;\n'
+    body += 'border-width: inherit;\n'
+    body += 'text-align: left;\n'
+    body += 'vertical-align: top;\n'
+    body += 'padding:1px 3px 1px 3px;\n'
+    body += '}\n'
+    body += '</style></head>\n'
+    ret += '<table border=\'1\'>\n'
+    ret += '<tr><td>os.environ</td><td>\n' % escape(str(attr))
+    ret += '<table border=\'1\'>\n'
+    for key in os.environ:
+        value = os.environ[key]
+        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+    ret += '</table>\n'
+    ret += '</td></tr>\n'
+    ret += '</table>\n'
     body += '</html>\n'
     return HttpResponse(body, content_type='text/html')
 
@@ -324,4 +350,5 @@ def django_debug_urls(urls_module, urls_file):
     urls_module_obj_type = type(urls_module_obj)
 
     # add debug handler here
-    urls_module_obj.urlpatterns.append(url(r'^debug/request$', 'arsoft.web.utils.django_request_info_view', name='django_request'))
+    urls_module_obj.urlpatterns.append(url(r'^debug/request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'))
+    urls_module_obj.urlpatterns.append(url(r'^debug/env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'))

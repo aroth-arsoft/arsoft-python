@@ -86,7 +86,7 @@ class ssdp_discover:
             if skip_interface:
                 continue
             if self._verbose:
-                print(('Search on interface %s (%s)' % (iface['name'], ifaddr)))
+                print('Search on interface %s (%s)' % (iface['name'], ifaddr))
 
             for _ in range(retries):
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -104,11 +104,11 @@ class ssdp_discover:
                 msg_dest = receiver if receiver else group
                 try:
                     if self._verbose:
-                        print(('Send msg (%i bytes) on interface %s (%s) to %s' % (len(msg), iface['name'], ifaddr, msg_dest)))
+                        print('Send msg (%i bytes) on interface %s (%s) to %s' % (len(msg), iface['name'], ifaddr, msg_dest))
                     sock.sendto(msg, msg_dest)
                     socket_ok = True
                 except socket.error:
-                    print(('Failed to send through interface %s (%s)' % (iface['name'], ifaddr)))
+                    print('Failed to send through interface %s (%s)' % (iface['name'], ifaddr))
                     pass
                 while socket_ok:
                     try:
@@ -149,7 +149,7 @@ class ssdp_discover:
         response = send_and_recv_unix_socket_message(path=socket_path, message=msg)
 
         if self._verbose:
-            print(('got %s' % hexstring_with_length(response)))
+            print('got %s' % hexstring_with_length(response))
         responses = {}
         if response:
             (num_services) = struct.unpack('B', response[0])
@@ -170,11 +170,11 @@ class ssdp_discover:
         return list(responses.values())
 
     def print_repsonse(self, response):
-        print((response.location))
-        print(('  USN: %s' % response.usn))
-        print(('  Service: %s' % response.st))
+        print(response.location)
+        print('  USN: %s' % response.usn)
+        print('  Service: %s' % response.st)
         if response.cache:
-            print(('  Cache: %s' % response.cache))
+            print('  Cache: %s' % response.cache)
 
     def main(self):
         #=============================================================================================

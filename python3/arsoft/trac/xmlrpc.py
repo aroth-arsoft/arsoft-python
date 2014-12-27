@@ -26,7 +26,7 @@ class TracXmlrpc(object):
             o = urlparse(uri)
 
         self._url = o.geturl()
-        print((self._url))
+        print(self._url)
 
         self._server = server
         self._base = base
@@ -56,6 +56,6 @@ class TracXmlrpc(object):
 
 if __name__ == '__main__':
     t = TracXmlrpc(url=sys.argv[1])
-    print((t.api_version))
-    print((t.methods))
+    print(t.api_version)
+    print(t.methods)
  

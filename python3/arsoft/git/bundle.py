@@ -143,7 +143,7 @@ if __name__ == '__main__':
 
     bundle = GitBundle(sys.argv[1])
 
-    print(('git: %s' % (GIT_EXECUTABLE)))
-    print(('filename: %s' % (str(bundle.filename))))
-    print(('valid: %s' % (str(bundle.valid))))
-    print(('heads: %s' % (str(bundle.heads))))
+    print('git: %s' % (GIT_EXECUTABLE))
+    print('filename: %s' % (str(bundle.filename)))
+    print('valid: %s' % (str(bundle.valid)))
+    print('heads: %s' % (str(bundle.heads)))

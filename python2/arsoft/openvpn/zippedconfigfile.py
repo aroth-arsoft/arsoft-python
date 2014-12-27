@@ -349,7 +349,7 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(private_config_directory_ccd)
                     ret = True
-                except IOError, OSError:
+                except IOError as OSError:
                     ret = False
             if ret:
                 for (client_name, client_config_file) in cfgfile.client_config_files.iteritems():

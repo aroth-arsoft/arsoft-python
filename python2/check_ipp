@@ -42,7 +42,7 @@ def run_ipptool_test(test_name):
                 attributes[attribute] = { 'type':attrtype, 'value':value}
     else:
         attributes = None
-    return attributes
+    return attributes, sts, stderrdata
 
 def get_attr(attributes, attr_name, default=None):
     if attr_name in attributes:
@@ -51,7 +51,7 @@ def get_attr(attributes, attr_name, default=None):
         ret = default
     return ret
 
-printer_attributes = run_ipptool_test('check_ipp.test')
+printer_attributes, sts, stderrdata = run_ipptool_test('check_ipp.test')
 if printer_attributes is not None:
     printer_name = get_attr(printer_attributes, 'printer-name')
     printer_make_and_model = get_attr(printer_attributes, 'printer-make-and-model')

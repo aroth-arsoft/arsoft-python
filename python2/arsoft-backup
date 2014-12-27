@@ -180,7 +180,7 @@ class ARSoftBackupApp(BackupApp):
             print('  End:       %s ' % (item.enddate))
             print('  Directory: %s' % (item.backup_dir))
             if item.backup_disk:
-                print('  DisK:      %s' % (item.backup_disk))
+                print('  Disk:      %s' % (item.backup_disk))
 
         if self.previous_backups:
             print('Previous backups:')

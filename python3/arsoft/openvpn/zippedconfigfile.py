@@ -453,9 +453,9 @@ if __name__ == '__main__':
     c = ZippedConfigFile(sys.argv[1])
 
     print(c)
-    print((c.config_file))
-    print((c.config_file.ca_file))
-    print((c[c.config_file.ca_file]))
-    print((iter(c)))
+    print(c.config_file)
+    print(c.config_file.ca_file)
+    print(c[c.config_file.ca_file])
+    print(iter(c))
     for f in iter(c):
-        print((f.name))
+        print(f.name)

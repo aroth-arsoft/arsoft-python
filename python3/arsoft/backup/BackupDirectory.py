@@ -31,7 +31,7 @@ class BackupDirectory:
 
     def log(self, msg):
         if self.m_verbose:
-            print((str(msg)))
+            print(str(msg))
             
     ######################################################################
     # Helper functions
@@ -198,10 +198,10 @@ class BackupDirectory:
             filename_full = os.path.join(self.m_path, filename)
             hashfilename_full = os.path.join(self.m_path, hashfilename)
             if BackupDirectory._removeFile(filename_full):
-                print(('deleted ' + str(filename)))
+                print('deleted ' + str(filename))
                 BackupDirectory._removeFile(hashfilename_full)
             else:
-                print(('failed to delete ' + str(filename)))
+                print('failed to delete ' + str(filename))
 
     def get_latest_revision(self):
         filelist = self.listFiles()

@@ -93,7 +93,7 @@ class BackupDirectory:
             h.write(hashsum)
             h.close()
             ret = True
-        except OSError, e:
+        except OSError as e:
             ret = False
         return ret
         

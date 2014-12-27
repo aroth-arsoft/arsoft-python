@@ -14,17 +14,17 @@ class CupsAdminApp(object):
         self._conn = None
 
     def _show_printer(self, printer, include_attributes=False):
-        print(('  Printer: %s' %(printer.name)))
-        print(('    Model: %s' % (printer.make_and_model)))
-        print(('    Location: %s' % (printer.location)))
-        print(('    Device URI: %s' % (printer.device_uri)))
-        print(('    Enabled: %s' % (printer.enabled)))
-        print(('    Shared: %s' % (printer.is_shared)))
+        print('  Printer: %s' %(printer.name))
+        print('    Model: %s' % (printer.make_and_model))
+        print('    Location: %s' % (printer.location))
+        print('    Device URI: %s' % (printer.device_uri))
+        print('    Enabled: %s' % (printer.enabled))
+        print('    Shared: %s' % (printer.is_shared))
 
         printer.getAttributes()
         print('    Attributes:')
         for key, value in printer.attributes.items():
-            print(('      %s: %s' % (key, value)))
+            print('      %s: %s' % (key, value))
 
         print('    Queued jobs:')
         jobs = printer.jobsQueued()
@@ -32,7 +32,7 @@ class CupsAdminApp(object):
             print('      None')
         else:
             for job in jobs:
-                print(('      %s' % (job)))
+                print('      %s' % (job))
 
         print('    Preserved jobs:')
         jobs = printer.jobsPreserved()
@@ -40,10 +40,10 @@ class CupsAdminApp(object):
             print('      None')
         else:
             for job in jobs:
-                print(('      %s' % (job)))
+                print('      %s' % (job))
 
     def show_printers(self, include_attributes=False):
-        print(('Printers on %s:%i' % (self._conn.server, self._conn.port)))
+        print('Printers on %s:%i' % (self._conn.server, self._conn.port))
         for (printername, printer_obj) in self._conn.printers.items():
             self._show_printer(printer_obj, include_attributes=include_attributes)
         return True

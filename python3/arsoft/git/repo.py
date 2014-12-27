@@ -625,15 +625,15 @@ if __name__ == '__main__':
         
     repo = GitRepository(sys.argv[1])
     
-    print(('git: %s' % (GIT_EXECUTABLE)))
-    print(('path: %s' % (str(repo.path))))
-    print(('name: %s' % (str(repo.name))))
-    print(('bare: %s' % (str(repo.bare))))
-    print(('magic: %s' % (str(repo.magic_directory))))
-    print(('description: %s' % (str(repo.description))))
-    print(('current branch: %s' % (str(repo.current_branch))))
-    print(('attributes: %s' % (str(repo.attributes))))
-    print(('excludes: %s' % (str(repo.excludes))))
+    print('git: %s' % (GIT_EXECUTABLE))
+    print('path: %s' % (str(repo.path)))
+    print('name: %s' % (str(repo.name)))
+    print('bare: %s' % (str(repo.bare)))
+    print('magic: %s' % (str(repo.magic_directory)))
+    print('description: %s' % (str(repo.description)))
+    print('current branch: %s' % (str(repo.current_branch)))
+    print('attributes: %s' % (str(repo.attributes)))
+    print('excludes: %s' % (str(repo.excludes)))
     
     repo.attributes = DEFAULT_ATTIRBUTES
     repo.excludes = DEFAULT_EXCLUDES

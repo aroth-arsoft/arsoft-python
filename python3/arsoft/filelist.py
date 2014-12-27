@@ -427,7 +427,7 @@ if __name__ == "__main__":
     fl = FileListWithDestination(sys.argv[1])
     print(fl)
     for it in fl.items.items():
-        print(('got fl.item %s' % str(it)))
+        print('got fl.item %s' % str(it))
     for it in fl:
-        print(('got item %s' % str(it)))
+        print('got item %s' % str(it))
     fl.save(sys.argv[2])

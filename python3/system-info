@@ -182,7 +182,7 @@ class system_info_app:
             for (key, value) in list(obj.data.items()):
                 if key == 'Characteristics':
                     continue
-                print(('  %s: %s' % (key, value)))
+                print('  %s: %s' % (key, value))
         return 0
 
     def show_cpu_info(self):
@@ -203,7 +203,7 @@ class system_info_app:
             for (key, value) in list(obj.data.items()):
                 if key == 'Characteristics':
                     continue
-                print(('  %s: %s' % (key, value)))
+                print('  %s: %s' % (key, value))
         return 0
 
     def show_block_device_info(self):

@@ -18,9 +18,12 @@ class slapd_cert_mk_check_plugin(object):
         self._saslmech = 'simple'
 
         if os.path.isdir('/etc/ldap/slapd.d') and os.path.isfile('/etc/check_mk/slapd_cert'):
-            f = open('/etc/check_mk/slapd_cert', 'r')
-            self._bindpw = f.read().strip()
-            f.close()
+            try:
+                f = open('/etc/check_mk/slapd_cert', 'r')
+                self._bindpw = f.read().strip()
+                f.close()
+            except IOError:
+                pass
 
         self._cert_files = []
         self._ca_files = []

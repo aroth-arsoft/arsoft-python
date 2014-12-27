@@ -305,7 +305,7 @@ class TracAdmin(object):
             if self._env:
                 self._env.config.save()
             ret = True
-        except Exception, e:
+        except Exception as e:
             self._last_error = 'Error writing to trac.ini: ' + exception_to_unicode(e)
             ret = False
         return ret

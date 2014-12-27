@@ -41,7 +41,7 @@ class IMAPCheckApp(object):
         try:
             print(self._cxn.getannotation(mailbox, entry, attribute))
         except Exception as e:
-            print((str(e)))
+            print(str(e))
         self._cxn.setannotation(mailbox, entry, attribute)
 
     def main(self, argv=None):
@@ -71,7 +71,7 @@ class IMAPCheckApp(object):
             try:
                 print(self._cxn.getannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv")'))
             except Exception as e:
-                print((str(e)))
+                print(str(e))
             print(self._cxn.setannotation('draft', "/vendor/cmu/cyrus-imapd/expire", '("value.priv" "42")'))
             ret = 0
         self._disconnect()

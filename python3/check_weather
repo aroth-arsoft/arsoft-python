@@ -9,7 +9,7 @@ import time
 import string
 
 ## Create the plugin option
-np = NagiosPlugin()
+np = NagiosPlugin(must_threshold = False, has_host_argument=False)
 np.add_arg('s', 'station', 'station id')
 
 ## This starts the actual plugin activation
@@ -107,4 +107,4 @@ if current_observation:
     else:
         np.nagios_exit("CRITICAL", 'Unable to parse observeration data for station %s' % str(station_id))
 else:
-    np.nagios_exit("CRITICAL", 'Unable to get current observeration data for station %s from ' % str(station_id, current_observation_url))
+    np.nagios_exit("CRITICAL", 'Unable to get current observeration data for station %s from %s' % (str(station_id), current_observation_url))
