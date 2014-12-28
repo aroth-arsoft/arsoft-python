@@ -521,6 +521,17 @@ class IniFile(object):
             ret = default
         return ret
 
+    def getAsInteger(self, section, key, default=None):
+        value = self.get(section, key, default)
+        if value is not None:
+            try:
+                ret = int(value)
+            except ValueError:
+                ret = default
+        else:
+            ret = default
+        return ret
+
     def getAsArray(self, section, key, default=[]):
         ret = default
         section_obj = self._getSection(section)

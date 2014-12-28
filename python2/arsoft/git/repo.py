@@ -86,6 +86,14 @@ class GitRepository(object):
                     break
         return None
 
+    @staticmethod
+    def suggested_name(path):
+        ret = None
+        bname = os.path.basename(path)
+        if bname:
+            (ret, bext) = os.path.splitext(bname)
+        return ret
+
     @property
     def valid(self):
         if os.path.isdir(self.root_directory):
@@ -280,7 +288,31 @@ class GitRepository(object):
         if recursive:
             args.append('--recurse-submodules')
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
-    
+
+    def fetch(self, remote=None, all=False, prune=True, tags=True, notags=False, quiet=False, recursive=True, outputStdErr=True, outputStdOut=True):
+        args = ['fetch']
+        if prune:
+            args.append('--prune')
+        if tags:
+            args.append('--tags')
+        if notags:
+            args.append('--no-tags')
+        if quiet:
+            args.append('--quiet')
+        if recursive:
+            args.append('--recurse-submodules=yes')
+        else:
+            args.append('--recurse-submodules=no')
+        if all:
+            args.append('--all')
+        elif isinstance(remote, list):
+            args.append('--multiple')
+            for e in remote:
+                args.append(e)
+        elif remote is not None:
+            args.append(remote)
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
+
     def submodule_init(self):
         args = ['submodule', 'init']
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
