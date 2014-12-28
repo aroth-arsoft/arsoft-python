@@ -54,6 +54,13 @@ class GitBackupPluginConfig(BackupPluginConfig):
     def _read_conf(self, inifile):
         repo_url_list = FileList.from_list(inifile.getAsArray(None, 'Repositories', []), base_directory=None, use_glob=True)
         self._list_to_repo_items(repo_url_list)
+        for sect in inifile.sections:
+            repo_url = inifile.get(sect, 'url', None)
+            repo_name = inifile.get(sect, 'name', None)
+            if repo_url:
+                if repo_name is None:
+                    repo_name = sect
+                self._repository_list.append(GitBackupPluginConfig.RepoItem(repo_url, repo_name))
         return True
     
     def _write_conf(self, inifile):
