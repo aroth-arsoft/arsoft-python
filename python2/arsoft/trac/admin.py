@@ -62,7 +62,16 @@ class TracAdmin(object):
         if backup == False:
             args.append('--no-backup')
         return self._run_trac_admin(args)
-    
+
+    def hotcopy(self, dest_dir, include_database=True):
+        args = ['hotcopy']
+        if not include_database:
+            args.append('--no-database')
+        #if os.path.exists(dest_dir):
+        #    raise FileExistsError(dest_dir)
+        args.append(dest_dir)
+        return self._run_trac_admin(args)
+
     def _init_env(self):
         if self._env is None:
             from trac.core import TracError

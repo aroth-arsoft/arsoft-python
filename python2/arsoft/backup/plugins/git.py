@@ -10,9 +10,38 @@ from arsoft.git.bundle import GitBundle
 from arsoft.git.error import *
 
 class GitBackupPluginConfig(BackupPluginConfig):
+
+    class RepoItem(object):
+        def __init__(self, url, name=None):
+            self.url = url
+            if name is None:
+                name = GitRepository.suggested_name(url)
+            self.name = name
+
+        @property
+        def is_ssh(self):
+            return self.url.startswith('ssh://')
+
+        @property
+        def is_remote(self):
+            idx = self.url.find('://')
+            ret = True if idx > 0 else False
+            return ret
+
+        def __str__(self):
+            if self.name:
+                return '%s (%s)' % (self.name, self.url)
+            return self.url
+
     def __init__(self, parent):
         BackupPluginConfig.__init__(self, parent, 'git')
         self._repository_list = None
+        self._filelist = None
+
+    def _list_to_repo_items(self, repo_url_list):
+        self._repository_list = []
+        for url in repo_url_list:
+            self._repository_list.append(GitBackupPluginConfig.RepoItem(url))
 
     @property
     def repository_list(self):
@@ -20,16 +49,18 @@ class GitBackupPluginConfig(BackupPluginConfig):
 
     @repository_list.setter
     def repository_list(self, value):
-        if value is not None:
-            if isinstance(value, FileList):
-                self._repository_list = value
-            else:
-                self._repository_list = FileList.from_list(value)
-        else:
-            self._repository_list = None
+        self._repository_list = value
 
     def _read_conf(self, inifile):
-        self.repository_list = inifile.getAsArray(None, 'Repositories', [])
+        repo_url_list = FileList.from_list(inifile.getAsArray(None, 'Repositories', []), base_directory=None, use_glob=True)
+        self._list_to_repo_items(repo_url_list)
+        for sect in inifile.sections:
+            repo_url = inifile.get(sect, 'url', None)
+            repo_name = inifile.get(sect, 'name', None)
+            if repo_url:
+                if repo_name is None:
+                    repo_name = sect
+                self._repository_list.append(GitBackupPluginConfig.RepoItem(repo_url, repo_name))
         return True
     
     def _write_conf(self, inifile):
@@ -42,6 +73,15 @@ class GitBackupPluginConfig(BackupPluginConfig):
             inifile.set(None, 'Repositories', [])
         return True
 
+    def __str__(self):
+        ret = BackupPluginConfig.__str__(self)
+        ret = ret + 'repositories:\n'
+        if self._repository_list:
+            for item in self._repository_list:
+                ret = ret + '  %s:\n' % item.name
+                ret = ret + '    url: %s\n' % item.url
+        return ret
+
 class GitBackupPlugin(BackupPlugin):
     def __init__(self, backup_app):
         self.config = GitBackupPluginConfig(backup_app)
@@ -49,6 +89,9 @@ class GitBackupPlugin(BackupPlugin):
 
     def _git_backup_to_bundle(self, repository, bundle_file):
         ret = False
+        if self.backup_app._verbose:
+            print('git backup %s to %s' % (repository.root_directory, bundle_file))
+
         if GitBundle.is_bundle(bundle_file):
             bundle = GitBundle(bundle_file, repository=repository, verbose=self.backup_app._verbose)
             try:
@@ -63,11 +106,30 @@ class GitBackupPlugin(BackupPlugin):
         else:
             try:
                 bundle = repository.create_bundle(bundle_file, all=True)
-                if self._verbose:
+                if self.backup_app._verbose:
                     print('backup %s to %s - Created' % (repository.root_directory, bundle.filename))
                 ret = True
             except (GitRepositoryError, GitBundleError) as e:
                 sys.stderr.write('Failed to create bundle from repository %s; error %s\n' % (repository.root_directory, str(e)))
+        return ret
+
+    def update_remote_repo(self, local_path, remote_url):
+        ret = True
+        if os.path.isdir(local_path):
+            repo = GitRepository(local_path, bare=True, verbose=self.backup_app._verbose)
+            # only update the origin remote (which should be always the case)
+            (sts, stdoutdata, stderrdata) = repo.fetch(remote='origin', quiet=True, recursive=True, outputStdErr=True, outputStdOut=True)
+            if sts != 0:
+                sys.stderr.write('Failed to pull latest from %s to %s\n' % (remote_url, local_path))
+                ret = False
+        else:
+            if self.backup_app._verbose:
+                print('git clone %s to %s' % (remote_url, local_path))
+            repo = GitRepository(local_path, bare=True, verbose=self.backup_app._verbose)
+            (sts, stdoutdata, stderrdata) = repo.clone(remote_url, local_path, recursive=True)
+            if sts != 0:
+                sys.stderr.write('Failed to clone %s to %s\n' % (remote_url, local_path))
+                ret = False
         return ret
 
     def perform_backup(self, **kwargs):
@@ -77,26 +139,32 @@ class GitBackupPlugin(BackupPlugin):
             ret = False
         if ret:
             repo_backup_filelist = FileListItem(base_directory=self.config.base_directory)
-            for repo_path in self.config.repository_list:
-                repo = GitRepository(repo_path, verbose=self.backup_app._verbose)
+            for repo_item in self.config.repository_list:
+                if repo_item.is_remote:
+                    local_repo_path = os.path.join(backup_dir, repo_item.name + '.git')
+                    if not self.update_remote_repo(local_repo_path, repo_item.url):
+                        local_repo_path = None
+                else:
+                    local_repo_path = repo_item.url
+                repo = GitRepository(local_repo_path, verbose=self.backup_app._verbose) if local_repo_path else None
                 if repo:
                     if repo.valid:
                         if repo.empty:
-                            sys.stderr.write('Repository %s is empty. Skip\n' % repo_path)
+                            sys.stderr.write('Repository %s is empty. Skip\n' % str(repo_item))
                             ret = False
                         else:
                             bundle_file = os.path.join(backup_dir, repo.name + '.git_bundle')
                             if self.backup_app._verbose:
-                                print('backup %s to %s' % (repo_path, bundle_file))
+                                print('backup %s to %s' % (repo_item.url, bundle_file))
                             if not self._git_backup_to_bundle(repo, bundle_file):
                                 ret = False
                             else:
                                 repo_backup_filelist.append(bundle_file)
                     else:
-                        sys.stderr.write('Repository %s is invalid\n' % repo_path)
+                        sys.stderr.write('Repository %s is invalid\n' % str(repo_item))
                         ret = False
                 else:
-                    sys.stderr.write('Failed to load repository %s\n' % repo_path)
+                    sys.stderr.write('Failed to load repository %s\n' % str(repo_item))
                     ret = False
             #print(repo_backup_filelist)
             self.backup_app.append_to_filelist(repo_backup_filelist)
