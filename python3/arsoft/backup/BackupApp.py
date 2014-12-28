@@ -27,7 +27,7 @@ class BackupList(object):
         self._items = []
         self._last_full = None
 
-    def load(self, backup_dir):
+    def load(self, backup_dir, skip_failed=False, current_session=None):
         ret = True
         local_backup_dir = None
         ssh_remote_backup_dir = None
@@ -49,7 +49,10 @@ class BackupList(object):
                         (backup_ok, timestamp) = self.config.is_backup_item(item)
                         if backup_ok:
                             session = self.app.job_state.find_session(timestamp, fullpath)
+                            if session is not None and session == current_session:
+                                continue
                             bak = BackupList.BackupItem(fullpath, timestamp, session)
+
                             found_backup_dirs.append( bak )
                 self._items = sorted(found_backup_dirs, key=lambda bak: bak.timestamp)
             else:
@@ -66,6 +69,8 @@ class BackupList(object):
                         (backup_ok, timestamp) = self.config.is_backup_item(item)
                         if backup_ok:
                             session = self.app.job_state.find_session(timestamp, fullpath)
+                            if session is not None and session == current_session:
+                                continue
                             bak = BackupList.BackupItem(fullpath, timestamp, session)
                             found_backup_dirs.append( bak )
                 self._items = sorted(found_backup_dirs, key=lambda bak: bak.timestamp)
@@ -74,7 +79,14 @@ class BackupList(object):
                     ret = False 
 
         # pick the latest/last backup from the list
-        self._last_full = self._items[-1] if self._items else None
+        self._last_full = None
+        if self._items:
+            idx = len(self._items) - 1
+            while idx >= 0:
+                if not self._items[idx].session.temporary:
+                    self._last_full = self._items[idx]
+                    break
+                idx = idx - 1
         return ret
     
     def remove_old_backups(self, max_age, min_count=0, max_count=50):
@@ -287,7 +299,7 @@ class BackupApp(object):
         return ret
 
     def load_previous(self):
-        return self.previous_backups.load(self._real_backup_dir)
+        return self.previous_backups.load(self._real_backup_dir, current_session=self.session)
 
     def prepare_destination(self, create_backup_dir=False):
         # load all available external discs
