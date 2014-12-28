@@ -142,11 +142,11 @@ class MysqlBackupPlugin(BackupPlugin):
         self.mysqldump_exe = which('mysqldump')
         self.zip_exe = which('bzip2')
         self.checksum_exe = which('md5sum')
-        if isinstance(self.mysqldump_exe, list):
+        if self.mysqldump_exe:
             self.mysqldump_exe = self.mysqldump_exe[0]
-        if isinstance(self.zip_exe, list):
+        if self.zip_exe:
             self.zip_exe = self.zip_exe[0]
-        if isinstance(self.checksum_exe, list):
+        if self.checksum_exe:
             self.checksum_exe = self.checksum_exe[0]
 
     def perform_backup(self, **kwargs):

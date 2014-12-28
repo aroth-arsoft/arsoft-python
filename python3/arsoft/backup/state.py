@@ -317,8 +317,6 @@ class BackupJobState(object):
         ret = inifile.open(filename)
         self.last_success = inifile.getAsTimestamp(None, 'LastSuccess', None)
         self.last_failure = inifile.getAsTimestamp(None, 'LastFailure', None)
-        print('last_success=%s' % (self.last_success))
-        print('last_failure=%s' % (self.last_failure))
         return ret
         
     def _write_state_conf(self, filename):
