@@ -83,7 +83,7 @@ class BackupList(object):
         if self._items:
             idx = len(self._items) - 1
             while idx >= 0:
-                if not self._items[idx].session.temporary:
+                if self._items[idx].session is not None and not self._items[idx].session.temporary:
                     self._last_full = self._items[idx]
                     break
                 idx = idx - 1
@@ -212,7 +212,7 @@ class BackupApp(object):
         for plugin in plugins_to_load:
             try:
                 self._load_plugin(plugin)
-            except PluginLoadException as e:
+            except BackupApp.PluginLoadException as e:
                 sys.stderr.write('Failed to load plugin %s: error %s\n' % (plugin, str(e)))
         return True
 
