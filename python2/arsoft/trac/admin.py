@@ -58,18 +58,20 @@ class TracAdmin(object):
         return self._run_trac_admin(args)
 
     def upgrade(self, backup=True):
+        if not self._check_config_access(read_only=False):
+            return False
         args = ['upgrade']
         if backup == False:
             args.append('--no-backup')
         return self._run_trac_admin(args)
 
     def hotcopy(self, dest_dir, include_database=True):
+        if not self._check_config_access(read_only=True):
+            return False
         args = ['hotcopy']
+        args.append(dest_dir)
         if not include_database:
             args.append('--no-database')
-        #if os.path.exists(dest_dir):
-        #    raise FileExistsError(dest_dir)
-        args.append(dest_dir)
         return self._run_trac_admin(args)
 
     def _init_env(self):
@@ -84,7 +86,21 @@ class TracAdmin(object):
             except IOError as e:
                 self._env = None
                 self._last_error = str(e)
-    
+
+    def _check_config_access(self, read_only=True):
+        ret = True
+        if self._tracenv:
+            trac_ini = os.path.join(self._tracenv, 'conf', 'trac.ini')
+            if read_only:
+                if not os.access(trac_ini, os.R_OK):
+                    self._last_error = str(PermissionError('Unable to read %s.' % trac_ini))
+                    ret = False
+            else:
+                if not os.access(trac_ini, os.W_OK):
+                    self._last_error = str(PermissionError('Unable to write %s.' % trac_ini))
+                    ret = False
+        return ret
+
     def _retrieve_plugin_info(self):
         if self._plugin_info is None:
             self._init_env()

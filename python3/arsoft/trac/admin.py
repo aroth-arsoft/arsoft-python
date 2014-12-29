@@ -72,8 +72,6 @@ class TracAdmin(object):
         args.append(dest_dir)
         if not include_database:
             args.append('--no-database')
-        #if os.path.exists(dest_dir):
-        #    raise FileExistsError(dest_dir)
         return self._run_trac_admin(args)
 
     def _init_env(self):

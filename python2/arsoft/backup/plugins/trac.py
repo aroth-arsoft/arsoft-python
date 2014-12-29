@@ -12,12 +12,13 @@ import sys
 class TracBackupPluginConfig(BackupPluginConfig):
 
     class TracEnvItem(object):
-        def __init__(self, path, include_database=False):
+        def __init__(self, name, path, include_database=False):
+            self.name = name
             self.path = path
             self.include_database = include_database
 
         def __str__(self):
-            return '%s' % (self.path)
+            return '%s (%s)' % (self.name, self.path)
 
     def __init__(self, parent):
         BackupPluginConfig.__init__(self, parent, 'trac')
@@ -36,7 +37,7 @@ class TracBackupPluginConfig(BackupPluginConfig):
             tracenv = inifile.get(sect, 'tracenv', None)
             include_database = inifile.getAsBoolean(sect, 'include_database', False)
             if tracenv:
-                self._instance_list.append(TracBackupPluginConfig.TracEnvItem(tracenv, include_database))
+                self._instance_list.append(TracBackupPluginConfig.TracEnvItem(sect, tracenv, include_database))
         return True
     
     def _write_conf(self, inifile):
@@ -47,7 +48,7 @@ class TracBackupPluginConfig(BackupPluginConfig):
         ret = ret + 'instances:\n'
         if self._instance_list:
             for item in self._instance_list:
-                ret = ret + '  %s:\n' % item.path
+                ret = ret + '  %s: %s\n' % (item.name, item.path)
         return ret
 
 class TracBackupPlugin(BackupPlugin):
@@ -66,11 +67,22 @@ class TracBackupPlugin(BackupPlugin):
                 if self.backup_app._verbose:
                     print('backup %s' % str(item))
 
+                current_backup_dir = os.path.join(backup_dir, item.name)
+
                 trac_admin = TracAdmin(item.path, verbose=self.backup_app._verbose)
                 tmp_backup_dir = tempfile.TemporaryDirectory(dir=backup_dir)
-                if not trac_admin.hotcopy(tmp_backup_dir.name, include_database=item.include_database):
+                tmp_backup_dir_hotcopy = os.path.join(tmp_backup_dir.name, 'backup')
+                if not trac_admin.hotcopy(tmp_backup_dir_hotcopy, include_database=item.include_database):
                     sys.stderr.write('Failed to create hot copy of %s. %s\n' % (str(item), trac_admin.last_error))
                     ret = False
+                else:
+                    if not self.backup_app.sync_directories(source_dir=tmp_backup_dir_hotcopy + '/', target_dir=current_backup_dir + '/'):
+                        sys.stderr.write('Failed to sync hot copy at %s to %s\n' % (tmp_backup_dir_hotcopy, current_backup_dir))
+                        ret = False
+                    else:
+                        trac_backup_filelist.append(current_backup_dir)
+                tmp_backup_dir.cleanup()
+
 
             #print(trac_backup_filelist)
             self.backup_app.append_to_filelist(trac_backup_filelist)

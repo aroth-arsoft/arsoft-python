@@ -5,7 +5,6 @@
 # onkyo-rs232 <cmd> <cmd2> <cmd3> ...
 
 import sys, time
-import serial
 import argparse
 import re
 from arsoft.eiscp.core import eISCP, command_to_iscp, iscp_to_command
@@ -257,7 +256,12 @@ class OnkyoRS232(object):
 
         if self.devfile:
             try:
+                import serial
                 self.ser = serial.Serial(self.devfile, 9600, timeout=1)
+            except ImportError:
+                self.ser = None
+                sys.stderr.write('Failed to load serial module to open %s\n' % (self.devfile))
+                ret = 2
             except IOError as e:
                 self.ser = None
                 sys.stderr.write('Failed to open serial port %s; %s\n' % (self.devfile, str(e)))
