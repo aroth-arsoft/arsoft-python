@@ -91,7 +91,7 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
             if verbose:
                 print(real_script)
             (sts, stdout_data, stderr_data) = runcmdAndGetData(ssh_executable, exec_args,
-                                verbose=verbose, outputStdErr=outputStdErr, outputStdOut=True,
+                                verbose=verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
                                 stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env)
         else:
             (sts, stdout_data, stderr_data) = (put_sts, put_stdout, put_stderr)
@@ -267,3 +267,100 @@ def ssh_rmdir(server, directory, recursive=False, keyfile=None, username=None, p
     (sts, stdoutdata, stderrdata) = ssh_runcmdAndGetData(server, commandline, keyfile=keyfile, username=username, password=password, verbose=verbose)
     return True if sts == 0 else False
 
+
+
+class SSHSudoSession(object):
+
+    def __init__(self, url=None, hostname=None, username=None, sudo_password=None, password=None, keyfile=None, verbose=False):
+        if url is None:
+            self.hostname = hostname
+            self.username = username
+            self.password = password
+        else:
+            self.username = url.username
+            self.password = url.password
+            self.hostname = url.hostname
+
+        self.keyfile = keyfile
+        self.sudo_password = sudo_password
+        self.sudo_askpass_script = None
+        self.sudo_command = None
+        self.sudo_user_id = None
+        self.verbose = verbose
+
+    def __del__(self):
+        self.close()
+
+    @property
+    def user_id(self):
+        return self.sudo_user_id
+
+    @property
+    def command_prefix(self):
+        return self.sudo_command
+
+    def run(self, script=None, commandline=None,
+                useTerminal=False,
+                outputStdErr=False, outputStdOut=False,
+                stdin=None, stdout=None, stderr=None,
+                allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
+
+        if useTerminal:
+            used_stdin = sys.stdin if stdin is None else stdin
+            used_stdout = sys.stdout if stdout is None else stdout
+            used_stderr = sys.stderr if stderr is None else stderr
+        else:
+            used_stdin = None
+            used_stdout = None
+            used_stderr = None
+
+        return ssh_runcmdAndGetData(self.hostname, commandline=commandline, script=script,
+                                                     outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                                     stdin=used_stdin, stdout=used_stdout, stderr=used_stderr,
+                                                     cwd=cwd, env=env,
+                                                     allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
+                                                     keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+
+
+    def start(self):
+        script = """
+tmpfile=`mktemp`
+echo "#!/bin/sh\necho \"%(sudo_password)s\"\n" > "$tmpfile"
+chmod 700 "$tmpfile"
+SUDO_ASKPASS="$tmpfile" sudo -A /bin/true; RES=$?
+if [ $RES -eq 0 ]; then
+    echo "$tmpfile"
+else
+    rm -f "$tmpfile"
+fi
+exit $RES
+""" % { 'sudo_password': self.sudo_password }
+        (sts, stdout, stderr) = self.run(script, useTerminal=False)
+        ret = True if sts == 0 else False
+        if ret:
+            #print (sts, stdout, stderr)
+            self.sudo_askpass_script = stdout.strip().decode()
+            self.sudo_command = 'SUDO_ASKPASS=\'%s\' sudo -A ' % self.sudo_askpass_script
+
+            (sts, stdout, stderr) = self.run(commandline="%sid -u" % self.sudo_command)
+            ret = True if sts == 0 else False
+            if ret:
+                if stdout:
+                    self.sudo_user_id = int(stdout.strip())
+                    ret = True if self.sudo_user_id == 0 else False
+                else:
+                    ret = False
+            if not ret:
+                self.close()
+        return ret
+
+    def close(self):
+        if self.sudo_askpass_script:
+            (sts, stdout, stderr) = self.run(commandline="rm -f %s" % self.sudo_askpass_script)
+            ret = True if sts == 0 else False
+            if ret:
+                self.sudo_askpass_script = None
+                self.sudo_command = None
+        else:
+            ret = True
+        return ret

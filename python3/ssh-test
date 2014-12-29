@@ -1,0 +1,11 @@
+#!/usr/bin/python3
+import sys
+from arsoft.sshutils import *
+
+if __name__ == "__main__":
+    url = SSHUrl(sys.argv[1])
+    session = SSHSudoSession(url=url, sudo_password=sys.argv[2], verbose=False)
+    session.start()
+    session.run('id', outputStdErr=True, outputStdOut=True)
+    print(session.command_prefix)
+
