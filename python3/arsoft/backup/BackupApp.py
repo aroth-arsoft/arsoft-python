@@ -265,6 +265,11 @@ class BackupApp(object):
                 ret = False
         return ret
 
+    def sync_directories(self, source_dir, target_dir, recursive=True, relative=False, exclude=None, delete=True, deleteExcluded=True):
+        return Rsync.sync_directories(source_dir, target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete,
+                               deleteExcluded=deleteExcluded, stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._verbose)
+
+
     def _prepare_backup_dir(self):
         ret = True
         backup_dir = self._real_backup_dir
