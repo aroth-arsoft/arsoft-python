@@ -139,20 +139,17 @@ class MysqlBackupPlugin(BackupPlugin):
     def __init__(self, backup_app):
         self.config = MysqlBackupPluginConfig(backup_app)
         BackupPlugin.__init__(self, backup_app, 'mysql')
-        self.mysqldump_exe = which('mysqldump')
-        self.zip_exe = which('bzip2')
-        self.checksum_exe = which('md5sum')
-        if self.mysqldump_exe:
-            self.mysqldump_exe = self.mysqldump_exe[0]
-        if self.zip_exe:
-            self.zip_exe = self.zip_exe[0]
-        if self.checksum_exe:
-            self.checksum_exe = self.checksum_exe[0]
+        self.mysqldump_exe = which('mysqldump', only_first=True)
+        self.zip_exe = which('bzip2', only_first=True)
+        self.checksum_exe = which('md5sum', only_first=True)
 
     def perform_backup(self, **kwargs):
         ret = True
         backup_dir = self.config.intermediate_backup_directory
         if not self._mkdir(backup_dir):
+            ret = False
+        if not self.mysqldump_exe:
+            sys.stderr.write('mysqldump not found.\n')
             ret = False
         if ret:
             mysql_backup_filelist = FileListItem(base_directory=self.config.base_directory)

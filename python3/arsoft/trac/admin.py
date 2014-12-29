@@ -2,13 +2,17 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from arsoft.utils import runcmdAndGetData
+from arsoft.utils import runcmdAndGetData, which
 import sys, os
 
 class TracAdmin(object):
-    def __init__(self, tracenv, trac_admin_bin='trac-admin', verbose=False):
+    def __init__(self, tracenv, trac_admin_bin=None, verbose=False):
         self._tracenv = tracenv
-        self._trac_admin_bin = trac_admin_bin
+
+        if trac_admin_bin is None:
+            self._trac_admin_bin = which('trac-admin', only_first=True)
+        else:
+            self._trac_admin_bin = trac_admin_bin
         self._last_error = None
         self._verbose = verbose
         self._trac_config = None

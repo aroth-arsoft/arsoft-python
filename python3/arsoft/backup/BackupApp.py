@@ -6,6 +6,7 @@ from arsoft.filelist import *
 from arsoft.rsync import Rsync
 from arsoft.sshutils import *
 from arsoft.utils import rmtree
+from arsoft.socket_utils import gethostname_tuple
 from .BackupConfig import *
 from .plugin import *
 from .state import *
@@ -185,6 +186,8 @@ class BackupApp(object):
         self._real_backup_dir = None
         self._verbose = False
         self.root_dir = None
+        self.fqdn = None
+        self.hostname = None
 
     @property
     def verbose(self):
@@ -204,6 +207,10 @@ class BackupApp(object):
         self.root_dir = root_dir
         self.config.open(config_dir, root_dir=root_dir)
         self.job_state.open(state_dir, root_dir=root_dir)
+
+        (fqdn, hostname, domain) = gethostname_tuple()
+        self.fqdn = fqdn
+        self.hostname = hostname
 
         # in any case continue with the config we got
         self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag)
@@ -269,6 +276,15 @@ class BackupApp(object):
         return Rsync.sync_directories(source_dir, target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete,
                                deleteExcluded=deleteExcluded, stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._verbose)
 
+    def is_localhost(self, hostname):
+        if hostname == 'localhost' or hostname == 'loopback':
+            return True
+        elif hostname == '127.0.0.1' or hostname == '::1':
+            return True
+        elif hostname == self.hostname or hostname == self.fqdn:
+            return True
+        else:
+            return False
 
     def _prepare_backup_dir(self):
         ret = True
