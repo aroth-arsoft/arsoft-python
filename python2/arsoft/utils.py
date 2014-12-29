@@ -250,7 +250,7 @@ def to_gid(group):
 Utilities for dealing with processes.
 """
 
-def which(name, flags=os.X_OK):
+def which(name, flags=os.X_OK, only_first=False):
     """Search PATH for executable files with the given name.
     
     On newer versions of MS-Windows, the PATHEXT environment variable will be
@@ -275,7 +275,10 @@ def which(name, flags=os.X_OK):
     exts = filter(None, os.environ.get('PATHEXT', '').split(os.pathsep))
     path = os.environ.get('PATH', None)
     if path is None:
-        return []
+        if only_first:
+            return None
+        else:
+            return []
     for p in os.environ.get('PATH', '').split(os.pathsep):
         p = os.path.join(p, name)
         if os.access(p, flags):
@@ -284,7 +287,10 @@ def which(name, flags=os.X_OK):
             pext = p + e
             if os.access(pext, flags):
                 result.append(pext)
-    return result
+    if only_first:
+        return result[0] if result else None
+    else:
+        return result
 
 def import_non_local(name, custom_name=None):
     import imp, sys
