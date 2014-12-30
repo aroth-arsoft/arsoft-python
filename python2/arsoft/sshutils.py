@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from utils import runcmdAndGetData, platform_is_windows, which
+from .utils import runcmdAndGetData, platform_is_windows, which
+from .socket_utils import gethostname
+import tempfile
+import os.path
 import copy, uuid
 
 def _find_executable_impl(user_override, ssh_name, putty_name):
@@ -49,18 +52,20 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
 
     if use_putty:
         args = ['-batch', '-noagent', '-a', '-x']
-        if username:
-            args.extend(['-l', username ])
-        if keyfile:
-            args.extend(['-i', keyfile])
-        elif password:
+        if keyfile is None and password:
             args.extend(['-pw', password])
     else:
         args = ['-a', '-o', 'BatchMode=yes']
-        if username:
-            args.extend(['-l', username ])
-        if keyfile:
+
+    if username:
+        args.extend(['-l', username ])
+    if keyfile:
+        if isinstance(keyfile, SSHSessionKey):
+            args.extend(['-i', keyfile.keyfile])
+        else:
             args.extend(['-i', keyfile])
+
+    if not use_putty:
         args.append( '-t' if allocateTerminal else '-T')
         args.append( '-X' if x11Forwarding else '-x')
 
@@ -75,7 +80,7 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
     elif script:
         tmpfile = '/tmp/arsoft_remote_ssh_%s.sh' % uuid.uuid4()
         put_args = copy.deepcopy(args)
-        put_args.append('/bin/cat > ' + tmpfile)
+        put_args.append('umask 077; /bin/cat > ' + tmpfile)
         cleanup_args = copy.deepcopy(args)
         cleanup_args.append('/bin/rm -f ' + tmpfile)
         exec_args = copy.deepcopy(args)
@@ -110,15 +115,17 @@ def scp(server, files, target_dir, keyfile=None, username=None, password=None,
         args = ['-batch', '-noagent', '-q', '-l']
         if username:
             args.extend(['-l', username ])
-        if keyfile:
-            args.extend(['-i', keyfile])
-        elif password:
+        if keyfile is None and password:
             args.extend(['-pw', password])
     else:
         # enable batch-mode, compression and quiet (no progress)
         args = ['-B', '-C', '-q']
-        if keyfile:
-            args.extend(['-i', self._keyfile])
+
+    if keyfile:
+        if isinstance(keyfile, SSHSessionKey):
+            args.extend(['-i', keyfile.keyfile])
+        else:
+            args.extend(['-i', keyfile])
 
     args.extend(files)
     if use_putty or username is None:
@@ -268,10 +275,8 @@ def ssh_rmdir(server, directory, recursive=False, keyfile=None, username=None, p
     return True if sts == 0 else False
 
 
-
-class SSHSudoSession(object):
-
-    def __init__(self, url=None, hostname=None, username=None, sudo_password=None, password=None, keyfile=None, verbose=False):
+class SSHConnection(object):
+    def __init__(self, url=None, hostname=None, username=None, password=None, keyfile=None, verbose=False):
         if url is None:
             self.hostname = hostname
             self.username = username
@@ -280,26 +285,13 @@ class SSHSudoSession(object):
             self.username = url.username
             self.password = url.password
             self.hostname = url.hostname
-
         self.keyfile = keyfile
-        self.sudo_password = sudo_password
-        self.sudo_askpass_script = None
-        self.sudo_command = None
-        self.sudo_user_id = None
         self.verbose = verbose
 
     def __del__(self):
-        self.close()
+        self.keyfile = None
 
-    @property
-    def user_id(self):
-        return self.sudo_user_id
-
-    @property
-    def command_prefix(self):
-        return self.sudo_command
-
-    def run(self, script=None, commandline=None,
+    def runcmdAndGetData(self, script=None, commandline=None,
                 useTerminal=False,
                 outputStdErr=False, outputStdOut=False,
                 stdin=None, stdout=None, stderr=None,
@@ -321,6 +313,37 @@ class SSHSudoSession(object):
                                                      allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
                                                      keyfile=self.keyfile, username=self.username, verbose=self.verbose)
 
+    def copy_id(self, public_keyfile,
+                outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
+                ssh_copy_id_executable=SSH_COPY_ID_EXECUTABLE, use_putty=SSH_COPY_ID_USE_PUTTY):
+
+        return ssh_copy_id(public_keyfile=public_keyfile, server=self.hostname, username=self.username,
+                     verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                     stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env,
+                     ssh_copy_id_executable=ssh_copy_id_executable, use_putty=use_putty)
+
+class SSHSudoSession(object):
+    def __init__(self, cxn, sudo_password=None):
+        self._cxn = cxn
+        self.sudo_password = sudo_password
+        self.sudo_askpass_script = None
+        self.sudo_command = None
+        self.sudo_user_id = None
+
+    def __del__(self):
+        self.close()
+
+    @property
+    def verbose(self):
+        return self._cxn.verbose
+
+    @property
+    def user_id(self):
+        return self.sudo_user_id
+
+    @property
+    def command_prefix(self):
+        return self.sudo_command
 
     def start(self):
         script = """
@@ -335,14 +358,14 @@ else
 fi
 exit $RES
 """ % { 'sudo_password': self.sudo_password }
-        (sts, stdout, stderr) = self.run(script, useTerminal=False)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script, useTerminal=False)
         ret = True if sts == 0 else False
         if ret:
             #print (sts, stdout, stderr)
             self.sudo_askpass_script = stdout.strip().decode()
             self.sudo_command = 'SUDO_ASKPASS=\'%s\' sudo -A ' % self.sudo_askpass_script
 
-            (sts, stdout, stderr) = self.run(commandline="%sid -u" % self.sudo_command)
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(commandline="%sid -u" % self.sudo_command)
             ret = True if sts == 0 else False
             if ret:
                 if stdout:
@@ -356,11 +379,77 @@ exit $RES
 
     def close(self):
         if self.sudo_askpass_script:
-            (sts, stdout, stderr) = self.run(commandline="rm -f %s" % self.sudo_askpass_script)
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(commandline="rm -f %s" % self.sudo_askpass_script)
             ret = True if sts == 0 else False
             if ret:
                 self.sudo_askpass_script = None
                 self.sudo_command = None
+        else:
+            ret = True
+        return ret
+
+class SSHSessionKey(object):
+    def __init__(self, cxn, name=None):
+        self._temp_directory = None
+        if name is None:
+            self._public_key_comment = '%s@%s' % (self.__class__.__name__, gethostname(fqdn=True))
+        else:
+            self._public_key_comment = name
+        self._private_keyfile = None
+        self._public_keyfile = None
+        self._cxn = cxn
+        if self._cxn is not None:
+            self.start()
+
+    def __del__(self):
+        self.close()
+
+    @property
+    def verbose(self):
+        return self._cxn.verbose
+
+    @property
+    def keyfile(self):
+        return self._private_keyfile
+
+    def close(self):
+        if self._public_keyfile:
+            if self.verbose:
+                print('remove key %s' % self._public_key_comment)
+            commandline = 'sed \'/%(public_key_comment)s/d\' -i.old ~/.ssh/authorized_keys' % { 'public_key_comment':self._public_key_comment }
+            ret = self._cxn.runcmdAndGetData(commandline=commandline)
+        else:
+            ret = True
+        if self._temp_directory:
+            self._temp_directory.cleanup()
+            self._temp_directory = None
+        return ret
+
+    def start(self, cxn=None):
+        if cxn is None:
+            cxn = self._cxn
+        else:
+            self.close()
+        ret = False
+        if self._private_keyfile is None:
+            self._temp_directory = tempfile.TemporaryDirectory()
+            keyfile = os.path.join(self._temp_directory.name, self.__class__.__name__)
+
+            (private_keyfile, public_keyfile) = ssh_keygen(keyfile, comment=self._public_key_comment, verbose=self._cxn.verbose)
+            if private_keyfile and public_keyfile:
+                if self._cxn.copy_id(public_keyfile):
+                    self._private_keyfile = private_keyfile
+                    self._public_keyfile = public_keyfile
+                    if self._cxn.keyfile is None:
+                        self._cxn.keyfile = self
+                    ret = True
+                elif self.verbose:
+                    print('Failed to copy SSH key %s to %s@%s' % (public_keyfile, self.username, self.target_hostname_full))
+            elif self.verbose:
+                print('Failed to generate SSH key')
+            if not ret:
+                self._temp_directory.cleanup()
+                self._temp_directory = None
         else:
             ret = True
         return ret
