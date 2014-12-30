@@ -111,3 +111,9 @@ def getdomainname():
     else:
         ret = 'localdomain'
     return ret
+
+def getportbyname(servicename, protocolname=None):
+    if protocolname is None:
+        return socket.getservbyname(servicename)
+    else:
+        return socket.getservbyname(servicename, protocolname)

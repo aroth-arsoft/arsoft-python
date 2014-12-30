@@ -90,10 +90,12 @@ class SlapdBackupPlugin(BackupPlugin):
                     if self.backup_app._verbose:
                         print('backup remote LDAP server %s' % server.hostname)
 
-                    script="""
-slapcat -v -l
-                    """
-                    ssh_runcmdAndGetData(script=
+                    server_item = self.backup_app.find_remote_server_entry(hostname=server.hostname)
+                    if self.backup_app._verbose:
+                        print('use remote server %s' % str(server_item))
+                    if server_item:
+                        cxn = server_item.connection
+                        (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData('slapcat', outputStdErr=True, outputStdOut=True)
 
             self.backup_app.append_to_filelist(slapd_backup_filelist)
         return ret

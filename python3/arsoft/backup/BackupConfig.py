@@ -6,11 +6,14 @@ import os.path
 import datetime
 from arsoft.inifile import IniFile
 from arsoft.filelist import *
+from arsoft.socket_utils import getportbyname
 
 class BackupConfigDefaults(object):
     ROOT_DIR = None
     CONFIG_DIR = '/etc/arsoft-backup'
     MAIN_CONF = 'main.conf'
+    SECRET_CONF = 'secret.conf'
+    PRIVATE_DIR = 'private'
     CONFIG_FILE_EXTENSTION = '.conf'
     INCLUDE_DIR = 'include.d'
     EXCLUDE_DIR = 'exclude.d'
@@ -32,6 +35,58 @@ class BackupConfigDefaults(object):
     DISK_TIMEOUT = 60.0
 
 class BackupConfig(object):
+
+    class RemoteServerInstance(object):
+        def __init__(self, name, scheme=None, hostname=None, port=None, username=None, password=None, keyfile=None):
+            self.name = name
+            self.scheme = scheme
+            self.hostname = hostname
+            self._port = port
+            self.username = username
+            self.password = password
+            self.keyfile = None
+
+        def __str__(self):
+            if self.keyfile:
+                return '%s (%s://%s@%s:%i using %s)' % (self.name, self.scheme, self.username, self.hostname, self.port, self.keyfile)
+            else:
+                # leave out the password
+                return '%s (%s://%s:***@%s:%i)' % (self.name, self.scheme, self.username, self.hostname, self.port)
+
+        @property
+        def valid(self):
+            return self.hostname is not None and self.scheme is not None
+
+        @property
+        def port(self):
+            if self._port is not None:
+                return self._port
+            elif self.scheme is not None:
+                return getportbyname(self.scheme)
+            else:
+                return None
+
+        def read_conf(self, bak_config, inifile, section):
+            self.scheme = inifile.get(section, 'scheme', None)
+            self.hostname = inifile.get(section, 'host', None)
+            self._port = inifile.getAsInteger(section, 'port', None)
+            self.username = inifile.get(section, 'username', None)
+            self.password = inifile.get(section, 'password', None)
+            self.keyfile = inifile.get(section, 'keyfile', None)
+            if self.keyfile:
+                self.keyfile = os.path.join(bak_config.private_dir, self.keyfile)
+            return self.valid
+
+        def write_conf(self, bak_config, inifile, section):
+            inifile.set(section, 'scheme', self.scheme)
+            inifile.set(section, 'host', self.hostname )
+            inifile.setAsInteger(section, 'port', self._port)
+            inifile.set(section, 'username', self.username)
+            inifile.set(section, 'password', self.password)
+            s = os.path.relpath(self.keyfile, bak_config.private_dir) if self.keyfile else None
+            inifile.set(section, 'keyfile', s)
+            return True
+
     def __init__(self,
                  root_dir=BackupConfigDefaults.ROOT_DIR,
                  config_dir=BackupConfigDefaults.CONFIG_DIR,
@@ -43,6 +98,7 @@ class BackupConfig(object):
                  filesystem=BackupConfigDefaults.FILESYSTEM,
                  filelist_include_dir=BackupConfigDefaults.INCLUDE_DIR,
                  filelist_exclude_dir=BackupConfigDefaults.EXCLUDE_DIR,
+                 private_dir=BackupConfigDefaults.PRIVATE_DIR,
                  eject_unused_backup_discs=BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS,
                  use_filesystem_snapshots=BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS,
                  use_filesystem_hardlinks=BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS,
@@ -58,6 +114,7 @@ class BackupConfig(object):
         self.root_dir = root_dir
         self.config_dir = config_dir
         self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
+        self.secret_conf = os.path.join(config_dir, BackupConfigDefaults.SECRET_CONF)
         self.filesystem = filesystem
         self.retention_time = retention_time
         self.retention_count = retention_count
@@ -67,6 +124,7 @@ class BackupConfig(object):
         self.filelist_exclude = filelist_exclude
         self.filelist_include_dir = filelist_include_dir
         self.filelist_exclude_dir = filelist_exclude_dir
+        self.private_dir = os.path.join(config_dir, private_dir)
         self.eject_unused_backup_discs = eject_unused_backup_discs
         self.use_filesystem_snapshots = use_filesystem_snapshots
         self.use_filesystem_hardlinks = use_filesystem_hardlinks
@@ -77,10 +135,13 @@ class BackupConfig(object):
         self.active_plugins = active_plugins
         self.disk_tag = disk_tag
         self.disk_timeout = disk_timeout
+        self._remote_servers = []
 
     def clear(self):
         self.root_dir = BackupConfigDefaults.ROOT_DIR
         self.config_dir = BackupConfigDefaults.CONFIG_DIR
+        self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
+        self.secret_conf = os.path.join(config_dir, BackupConfigDefaults.SECRET_CONF)
         self.filesystem = BackupConfigDefaults.FILESYSTEM
         self.retention_time = BackupConfigDefaults.RETENTION_TIME_S
         self.retention_count = BackupConfigDefaults.RETENTION_COUNT
@@ -90,6 +151,7 @@ class BackupConfig(object):
         self.filelist_exclude = None
         self.filelist_include_dir = BackupConfigDefaults.INCLUDE_DIR
         self.filelist_exclude_dir = BackupConfigDefaults.EXCLUDE_DIR
+        self.private_dir = os.path.join(config_dir, BackupConfigDefaults.PRIVATE_DIR)
         self.eject_unused_backup_discs = BackupConfigDefaults.EJECT_UNUSED_BACKUP_DISCS
         self.use_filesystem_snapshots = BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS
         self.use_filesystem_hardlinks = BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS
@@ -100,6 +162,7 @@ class BackupConfig(object):
         self.active_plugins = BackupConfigDefaults.ACTIVE_PLUGINS
         self.disk_tag = BackupConfigDefaults.DISK_TAG
         self.disk_timeout = BackupConfigDefaults.DISK_TIMEOUT
+        self._remote_servers = []
 
     @property
     def retention_time(self):
@@ -157,6 +220,10 @@ class BackupConfig(object):
         else:
             self._filelist_exclude = None
 
+    @property
+    def remote_servers(self):
+        return self._remote_servers
+
     def open(self, config_dir=None, root_dir=None):
         self.root_dir = root_dir
         if config_dir is None:
@@ -165,6 +232,7 @@ class BackupConfig(object):
             if self.root_dir is not None:
                 config_dir = self.root_dir + config_dir
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
+            self.secret_conf = os.path.join(config_dir, BackupConfigDefaults.SECRET_CONF)
             self.config_dir = config_dir
 
         if not os.path.isdir(config_dir):
@@ -182,6 +250,11 @@ class BackupConfig(object):
         if save_config_file:
             ret = self._write_main_conf(self.main_conf)
 
+        print(self.secret_conf)
+        ret = self._read_secret_conf(self.secret_conf)
+        if save_config_file:
+            ret = self._write_secret_conf(self.secret_conf)
+
         filelist_path = os.path.join(config_dir, self.filelist_include_dir)
         if not os.path.isdir(filelist_path):
             try:
@@ -189,8 +262,15 @@ class BackupConfig(object):
             except OSError:
                 pass
 
+        filelist_path = os.path.join(config_dir, self.private_dir)
+        if not os.path.isdir(filelist_path):
+            try:
+                os.mkdir(filelist_path)
+            except OSError:
+                pass
+
         # reload the file lists
-        self.filelist_include = self.filelist_exclude_dir
+        self.filelist_include = self.filelist_include_dir
         self.filelist_exclude = self.filelist_exclude_dir
 
         return ret
@@ -204,6 +284,8 @@ class BackupConfig(object):
             self.config_dir = config_dir
 
         ret = self._write_main_conf(self.main_conf)
+        if not self._write_secret_conf(self.secret_conf):
+            ret = False
 
         filelist_path = os.path.join(config_dir, self.filelist_include_dir)
         if self.filelist_include:
@@ -272,7 +354,7 @@ class BackupConfig(object):
         self.disk_tag = inifile.get(None, 'DiskTag', BackupConfigDefaults.DISK_TAG)
         self.disk_timeout = inifile.get(None, 'DiskTimeout', BackupConfigDefaults.DISK_TIMEOUT)
         return ret
-        
+
     def _write_main_conf(self, filename):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         # read existing file
@@ -300,6 +382,28 @@ class BackupConfig(object):
         ret = inifile.save(filename)
         return ret
 
+    def _read_secret_conf(self, filename):
+        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        ret = inifile.open(filename)
+
+        for section in inifile.sections:
+            inst = BackupConfig.RemoteServerInstance(name=section)
+            if inst.read_conf(self, inifile, section):
+                self._remote_servers.append(inst)
+        return ret
+
+    def _write_secret_conf(self, filename):
+        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
+        # read existing file
+        inifile.open(filename)
+        # and modify it according to current config
+
+        for inst in self._remote_servers:
+            inst.write_conf(self, inifile, inst.name)
+
+        ret = inifile.save(filename)
+        return ret
+
     def __str__(self):
         ret = ''
         ret = ret + 'root directory: ' + str(self.root_dir) + '\n'
@@ -321,6 +425,9 @@ class BackupConfig(object):
         ret = ret + 'active plugins: ' + str(self.active_plugins) + '\n'
         ret = ret + 'disk tag: ' + str(self.disk_tag) + '\n'
         ret = ret + 'disk timeout: ' + str(self.disk_timeout) + '\n'
+        ret = ret + 'servers:\n'
+        for inst in self._remote_servers:
+            ret = ret + '  %s\n' % str(inst)
         return ret
 
 class BackupPluginConfig(object):

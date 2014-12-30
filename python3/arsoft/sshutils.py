@@ -276,19 +276,24 @@ def ssh_rmdir(server, directory, recursive=False, keyfile=None, username=None, p
 
 
 class SSHConnection(object):
-    def __init__(self, url=None, hostname=None, username=None, password=None, keyfile=None, verbose=False):
+    def __init__(self, url=None, hostname=None, port=None, username=None, password=None, keyfile=None, verbose=False):
         if url is None:
             self.hostname = hostname
+            self.port = port
             self.username = username
             self.password = password
         else:
             self.username = url.username
+            self.port = url.port
             self.password = url.password
             self.hostname = url.hostname
         self.keyfile = keyfile
         self.verbose = verbose
 
     def __del__(self):
+        self.close()
+
+    def close(self):
         self.keyfile = None
 
     def runcmdAndGetData(self, script=None, commandline=None,

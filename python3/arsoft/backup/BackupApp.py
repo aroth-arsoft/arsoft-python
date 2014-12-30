@@ -7,6 +7,7 @@ from arsoft.rsync import Rsync
 from arsoft.sshutils import *
 from arsoft.utils import rmtree
 from arsoft.socket_utils import gethostname_tuple
+from arsoft.sshutils import *
 from .BackupConfig import *
 from .plugin import *
 from .state import *
@@ -445,3 +446,50 @@ class BackupApp(object):
         self._call_plugins('perform_backup')
     def plugin_notify_backup_complete(self):
         self._call_plugins('backup_complete')
+
+    class RemoteServerConnection(BackupConfig.RemoteServerInstance):
+        def __init__(self, backup_app, server_item):
+            BackupConfig.RemoteServerInstance.__init__(self,
+                                                       name=server_item.name,
+                                                       scheme=server_item.scheme,
+                                                       hostname=server_item.hostname,
+                                                       port=server_item.port,
+                                                       username=server_item.username,
+                                                       password=server_item.password,
+                                                       keyfile=server_item.keyfile)
+            self._backup_app = backup_app
+            self._cxn = None
+            self._session_key = None
+
+        def __del__(self):
+            self.close()
+
+        @property
+        def connection(self):
+            if self._cxn is None:
+                self.connect()
+            return self._cxn
+
+        def connect(self):
+            if self.scheme == 'ssh':
+                self._cxn = SSHConnection(hostname=self.hostname, port=self.port, username=self.username, keyfile=self.keyfile, verbose=self._backup_app.verbose)
+                if self.keyfile is None and self.password:
+                    self._session_key = SSHSessionKey(self._cxn)
+            return 0
+
+        def close(self):
+            self._session_key = None
+            if self._cxn:
+                self._cxn.close()
+                self._cxn = None
+
+    def find_remote_server_entry(self, name=None, hostname=None):
+        if hostname is not None:
+            hostname_for_comparison = hostname.lower()
+        for item in self.config.remote_servers:
+            if name is not None and item.name == name:
+                return BackupApp.RemoteServerConnection(self,item)
+            if hostname is not None and item.hostname.lower() == hostname_for_comparison:
+                return BackupApp.RemoteServerConnection(self,item)
+        return None
+
