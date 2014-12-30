@@ -4,8 +4,9 @@ from arsoft.sshutils import *
 
 if __name__ == "__main__":
     url = SSHUrl(sys.argv[1])
-    session = SSHSudoSession(url=url, sudo_password=sys.argv[2], verbose=False)
-    session.start()
-    session.run('id', outputStdErr=True, outputStdOut=True)
-    print(session.command_prefix)
+    cxn = SSHConnection(url, verbose=True)
+    key = SSHSessionKey(cxn)
+    sudo = SSHSudoSession(cxn, sudo_password=sys.argv[2])
+    sudo.start()
+    cxn.runcmdAndGetData(sudo.command_prefix + 'id', outputStdErr=True, outputStdOut=True)
 
