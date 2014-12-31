@@ -334,6 +334,8 @@ class SSHSudoSession(object):
         self.sudo_askpass_script = None
         self.sudo_command = None
         self.sudo_user_id = None
+        if self._cxn is not None:
+            self.start()
 
     def __del__(self):
         self.close()
@@ -350,7 +352,11 @@ class SSHSudoSession(object):
     def command_prefix(self):
         return self.sudo_command
 
-    def start(self):
+    def start(self, cxn=None):
+        if cxn is None:
+            cxn = self._cxn
+        else:
+            self.close()
         script = """
 tmpfile=`mktemp`
 echo "#!/bin/sh\necho \"%(sudo_password)s\"\n" > "$tmpfile"
