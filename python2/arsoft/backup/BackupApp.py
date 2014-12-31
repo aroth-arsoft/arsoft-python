@@ -5,13 +5,15 @@
 from arsoft.filelist import *
 from arsoft.rsync import Rsync
 from arsoft.sshutils import *
-from arsoft.utils import rmtree
+from arsoft.utils import rmtree, LocalSudoSession, LocalSudoException
+from arsoft.socket_utils import gethostname_tuple
+from arsoft.sshutils import *
 from .BackupConfig import *
 from .plugin import *
 from .state import *
 from .diskmgr import *
 import sys, stat
-
+import shlex
     
 class BackupList(object):
 
@@ -185,6 +187,8 @@ class BackupApp(object):
         self._real_backup_dir = None
         self._verbose = False
         self.root_dir = None
+        self.fqdn = None
+        self.hostname = None
 
     @property
     def verbose(self):
@@ -204,6 +208,20 @@ class BackupApp(object):
         self.root_dir = root_dir
         self.config.open(config_dir, root_dir=root_dir)
         self.job_state.open(state_dir, root_dir=root_dir)
+
+        (fqdn, hostname, domain) = gethostname_tuple()
+        self.fqdn = fqdn
+        self.hostname = hostname
+
+        has_localhost_server = False
+        for item in self.config.remote_servers:
+            if self.is_localhost(item.hostname):
+                if item.scheme != 'local':
+                    sys.stderr.write('Remote server %s is configured to use scheme %s instead of local.\n' % (item.name, item.scheme))
+                has_localhost_server = True
+
+        if not has_localhost_server:
+            self.config.remote_servers.append(BackupConfig.RemoteServerInstance(name='localhost', scheme='local', hostname=self.fqdn))
 
         # in any case continue with the config we got
         self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag)
@@ -251,7 +269,7 @@ class BackupApp(object):
         return ret
         
     @staticmethod
-    def _mkdir(dir):
+    def _mkdir(dir, perms=0700):
         ret = True
         if os.path.exists(dir):
             if not os.path.isdir(dir):
@@ -260,6 +278,7 @@ class BackupApp(object):
         else:
             try:
                 os.makedirs(dir)
+                os.chmod(dir, perms)
             except (IOError, OSError) as e:
                 sys.stderr.write('Failed to create directory %s; error %s\n' % (dir, str(e)) )
                 ret = False
@@ -269,6 +288,15 @@ class BackupApp(object):
         return Rsync.sync_directories(source_dir, target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete,
                                deleteExcluded=deleteExcluded, stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._verbose)
 
+    def is_localhost(self, hostname):
+        if hostname == 'localhost' or hostname == 'loopback':
+            return True
+        elif hostname == '127.0.0.1' or hostname == '::1':
+            return True
+        elif hostname == self.hostname or hostname == self.fqdn:
+            return True
+        else:
+            return False
 
     def _prepare_backup_dir(self):
         ret = True
@@ -429,3 +457,109 @@ class BackupApp(object):
         self._call_plugins('perform_backup')
     def plugin_notify_backup_complete(self):
         self._call_plugins('backup_complete')
+
+    class LocalConnection(object):
+        def __init__(self, verbose=False):
+            self.hostname = 'localhost'
+            self.port = 0
+            self.username = None
+            self.password = ''
+            self.keyfile = None
+            self.sudo_session = None
+            self.verbose = verbose
+
+        def __del__(self):
+            self.close()
+
+        def __str__(self):
+            return '%s(%s@%s:%i)' % (self.__class__.__name__, self.username, self.hostname, self.port)
+
+        def close(self):
+            self.sudo_session = None
+
+        def runcmdAndGetData(self, script=None, commandline=None,
+                    useTerminal=False, sudo=False,
+                    outputStdErr=False, outputStdOut=False,
+                    stdin=None, stdout=None, stderr=None, cwd=None, env=None):
+
+            if commandline:
+                print('runcmdAndGetData %s' % commandline)
+                args = shlex.split(commandline)
+                exe = args[0]
+                args = args[1:] if len(args) > 1 else []
+            else:
+                exe = None
+                args = []
+            if not sudo:
+                return runcmdAndGetData(exe, args, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                        stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=real_env)
+            elif self.sudo_session is None:
+                # No sudo session available, so failure immediately
+                raise LocalSudoException('No sudo session available')
+            else:
+                return self.sudo_session.runcmdAndGetData(exe, args, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                        stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env)
+
+    class RemoteServerConnection(BackupConfig.RemoteServerInstance):
+        def __init__(self, backup_app, server_item):
+            BackupConfig.RemoteServerInstance.__init__(self,
+                                                       name=server_item.name,
+                                                       scheme=server_item.scheme,
+                                                       hostname=server_item.hostname,
+                                                       port=server_item.port,
+                                                       username=server_item.username,
+                                                       password=server_item.password,
+                                                       keyfile=server_item.keyfile,
+                                                       sudo_password=server_item.sudo_password)
+            self._backup_app = backup_app
+            self._cxn = None
+            self._session_key = None
+            self._sudo = None
+
+        def __del__(self):
+            self.close()
+
+        @property
+        def connection(self):
+            if self._cxn is None:
+                self.connect()
+            return self._cxn
+
+        @property
+        def has_sudo(self):
+            return True if self._sudo else False
+
+        def connect(self):
+            if self.scheme == 'ssh':
+                self._cxn = SSHConnection(hostname=self.hostname, port=self.port, username=self.username, keyfile=self.keyfile, verbose=self._backup_app.verbose)
+                if self.keyfile is None and self.password:
+                    self._session_key = SSHSessionKey(self._cxn)
+
+                if self.sudo_password:
+                    self._sudo = SSHSudoSession(self._cxn, sudo_password=self.sudo_password)
+            elif self.scheme == 'local':
+                self._cxn = BackupApp.LocalConnection(verbose=self._backup_app.verbose)
+                print('cxn %s' % str(self._cxn))
+                if self.sudo_password:
+                    print('cxn %s %s' % (str(self._cxn), self.sudo_password))
+                    self._sudo = LocalSudoSession(sudo_password=self.sudo_password)
+                    self._cxn.sudo_session = self._sudo
+            return 0
+
+        def close(self):
+            self._session_key = None
+            self._sudo = None
+            if self._cxn:
+                self._cxn.close()
+                self._cxn = None
+
+    def find_remote_server_entry(self, name=None, hostname=None):
+        if hostname is not None:
+            hostname_for_comparison = hostname.lower()
+        for item in self.config.remote_servers:
+            if name is not None and item.name == name:
+                return BackupApp.RemoteServerConnection(self,item)
+            if hostname is not None and item.hostname.lower() == hostname_for_comparison:
+                return BackupApp.RemoteServerConnection(self,item)
+        return None
+
