@@ -259,7 +259,7 @@ class BackupApp(object):
         return ret
         
     @staticmethod
-    def _mkdir(dir):
+    def _mkdir(dir, perms=0o700):
         ret = True
         if os.path.exists(dir):
             if not os.path.isdir(dir):
@@ -268,6 +268,7 @@ class BackupApp(object):
         else:
             try:
                 os.makedirs(dir)
+                os.chmod(dir, perms)
             except (IOError, OSError) as e:
                 sys.stderr.write('Failed to create directory %s; error %s\n' % (dir, str(e)) )
                 ret = False
@@ -456,7 +457,8 @@ class BackupApp(object):
                                                        port=server_item.port,
                                                        username=server_item.username,
                                                        password=server_item.password,
-                                                       keyfile=server_item.keyfile)
+                                                       keyfile=server_item.keyfile,
+                                                       sudo_password=server_item.sudo_password)
             self._backup_app = backup_app
             self._cxn = None
             self._session_key = None
@@ -480,6 +482,7 @@ class BackupApp(object):
                 self._cxn = SSHConnection(hostname=self.hostname, port=self.port, username=self.username, keyfile=self.keyfile, verbose=self._backup_app.verbose)
                 if self.keyfile is None and self.password:
                     self._session_key = SSHSessionKey(self._cxn)
+
                 if self.sudo_password:
                     self._sudo = SSHSudoSession(self._cxn, sudo_password=self.sudo_password)
             return 0
