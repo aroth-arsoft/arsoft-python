@@ -48,11 +48,16 @@ class BackupConfig(object):
             self.keyfile = None
 
         def __str__(self):
-            if self.keyfile:
-                return '%s (%s://%s@%s:%i using %s)' % (self.name, self.scheme, self.username, self.hostname, self.port, self.keyfile)
-            else:
+            if self.password:
                 # leave out the password
-                return '%s (%s://%s:***@%s:%i)' % (self.name, self.scheme, self.username, self.hostname, self.port)
+                ret = '%s (%s://%s:***@%s:%i)' % (self.name, self.scheme, self.username if self.username else 'current-user', self.hostname, self.port)
+            else:
+                ret = '%s (%s://%s@%s:%i)' % (self.name, self.scheme, self.username if self.username else 'current-user', self.hostname, self.port)
+            if self.keyfile:
+                ret = ret + ', keyfile %s' % self.keyfile
+            if self.sudo_password:
+                ret = ret + ', sudo *secret*'
+            return ret
 
         @property
         def valid(self):
@@ -62,13 +67,18 @@ class BackupConfig(object):
         def port(self):
             if self._port is not None:
                 return self._port
+            elif self.scheme == 'local':
+                return 0
             elif self.scheme is not None:
-                return getportbyname(self.scheme)
+                try:
+                    return getportbyname(self.scheme)
+                except OSError:
+                    return 0
             else:
-                return None
+                return 0
 
         def read_conf(self, bak_config, inifile, section):
-            self.scheme = inifile.get(section, 'scheme', None)
+            self.scheme = inifile.get(section, 'scheme', 'local')
             self.hostname = inifile.get(section, 'host', None)
             self._port = inifile.getAsInteger(section, 'port', None)
             self.username = inifile.get(section, 'username', None)
@@ -253,7 +263,6 @@ class BackupConfig(object):
         if save_config_file:
             ret = self._write_main_conf(self.main_conf)
 
-        print(self.secret_conf)
         ret = self._read_secret_conf(self.secret_conf)
         if save_config_file:
             ret = self._write_secret_conf(self.secret_conf)

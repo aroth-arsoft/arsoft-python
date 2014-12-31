@@ -4,9 +4,9 @@
 
 from ..plugin import *
 from arsoft.filelist import *
-from arsoft.utils import which
-from arsoft.sshutils import ssh_runcmdAndGetData
-import tempfile
+from arsoft.utils import which, LocalSudoException
+from arsoft.sshutils import SSHSudoException
+import hashlib
 import sys
 
 class SlapdBackupPluginConfig(BackupPluginConfig):
@@ -66,6 +66,37 @@ class SlapdBackupPlugin(BackupPlugin):
         BackupPlugin.__init__(self, backup_app, 'slapd')
         self.slapcat_exe = which('slapcat', only_first=True)
 
+    def _update_dump_file(self, dest_file, dump_data):
+        m = hashlib.md5()
+        m.update(dump_data)
+        new_checksum = m.hexdigest()
+
+        old_checksum = None
+        try:
+            f = open(dest_file + '.md5', 'r')
+            old_checksum = f.read().strip()
+            f.close()
+        except IOError:
+            pass
+
+        ret = True
+        if old_checksum != new_checksum:
+            try:
+                f = open(dest_file, 'w')
+                f.write(dump_data.decode())
+                # protect the file content (includes passwords and other sensitive information)
+                # from the rest of the world.
+                os.fchmod(f.fileno(), 0o600)
+                f.close()
+                f = open(dest_file + '.md5', 'w')
+                f.write(new_checksum)
+                # same for checksump file not necessary, but looks better.
+                os.fchmod(f.fileno(), 0o600)
+                f.close()
+            except IOError:
+                ret = False
+        return ret
+
     def perform_backup(self, **kwargs):
         ret = True
         backup_dir = self.config.intermediate_backup_directory
@@ -78,15 +109,19 @@ class SlapdBackupPlugin(BackupPlugin):
                 if self.backup_app._verbose:
                     print('backup LDAP server %s' % str(server))
 
+                slapd_dumpfile = os.path.join(backup_dir, server.name + '.ldif')
+                slapd_checksumfile = slapd_dumpfile + '.md5'
+
+                slapd_dump_data = None
+                exe = 'slapcat'
                 if self.backup_app.is_localhost(server.hostname):
                     if self.slapcat_exe is None:
-                        sys.stderr.write('Unable to find slapcat for local LDAP backup.')
+                        sys.stderr.write('Unable to find slapcat executable for local LDAP backup.\n')
                         ret = False
                     else:
-                        if self.backup_app._verbose:
-                            print('backup local LDAP server %s' % server.hostname)
-                        pass
-                else:
+                        exe = self.slapcat_exe
+
+                if ret:
                     if self.backup_app._verbose:
                         print('backup remote LDAP server %s' % server.hostname)
 
@@ -95,7 +130,21 @@ class SlapdBackupPlugin(BackupPlugin):
                         print('use remote server %s' % str(server_item))
                     if server_item:
                         cxn = server_item.connection
-                        (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData('slapcat', outputStdErr=True, outputStdOut=True)
+                        try:
+                            (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(commandline=exe, sudo=True, outputStdErr=False, outputStdOut=False)
+                            if sts != 0:
+                                sys.stderr.write('slapcat failed, error %s\n' % stderr_data)
+                                ret = False
+                            else:
+                                slapd_dump_data = stdout_data
+                        except (SSHSudoException, LocalSudoException) as e:
+                            sys.stderr.write('slapcat failed, because sudo failed: %s.\n' % str(e))
+                            ret = False
+                if ret and slapd_dump_data:
+                    ret = self._update_dump_file(slapd_dumpfile, slapd_dump_data)
+                    if ret:
+                        slapd_backup_filelist.append(slapd_dumpfile)
+                        slapd_backup_filelist.append(slapd_checksumfile)
 
             self.backup_app.append_to_filelist(slapd_backup_filelist)
         return ret

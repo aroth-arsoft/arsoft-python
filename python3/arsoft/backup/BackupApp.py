@@ -5,7 +5,7 @@
 from arsoft.filelist import *
 from arsoft.rsync import Rsync
 from arsoft.sshutils import *
-from arsoft.utils import rmtree
+from arsoft.utils import rmtree, LocalSudoSession, LocalSudoException
 from arsoft.socket_utils import gethostname_tuple
 from arsoft.sshutils import *
 from .BackupConfig import *
@@ -13,7 +13,7 @@ from .plugin import *
 from .state import *
 from .diskmgr import *
 import sys, stat
-
+import shlex
     
 class BackupList(object):
 
@@ -212,6 +212,16 @@ class BackupApp(object):
         (fqdn, hostname, domain) = gethostname_tuple()
         self.fqdn = fqdn
         self.hostname = hostname
+
+        has_localhost_server = False
+        for item in self.config.remote_servers:
+            if self.is_localhost(item.hostname):
+                if item.scheme != 'local':
+                    sys.stderr.write('Remote server %s is configured to use scheme %s instead of local.\n' % (item.name, item.scheme))
+                has_localhost_server = True
+
+        if not has_localhost_server:
+            self.config.remote_servers.append(BackupConfig.RemoteServerInstance(name='localhost', scheme='local', hostname=self.fqdn))
 
         # in any case continue with the config we got
         self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag)
@@ -448,6 +458,48 @@ class BackupApp(object):
     def plugin_notify_backup_complete(self):
         self._call_plugins('backup_complete')
 
+    class LocalConnection(object):
+        def __init__(self, verbose=False):
+            self.hostname = 'localhost'
+            self.port = 0
+            self.username = None
+            self.password = ''
+            self.keyfile = None
+            self.sudo_session = None
+            self.verbose = verbose
+
+        def __del__(self):
+            self.close()
+
+        def __str__(self):
+            return '%s(%s@%s:%i)' % (self.__class__.__name__, self.username, self.hostname, self.port)
+
+        def close(self):
+            self.sudo_session = None
+
+        def runcmdAndGetData(self, script=None, commandline=None,
+                    useTerminal=False, sudo=False,
+                    outputStdErr=False, outputStdOut=False,
+                    stdin=None, stdout=None, stderr=None, cwd=None, env=None):
+
+            if commandline:
+                print('runcmdAndGetData %s' % commandline)
+                args = shlex.split(commandline)
+                exe = args[0]
+                args = args[1:] if len(args) > 1 else []
+            else:
+                exe = None
+                args = []
+            if not sudo:
+                return runcmdAndGetData(exe, args, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                        stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=real_env)
+            elif self.sudo_session is None:
+                # No sudo session available, so failure immediately
+                raise LocalSudoException('No sudo session available')
+            else:
+                return self.sudo_session.runcmdAndGetData(exe, args, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                        stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=env)
+
     class RemoteServerConnection(BackupConfig.RemoteServerInstance):
         def __init__(self, backup_app, server_item):
             BackupConfig.RemoteServerInstance.__init__(self,
@@ -485,10 +537,18 @@ class BackupApp(object):
 
                 if self.sudo_password:
                     self._sudo = SSHSudoSession(self._cxn, sudo_password=self.sudo_password)
+            elif self.scheme == 'local':
+                self._cxn = BackupApp.LocalConnection(verbose=self._backup_app.verbose)
+                print('cxn %s' % str(self._cxn))
+                if self.sudo_password:
+                    print('cxn %s %s' % (str(self._cxn), self.sudo_password))
+                    self._sudo = LocalSudoSession(sudo_password=self.sudo_password)
+                    self._cxn.sudo_session = self._sudo
             return 0
 
         def close(self):
             self._session_key = None
+            self._sudo = None
             if self._cxn:
                 self._cxn.close()
                 self._cxn = None
