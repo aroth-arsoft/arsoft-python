@@ -46,6 +46,7 @@ def _find_scp_executable(scp=None):
 (SCP_EXECUTABLE, SCP_USE_PUTTY) = _find_scp_executable()
 
 def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, username=None, password=None, 
+                         sudo_command=None,
                          verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
                          allocateTerminal=False, x11Forwarding=False,
                          ssh_executable=SSH_EXECUTABLE, use_putty=SSH_USE_PUTTY):
@@ -71,7 +72,10 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
 
     args.append(server)
     if commandline:
-        args.append(commandline)
+        if sudo_command:
+            args.apppend('%s %s' % (sudo_command, commandline))
+        else:
+            args.append(str(commandline))
         input = None
         return runcmdAndGetData(ssh_executable, args,
                                 verbose=verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
@@ -80,11 +84,15 @@ def ssh_runcmdAndGetData(server, commandline=None, script=None, keyfile=None, us
     elif script:
         tmpfile = '/tmp/arsoft_remote_ssh_%s.sh' % uuid.uuid4()
         put_args = copy.deepcopy(args)
+        # do not allow anyone except ourself to execute (read/write) this script
         put_args.append('umask 077; /bin/cat > ' + tmpfile)
         cleanup_args = copy.deepcopy(args)
         cleanup_args.append('/bin/rm -f ' + tmpfile)
         exec_args = copy.deepcopy(args)
-        exec_args.append('/bin/bash ' + tmpfile)
+        if sudo_command:
+            exec_args.append('%s /bin/bash %s' % (sudo_command,tmpfile))
+        else:
+            exec_args.append('/bin/bash %s' % tmpfile)
 
         # convert any M$-newlines into the real-ones
         real_script = script.replace('\r\n', '\n')
@@ -274,6 +282,13 @@ def ssh_rmdir(server, directory, recursive=False, keyfile=None, username=None, p
     (sts, stdoutdata, stderrdata) = ssh_runcmdAndGetData(server, commandline, keyfile=keyfile, username=username, password=password, verbose=verbose)
     return True if sts == 0 else False
 
+class SSHSudoException(Exception):
+    def __init__(self, cxn, msg):
+        self.cxn = cxn
+        self.msg = msg
+
+    def __str__(self):
+        return 'SSHSudoException %s: %s' % (str(self.cxn), str(self.msg))
 
 class SSHConnection(object):
     def __init__(self, url=None, hostname=None, port=None, username=None, password=None, keyfile=None, verbose=False):
@@ -288,16 +303,20 @@ class SSHConnection(object):
             self.password = url.password
             self.hostname = url.hostname
         self.keyfile = keyfile
+        self.sudo_session = None
         self.verbose = verbose
 
     def __del__(self):
         self.close()
 
+    def __str__(self):
+        return '%s(%s@%s:%i)' % (self.__class__.__name__, self.username, self.hostname, self.port)
+
     def close(self):
         self.keyfile = None
 
     def runcmdAndGetData(self, script=None, commandline=None,
-                useTerminal=False,
+                useTerminal=False, sudo=False,
                 outputStdErr=False, outputStdOut=False,
                 stdin=None, stdout=None, stderr=None,
                 allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
@@ -310,11 +329,19 @@ class SSHConnection(object):
             used_stdin = None
             used_stdout = None
             used_stderr = None
+        sudo_command = None
+        if sudo:
+            if self.sudo_session:
+                sudo_command = self.sudo_session.command_prefix
+            else:
+                # No sudo session available, so failure immediately
+                raise SSHSudoException(self, 'No sudo session available')
 
         return ssh_runcmdAndGetData(self.hostname, commandline=commandline, script=script,
                                                      outputStdErr=outputStdErr, outputStdOut=outputStdOut,
                                                      stdin=used_stdin, stdout=used_stdout, stderr=used_stderr,
                                                      cwd=cwd, env=env,
+                                                     sudo_command=sudo_command,
                                                      allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
                                                      keyfile=self.keyfile, username=self.username, verbose=self.verbose)
 
@@ -382,6 +409,8 @@ exit $RES
                 if stdout:
                     self.sudo_user_id = int(stdout.strip())
                     ret = True if self.sudo_user_id == 0 else False
+                    if ret:
+                        self._cxn.sudo_session = self
                 else:
                     ret = False
             if not ret:
