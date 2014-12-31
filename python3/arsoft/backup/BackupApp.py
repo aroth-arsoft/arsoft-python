@@ -460,6 +460,7 @@ class BackupApp(object):
             self._backup_app = backup_app
             self._cxn = None
             self._session_key = None
+            self._sudo = None
 
         def __del__(self):
             self.close()
@@ -470,11 +471,17 @@ class BackupApp(object):
                 self.connect()
             return self._cxn
 
+        @property
+        def has_sudo(self):
+            return True if self._sudo else False
+
         def connect(self):
             if self.scheme == 'ssh':
                 self._cxn = SSHConnection(hostname=self.hostname, port=self.port, username=self.username, keyfile=self.keyfile, verbose=self._backup_app.verbose)
                 if self.keyfile is None and self.password:
                     self._session_key = SSHSessionKey(self._cxn)
+                if self.sudo_password:
+                    self._sudo = SSHSudoSession(self._cxn, sudo_password=self.sudo_password)
             return 0
 
         def close(self):

@@ -37,13 +37,14 @@ class BackupConfigDefaults(object):
 class BackupConfig(object):
 
     class RemoteServerInstance(object):
-        def __init__(self, name, scheme=None, hostname=None, port=None, username=None, password=None, keyfile=None):
+        def __init__(self, name, scheme=None, hostname=None, port=None, username=None, password=None, sudo_password=None, keyfile=None):
             self.name = name
             self.scheme = scheme
             self.hostname = hostname
             self._port = port
             self.username = username
             self.password = password
+            self.sudo_password = sudo_password
             self.keyfile = None
 
         def __str__(self):
@@ -72,6 +73,7 @@ class BackupConfig(object):
             self._port = inifile.getAsInteger(section, 'port', None)
             self.username = inifile.get(section, 'username', None)
             self.password = inifile.get(section, 'password', None)
+            self.sudo_password = inifile.get(section, 'sudo-password', None)
             self.keyfile = inifile.get(section, 'keyfile', None)
             if self.keyfile:
                 self.keyfile = os.path.join(bak_config.private_dir, self.keyfile)
@@ -83,6 +85,7 @@ class BackupConfig(object):
             inifile.setAsInteger(section, 'port', self._port)
             inifile.set(section, 'username', self.username)
             inifile.set(section, 'password', self.password)
+            inifile.set(section, 'sudo-password', self.sudo_password)
             s = os.path.relpath(self.keyfile, bak_config.private_dir) if self.keyfile else None
             inifile.set(section, 'keyfile', s)
             return True
