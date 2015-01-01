@@ -28,7 +28,7 @@ class trac_sqlite2mysql(object):
         self._trac_plugins = None
 
     def _run_mysql_query(self, query):
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysql', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '-e', query ], verbose=self._verbose)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(['mysql', '--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '-e', query ], verbose=self._verbose)
         if sts == 0:
             return True
         else:
@@ -36,9 +36,9 @@ class trac_sqlite2mysql(object):
             return False
 
     def _run_trac_admin(self, trac_directory, args):
-        cmd_args = [trac_directory]
+        cmd_args = ['trac-admin', trac_directory]
         cmd_args.extend(args)
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('trac-admin', cmd_args, verbose=self._verbose)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(cmd_args, verbose=self._verbose)
         if sts == 0:
             return True
         else:
@@ -74,7 +74,7 @@ class trac_sqlite2mysql(object):
                         print('failed to save trac configuration. error ' + trac.last_error)
                     if trac.upgrade(backup=False):
                         print('trac database upgrade.')
-                        (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysqldump', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '--no-data', dbname ], verbose=self._verbose)
+                        (sts, stdoutdata, stderrdata) = runcmdAndGetData(['mysqldump', '--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, '--no-data', dbname ], verbose=self._verbose)
                         if sts == 0:
                             print('dump successful.')
                             self._db_struct = stdoutdata
@@ -95,8 +95,8 @@ class trac_sqlite2mysql(object):
     def _dump_db(self, dbfile, cleanup_sql=True):
         self._db_data = ''
     
-        cmd_args = [dbfile, '.dump']
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('sqlite3', cmd_args, verbose=self._verbose)
+        cmd_args = ['sqlite3', dbfile, '.dump']
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(cmd_args, verbose=self._verbose)
         if sts == 0:
             print('sqlite database dump complete. clean up SQL')
             stdoutdata = stdoutdata.decode('utf-8')
@@ -149,7 +149,7 @@ class trac_sqlite2mysql(object):
                 print(e)
                 sqlfile = None
             if sqlfile:
-                (sts, stdoutdata, stderrdata) = runcmdAndGetData('mysql', ['--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, database_name ], stdin=sqlfile, verbose=self._verbose)
+                (sts, stdoutdata, stderrdata) = runcmdAndGetData(['mysql', '--host=' + self._mysql_server, '--user=' + self._mysql_user, '--password=' + self._mysql_password, database_name ], stdin=sqlfile, verbose=self._verbose)
                 if sts == 0:
                     ret = True
                 else:

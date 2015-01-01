@@ -25,8 +25,8 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 test_file_dir = os.path.join(script_dir, 'test_data')
 
 def run_ipptool_test(test_name):
-    args = [ 'ipp://' + target_host + '/', '-t', os.path.join(test_file_dir, test_name) ]
-    (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/ipptool', args)
+    args = [ '/usr/bin/ipptool', 'ipp://' + target_host + '/', '-t', os.path.join(test_file_dir, test_name) ]
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(args)
     if sts == 0:
         ATTRRE = re.compile(
                 r'^\s*(?P<attribute>[a-zA-Z\-]+)\s+\((?P<attrtype>[a-zA-Z\-]+)\)\s+=\s+(?P<value>.*)$'

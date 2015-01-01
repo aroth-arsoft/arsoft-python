@@ -9,11 +9,7 @@ from arsoft.utils import which
 from .repo import *
 
 def find_git_commit_notifier_executable():
-    candidates = which('git-commit-notifier')
-    if len(candidates) > 0:
-        return candidates[0]
-    else:
-        return None
+    return which('git-commit-notifier', only_first=True)
 
 GIT_COMMIT_NOTIFIER_EXECUTABLE = find_git_commit_notifier_executable()
 
