@@ -2,11 +2,29 @@
 import sys
 from arsoft.sshutils import *
 
-if __name__ == "__main__":
+def ssh_with_env():
+    url = SSHUrl(sys.argv[1])
+    cxn = SSHConnection(url, verbose=True)
+    cxn.runcmdAndGetData(['env'], outputStdErr=True, outputStdOut=True, env={'MYNAME':'rabbit'})
+
+def ssh_script_with_env():
+    url = SSHUrl(sys.argv[1])
+    cxn = SSHConnection(url, verbose=True)
+    cxn.runcmdAndGetData(script='env', outputStdErr=True, outputStdOut=True, env={'MYNAME':'rabbit'})
+
+def ssh_sudo():
     url = SSHUrl(sys.argv[1])
     cxn = SSHConnection(url, verbose=True)
     key = SSHSessionKey(cxn)
     sudo = SSHSudoSession(cxn, sudo_password=sys.argv[2])
     sudo.start()
-    cxn.runcmdAndGetData(sudo.command_prefix + 'id', outputStdErr=True, outputStdOut=True)
+    cxn.runcmdAndGetData(['id'], sudo=True, outputStdErr=True, outputStdOut=True)
 
+def local_sudo():
+    cxn = LocalConnection(verbose=True)
+    sudo = LocalSudoSession(cxn, sudo_password=sys.argv[2])
+    cxn.runcmdAndGetData(['/usr/bin/id'], sudo=True, outputStdErr=True, outputStdOut=True)
+
+if __name__ == "__main__":
+    local_sudo()
+    #ssh_sudo()
