@@ -31,7 +31,7 @@ class samba_status_check_mk_plugin(object):
     def _get_version(self):
         if not os.path.isfile(self.SMBSTATUS):
             return
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(self.SMBSTATUS, ['-V'])
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.SMBSTATUS, '-V'])
 
         if sts == 0:
             mo = self.VERSION_RE.match(stdoutdata)
@@ -43,7 +43,7 @@ class samba_status_check_mk_plugin(object):
     def _get_config(self):
         if not os.path.isfile(self.TESTPARM):
             return
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(self.TESTPARM, ['-s'])
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.TESTPARM, '-s'])
 
         if sts == 0:
             for line in stderrdata.splitlines():

@@ -13,7 +13,7 @@ class postfix_cert_mk_check_plugin(object):
         pass
 
     def status(self):
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/sbin/postconf')
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/usr/sbin/postconf'])
         if sts == 0:
             for line in stdoutdata.splitlines():
                 (key, value) = line.split('=',1)

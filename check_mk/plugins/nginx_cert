@@ -4,8 +4,6 @@
 
 from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
 import os
-from arsoft.utils import runcmdAndGetData
-import time
 import re
 
 class nginx_cert_mk_check_plugin(object):

@@ -1,4 +1,10 @@
-arsoft-python (1.191) UNRELEASED; urgency=medium
+arsoft-python (1.192) utopic; urgency=medium
+
+  * fixed runcmdAndGetData in check_mk plugins
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 02 Jan 2015 16:04:03 +0100
+
+arsoft-python (1.191) utopic; urgency=medium
 
   * arsoft-backup: several improvements and enhancements
   * alog: syslog pattern fixes
