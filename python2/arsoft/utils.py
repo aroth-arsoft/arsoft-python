@@ -15,12 +15,14 @@ from grp import getgrnam
 
 (python_major, python_minor, python_micro, python_releaselevel, python_serial) = sys.version_info
 platform_is_windows = True if platform.system() == 'Windows' else False
+python_is_version3 = True if python_major == 3 else False
+python_is_version2 = True if python_major == 2 else False
 
 def isRoot():
     euid = os.geteuid()
     return True if euid == 0 else False
 
-def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=None):
+def runcmd(args=[], verbose=False, stdin=None, input=None, executable=None, cwd=None, env=None):
     all_args = [str(exe)]
     all_args.extend(args)
     if verbose:
@@ -29,7 +31,7 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=No
         stdin_param = stdin
     else:
         stdin_param = subprocess.PIPE
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False, cwd=cwd, env=env)
+    p = subprocess.Popen(all_args, executable=executable, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None:
@@ -52,11 +54,26 @@ def runcmd(exe, args=[], verbose=False, stdin=None, input=None, cwd=None, env=No
     return sts
 
 
-def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False,
+def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, outputStdOut=False,
+                     executable=None, shell='/bin/sh',
                      stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None):
-    all_args = [str(exe)]
-    all_args.extend(args)
-    
+
+    script_tmpfile = None
+    if script is None:
+        if args:
+            all_args = args
+        else:
+            raise ValueError('neither commandline nor script specified.')
+    else:
+        try:
+            script_tmpfile = tempfile.NamedTemporaryFile()
+            script_tmpfile.write(script.encode())
+        except IOError:
+            script_tmpfile = None
+
+        all_args = [str(shell)]
+        all_args.append(script_tmpfile.name)
+
     stdin_param = stdin if stdin is not None else subprocess.PIPE
     if stdout is not None and hasattr(stdout, '__call__'):
         stdout_param = subprocess.PIPE
@@ -76,7 +93,7 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
                 ' 2>' + str(stderr_param)
                     )
 
-    p = subprocess.Popen(all_args, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
+    p = subprocess.Popen(all_args, executable=executable, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
         if stdout is not None and hasattr(stdout, '__call__'):
             encoding = 'CP1252' if platform.system() == 'Windows' else 'utf-8'
@@ -123,6 +140,20 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
         stderrdata = None
     return (sts, stdoutdata, stderrdata)
 
+def _is_quoted(s, quote_chars = '\'"'):
+    l = len(s)
+    return True if l >= 2 and s[0] in quote_chars and s[-1] in quote_chars else False
+
+def to_commandline(args, posix=True):
+    ret = ''
+    for arg in args:
+        if ret:
+            ret += ' '
+        if not _is_quoted(arg):
+            ret = ret + '\'%s\'' % arg
+        else:
+            ret = ret + arg
+    return ret
 
 def rmtree(directory):
     def remove_readonly(fn, path, excinfo):

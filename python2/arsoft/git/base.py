@@ -7,16 +7,12 @@ import platform
 
 def find_git_executable():
     git_executable_name = 'git.exe' if platform.system() == 'Windows' else 'git'
-    candidates = which(git_executable_name)
-    if len(candidates) > 0:
-        return candidates[0]
-    else:
-        return None
+    return which(git_executable_name, only_first=True)
 
 def retrieve_git_version():
     ret = None
     if GIT_EXECUTABLE:
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(GIT_EXECUTABLE, ['--version'])
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData([GIT_EXECUTABLE, '--version'])
         if sts == 0:
             stdoutdata = stdoutdata.decode("utf-8")
             if stdoutdata.startswith('git version'):

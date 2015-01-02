@@ -58,7 +58,7 @@ class CupsConnection(object):
             cups.setEncryption(old_encryption)
 
     def _password_callback(self, context):
-        print(('_password_callback %s' % (context)))
+        print('_password_callback %s' % (context))
         return None
 
     def __del__(self):

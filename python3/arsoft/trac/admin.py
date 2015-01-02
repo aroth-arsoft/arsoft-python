@@ -44,9 +44,9 @@ class TracAdmin(object):
 
     def _run_trac_admin(self, args):
         self._last_error = None
-        cmd_args = [self._tracenv]
+        cmd_args = [self._trac_admin_bin, self._tracenv]
         cmd_args.extend(args)
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(self._trac_admin_bin, cmd_args, verbose=self._verbose)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(cmd_args, verbose=self._verbose)
         self._last_error = stderrdata
         if sts == 0:
             return True

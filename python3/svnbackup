@@ -392,7 +392,7 @@ class svnbackup:
 
     def log(self, msg):
         if self.m_verbose:
-            print((str(msg)))
+            print(str(msg))
 
     def start_restore(backupdir=None, destdir=None, options={}):
         if backupdir is None:
@@ -442,20 +442,20 @@ class svnbackup:
         if args.info:
             if self.m_bakdir:
                 (bak_youngest_filename, bak_youngest_hashfilename, bak_youngest_from, bak_youngest_to) = self.m_bakdir.get_latest_revision()
-                print(('latest backup: ' + bak_youngest_filename))
-                print(('latest backup rev: ' + str(bak_youngest_from) + ' to ' + str(bak_youngest_to)))
+                print('latest backup: ' + bak_youngest_filename)
+                print('latest backup rev: ' + str(bak_youngest_from) + ' to ' + str(bak_youngest_to))
                 
                 missing_revs = self.m_bakdir.missingFiles()
                 for (missing_from, missing_to) in missing_revs:
-                    print(('missing revision: ' + str(missing_from) + ' to ' + str(missing_to)))
+                    print('missing revision: ' + str(missing_from) + ' to ' + str(missing_to))
                     
                 best_files = self.m_bakdir.bestFiles()
                 for (best_filename, best_hashfilename, best_from, best_to) in best_files:
-                    print((best_filename + ' ' + str(best_from) + ' to ' + str(best_to)))
+                    print(best_filename + ' ' + str(best_from) + ' to ' + str(best_to))
 
             if self.m_repo:
                 repo_youngest = self.m_repo.get_latest_revision()
-                print(('latest repo rev: ' + str(repo_youngest)))
+                print('latest repo rev: ' + str(repo_youngest))
         elif args.verify:
             if self.m_bakdir:
                 failed_filelist = self.m_bakdir.verifyFiles()
@@ -464,7 +464,7 @@ class svnbackup:
                 else:
                     print('The following files failed to verify:')
                     for (failed_filename, failed_hashfilename, failed_from, failed_to) in failed_filelist:
-                        print((failed_filename + ' ' + str(failed_from) + ' to ' + str(failed_to)))
+                        print(failed_filename + ' ' + str(failed_from) + ' to ' + str(failed_to))
         elif args.cleanup:
             if self.m_bakdir:
                 self.m_bakdir.removeObsoleteFiles()
@@ -476,24 +476,24 @@ class svnbackup:
                 repo_youngest = self.m_repo.get_latest_revision()
                 
                 if repo_youngest > bak_youngest_to:
-                    print(('create new backup from ' + str(bak_youngest_to + 1) + ' to ' + str(repo_youngest)))
+                    print('create new backup from ' + str(bak_youngest_to + 1) + ' to ' + str(repo_youngest))
                     
                     (backupfile, hashfile) = self.m_bakdir.get_filenameAndHash(minrev=bak_youngest_to + 1, maxrev=repo_youngest)
                     
-                    print(('backup to ' + backupfile))
+                    print('backup to ' + backupfile)
                     if self.m_repo.dump(backupfile, minrev=bak_youngest_to + 1, maxrev=repo_youngest) == 0:
                         self.m_bakdir.hashFilename(backupfile, hashfile)
                     else:
-                        print(('failed to create backup to ' + backupfile))
+                        print('failed to create backup to ' + backupfile)
                     self.m_rsync = True
                     
             if self.m_bakdir and self.m_rsync:
-                print(('rsync to ' + args.destdir))
+                print('rsync to ' + args.destdir)
                 (ret, out, err) = self.m_bakdir.sync_remote(remote_key=args.keyfile, remote_site=args.destdir)
                 if ret == 0:
-                    print(('rsync to ' + args.destdir + ' successfully'))
+                    print('rsync to ' + args.destdir + ' successfully')
                 else:
-                    print(('rsync to ' + args.destdir + ' failed with status ' + str(ret)))
+                    print('rsync to ' + args.destdir + ' failed with status ' + str(ret))
                     print(err)
                     print(out)
         

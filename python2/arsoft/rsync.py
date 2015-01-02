@@ -159,18 +159,15 @@ class Rsync(object):
             args.append(self._source)
         args.append(self._normalize_url(self._dest))
 
-        if self.verbose:
-            print("runcmd " + ' '.join(args))
-
-        (status_code, stdout_data, stderr_data) = runcmdAndGetData(self._rsync_bin, args, stdout=stdout, stderr_to_stdout=stderr_to_stdout, verbose=self.verbose)
+        (status_code, stdout_data, stderr_data) = runcmdAndGetData([self._rsync_bin] + args, stdout=stdout, stderr_to_stdout=stderr_to_stdout, verbose=self.verbose)
         ret = True if status_code == 0 else False
 
-        #if tmp_include:
-            #os.remove(tmp_include)
-        #if tmp_exclude:
-            #os.remove(tmp_exclude)
-        #if tmp_source:
-            #os.remove(tmp_source)
+        if tmp_include:
+            os.remove(tmp_include)
+        if tmp_exclude:
+            os.remove(tmp_exclude)
+        if tmp_source:
+            os.remove(tmp_source)
         return ret
 
     @staticmethod

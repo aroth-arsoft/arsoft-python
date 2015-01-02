@@ -582,6 +582,13 @@ class IniFile(object):
             real_value = None
         return self.set(section, key, real_value, comment)
 
+    def setAsInteger(self, section, key, value, comment=None):
+        if value is not None:
+            real_value = str(value)
+        else:
+            real_value = None
+        return self.set(section, key, real_value, comment)
+
     def setAsDateTime(self, section, key, value, comment=None, date_format='%a, %d %b %Y %H:%M:%S %z'):
         if value is not None:
             if isinstance(value, datetime.datetime):

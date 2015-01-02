@@ -8,7 +8,6 @@ import os
 import argparse
 import re
 from urlparse import urlparse
-from arsoft.utils import rmtree, runcmdAndGetData
 from arsoft.trac.admin import TracAdmin
 
 class trac_svn2git(object):

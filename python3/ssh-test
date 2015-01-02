@@ -26,5 +26,5 @@ def local_sudo():
     cxn.runcmdAndGetData(['/usr/bin/id'], sudo=True, outputStdErr=True, outputStdOut=True)
 
 if __name__ == "__main__":
-    local_sudo()
-    #ssh_sudo()
+    #local_sudo()
+    ssh_sudo()

@@ -29,7 +29,8 @@ class ARSoftBackupApp(BackupApp):
 
     def _on_system_startup(self):
         if self.config.eject_unused_backup_discs:
-            print('eject unused discs')
+            if self._verbose:
+                print('eject unused discs')
             if self._diskmgr.eject():
                 ret = 0
             else:
@@ -46,8 +47,18 @@ class ARSoftBackupApp(BackupApp):
 
         previous_backup_dir = None
         if self.config.use_filesystem_hardlinks:
-            if self.previous_backups.last_full_backup:
-                previous_backup_dir = self.previous_backups.last_full_backup.fullpath
+            if self._verbose:
+                print('use filesystem hardlinks')
+            if self.previous_backups is not None:
+                if self.previous_backups.last_full_backup:
+                    previous_backup_dir = self.previous_backups.last_full_backup.fullpath
+                else:
+                    if self._verbose:
+                        print('No previous backup available.')
+            else:
+                if self._verbose:
+                    print('Previous backups have not been loaded.')
+
 
         if backup_dir[-1] != '/':
             backup_dir += '/'
@@ -105,6 +116,8 @@ class ARSoftBackupApp(BackupApp):
 
             # rsync to backup destination/backup_dir
             if not self._do_rsync():
+                if self._verbose:
+                    print('rsync failure')
                 success = False
                 failure_message = 'rsync failure'
 
@@ -158,7 +171,7 @@ class ARSoftBackupApp(BackupApp):
                 # just get the disk when it's already there
                 disk = self._diskmgr.wait_for_disk(timeout=None)
             if disk:
-                print('Disk ready:       yes')
+                print('Disk ready:       yes (tag=%s)' % (self._diskmgr.disk_tag))
                 print('  Vendor:         %s' % (disk.vendor))
                 print('  Model:          %s' % (disk.model))
                 print('  Serial:         %s' % (disk.serial))
@@ -178,6 +191,8 @@ class ARSoftBackupApp(BackupApp):
                 print('Last backup:      %s in %s' % (self.previous_backups.last_full_backup.timestamp, self.previous_backups.last_full_backup.fullpath))
             else:
                 print('Last backup:      None')
+        else:
+            print('Last backup:      N/A')
 
         for item in self.job_state.history:
             print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))

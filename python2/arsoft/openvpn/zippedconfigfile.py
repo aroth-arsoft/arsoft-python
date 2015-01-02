@@ -303,7 +303,7 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(target_config_directory)
                     ret = True
-                except IOError, OSError:
+                except IOError as OSError:
                     ret = False
         if ret:
             private_config_directory = os.path.join(target_config_directory, cfgfile.suggested_private_directory)
@@ -311,7 +311,7 @@ class ZippedConfigFile(object):
                 try:
                     os.makedirs(private_config_directory)
                     ret = True
-                except IOError, OSError:
+                except IOError as OSError:
                     ret = False
         if ret and cfgfile.cert_filename:
             ret = self.extract(cfgfile.cert_filename, private_config_directory, 'cert.pem')

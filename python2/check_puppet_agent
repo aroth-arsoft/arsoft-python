@@ -113,13 +113,16 @@ if running:
                     else:
                         if num_failed > 0:
                             exit_code = WARNING
-                            exit_message = 'Puppet agent failed with %i resources' % (num_failed)
+                            exit_message = 'Puppet agent: %i failed at %s, %s ago' % (num_failed, datetime.fromtimestamp(last_run), timedelta(seconds=int(time_since_last)))
                         elif num_failed_to_restart > 0:
                             exit_code = WARNING
-                            exit_message = 'Puppet agent failed to restart %i services' % (num_failed_to_restart)
+                            exit_message = 'Puppet agent: %i failed to restart at %s, %s ago' % (num_failed_to_restart, datetime.fromtimestamp(last_run), timedelta(seconds=int(time_since_last)))
                         else:
                             exit_code = OK
-                            exit_message = 'Puppet agent running %i resources changed' % (num_changed)
+                            if num_changed == 0:
+                                exit_message = 'Puppet agent: %s, %s ago' % (datetime.fromtimestamp(last_run), timedelta(seconds=int(time_since_last)))
+                            else:
+                                exit_message = 'Puppet agent: %i changed at %s, %s ago' % (num_changed, datetime.fromtimestamp(last_run), timedelta(seconds=int(time_since_last)))
                 else:
                     exit_code = CRITICAL
                     exit_message = 'Failed to read ' + str(np['statefile']) + '; error ' + str(stderrdata)

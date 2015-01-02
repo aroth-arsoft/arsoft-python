@@ -122,11 +122,11 @@ class CupsConnection(object):
             cupsppds = None
             try:
                 cupsppds = self._conn.getPPDs2()
-                print "Using getPPDs2()"
+                print("Using getPPDs2()")
             except AttributeError:
                 # Need pycups >= 1.9.52 for getPPDs2
                 cupsppds = self._conn.getPPDs ()
-                print "Using getPPDs()"
+                print("Using getPPDs()")
             if cupsppds:
                 self._ppds = cupshelpers.ppds.PPDs(cupsppds)
         return self._ppds
@@ -176,9 +176,9 @@ class CupsConnection(object):
                 models = all_ppds.getModels (make)
                 models_count += len (models)
                 if list_models:
-                    print make
+                    print(make)
                     for model in models:
-                        print "  " + model
+                        print("  " + model)
         else:
             ret = False
         return ret

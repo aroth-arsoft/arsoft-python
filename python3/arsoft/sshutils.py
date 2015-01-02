@@ -44,7 +44,7 @@ def _find_scp_executable(scp=None):
 (SCP_EXECUTABLE, SCP_USE_PUTTY) = _find_scp_executable()
 
 def ssh_runcmdAndGetData(server, args=[], script=None, keyfile=None, username=None, password=None,
-                         sudo_command=None, sudo_env=None,
+                         sudo_command=None, sudo_env=None, shell='/bin/sh',
                          verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
                          ssh_env=None, ssh_verbose=0,
                          allocateTerminal=False, x11Forwarding=False,
@@ -111,9 +111,9 @@ def ssh_runcmdAndGetData(server, args=[], script=None, keyfile=None, username=No
         else:
             script_args = ' '.join(args) if args else ''
         if sudo_command:
-            exec_args.append('%s %s %s/bin/bash %s %s' % (sudo_env_str, sudo_command, env_str, tmpfile, script_args))
+            exec_args.append('%s %s %s%s %s %s' % (sudo_env_str, sudo_command, env_str, shell, tmpfile, script_args))
         else:
-            exec_args.append('%s/bin/bash %s %s' % (env_str, tmpfile, script_args))
+            exec_args.append('%s%s %s %s' % (env_str, shell, tmpfile, script_args))
 
         # convert any M$-newlines into the real-ones
         real_script = script.replace('\r\n', '\n')

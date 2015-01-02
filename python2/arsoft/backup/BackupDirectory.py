@@ -271,7 +271,7 @@ class BackupDirectory:
         if destdir[remote_site_len - 1] != '/':
             destdir = destdir + '/'
             
-        args = ['-z', '-r', '-a', '--delete', '-e', rsync_rsh, srcdir, destdir]
+        args = ['/usr/bin/rsync', '-z', '-r', '-a', '--delete', '-e', rsync_rsh, srcdir, destdir]
         
-        (ret, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData('/usr/bin/rsync', args)
+        (ret, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData(args)
         return (ret, stdoutdata, stderrdata)

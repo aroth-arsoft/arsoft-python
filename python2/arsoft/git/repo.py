@@ -245,7 +245,7 @@ class GitRepository(object):
         return ret
 
     def git(self, args, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, use_root_for_cwd=True):
-        return runcmdAndGetData(GIT_EXECUTABLE, args, cwd=(self.root_directory if use_root_for_cwd else None), verbose=self.verbose, 
+        return runcmdAndGetData([GIT_EXECUTABLE] + args, cwd=(self.root_directory if use_root_for_cwd else None), verbose=self.verbose,
                                 outputStdErr=outputStdErr, outputStdOut=outputStdErr,
                                 stdin=stdin, stdout=stdout, stderr=stderr)
 

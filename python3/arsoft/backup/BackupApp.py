@@ -60,11 +60,9 @@ class BackupList(object):
             else:
                 ret = False
         elif ssh_remote_backup_dir is not None:
-            print('retrieve backup list from remote')
             remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
                         username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password, 
                         keyfile=self.config.ssh_identity_file, verbose=self.app.verbose)
-            print('items = %s' % str(remote_items))
             if remote_items:
                 found_backup_dirs = []
                 for item, item_stat in remote_items.items():

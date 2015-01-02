@@ -28,14 +28,14 @@ class GitBundle(object):
                 use_cwd = None
         else:
             use_cwd = None
-        return runcmdAndGetData(GIT_EXECUTABLE, args, cwd=use_cwd, verbose=self.verbose, 
+        return runcmdAndGetData([GIT_EXECUTABLE] + args, cwd=use_cwd, verbose=self.verbose,
                                 outputStdErr=outputStdErr, outputStdOut=outputStdErr,
                                 stdin=stdin, stdout=stdout, stderr=stderr)
 
     @staticmethod
     def is_bundle(path):
-        args = ['bundle', 'list-heads', path ]
-        (sts, stdout, stderr) = runcmdAndGetData(GIT_EXECUTABLE, args)
+        args = [GIT_EXECUTABLE, 'bundle', 'list-heads', path ]
+        (sts, stdout, stderr) = runcmdAndGetData(args)
         if sts == 0:
             return True
         else:
@@ -43,7 +43,7 @@ class GitBundle(object):
 
     @staticmethod
     def create(repository, filename, rev_list=[], all=True):
-        args = ['bundle', 'create', filename]
+        args = [GIT_EXECUTABLE, 'bundle', 'create', filename]
         if all:
             args.append('--all')
         args.extend(rev_list)
@@ -53,7 +53,7 @@ class GitBundle(object):
         else:
             cwd = repository
             repo = GitRepository(repository)
-        (sts, stdout, stderr) = runcmdAndGetData(GIT_EXECUTABLE, args, cwd=cwd)
+        (sts, stdout, stderr) = runcmdAndGetData(args, cwd=cwd)
         if sts == 0:
             return GitBundle(filename, repository=repo)
         else:
@@ -62,11 +62,11 @@ class GitBundle(object):
     def _recreate(self, rev_list=[], repository=None, all=True):
         if repository is None:
             repository = self._repository
-        args = ['bundle', 'create', self._filename]
+        args = [GIT_EXECUTABLE, 'bundle', 'create', self._filename]
         if all:
             args.append('--all')
         args.extend(rev_list)
-        (sts, stdout, stderr) = runcmdAndGetData(GIT_EXECUTABLE, args, cwd=repository.root_directory)
+        (sts, stdout, stderr) = runcmdAndGetData(args, cwd=repository.root_directory)
         if sts == 0:
             return True
         else:

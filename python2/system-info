@@ -4,7 +4,6 @@
 
 import sys
 import argparse
-import subprocess
 
 from arsoft.utils import *
 
@@ -107,7 +106,7 @@ class system_info_app:
         ret = False
         env = os.environ
         env['LANG'] = 'C'
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('dmidecode', env=env, verbose=self._verbose)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(['dmidecode'], env=env, verbose=self._verbose)
         if sts == 0:
             current_handle = None
             current_section = None
