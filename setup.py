@@ -7,9 +7,18 @@ import os.path
 from distutils.core import setup
 
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
+is_python2 = True if sys.version_info[0] == 2 else False
+is_python3 = True if sys.version_info[0] == 3 else False
+
+def version_dep_scripts(scripts):
+    ret = []
+    for (s, v) in scripts:
+        if sys.version_info[0] == v or v is None:
+            ret.append(os.path.join(source_dir, s))
+    return ret
 
 setup(name='arsoft-python',
-		version='1.190',
+		version='1.191',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -44,27 +53,35 @@ setup(name='arsoft-python',
                     'arsoft.xdg',
                     'arsoft.xmpp'
                     ],
-		scripts=[
-            os.path.join(source_dir, 'certinfo'),
-            os.path.join(source_dir, 'dns-query'),
-            os.path.join(source_dir, 'fritzbox-status'),
-            os.path.join(source_dir, 'ini-util'),
-            os.path.join(source_dir, 'trac-sqlite2mysql'),
-            os.path.join(source_dir, 'trac-svn2git'),
-            os.path.join(source_dir, 'trac-manage'),
-            os.path.join(source_dir, 'trac-git-post-receive-hook'),
-            os.path.join(source_dir, 'arsoft-backup'),
-            os.path.join(source_dir, 'arsoft-mailer'),
-            os.path.join(source_dir, 'edskmgr'),
-            os.path.join(source_dir, 'alog'),
-            os.path.join(source_dir, 'onkyo-rs232'),
-            os.path.join(source_dir, 'system-info'),
-            os.path.join(source_dir, 'nsswitch-config'),
-            os.path.join(source_dir, 'efiinfo'),
-            os.path.join(source_dir, 'ssdp-discover'),
-            os.path.join(source_dir, 'managehosts'),
-            os.path.join(source_dir, 'openvpn-admin'),
-            ],
+		scripts=version_dep_scripts([
+            ('certinfo', 3),
+            ('dns-query', 2),
+            ('fritzbox-status', 2),
+            ('ini-util', 2),
+            ('trac-sqlite2mysql', 2),
+            ('trac-svn2git', 2),
+            ('trac-manage', 2),
+            ('trac-git-post-receive-hook', 2),
+            ('arsoft-backup', 3),
+            ('arsoft-mailer', 2),
+            ('edskmgr', 2),
+            ('alog', 3),
+            ('onkyo-rs232', 2),
+            ('system-info', 3),
+            ('nsswitch-config', 2),
+            ('efiinfo', 3),
+            ('ssdp-discover', 2),
+            ('managehosts', 2),
+            ('openvpn-admin', 2),
+            ('svnbackup', 2),
+            ('cups-admin', 2),
+            ('slapd-config', 2),
+            ('pxeconfig', 2),
+            ('autofs-ldap-auth', 2),
+            ('puppet-setup', 2),
+            ('heimdal-password-expire', 2),
+            ('dns-update', 2),
+            ]),
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients', 'check_mk/cron/check_mk_agent_apt' ]),
@@ -82,17 +99,10 @@ setup(name='arsoft-python',
                                    ]),
             ('/usr/bin', [
                     os.path.join(source_dir, 'onkyo-remote'),
-                    os.path.join(source_dir, 'svnbackup'),
-                    os.path.join(source_dir, 'cups-admin'),
-                    os.path.join(source_dir, 'slapd-config'),
-                    os.path.join(source_dir, 'pxeconfig'),
                     os.path.join(source_dir, 'nsswitch-ldap'),
                     os.path.join(source_dir, 'nsswitch-winbind'),
-                    os.path.join(source_dir, 'autofs-ldap-auth'),
                     os.path.join(source_dir, 'openvpn-status'),
-                    os.path.join(source_dir, 'puppet-setup'),
-                    os.path.join(source_dir, 'heimdal-password-expire'),
-                    os.path.join(source_dir, 'dns-update')]),
+                    ]),
 			('/usr/lib/nagios', [os.path.join(source_dir, 'send_xmpp_notification')]),
 			('/usr/lib/nagios/plugins', [
                     os.path.join(source_dir, 'check_fritzbox'),

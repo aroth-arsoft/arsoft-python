@@ -24,7 +24,7 @@ Description: common files for the AR Soft python scripts
 
 Package: arsoft-netconfig
 Architecture: all
-Depends: python-arsoft, ${python:Depends}, ${misc:Depends}, ${dhcpserver:Depends}
+Depends: python-arsoft, ${python:Depends}, ${misc:Depends}
 Description: common files for the AR Soft netconfig framework
  This package includes all files of the AR Soft netconfig
  framework and all binaries.

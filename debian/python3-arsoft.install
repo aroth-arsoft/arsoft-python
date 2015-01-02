@@ -1,8 +1,10 @@
+etc/arsoft
 usr/lib/python3*/dist-packages/arsoft/*.py
 usr/lib/python3*/dist-packages/arsoft/backup/*.py
 usr/lib/python3*/dist-packages/arsoft/backup/plugins/*.py
 usr/lib/python3*/dist-packages/arsoft/config/*.py
 usr/lib/python3*/dist-packages/arsoft/cups/*.py
+usr/lib/python3*/dist-packages/arsoft/crypto/*.py
 usr/lib/python3*/dist-packages/arsoft/disks/*.py
 usr/lib/python3*/dist-packages/arsoft/efi/*.py
 usr/lib/python3*/dist-packages/arsoft/ldap/*.py
@@ -13,3 +15,7 @@ usr/lib/python3*/dist-packages/arsoft/nfs/*.py
 usr/lib/python3*/dist-packages/arsoft/xdg/*.py
 usr/lib/python3*/dist-packages/arsoft/xmpp/*.py
 usr/bin/arsoft-backup
+usr/bin/certinfo
+usr/bin/alog
+usr/bin/efiinfo
+usr/bin/system-info

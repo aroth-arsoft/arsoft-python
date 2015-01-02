@@ -1,4 +1,3 @@
-etc/arsoft
 usr/lib/python2*/dist-packages/arsoft/*.py
 usr/lib/python2*/dist-packages/arsoft/backup/*.py
 usr/lib/python2*/dist-packages/arsoft/backup/plugins/*.py
@@ -14,14 +13,11 @@ usr/lib/python2*/dist-packages/arsoft/nfs/*.py
 usr/lib/python2*/dist-packages/arsoft/xdg/*.py
 usr/lib/python2*/dist-packages/arsoft/xmpp/*.py
 usr/bin/ini-util
-usr/bin/alog
 usr/bin/dns-query
 usr/bin/arsoft-mailer
-usr/bin/system-info
 usr/bin/ssdp-discover
 usr/bin/slapd-config
 usr/bin/svnbackup
-usr/bin/efiinfo
 usr/bin/nsswitch-config
 usr/bin/nsswitch-ldap
 usr/bin/nsswitch-winbind
