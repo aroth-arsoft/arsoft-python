@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from .utils import runcmdAndGetData, platform_is_windows, python_is_version3, which
+from .utils import runcmdAndGetData, to_commandline, platform_is_windows, python_is_version3, which
 from .socket_utils import gethostname
 import tempfile
 import os.path
@@ -86,9 +86,9 @@ def ssh_runcmdAndGetData(server, args=[], script=None, keyfile=None, username=No
 
     if script is None:
         if isinstance(args, str):
-            commandline = env_str + args
+            commandline = env_str + to_commandline([args])
         else:
-            commandline = env_str + ' '.join(args)
+            commandline = env_str + to_commandline(args)
         if sudo_command:
             ssh_args.append('%s %s %s' % (sudo_env_str, sudo_command, commandline))
         else:
@@ -279,7 +279,7 @@ if os.path.isdir(directory):
         items[d] = d_s
 else:
     items = None
-print(pickle.dumps(items))'''
+os.write(sys.stdout.fileno(), pickle.dumps(items))'''
 
     args = ['/usr/bin/python3'] if python_is_version3 else ['/usr/bin/python']
     args.append('-c')

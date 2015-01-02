@@ -332,7 +332,11 @@ class BackupConfig(object):
         if path is None:
             return None
         if self.root_dir is not None:
-            return self.root_dir + path
+            idx = path.find('://')
+            if idx > 0:
+                return path
+            else:
+                return self.root_dir + path
         return path
 
     def _unchroot_dir(self, path):

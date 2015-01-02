@@ -5,7 +5,7 @@
 from arsoft.filelist import *
 from arsoft.rsync import Rsync
 from arsoft.sshutils import *
-from arsoft.utils import rmtree, LocalSudoSession, LocalSudoException
+from arsoft.utils import rmtree
 from arsoft.socket_utils import gethostname_tuple
 from arsoft.sshutils import *
 from .BackupConfig import *
@@ -60,9 +60,11 @@ class BackupList(object):
             else:
                 ret = False
         elif ssh_remote_backup_dir is not None:
+            print('retrieve backup list from remote')
             remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
                         username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password, 
-                        keyfile=self.config.ssh_identity_file)
+                        keyfile=self.config.ssh_identity_file, verbose=self.app.verbose)
+            print('items = %s' % str(remote_items))
             if remote_items:
                 found_backup_dirs = []
                 for item, item_stat in remote_items.items():
@@ -497,11 +499,9 @@ class BackupApp(object):
                     self._sudo = SSHSudoSession(self._cxn, sudo_password=self.sudo_password)
             elif self.scheme == 'local':
                 self._cxn = LocalConnection(verbose=self._backup_app.verbose)
-                print('cxn %s' % str(self._cxn))
                 if self.sudo_password:
-                    print('cxn %s %s' % (str(self._cxn), self.sudo_password))
                     self._sudo = LocalSudoSession(sudo_password=self.sudo_password)
-            return 0
+            return True if self._cxn else False
 
         def close(self):
             self._session_key = None

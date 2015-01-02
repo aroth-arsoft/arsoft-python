@@ -140,6 +140,20 @@ def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, ou
         stderrdata = None
     return (sts, stdoutdata, stderrdata)
 
+def _is_quoted(s, quote_chars = '\'"'):
+    l = len(s)
+    return True if l >= 2 and s[0] in quote_chars and s[-1] in quote_chars else False
+
+def to_commandline(args, posix=True):
+    ret = ''
+    for arg in args:
+        if ret:
+            ret += ' '
+        if not _is_quoted(arg):
+            ret = ret + '\'%s\'' % arg
+        else:
+            ret = ret + arg
+    return ret
 
 def rmtree(directory):
     def remove_readonly(fn, path, excinfo):
