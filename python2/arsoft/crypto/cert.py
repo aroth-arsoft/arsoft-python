@@ -238,25 +238,25 @@ class Certificate(PEMItem):
         else:
             if filename:
                 if certno:
-                    fobj.write(prefix + "Certificate " + filename + " #" + str(certno) + ":\n")
+                    fobj.write(prefix + "Certificate %s #%i:\n" % (filename, certno))
                 else:
-                    fobj.write(prefix + "Certificate " + filename + ":\n")
+                    fobj.write(prefix + "Certificate %s:\n" % filename)
             else:
                 if certno:
-                    fobj.write(prefix + "Certificate #" + str(certno) + ":\n")
+                    fobj.write(prefix + "Certificate #%i:\n" % certno)
                 else:
                     fobj.write(prefix + "Certificate:\n")
-            fobj.write(prefix + "  Version: " + str(version) + '\n')
-            fobj.write(prefix + "  Bits: " + self.get_pubkey_type_str() + '/' + str(self.get_pubkey_bits()) + '\n')
-            fobj.write(prefix + "  Hash: " + str(self.getHash()) + '\n')
-            fobj.write(prefix + "  Digest MD5: " + str(self.digest('md5')) + '\n')
-            fobj.write(prefix + "  Digest SHA1: " + str(self.digest('sha1')) + '\n')
+            fobj.write(prefix + "  Version: %i\n" % version)
+            fobj.write(prefix + "  Bits: %s/%i\n" % (self.get_pubkey_type_str(), self.get_pubkey_bits()))
+            fobj.write(prefix + "  Hash: %s\n" % self.getHash())
+            fobj.write(prefix + "  Digest MD5: %s\n" % self.digest('md5'))
+            fobj.write(prefix + "  Digest SHA1: %s\n" % self.digest('sha1'))
             fobj.write(prefix + ("  Serial Number: %i (0x%X)\n" %(serial, serial)))
-            fobj.write(prefix + "  Signature Algorithm: " + str(signature_algorithm) + '\n')
+            fobj.write(prefix + "  Signature Algorithm: %s\n" % signature_algorithm)
             self._writeNamePretty(fobj, '  Issuer:  ', issuer)
-            fobj.write(prefix + "  Validity" + '\n')
-            fobj.write(prefix + "    Not Before: " + not_before.ctime() + '\n')
-            fobj.write(prefix + "    Not After : " + not_after.ctime() + '\n')
+            fobj.write(prefix + "  Validity\n")
+            fobj.write(prefix + "    Not Before: %s\n" % not_before.ctime())
+            fobj.write(prefix + "    Not After : %s\n" % not_after.ctime())
             self._writeNamePretty(fobj, '  Subject: ', subject)
  
 

@@ -80,7 +80,9 @@ def parse_timezone(tzstring, default_timezone=UTC):
         minutes = -minutes
     return FixedOffset(hours, minutes, tzstring)
 
-def parse_date(datestring, default_timezone=UTC):
+def parse_date(datestring, default_timezone=UTC, encoding='utf8'):
+    if datestring is None:
+        return None
     """Parses ISO 8601 dates into datetime objects
     
     The timezone is parsed from the date string. However it is quite common to
@@ -88,8 +90,10 @@ def parse_date(datestring, default_timezone=UTC):
     default timezone specified in default_timezone is used. This is UTC by
     default.
     """
-    if not isinstance(datestring, str):
-        raise ParseError("Expecting a string %r" % datestring)
+    if isinstance(datestring, bytes):
+        datestring = datestring.decode(encoding)
+    elif not isinstance(datestring, str):
+        raise ParseError("Expecting a string %r (%s)" % (datestring, type(datestring)))
     m = ISO8601_REGEX.match(datestring)
     if not m:
         raise ParseError("Unable to parse date string %r" % datestring)

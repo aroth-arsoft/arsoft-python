@@ -7,20 +7,21 @@ import io
 import hashlib
 
 class PEMItem(object):
-    def __init__(self, blockindex, blocktype, blockdata):
+    def __init__(self, blockindex, blocktype, blockdata, encoding='utf8'):
         self.blockindex = blockindex
         self.blocktype = blocktype
         self.blockdata = blockdata
+        self.encoding = encoding
         
     def write(self, fobj):
-        fobj.write(self.blockdata)
+        fobj.write(self.blockdata.encode(self.encoding))
         
     def getHash(self):
         m = hashlib.md5()
-        m.update(self.blockdata)
+        m.update(self.blockdata.encode(self.encoding))
         return m.hexdigest()
         
-class PEMFile:
+class PEMFile(object):
 
     s_begin_or_end_pattern = re.compile('^-----(?P<cmd>BEGIN|END) (?P<type>[A-Za-z0-9 ]+)-----$')
     def __init__(self, filename=None, passphrase=None):

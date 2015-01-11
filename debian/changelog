@@ -1,3 +1,9 @@
+arsoft-python (1.193) utopic; urgency=medium
+
+  * fixed crypto encoding trouble
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 11 Jan 2015 16:40:33 +0100
+
 arsoft-python (1.192) utopic; urgency=medium
 
   * fixed runcmdAndGetData in check_mk plugins
