@@ -46,6 +46,10 @@ class rkhunter_mk_check_plugin(object):
         self.changed_groups = []
         self.num_downloads_failed  = 0
         self.downloads_failed = []
+        self.warnings = []
+        self.errors = []
+        self.criticals = []
+        self.infects = []
         self.current_message = None
         self.check_time = 0
         self.check_age = 0
@@ -96,8 +100,13 @@ class rkhunter_mk_check_plugin(object):
                     self.downloads_failed.append(f_name)
             else:
                 self.num_warnings += 1
+                self.warnigns.append(msgobj.message)
         elif msgobj.loglevel == 'ERROR':
             self.num_errors += 1
+            self.errors.append(msgobj.message)
+        elif msgobj.loglevel == 'CRITICAL':
+            self.num_criticals += 1
+            self.criticals.append(msgobj.message)
         elif msgobj.loglevel == 'INFO':
             self.num_infos += 1
 
@@ -145,9 +154,13 @@ class rkhunter_mk_check_plugin(object):
         print('check_time;%i' % self.check_time)
         print('check_age;%i' % self.check_age)
         print('num_infects;%i' % self.num_infects)
+        print('infects;%s' % ','.join(self.infects))
         print('num_criticals;%i' % self.num_criticals)
+        print('criticals;%s' % ','.join(self.criticals))
         print('num_errors;%i' % self.num_errors)
+        print('errors;%s' % ','.join(self.errors))
         print('num_warnings;%i' % self.num_warnings)
+        print('warnings;%s' % ','.join(self.warnings))
         print('num_infos;%i' % self.num_infos)
         print('num_file_properties_changed;%i' % self.num_file_properties_changed)
         print('changed_file_properties;%s' % ','.join(self.changed_file_properties))

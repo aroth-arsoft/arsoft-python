@@ -50,6 +50,10 @@ def check_rkhunter(item, params, info):
         'changed_users':[],
         'changed_groups':[],
         'downloads_failed':[],
+        'warnings':[],
+        'errors':[],
+        'criticals':[],
+        'infects':[],
         }
 
     for line in info:
@@ -80,24 +84,22 @@ def check_rkhunter(item, params, info):
             level = 0
         details.append('last check %s ago' % format_timedelta(check_age))
     else:
-        num_infects = data['num_infects']
-
         if data['num_infects'] > 0:
             if level < 2:
                 level = 2
-            details.append('%i infected' % data['num_infects'])
+            details.append('%i infects %s' % (data['num_infects'], ','.join(data['infects']) ) )
         if data['num_criticals'] > 0:
             if level < 2:
                 level = 2
-            details.append('%i critical' % data['num_criticals'])
+            details.append('%i criticals %s' % (data['num_criticals'], ','.join(data['criticals']) ) )
         if data['num_errors'] > 0:
             if level < 2:
                 level = 2
-            details.append('%i errors' % data['num_errors'])
+            details.append('%i errors %s' % (data['num_errors'], ','.join(data['errors']) ) )
         if data['num_warnings'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i warnings' % data['num_warnings'])
+            details.append('%i warnings %s' % (data['num_warnings'], ','.join(data['warnings']) ) )
 
         if data['num_file_properties_changed'] > 0:
             if level < 1:
