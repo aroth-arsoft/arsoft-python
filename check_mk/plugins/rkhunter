@@ -44,6 +44,8 @@ class rkhunter_mk_check_plugin(object):
         self.changed_users = []
         self.num_groups_changed = 0
         self.changed_groups = []
+        self.num_downloads_failed  = 0
+        self.downloads_failed = []
         self.current_message = None
         self.check_time = 0
         self.check_age = 0
@@ -84,6 +86,14 @@ class rkhunter_mk_check_plugin(object):
                     f_end = msgobj.message.find('\'', f_start)
                     f_name = msgobj.message[f_start:f_end] if f_end > 0 else msgobj.message[f_start:]
                     self.changed_groups.append(f_name)
+            elif msgobj.message.startswith('Download of '):
+                self.num_downloads_failed += 1
+                f_start = msgobj.message.find('\'')
+                if f_start > 0:
+                    f_start += 1
+                    f_end = msgobj.message.find('\'', f_start)
+                    f_name = msgobj.message[f_start:f_end] if f_end > 0 else msgobj.message[f_start:]
+                    self.downloads_failed.append(f_name)
             else:
                 self.num_warnings += 1
         elif msgobj.loglevel == 'ERROR':
@@ -147,6 +157,8 @@ class rkhunter_mk_check_plugin(object):
         print('changed_users;%s' % ','.join(self.changed_users))
         print('num_groups_changed;%i' % self.num_groups_changed)
         print('changed_groups;%s' % ','.join(self.changed_groups))
+        print('num_downloads_failed;%i' % self.num_downloads_failed)
+        print('downloads_failed;%s' % ','.join(self.downloads_failed))
 
 if __name__ == "__main__":
     print("<<<rkhunter:sep(59)>>>")

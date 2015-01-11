@@ -44,10 +44,12 @@ def check_rkhunter(item, params, info):
         'num_services_changed':0,
         'num_users_changed':0,
         'num_groups_changed':0,
+        'num_downloads_failed':0,
         'changed_file_properties':[],
         'changed_services':[],
         'changed_users':[],
         'changed_groups':[],
+        'downloads_failed':[],
         }
 
     for line in info:
@@ -117,6 +119,11 @@ def check_rkhunter(item, params, info):
                 level = 1
             details.append('%i changed groups %s' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
 
+        if data['num_downloads_failed'] > 0:
+            if level < 1:
+                level = 1
+            details.append('%i downloads failed %s' % (data['num_downloads_failed'], ','.join(data['downloads_failed']) ) )
+
         if len(details) == 0:
             details.append('No issues detected.')
 
@@ -129,6 +136,7 @@ def check_rkhunter(item, params, info):
         perfdata.append( ('num_services_changed', data['num_services_changed'], 1, 0) )
         perfdata.append( ('num_users_changed', data['num_users_changed'], 1, 0) )
         perfdata.append( ('num_groups_changed', data['num_groups_changed'], 1, 0) )
+        perfdata.append( ('num_downloads_failed', data['num_downloads_failed'], 1, 0) )
 
     # Construct a the status message.
     if level == 0:
