@@ -336,22 +336,26 @@ def import_non_local(name, custom_name=None):
     return module
 
 def detect_file_type(filename, fallback=None):
-    import magic
-    ms = magic.open(magic.NONE)
-    ms.load()
+    try:
+        import magic
+        ms = magic.open(magic.NONE)
+        ms.load()
+    except ImportError:
+        ms = None
     file_type = None
-    if hasattr(filename, 'read'):
-        try:
-            buf = filename.read(256)
-            #if hasattr(filename, 'seek'):
-            #    filename.seek(-len(buf),1)
-            file_type = ms.buffer(buf)
-        except IOError as e:
-            print(e)
-            file_type = None
-        print(file_type)
-    else:
-        file_type = ms.file(filename)
+    if ms is not None:
+        if hasattr(filename, 'read'):
+            try:
+                buf = filename.read(256)
+                #if hasattr(filename, 'seek'):
+                #    filename.seek(-len(buf),1)
+                file_type = ms.buffer(buf)
+            except IOError as e:
+                print(e)
+                file_type = None
+            print(file_type)
+        else:
+            file_type = ms.file(filename)
     if file_type is None:
         file_type = fallback
     return file_type

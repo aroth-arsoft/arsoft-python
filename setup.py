@@ -18,7 +18,7 @@ def version_dep_scripts(scripts):
     return ret
 
 setup(name='arsoft-python',
-		version='1.195',
+		version='1.196',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
