@@ -1,3 +1,9 @@
+arsoft-python (1.199) utopic; urgency=medium
+
+  * fixed runcmd
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 16 Jan 2015 13:38:04 +0100
+
 arsoft-python (1.198) utopic; urgency=medium
 
   * fixed runcmd in xdg module

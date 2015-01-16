@@ -23,15 +23,13 @@ def isRoot():
     return True if euid == 0 else False
 
 def runcmd(args=[], verbose=False, stdin=None, input=None, executable=None, cwd=None, env=None):
-    all_args = [str(exe)]
-    all_args.extend(args)
     if verbose:
-        print("runcmd " + ' '.join(all_args) + (('< ' + stdin.name) if stdin is not None else ''))
+        print("runcmd " + ' '.join(args) + (('< ' + stdin.name) if stdin is not None else ''))
     if stdin is not None:
         stdin_param = stdin
     else:
         stdin_param = subprocess.PIPE
-    p = subprocess.Popen(all_args, executable=executable, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False, cwd=cwd, env=env)
+    p = subprocess.Popen(args, executable=executable, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False, cwd=cwd, env=env)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None:
