@@ -3,7 +3,6 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from .base import xdg_menu_file
-from arsoft.utils import runcmd
 import os.path
 import tempfile
 from os.path import expanduser

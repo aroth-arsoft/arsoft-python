@@ -4,7 +4,6 @@
 
 from arsoft.inifile import IniFile
 from arsoft.xmlfile import XmlFile
-from arsoft.utils import runcmd
 import re
 import os.path
 import tempfile

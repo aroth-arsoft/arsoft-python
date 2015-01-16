@@ -21,7 +21,7 @@ class DesktopMenuItem(xdg_desktop_file):
         tmpfiles = [tmpfile]
         ret = self.save(tmpfile)
         if ret:
-            args = ['install']
+            args = ['xdg-desktop-menu', 'install']
             if noUpdate:
                 args.append('--noupdate')
             if directoryFile:
@@ -35,7 +35,7 @@ class DesktopMenuItem(xdg_desktop_file):
 
             args.append(tmpfile)
 
-            if runcmd('xdg-desktop-menu', args, verbose=verbose) == 0:
+            if runcmd(args, verbose=verbose) == 0:
                 ret = True
             else:
                 ret = False

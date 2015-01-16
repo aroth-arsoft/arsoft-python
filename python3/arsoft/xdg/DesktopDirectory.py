@@ -19,8 +19,8 @@ class DesktopDirectory(xdg_desktop_file):
         tmpfile = os.path.join(tmppath, self.suggested_basename)
         ret = self.save(tmpfile)
         if ret:
-            args = ['install', tmpfile]
-            if runcmd('xdg-desktop-menu', args, verbose=verbose) == 0:
+            args = ['xdg-desktop-menu', 'install', tmpfile]
+            if runcmd(args, verbose=verbose) == 0:
                 ret = True
             else:
                 ret = False

@@ -1,17 +1,19 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
-
+from arsoft.utils import runcmd
 
 def xdg_open(*args, **kwargs):
-    if runcmd('xdg-open', args) == 0:
+    real_args = 'xdg-open'
+    real_args.extend(args)
+    if runcmd(real_args) == 0:
         ret = True
     else:
         ret = False
     return ret
 
-def xdg_email(subject, body, cc=[], bcc=[], attachments=[], recipiants=[], utf8=False, uri=None):
-    args=[]
+def xdg_email(subject, body, cc=[], bcc=[], attachments=[], recipiants=[], utf8=False, uri=None, verbose=False):
+    args=['xdg-email']
     if utf8:
         args.append('--utf8')
     if subject is not None:
@@ -33,7 +35,7 @@ def xdg_email(subject, body, cc=[], bcc=[], attachments=[], recipiants=[], utf8=
     if uri is not None:
         args.append(uri)
 
-    if runcmd('xdg-email', args) == 0:
+    if runcmd(args, verbose=verbose) == 0:
         ret = True
     else:
         ret = False
