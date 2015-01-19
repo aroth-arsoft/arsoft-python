@@ -1,0 +1,60 @@
+#!/usr/bin/env python
+#
+from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
+
+
+def inventory_fritz_ddns(checkname, info):
+    return None
+
+def check_fritz_ddns(item, params, info):
+    # hostname, ipaddress are defined by check_mk
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    perfdata = []
+    details = []
+
+    if params is not None:
+        (dnsserver, ) = params
+        dnsserver_ip = lookup_ipaddress(dnsserver)
+    else:
+        dnsserver = g_hostname
+        dnsserver_ip = ipaddress
+
+    wan_if_info = get_host_info(hostname, ipaddress, 'fritz.wan_if')
+    wan_ip = ipaddress
+
+    print(wan_if_info)
+
+    results = []
+    try:
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = [dnsserver_ip]
+        answers = resolver.query(item, dns.rdatatype.A)
+        for rdata in answers:
+            results.append(str(rdata))
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+        pass
+    if wan_ip not in results:
+        level = 2
+        details.append('%s not found in DNS results %s' % (wan_ip, ','.join(results)))
+
+    if level == 0:
+        details.append(','.join(results))
+
+    # Construct a the status message.
+    if level == 0:
+        msg = "OK - %s" % (','.join(details))
+    elif level == 1:
+        msg = "WARN - %s" % (','.join(details))
+    elif level == 2:
+        msg = "CRIT - %s" % (','.join(details))
+    return (level, msg, perfdata)
+
+# declare the check to Check_MK.
+check_info['fritz_ddns'] = {
+    'check_function':            check_fritz_ddns,
+    'inventory_function':        None,
+    'service_description':       'Dynamic DNS',
+    'has_perfdata':              True,
+}
+
