@@ -13,9 +13,10 @@ class HdParm(object):
         self.stderr = None
 
     def _exec(self, args):
-        final_args = args
+        final_args = [self.hdparm_executeable]
+        final_args.extend(args)
         final_args.append(self.device)
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(self.hdparm_executeable, args, verbose=self.verbose)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(final_args, verbose=self.verbose)
         ret = True if sts == 0 else False
         self.stdout = stdoutdata.rstrip()
         self.stderr = stderrdata.rstrip()
