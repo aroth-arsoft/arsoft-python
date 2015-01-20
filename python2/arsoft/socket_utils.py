@@ -81,7 +81,7 @@ def send_and_recv_unix_socket_message(path, message, socktype=socket.SOCK_STREAM
 
 def sethostname(new_hostname):
     from utils import runcmdAndGetData
-    (sts, stdoutdata, stderrdata) = runcmdAndGetData('/bin/hostname', [new_hostname])
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/bin/hostname', new_hostname])
     ret = True if sts == 0 else False
     return ret
 
@@ -111,3 +111,9 @@ def getdomainname():
     else:
         ret = 'localdomain'
     return ret
+
+def getportbyname(servicename, protocolname=None):
+    if protocolname is None:
+        return socket.getservbyname(servicename)
+    else:
+        return socket.getservbyname(servicename, protocolname)

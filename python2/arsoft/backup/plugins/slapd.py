@@ -4,8 +4,8 @@
 
 from ..plugin import *
 from arsoft.filelist import *
-from arsoft.utils import which, LocalSudoException
-from arsoft.sshutils import SSHSudoException
+from arsoft.utils import which
+from arsoft.sshutils import SudoSessionException
 import hashlib
 import sys
 
@@ -116,7 +116,7 @@ class SlapdBackupPlugin(BackupPlugin):
                 exe = 'slapcat'
                 if self.backup_app.is_localhost(server.hostname):
                     if self.slapcat_exe is None:
-                        sys.stderr.write('Unable to find slapcat executable for local LDAP backup.\n')
+                        sys.stderr.write('Unable to find slapcat executable for local LDAP backup of server %s.\n' % str(server))
                         ret = False
                     else:
                         exe = self.slapcat_exe
@@ -131,13 +131,13 @@ class SlapdBackupPlugin(BackupPlugin):
                     if server_item:
                         cxn = server_item.connection
                         try:
-                            (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(commandline=exe, sudo=True, outputStdErr=False, outputStdOut=False)
+                            (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(args=[exe], sudo=True, outputStdErr=False, outputStdOut=False)
                             if sts != 0:
                                 sys.stderr.write('slapcat failed, error %s\n' % stderr_data)
                                 ret = False
                             else:
                                 slapd_dump_data = stdout_data
-                        except (SSHSudoException, LocalSudoException) as e:
+                        except SudoSessionException as e:
                             sys.stderr.write('slapcat failed, because sudo failed: %s.\n' % str(e))
                             ret = False
                 if ret and slapd_dump_data:

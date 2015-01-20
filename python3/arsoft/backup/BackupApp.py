@@ -394,11 +394,17 @@ class BackupApp(object):
         ret = True
         if self.disk_loaded:
             self.plugin_notify_disk_eject()
-            
             if self._disk_obj:
+                self.session.writelog('Ejecting backup disk %s' % str(self._disk_obj))
                 if not self._diskmgr.eject(self._disk_obj):
+                    self.session.writelog('Failed to eject backup disk %s' % str(self._disk_obj))
                     ret = False
                 self._disk_obj = None
+            else:
+                self.session.writelog('Ejecting backup disk but no disk object available.')
+        else:
+            self.session.writelog('No backup disk loaded.')
+
         return ret
     
     def start_session(self, temporary=False):
