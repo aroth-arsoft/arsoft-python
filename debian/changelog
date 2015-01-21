@@ -1,3 +1,9 @@
+arsoft-python (1.200) utopic; urgency=medium
+
+  * various python3 fixes
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 21 Jan 2015 18:39:57 +0100
+
 arsoft-python (1.199) utopic; urgency=medium
 
   * fixed runcmd
