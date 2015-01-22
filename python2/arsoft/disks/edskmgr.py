@@ -5,7 +5,7 @@
 from arsoft.utils import isRoot, runcmdAndGetData
 from arsoft.inifile import IniFile
 from arsoft.timestamp import timestamp_from_datetime
-from .disk import Disk, Disks
+from .disk import Drive, Disks
 from .scsi import Scsi
 from .edskmgr_config import *
 import syslog
@@ -210,7 +210,7 @@ class ExternalDiskManager(object):
         ret = True
         disk_mgr = Disks()
         scsi_mgr = Scsi()
-        for disk_obj in disk_mgr.disks:
+        for disk_obj in disk_mgr.drives:
             if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
                 ret = False
         return ret
@@ -220,7 +220,7 @@ class ExternalDiskManager(object):
         disk_mgr = Disks()
         scsi_mgr = Scsi()
         for devname in devices:
-            disk_obj = disk_mgr.find_disk_from_user_input(devname)
+            disk_obj = disk_mgr.find_drive_from_user_input(devname)
             if disk_obj:
                 if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
                     ret = False
@@ -240,7 +240,7 @@ class ExternalDiskManager(object):
         ret = self.config.reset()
         if ret:
             disk_mgr = Disks()
-            for disk_obj in disk_mgr.disks:
+            for disk_obj in disk_mgr.drives:
                 if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=False):
                     self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                     ret = False
@@ -250,14 +250,14 @@ class ExternalDiskManager(object):
 
     def get_disk_for_file(self, path):
         disk_mgr = Disks()
-        disk_obj = disk_mgr.find_disk_for_file(path)
+        disk_obj = disk_mgr.find_drive_for_file(path)
         return disk_obj
 
     def register_disk(self, devices, external=True, tags=[]):
         ret = True
         disk_mgr = Disks()
         for devname in devices:
-            disk_obj = disk_mgr.find_disk_from_user_input(devname)
+            disk_obj = disk_mgr.find_drive_from_user_input(devname)
             if disk_obj:
                 if not self.config.register_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external, tags=tags):
                     self.err('failed to register disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
@@ -272,7 +272,7 @@ class ExternalDiskManager(object):
         ret = True
         disk_mgr = Disks()
         for devname in devices:
-            disk_obj = disk_mgr.find_disk_from_user_input(devname)
+            disk_obj = disk_mgr.find_drive_from_user_input(devname)
             if disk_obj:
                 if not self.config.unregister_disk(disk_obj.disk_name, disk_obj.match_pattern, external=external):
                     self.err('failed to unregister disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
@@ -329,10 +329,10 @@ class ExternalDiskManager(object):
         disk_tags = []
         dev_obj = disk_mgr.find_device(devpath=devpath)
         if dev_obj:
-            if isinstance(dev_obj, Disk):
+            if isinstance(dev_obj, Drive):
                 disk_obj = dev_obj
             else:
-                disk_obj = disk_mgr.find_disk_for_device(dev_obj)
+                disk_obj = disk_mgr.find_drive_for_device(dev_obj)
         if disk_obj:
             disk_tags = self.config.get_tags_for_disk(disk_obj.match_pattern)
         return (disk_obj, dev_obj, disk_tags)
@@ -360,10 +360,10 @@ class ExternalDiskManager(object):
                             time.sleep(1.0)
                             disk_mgr.rescan()
                     if dev_obj:
-                        if isinstance(dev_obj, Disk):
+                        if isinstance(dev_obj, Drive):
                             disk_obj = dev_obj
                         else:
-                            disk_obj = disk_mgr.find_disk_for_device(dev_obj)
+                            disk_obj = disk_mgr.find_drive_for_device(dev_obj)
                     if disk_obj:
                         if action == 'add':
                             cmd = 'disk-loaded'
@@ -410,13 +410,13 @@ class ExternalDiskManager(object):
                 raise ValueError('expected int, float, datetime.datetime or datetime.timedelta but cannot handle a %s' % type(timeout))
 
         disk_mgr = Disks()
-        diskobj = disk_mgr.find_disk_by_pattern(pattern)
+        diskobj = disk_mgr.find_drive_by_pattern(pattern)
         if not diskobj:
             if abs_timeout is not None:
                 while time.time() < abs_timeout:
                     time.sleep(wait_interval)
                     disk_mgr.rescan()
-                    diskobj = disk_mgr.find_disk_by_pattern(pattern)
+                    diskobj = disk_mgr.find_drive_by_pattern(pattern)
                     if diskobj:
                         break
         return diskobj

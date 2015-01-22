@@ -6,7 +6,7 @@ import sys
 import os
 import argparse
 from arsoft.disks.edskmgr import ExternalDiskManager
-from arsoft.disks.disk import Disk, Disks
+from arsoft.disks.disk import Drive, Disks
 
 class ExternalDiskManagerApp(object):
 
@@ -23,7 +23,7 @@ class ExternalDiskManagerApp(object):
 
         e = Disks()
         print('Available disks:')
-        for disk_obj in e.disks:
+        for disk_obj in e.drives:
             print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             if self._mgr.verbose:
                 print('    Native path: %s'%(disk_obj.nativepath))
@@ -40,7 +40,7 @@ class ExternalDiskManagerApp(object):
                 if disk_obj.partitions:
                     print('    Partitions:')
                 for dev_obj in disk_obj.partitions:
-                    print('      %s: %s' % (dev_obj.path, ','.join(dev_obj.mountpaths)))
+                    print('      %s: %s' % (dev_obj.path, ','.join(dev_obj.mountpoints)))
 
 
     def main(self, argv=None):
