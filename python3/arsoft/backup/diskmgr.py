@@ -43,6 +43,12 @@ class DiskManager(object):
         disk = self._mgr.wait_for_disk(tag=self._tag, timeout=None)
         return disk
 
+    def update_disk(self, disk_obj):
+        if self._tag is None:
+            return None
+        disk = self._mgr.wait_for_disk(tag=self._tag, timeout=None)
+        return disk
+
     def get_disk_for_directory(self, dir):
         return self._mgr.get_disk_for_file(dir)
 
@@ -58,9 +64,16 @@ class DiskManager(object):
     def disk_mount(self, disk_obj):
         ret = (False, None)
         for fs_obj in disk_obj.filesystems:
-            mountpoints = fs_obj.mountpoints
-            if mountpoints is not None and len(mountpoints) == 0:
+            if not fs_obj.is_mounted:
                 ret = fs_obj.mount()
+                break
+        return ret
+
+    def disk_unmount(self, disk_obj):
+        ret = (False, None)
+        for fs_obj in disk_obj.filesystems:
+            if fs_obj.is_mounted:
+                ret = fs_obj.unmount()
                 break
         return ret
 

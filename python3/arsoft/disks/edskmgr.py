@@ -179,16 +179,16 @@ class ExternalDiskManager(object):
             ret = True
             self.log('ejecting disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             for child_obj in disk_obj.childs:
-                self.log('  eject child %s\n'%(str(child_obj.nativepath)))
+                self.log('  eject child %s\n'%(str(child_obj.path)))
                 if child_obj.is_mounted:
                     if self.noop:
-                        self.log('  unmount %s skipped (noop)\n'%(str(child_obj.nativepath)))
+                        self.log('  unmount %s skipped (noop)\n'%(str(child_obj.path)))
                     elif not child_obj.unmount():
-                        self.err('  failed to unmount %s\n'%(str(child_obj.nativepath)))
+                        self.err('  failed to unmount %s\n'%(str(child_obj.path)))
                         ret = False
                         break
             if ret:
-                devices = scsi_mgr.find_device(disk_obj.nativepath)
+                devices = scsi_mgr.find_device(syspath=disk_obj.path)
                 if devices:
                     for scsi_disk_obj in devices:
                         if self.noop:
@@ -212,6 +212,7 @@ class ExternalDiskManager(object):
         scsi_mgr = Scsi()
         for disk_obj in disk_mgr.drives:
             if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
+                self.err('Failed to remove device %s %s (%s).\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                 ret = False
         return ret
 
@@ -223,6 +224,7 @@ class ExternalDiskManager(object):
             disk_obj = disk_mgr.find_drive_from_user_input(devname)
             if disk_obj:
                 if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
+                    self.err('Failed to remove device %s %s (%s).\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
                     ret = False
             else:
                 self.err('Given device name %s is not a valid block device.\n'%(devname))
@@ -233,6 +235,7 @@ class ExternalDiskManager(object):
         disk_mgr = Disks()
         scsi_mgr = Scsi()
         if not self._remove_disk_impl(disk_mgr, scsi_mgr, disk_obj):
+            self.err('Failed to remove device %s %s (%s).\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             ret = False
         return ret
 
@@ -379,7 +382,6 @@ class ExternalDiskManager(object):
         return ret
     
     def get_disk_patterns_for_tag(self, tag):
-        print('get_disk_patterns_for_tag %s' %tag)
         return self.config.get_disks_by_tag(tag)
 
     def get_tags_for_disk(self, disk_obj):

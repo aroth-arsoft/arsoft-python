@@ -415,19 +415,27 @@ class FilesystemWithPartition(Partition):
         super(FilesystemWithPartition, self).__init__(mgr, path, dev_obj, obj_iface_and_props)
         self._filesystem_iface = dbus.Interface(dev_obj, FilesystemWithPartition.INTERFACE_NAME)
 
-    def mount(self, filesystem_type='', options=[]):
+    def mount(self, filesystem_type=None, options=[]):
         mountpath = None
+        mountopts = {}
+        if filesystem_type is not None:
+            mountopts['fstype'] = filesystem_type
+        if options:
+            mountopts['options'] = ','.join(options)
         try:
-            mountpath = self._filesystem_iface.Mount(filesystem_type, options)
+            mountpath = self._filesystem_iface.Mount(mountopts)
             ret = True
         except dbus.exceptions.DBusException as e:
             self._mgr._last_error = str(e)
             ret = False
         return (ret, mountpath)
 
-    def unmount(self, options=[]):
+    def unmount(self, force=False):
+        unmountopts = {}
+        if force:
+            unmountopts['force'] = True
         try:
-            self._filesystem_iface.Unmount(options)
+            self._filesystem_iface.Unmount(unmountopts)
             ret = True
         except dbus.exceptions.DBusException as e:
             self._mgr._last_error = str(e)

@@ -103,27 +103,23 @@ class ExternalDiskManagerApp(object):
                 else:
                     ret = 1
             elif args.load:
-                if self._mgr.checkRoot():
-                    if not self._mgr.rescan_empty_scsi_hosts():
+                if not self._mgr.rescan_empty_scsi_hosts():
+                    ret = 1
+                else:
+                    ret = 0
+            elif args.eject is not None:
+                if len(args.eject) == 0:
+                    if not self._mgr.remove_external_disks():
+                        sys.stderr.write('Failed to eject external disks')
                         ret = 1
                     else:
                         ret = 0
                 else:
-                    ret = 1
-            elif args.eject is not None:
-                if self._mgr.checkRoot():
-                    if len(args.eject) == 0:
-                        if not self._mgr.remove_external_disks():
-                            ret = 1
-                        else:
-                            ret = 0
+                    if not self._mgr.remove_disks(args.eject):
+                        sys.stderr.write('Failed to eject external disk(s) %s' % str(args.eject))
+                        ret = 1
                     else:
-                        if not self._mgr.remove_disks(args.eject):
-                            ret = 1
-                        else:
-                            ret = 0
-                else:
-                    ret = 1
+                        ret = 0
             elif args.udev:
                 if self._mgr.checkRoot():
                     if not self._mgr.udev_action():
