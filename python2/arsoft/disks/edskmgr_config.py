@@ -181,6 +181,7 @@ class ExternalDiskManagerConfigItem(object):
 class ExternalDiskManagerConfig(object):
     def __init__(self, config_dir=ExternalDiskManagerDefaults.CONFIG_DIR, 
                  hook_dir=ExternalDiskManagerDefaults.HOOK_DIR):
+        self.root_dir = None
         self.config_dir = os.path.abspath(config_dir)
         self.main_conf = os.path.join(self.config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
         self.hook_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
@@ -188,6 +189,7 @@ class ExternalDiskManagerConfig(object):
         self._items = []
 
     def clear(self):
+        self.root_dir = None
         self.config_dir = ExternalDiskManagerDefaults.CONFIG_DIR
         self.hook_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
         self.additional_config_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
@@ -216,14 +218,17 @@ class ExternalDiskManagerConfig(object):
             ret.append(item.pattern)
         return ret
 
-    def open(self, config_dir=None):
+    def open(self, config_dir=None, root_dir=None):
+        self.root_dir = root_dir
         if config_dir is None:
             config_dir = self.config_dir
-        else:
-            self.config_dir = os.path.abspath(config_dir)
-            self.main_conf = os.path.join(self.config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
-            self.hook_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
-            self.additional_config_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
+
+        if self.root_dir is not None:
+            config_dir = self.root_dir + config_dir
+        self.config_dir = os.path.abspath(config_dir)
+        self.main_conf = os.path.join(self.config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
+        self.hook_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
+        self.additional_config_dir = os.path.join(self.config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)
 
         if not os.path.isdir(config_dir):
             try:
@@ -260,10 +265,13 @@ class ExternalDiskManagerConfig(object):
 
         return ret
 
-    def save(self, config_dir=None):
+    def save(self, config_dir=None, root_dir=None):
         if config_dir is None:
             config_dir = self.config_dir
         else:
+            self.root_dir = root_dir
+            if self.root_dir is not None:
+                config_dir = self.root_dir + config_dir
             self.main_conf = os.path.join(config_dir, ExternalDiskManagerDefaults.MAIN_CONF)
             self.hook_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.HOOK_DIR)
             self.additional_config_dir = os.path.join(config_dir, ExternalDiskManagerDefaults.ADDITIONAL_CONFIG_DIR)

@@ -5,10 +5,10 @@
 from arsoft.disks.edskmgr import ExternalDiskManager
 
 class DiskManager(object):
-    def __init__(self, tag=None):
+    def __init__(self, tag=None, root_dir=None):
         self._tag = tag
         self._mgr = ExternalDiskManager(trigger='arsoft-backup')
-        self._mgr.load_config()
+        self._mgr.load_config(root_dir=root_dir)
     
     @property 
     def disk_tag(self):
@@ -24,15 +24,12 @@ class DiskManager(object):
         return self._mgr.rescan_empty_scsi_hosts()
     
     def is_disk_ready(self):
+        ret = True
         if self._tag is not None:
             # do not wait for a disk, just check if we got one
-            disk = self._mgr.wait_for_disk(tag=self._tag, timeout=None)
-            if disk:
-                return True
-            else:
-                return False
-        else:
-            return True
+            if not self._mgr.wait_for_disk(tag=self._tag, timeout=None):
+                ret = False
+        return ret
     
     def wait_for_disk(self, timeout=30.0):
         if self._tag is None:
@@ -46,24 +43,37 @@ class DiskManager(object):
         disk = self._mgr.wait_for_disk(tag=self._tag, timeout=None)
         return disk
 
+    def update_disk(self, disk_obj):
+        if self._tag is None:
+            return None
+        disk = self._mgr.wait_for_disk(tag=self._tag, timeout=None)
+        return disk
+
     def get_disk_for_directory(self, dir):
         return self._mgr.get_disk_for_file(dir)
 
     def get_disk_mountpath(self, disk_obj):
         ret = None
-        for part_obj in disk_obj.partitions:
-            mountpaths = part_obj.mountpaths
-            if mountpaths is not None and mountpaths:
-                ret = mountpaths[0]
+        for fs_obj in disk_obj.filesystems:
+            mountpoints = fs_obj.mountpoints
+            if mountpoints is not None and mountpoints:
+                ret = mountpoints[0]
                 break
         return ret
 
     def disk_mount(self, disk_obj):
         ret = (False, None)
-        for part_obj in disk_obj.partitions:
-            mountpaths = part_obj.mountpaths
-            if mountpaths is not None and len(mountpaths) == 0:
-                ret = part_obj.mount()
+        for fs_obj in disk_obj.filesystems:
+            if not fs_obj.is_mounted:
+                ret = fs_obj.mount()
+                break
+        return ret
+
+    def disk_unmount(self, disk_obj):
+        ret = (False, None)
+        for fs_obj in disk_obj.filesystems:
+            if fs_obj.is_mounted:
+                ret = fs_obj.unmount()
                 break
         return ret
 

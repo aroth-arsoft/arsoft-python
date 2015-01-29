@@ -6,7 +6,7 @@ import os.path
 import datetime
 from arsoft.inifile import IniFile
 from arsoft.timestamp import timestamp_from_datetime
-from arsoft.disks.disk import Disk
+from arsoft.disks.disk import Drive
 from arsoft.utils import logfile_writer_proxy
 
 class BackupStateDefaults(object):
@@ -98,7 +98,7 @@ class BackupJobHistoryItem(object):
     def backup_disk(self, value):
         if value is None:
             self._backup_disk = value
-        elif isinstance(value, Disk):
+        elif isinstance(value, Drive):
             self._backup_disk = value.match_pattern
         elif isinstance(value, str):
             self._backup_disk = value

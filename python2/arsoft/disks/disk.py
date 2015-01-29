@@ -285,9 +285,13 @@ class Drive(Device):
         return self._mgr.get_partitions(self)
 
     @property
+    def filesystems(self):
+        return self._mgr.get_filesystems(self)
+
+    @property
     def is_system_disk(self):
         root_fs = self._mgr.root_filesystem
-        parts = self._mgr.get_partitions(self)
+        parts = self._mgr.get_filesystems(self)
         ret = True if root_fs in parts else False
         return ret
 
@@ -387,7 +391,7 @@ class Partition(Block):
     @property
     def parent_device(self):
         parent_path = self.table
-        return self._mgr.find_device(parent_path)
+        return self._mgr.find_device(devpath=parent_path)
 
     def set_label(self, new_label):
         try:
@@ -411,19 +415,27 @@ class FilesystemWithPartition(Partition):
         super(FilesystemWithPartition, self).__init__(mgr, path, dev_obj, obj_iface_and_props)
         self._filesystem_iface = dbus.Interface(dev_obj, FilesystemWithPartition.INTERFACE_NAME)
 
-    def mount(self, filesystem_type='', options=[]):
+    def mount(self, filesystem_type=None, options=[]):
         mountpath = None
+        mountopts = {}
+        if filesystem_type is not None:
+            mountopts['fstype'] = filesystem_type
+        if options:
+            mountopts['options'] = ','.join(options)
         try:
-            mountpath = self._filesystem_iface.Mount(filesystem_type, options)
+            mountpath = self._filesystem_iface.Mount(mountopts)
             ret = True
         except dbus.exceptions.DBusException as e:
             self._mgr._last_error = str(e)
             ret = False
         return (ret, mountpath)
 
-    def unmount(self, options=[]):
+    def unmount(self, force=False):
+        unmountopts = {}
+        if force:
+            unmountopts['force'] = True
         try:
-            self._filesystem_iface.Unmount(options)
+            self._filesystem_iface.Unmount(unmountopts)
             ret = True
         except dbus.exceptions.DBusException as e:
             self._mgr._last_error = str(e)
@@ -685,15 +697,28 @@ class Disks(object):
             ret = ret + str(d) + "\n"
         return ret
 
-    def get_partitions(self, disk_obj=None):
+    def get_partitions(self, drive_obj=None):
         ret = []
         for devobj in self._list:
             if isinstance(devobj, Partition):
-                if disk_obj is None:
+                if drive_obj is None:
                     ret.append(devobj)
                 else:
-                    parent_path = devobj.table
-                    if parent_path == disk_obj.path:
+                    parent_device = devobj.parent_device
+                    if parent_device and isinstance(parent_device, Block):
+                        if parent_device.drive == drive_obj.path:
+                            ret.append(devobj)
+        return ret
+
+    def get_filesystems(self, drive_obj=None):
+        ret = []
+        for devobj in self._list:
+            if isinstance(devobj, Filesystem) or isinstance(devobj, FilesystemWithPartition):
+                if drive_obj is None:
+                    ret.append(devobj)
+                else:
+                    devobj_drive = self.find_drive_for_device(devobj)
+                    if devobj_drive and devobj_drive.path == drive_obj.path:
                         ret.append(devobj)
         return ret
 
@@ -703,7 +728,7 @@ class Disks(object):
 
     @property
     def partitions(self):
-        return self.get_partitions(disk_obj=None)
+        return self.get_partitions(drive_obj=None)
 
     @property
     def blocks(self):
@@ -731,11 +756,7 @@ class Disks(object):
 
     @property
     def filesystems(self):
-        ret = []
-        for d in self._list:
-            if isinstance(d, Filesystem) or isinstance(d, FilesystemWithPartition):
-                ret.append(d)
-        return ret
+        return self.get_filesystems(drive_obj=None)
 
     @property
     def fixed_drives(self):

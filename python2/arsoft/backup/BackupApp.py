@@ -183,6 +183,7 @@ class BackupApp(object):
         self.plugins = []
         self._diskmgr = None
         self.disk_loaded = False
+        self.disk_mounted = False
         self._disk_obj = None
         self._real_backup_dir = None
         self._verbose = False
@@ -224,7 +225,7 @@ class BackupApp(object):
             self.config.remote_servers.append(BackupConfig.RemoteServerInstance(name='localhost', scheme='local', hostname=self.fqdn))
 
         # in any case continue with the config we got
-        self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag)
+        self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag, root_dir=root_dir)
 
         plugins_to_load = self.config.active_plugins
         for plugin in plugins_to_load:
@@ -369,8 +370,10 @@ class BackupApp(object):
                 else:
                     (result, mountpath) = self._diskmgr.disk_mount(self._disk_obj)
                     if result:
+                        self.disk_mounted = True
                         self._real_backup_dir = mountpath
                         self.session.writelog('Disk mount to %s' % str(mountpath))
+                        self.plugin_notify_disk_mount()
                     else:
                         self.session.writelog('Failed to mount disk')
                         ret = False
@@ -393,6 +396,7 @@ class BackupApp(object):
     def shutdown_destination(self):
         ret = True
         if self.disk_loaded:
+            self._disk_obj = self._diskmgr.update_disk(self._disk_obj)
             self.plugin_notify_disk_eject()
             if self._disk_obj:
                 self.session.writelog('Ejecting backup disk %s' % str(self._disk_obj))
@@ -402,6 +406,17 @@ class BackupApp(object):
                 self._disk_obj = None
             else:
                 self.session.writelog('Ejecting backup disk but no disk object available.')
+        elif self.disk_mounted:
+            self._disk_obj = self._diskmgr.update_disk(self._disk_obj)
+            self.plugin_notify_disk_unmount()
+            if self._disk_obj:
+                self.session.writelog('Unmount backup disk %s' % str(self._disk_obj))
+                if not self._diskmgr.disk_unmount(self._disk_obj):
+                    self.session.writelog('Failed to unmount backup disk %s' % str(self._disk_obj))
+                    ret = False
+                self._disk_obj = None
+            else:
+                self.session.writelog('Mounted backup disk but no disk object available.')
         else:
             self.session.writelog('No backup disk loaded.')
 
@@ -450,6 +465,11 @@ class BackupApp(object):
 
     def plugin_notify_disk_eject(self):
         self._call_plugins('disk_eject')
+
+    def plugin_notify_disk_mount(self):
+        self._call_plugins('disk_mount')
+    def plugin_notify_disk_unmount(self):
+        self._call_plugins('disk_unmount')
 
     def plugin_notify_start_rsync(self):
         self._call_plugins('start_rsync')
