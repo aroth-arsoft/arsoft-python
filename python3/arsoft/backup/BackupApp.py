@@ -224,7 +224,7 @@ class BackupApp(object):
             self.config.remote_servers.append(BackupConfig.RemoteServerInstance(name='localhost', scheme='local', hostname=self.fqdn))
 
         # in any case continue with the config we got
-        self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag)
+        self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag, root_dir=root_dir)
 
         plugins_to_load = self.config.active_plugins
         for plugin in plugins_to_load:

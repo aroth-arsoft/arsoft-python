@@ -288,10 +288,12 @@ class BackupConfig(object):
         return ret
 
     def save(self, config_dir=None, root_dir=None):
-        self.root_dir = root_dir
         if config_dir is None:
             config_dir = self.config_dir
         else:
+            self.root_dir = root_dir
+            if self.root_dir is not None:
+                config_dir = self.root_dir + config_dir
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
             self.config_dir = config_dir
 

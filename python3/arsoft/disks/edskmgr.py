@@ -110,13 +110,13 @@ class ExternalDiskManager(object):
             ret = True
         return ret
 
-    def load_config(self, configdir=None):
-        ret = self.config.open(configdir)
+    def load_config(self, configdir=None, root_dir=None):
+        ret = self.config.open(configdir, root_dir)
         self._load_private_operation_data()
         return ret
 
-    def write_config(self, config_dir=None):
-        return self.config.save(config_dir)
+    def write_config(self, config_dir=None, root_dir=None):
+        return self.config.save(config_dir, root_dir)
 
     def is_internal_disk(self, diskobj):
         ret = False
@@ -379,6 +379,7 @@ class ExternalDiskManager(object):
         return ret
     
     def get_disk_patterns_for_tag(self, tag):
+        print('get_disk_patterns_for_tag %s' %tag)
         return self.config.get_disks_by_tag(tag)
 
     def get_tags_for_disk(self, disk_obj):
