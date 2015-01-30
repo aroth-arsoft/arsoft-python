@@ -100,8 +100,10 @@ class Block(Device):
 
         drive = self.table if self.is_partition else None
         if drive:
+            self._master_device = False
             self._sysfs_path = os.path.join('/sys/block', os.path.basename(drive), os.path.basename(self.device))
         else:
+            self._master_device = True
             self._sysfs_path = os.path.join('/sys/block', os.path.basename(self.device))
         if not os.path.exists(self._sysfs_path):
             self._sysfs_path = None
@@ -109,6 +111,10 @@ class Block(Device):
     @property
     def sysfs_path(self):
         return self._sysfs_path
+
+    @property
+    def is_master(self):
+        return self._master_device
 
     @property
     def slaves(self):
@@ -281,6 +287,18 @@ class Drive(Device):
         return self._mgr.get_partitions(self)
 
     @property
+    def block_devices(self):
+        return self._mgr.get_block_devices(self)
+
+    @property
+    def master_block_device(self):
+        tmp = self._mgr.get_block_devices(self, master_only=True)
+        if tmp and len(tmp) == 1:
+            return tmp[0]
+        else:
+            return None
+
+    @property
     def partitions(self):
         return self._mgr.get_partitions(self)
 
@@ -295,12 +313,40 @@ class Drive(Device):
         ret = True if root_fs in parts else False
         return ret
 
-    def eject(self, options=[]):
-        self._device_if.DriveEject(options)
+    def poweroff(self):
+        poweroff_opts = {}
+        try:
+            self._drive_iface.PowerOff(poweroff_opts)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
 
-    def detach(self, options=[]):
-        self._device_if.DriveDetach(options)
-        
+    def eject(self):
+        eject_opts = {}
+        try:
+            self._drive_iface.Eject(eject_opts)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
+
+    def poweroff_and_eject(self):
+        eject_opts = {}
+        poweroff_opts = {}
+        try:
+            if self.can_poweroff:
+                self._drive_iface.PowerOff(poweroff_opts)
+            if self.is_ejectable:
+                self._drive_iface.Eject(eject_opts)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
+
     def _match_pattern_element(self, pattern_element):
         # check for valid pattern
         if ':' in pattern_element:
@@ -393,15 +439,6 @@ class Partition(Block):
         parent_path = self.table
         return self._mgr.find_device(devpath=parent_path)
 
-    def set_label(self, new_label):
-        try:
-            self._device_if.FilesystemSetLabel(new_label)
-            ret = True
-        except dbus.exceptions.DBusException as e:
-            self._mgr._last_error = str(e)
-            ret = False
-        return ret
-
     def __str__(self):
         ret = Device.__str__(self) +\
             ' uuid=' + str(self.uuid) +\
@@ -414,6 +451,16 @@ class FilesystemWithPartition(Partition):
     def __init__(self, mgr, path, dev_obj, obj_iface_and_props):
         super(FilesystemWithPartition, self).__init__(mgr, path, dev_obj, obj_iface_and_props)
         self._filesystem_iface = dbus.Interface(dev_obj, FilesystemWithPartition.INTERFACE_NAME)
+
+    def set_label(self, new_label):
+        setlabel_opts = {}
+        try:
+            self._filesystem_iface.SetLabel(new_label, setlabel_opts)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
 
     def mount(self, filesystem_type=None, options=[]):
         mountpath = None
@@ -460,19 +507,38 @@ class Filesystem(Block):
         super(Filesystem, self).__init__(mgr, path, dev_obj, obj_iface_and_props)
         self._filesystem_iface = dbus.Interface(dev_obj, Filesystem.INTERFACE_NAME)
 
-    def mount(self, filesystem_type='', options=[]):
-        mountpath = None
+
+    def set_label(self, new_label):
+        setlabel_opts = {}
         try:
-            mountpath = self._filesystem_iface.Mount(filesystem_type, options)
+            self._filesystem_iface.SetLabel(new_label, setlabel_opts)
+            ret = True
+        except dbus.exceptions.DBusException as e:
+            self._mgr._last_error = str(e)
+            ret = False
+        return ret
+
+    def mount(self, filesystem_type=None, options=[]):
+        mountpath = None
+        mountopts = {}
+        if filesystem_type is not None:
+            mountopts['fstype'] = filesystem_type
+        if options:
+            mountopts['options'] = ','.join(options)
+        try:
+            mountpath = self._filesystem_iface.Mount(mountopts)
             ret = True
         except dbus.exceptions.DBusException as e:
             self._mgr._last_error = str(e)
             ret = False
         return (ret, mountpath)
 
-    def unmount(self, options=[]):
+    def unmount(self, force=False):
+        unmountopts = {}
+        if force:
+            unmountopts['force'] = True
         try:
-            self._filesystem_iface.Unmount(options)
+            self._filesystem_iface.Unmount(unmountopts)
             ret = True
         except dbus.exceptions.DBusException as e:
             self._mgr._last_error = str(e)
@@ -695,6 +761,24 @@ class Disks(object):
         ret = ''
         for d in self._list:
             ret = ret + str(d) + "\n"
+        return ret
+
+    def get_block_devices(self, drive_obj=None, master_only=False):
+        ret = []
+        for devobj in self._list:
+            if isinstance(devobj, Block):
+                if drive_obj is None:
+                    if master_only:
+                        if devobj.is_master:
+                            ret.append(devobj)
+                    else:
+                        ret.append(devobj)
+                elif devobj.drive == drive_obj.path:
+                    if master_only:
+                        if devobj.is_master:
+                            ret.append(devobj)
+                    else:
+                        ret.append(devobj)
         return ret
 
     def get_partitions(self, drive_obj=None):

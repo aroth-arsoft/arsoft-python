@@ -13,7 +13,7 @@ class ExternalDiskManagerApp(object):
     def __init__(self):
         self._mgr = ExternalDiskManager()
 
-    def show_status(self, show_partitions=True, show_filesystems=True):
+    def show_status(self, show_all_devices=False, show_partitions=False, show_filesystems=False):
         print('Internal disks:')
         for disk in self._mgr.internal_disks:
             print('  ' + disk)
@@ -28,15 +28,22 @@ class ExternalDiskManagerApp(object):
                 print('  ' + '%s %s (%s)'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             else:
                 print('  ' + '%s (%s)'%(str(disk_obj.model), str(disk_obj.serial)))
-            print('    Path:        %s'%(disk_obj.path))
-            print('    Removeable:  %s'%('yes' if disk_obj.is_removable else 'no'))
-            print('    System:      %s'%('yes' if disk_obj.is_system_disk else 'no'))
-            print('    Internal:    %s'%('yes' if self._mgr.is_internal_disk(disk_obj) else 'no'))
+            print('    Path:         %s'%(disk_obj.path))
+            print('    Block device: %s'%(disk_obj.master_block_device.sysfs_path if disk_obj.master_block_device else 'None'))
+            print('    Removeable:   %s'%('yes' if disk_obj.is_removable else 'no'))
+            print('    System:       %s'%('yes' if disk_obj.is_system_disk else 'no'))
+            print('    Internal:     %s'%('yes' if self._mgr.is_internal_disk(disk_obj) else 'no'))
             disk_tags = self._mgr.get_tags_for_disk(disk_obj)
             if disk_tags:
-                print('    Tags:        %s'%(','.join(disk_tags)))
+                print('    Tags:         %s'%(','.join(disk_tags)))
             else:
-                print('    Tags:        None')
+                print('    Tags:         None')
+
+            if show_all_devices:
+                if disk_obj.block_devices:
+                    print('    Block devices:')
+                    for dev_obj in disk_obj.block_devices:
+                        print('      %s (%s)' % (dev_obj.path, dev_obj.sysfs_path))
             if show_partitions:
                 print('    Partitions:')
                 if disk_obj.partitions:
@@ -149,7 +156,11 @@ class ExternalDiskManagerApp(object):
                 else:
                     ret = 1
             elif args.status:
-                ret = self.show_status(show_partitions=self._mgr.verbose)
+                ret = self.show_status(
+                    show_all_devices=self._mgr.verbose,
+                    show_partitions=self._mgr.verbose,
+                    show_filesystems=self._mgr.verbose
+                    )
             elif args.wait_for_disk is not None:
                 try:
                     disk_obj = self._mgr.wait_for_disk(pattern=args.wait_for_disk, tag=args.tags, timeout=10)

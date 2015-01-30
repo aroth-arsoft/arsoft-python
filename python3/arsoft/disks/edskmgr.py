@@ -174,7 +174,7 @@ class ExternalDiskManager(object):
                 self.err('rescan empty SCSI hosts failed, error %s\n' % (scsi_mgr.last_error))
         return ret
     
-    def _remove_disk_impl(self, disk_mgr, scsi_mgr, disk_obj):
+    def _remove_disk_impl(self, disk_mgr, scsi_mgr, disk_obj, use_scsi=False):
         if self.is_external_disk(disk_obj):
             ret = True
             self.log('ejecting disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
@@ -188,19 +188,24 @@ class ExternalDiskManager(object):
                         ret = False
                         break
             if ret:
-                devices = scsi_mgr.find_device(syspath=disk_obj.path)
-                if devices:
-                    for scsi_disk_obj in devices:
-                        if self.noop:
-                            self.log('  delete scsi device  %s %s (%s) skipped (noop)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
-                        else:
-                            if not scsi_disk_obj.standby():
-                                self.err('  failed to set scsi device %s %s (%s) on standby, error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
-                            if not scsi_disk_obj.delete():
-                                self.err('  failed to delete scsi device %s %s (%s), error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
-                                ret = False
+                if use_scsi:
+                    devices = scsi_mgr.find_device(syspath=disk_obj.path)
+                    if devices:
+                        for scsi_disk_obj in devices:
+                            if self.noop:
+                                self.log('  delete scsi device  %s %s (%s) skipped (noop)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
                             else:
-                                self.log('  delete scsi %s %s (%s)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
+                                if not scsi_disk_obj.standby():
+                                    self.err('  failed to set scsi device %s %s (%s) on standby, error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
+                                if not scsi_disk_obj.delete():
+                                    self.err('  failed to delete scsi device %s %s (%s), error %s\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile), scsi_mgr.last_error))
+                                    ret = False
+                                else:
+                                    self.log('  delete scsi %s %s (%s)\n'%(str(scsi_disk_obj.vendor), str(scsi_disk_obj.model), str(scsi_disk_obj.devfile)))
+                else:
+                    if not disk_obj.poweroff_and_eject():
+                        self.err('  failed to power down and eject %s %s (%s), error %s\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial), disk_mgr.last_error))
+                        ret = False
         else:
             self.log('skip internal disk %s %s (%s)\n'%(str(disk_obj.vendor), str(disk_obj.model), str(disk_obj.serial)))
             ret = True
