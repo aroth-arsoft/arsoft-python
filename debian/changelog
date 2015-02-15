@@ -1,3 +1,9 @@
+arsoft-python (1.201) utopic; urgency=medium
+
+  * fixed encoding trouble
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 15 Feb 2015 16:54:17 +0100
+
 arsoft-python (1.200) utopic; urgency=medium
 
   * various python3 fixes
