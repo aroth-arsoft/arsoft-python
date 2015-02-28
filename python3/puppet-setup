@@ -8,7 +8,7 @@ import argparse
 import sys
 import tempfile
 import socket
-from arsoft.dnsutils import get_dns_srv_record, get_dns_host_record, get_dns_ptr_record, gethostname_tuple, is_valid_ipv4
+from arsoft.dnsutils import get_dns_srv_record, get_dns_host_record, get_dns_ptr_record, gethostname_tuple, is_valid_ipv4, is_valid_ipv6
 from arsoft.utils import rmtree
 from arsoft.sshutils import *
 import arsoft.openvpn
@@ -21,17 +21,12 @@ class PuppetSetupApp(object):
         self.verbose = False
         self._config = None
         self._apt_update_required = False
-        self._temp_directory = None
-        self._private_keyfile = None
-        self._public_keyfile = None
-        self._public_key_comment = None
         self.puppet_server = None
         self.puppet_server_ip = None
         self.puppet_server_port = 8140
 
     def __del__(self):
-        if self._temp_directory:
-            rmtree(self._temp_directory)
+        self._disconnect()
 
     def version(self):
         print('Version: %s' % str(__version__))
@@ -40,71 +35,19 @@ class PuppetSetupApp(object):
         print('SSH copy id: %s' % str(SSH_COPY_ID_EXECUTABLE))
         print('SCP: %s' % str(SCP_EXECUTABLE))
         return 0
-    
-    def _generate_key(self):
-        ret = False
-        if self.keyfile is None:
-            self._temp_directory = tempfile.mkdtemp()
-            keyfile = os.path.join(self._temp_directory, 'puppet-setup')
-            comment = 'puppet-setup@%s' % self.local_fqdn
-            
-            (private_keyfile, public_keyfile) = ssh_keygen(keyfile, comment=comment, verbose=self.verbose)
-            if private_keyfile and public_keyfile:
-                if ssh_copy_id(public_keyfile, self.target_hostname_full, username=self.username, verbose=self.verbose):
-                    self._public_key_comment = comment
-                    self._private_keyfile = private_keyfile
-                    self._public_keyfile = public_keyfile
-                    self.keyfile = self._private_keyfile
-                    ret = True
-                else:
-                    sys.stderr.write('Failed to copy SSH key %s to %s@%s\n' % (keyfile, self.username, self.target_hostname_full))
-            else:
-                sys.stderr.write('Failed to generate SSH key\n')
-        else:
-            ret = True
-        return ret
 
-    def _remove_key(self):
-        if self._public_key_comment:
-            if self.verbose:
-                print('remove key %s' % self._public_key_comment)
-            commandline = 'sed \'/%(public_key_comment)s/d\' -i.old ~/.ssh/authorized_keys' % { 'public_key_comment':self._public_key_comment }
-            ret = self._runssh(commandline=commandline)
-        else:
-            ret = True
-        return ret
-            
-
-
-    def _runssh(self, script=None, commandline=None,
-                useTerminal=False,
-                outputStdErr=False, outputStdOut=False,
-                stdin=None, stdout=None, stderr=None,
-                allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
-
-        if useTerminal:
-            used_stdin = sys.stdin if stdin is None else stdin
-            used_stdout = sys.stdout if stdout is None else stdout
-            used_stderr = sys.stderr if stderr is None else stderr
-        else:
-            used_stdin = None
-            used_stdout = None
-            used_stderr = None
-
-        return ssh_runcmdAndGetData(self.target_hostname_full, commandline=commandline, script=script,
-                                                     outputStdErr=outputStdErr, outputStdOut=outputStdOut,
-                                                     stdin=used_stdin, stdout=used_stdout, stderr=used_stderr,
-                                                     cwd=cwd, env=env,
-                                                     allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
-                                                     keyfile=self.keyfile, username=self.username, verbose=self.verbose)
-
-    def _add_apt_source(self, sourcename, url, keyid, distcode=None, components=['main'], has_source=True):
+    def _add_apt_source(self, sourcename, url, keyid, distcode=None, components=['main'], has_source=True, distcode_remap={}):
         distro_cs="`lsb_release -cs`" if distcode is None else ("'%s'" %distcode)
+        distro_cs_map=''
+        for k,v in distcode_remap.items():
+            distro_cs_map += '[ "$distro_cs" = \'%s\' ] && distro_cs=\'%s\'\n' % (k,v)
+
         components_str = ' '.join(components)
         sourcefilename = os.path.join('/etc/apt/sources.list.d', sourcename + '.list')
         script = """
 distro_cs=%(distro_cs)s
 url="%(url)s"
+%(distro_cs_map)s
 line_deb="deb $url $distro_cs %(components_str)s"
 line_deb_src="deb-src $url $distro_cs %(components_str)s"
 tmpfile=`mktemp`
@@ -117,28 +60,29 @@ if [ -f "%(sourcefilename)s" ]; then
     has_deb_src_line=`grep -E -o "^${line_deb_src}[[:space:]]*\$" "%(sourcefilename)s" 2>/dev/null`
 
     if [ -z "$has_deb_line" -o -z "$has_deb_src_line" ]; then
-        %(sudo_command)sinstall -m 0644 -o root -g root "$tmpfile" "%(sourcefilename)s"; RES=$?
+        install -m 0644 -o root -g root "$tmpfile" "%(sourcefilename)s"; RES=$?
         if [ $RES -eq 0 ]; then
-            %(sudo_command)sapt-key adv --recv-keys --keyserver keyserver.ubuntu.com %(keyid)s; RES=$?
+            apt-key adv --recv-keys --keyserver keyserver.ubuntu.com %(keyid)s; RES=$?
         fi
     else
         RES=3
     fi
 else
-    %(sudo_command)sinstall -m 0644 -o root -g root "$tmpfile" "%(sourcefilename)s"; RES=$?
+    install -m 0644 -o root -g root "$tmpfile" "%(sourcefilename)s"; RES=$?
     if [ $RES -eq 0 ]; then
-        %(sudo_command)sapt-key adv --recv-keys --keyserver keyserver.ubuntu.com %(keyid)s; RES=$?
+        apt-key adv --recv-keys --keyserver keyserver.ubuntu.com %(keyid)s; RES=$?
     fi
 fi
 rm -f "$tmpfile"
 exit $RES
-""" % { 'sudo_command': self.sudo_command,
-       'distro_cs':distro_cs, 'url':url, 
+""" % { 'distro_cs':distro_cs,
+       'distro_cs_map':distro_cs_map,
+       'url':url,
        'keyid':keyid,
        'components_str':components_str, 
        'sourcename':sourcename,
        'sourcefilename':sourcefilename }
-        (sts, stdout, stderr) = self._runssh(script)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
         print('_add_apt_source %s sts=%i' % (sourcename, sts))
         if sts == 0:
             self._apt_update_required = True
@@ -168,27 +112,26 @@ proxy_conf_file='/etc/apt/apt.conf.d/02proxy'
 proxy_url='%(proxy_url)s'
 if [ -z "$proxy_url" ]; then
     if [ -f "$proxy_conf_file" ]; then
-        %(sudo_command)srm "$proxy_conf_file"; RES=$?
+        rm "$proxy_conf_file"; RES=$?
     else
         RES=0
     fi
 else
     tmpfile=`mktemp`
     echo "Acquire::http { Proxy \"$proxy_url\"; }" > "$tmpfile"
-    %(sudo_command)smv "$tmpfile" "$proxy_conf_file"; RES=$?
+    mv "$tmpfile" "$proxy_conf_file"; RES=$?
     rm -f "$tmpfile"
 fi
 exit $RES
 """ % { 'sudo_command': self.sudo_command,
        'proxy_url':'' if self.apt_proxy_server is None else self.apt_proxy_server }
-        (sts, stdout, stderr) = self._runssh(script)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
         ret = True if sts == 0 else False
         return ret
     
     def _apt_update(self):
         if self._apt_update_required:
-            script = "%(sudo_command)sapt-get -qq update" % {'sudo_command': self.sudo_command }
-            (sts, stdout, stderr) = self._runssh(script)
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=['apt-get', '-qq', 'update'], sudo=True)
             ret = True if sts == 0 else False
             if not ret:
                 sys.stderr.write('Failed to update package sources.\n%s\n%s\n' % (stdout, stderr))
@@ -198,14 +141,12 @@ exit $RES
     
     def _apt_install(self, packages):
         self._apt_update()
-        packages_str = ' '.join(packages)
-        script = """
-%(sudo_command)sapt-get install -q -y %(packages_str)s
-""" % { 'sudo_command': self.sudo_command, 'packages_str':packages_str }
-        (sts, stdout, stderr) = self._runssh(script)
+        args = ['apt-get', 'install', '-q', '-y']
+        args.extend(packages)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args, sudo=True)
         ret = True if sts == 0 else False
         if not ret:
-            sys.stderr.write('Failed to install packages %s.\n%s\n%s\n' % (packages_str, stdout, stderr))
+            sys.stderr.write('Failed to install packages %s.\n%s\n%s\n' % (','.join(packages), stdout, stderr))
         return ret
     
     def _get_local_puppet_server(self):
@@ -219,11 +160,8 @@ exit $RES
         return ret
 
     def _rename_host(self, new_hostname):
-        script = """
-%(sudo_command)smanagehosts set-hostname "%(new_hostname)s"
-""" % { 'sudo_command': self.sudo_command, 
-       'new_hostname':new_hostname }
-        (sts, stdout, stderr) = self._runssh(script)
+        args = ['managehosts', 'set-hostname', new_hostname]
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args, sudo=True)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('Failed to rename host to %s. %s\n' % (new_hostname, stderr))
@@ -240,13 +178,13 @@ exit $RES
             script = """
 current_fqdn=`hostname -f`
 if [ "$current_fqdn" != "%(fqdn)s" ]; then
-    %(sudo_command)smanagehosts set-hostname "%(fqdn)s"; RES=$?
+    managehosts set-hostname "%(fqdn)s"; RES=$?
 else
     RES=0
 fi
 exit $RES
-""" % { 'sudo_command': self.sudo_command, 'fqdn':self.target_hostname_full }
-            (sts, stdout, stderr) = self._runssh(script)
+""" % { 'fqdn':self.target_hostname_full }
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
             ret = True if sts == 0 else False
             if not ret:
                 sys.stderr.write('Failed to enforce full qualified hostname %s.\n%s\n%s\n' % (self.target_hostname_full, stdout, stderr))
@@ -254,11 +192,10 @@ exit $RES
 
     def _add_puppet_server_host_entry(self):
         script = """
-%(sudo_command)smanagehosts add "%(hostname)s" "%(addr)s"
-""" % { 'sudo_command': self.sudo_command, 
-       'hostname':self.puppet_server,
+managehosts add "%(hostname)s" "%(addr)s"
+""" % { 'hostname':self.puppet_server,
        'addr':self.puppet_server_ip}
-        (sts, stdout, stderr) = self._runssh(script)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('Failed to add puppet server %s as %s. %s\n' % (self.puppet_server, self.puppet_server_ip, stderr))
@@ -275,11 +212,8 @@ exit $RES
                 sys.stderr.write('Failed install openvpn config file %s. %s\n' % (config_file, stderr))
             else:
                 vpnname, ext = os.path.splitext(zipcfg.config_file.suggested_filename)
-                script = """
-%(sudo_command)sopenvpn-admin --start "%(vpnname)s"
-""" % { 'sudo_command': self.sudo_command, 
-       'vpnname':vpnname }
-                (sts, stdout, stderr) = self._runssh(script)
+                args = ['openvpn-admin', '--start', vpnname]
+                (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args, sudo=True)
                 ret = True if sts == 0 else False
                 if not ret:
                     sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, stderr))
@@ -292,7 +226,7 @@ screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent --enable && 
         { 'sudo_command': self.sudo_command,
         'screen_session': screen_session,
         'puppet_server': self.puppet_server }
-        (sts, stdout, stderr) = self._runssh(script=None, commandline=commandline, useTerminal=True, allocateTerminal=True)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=commandline, useTerminal=True, allocateTerminal=True, sudo=True)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('puppet run failed (%i).\n%s\n%s\n' % (sts, stdout, stderr))
@@ -302,7 +236,7 @@ cat /tmp/puppet-setup.log
 rm /tmp/puppet-setup.log
 """ % \
         { 'sudo_command': self.sudo_command }
-        (sts, stdout, stderr) = self._runssh(script=script, outputStdOut=True)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, outputStdOut=True, sudo=True)
         if sts != 0:
             sys.stderr.write('Failed get log file.\n')
         return ret
@@ -339,102 +273,100 @@ vbell=`awk "/^vbell/ { print \\\$2 }" '/etc/screenrc' 2>/dev/null`
 hardstatus=`awk "/^hardstatus/ { print \\\$2 }" '/etc/screenrc' 2>/dev/null`
 
 if [ "$vbell" != 'off' -a "$startup_message" != 'off' -a "$hardstatus" != 'alwayslastline' ]; then
-    %(sudo_command)sinstall -m 0644 -o root -g root "$tmpfile" '/etc/screenrc'; RES=$?
+    install -m 0644 -o root -g root "$tmpfile" '/etc/screenrc'; RES=$?
 else
     RES=0
 fi
 rm -f "$tmpfile"
 exit $RES
-""" % \
-        { 'sudo_command': self.sudo_command }
-        (sts, stdout, stderr) = self._runssh(script)
+"""
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script, sudo=True)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('Failed to set up GNU screen (Error %i).\n%s\n%s\n' % (sts, stdout, stderr))
         return ret
 
     def _start_screen(self, screen_session='puppet-setup', detached=True):
+        args=['screen', '-S', screen_session]
         if detached:
-            commandline="screen -S '%s' -d -m" % (screen_session)
-        else:
-            commandline="screen -S '%s'" % (screen_session)
-        (sts, stdout, stderr) = self._runssh(commandline=commandline, allocateTerminal=True)
+            args.append('-d')
+            args.append('-m')
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args, allocateTerminal=True)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('Failed start screen session %s.\n' % screen_session)
         return ret
 
     def _end_screen(self, screen_session='puppet-setup'):
-        commandline = "screen -S '%(screen_session)s' -X quit" % \
-            { 'screen_session': screen_session }
-        (sts, stdout, stderr) = self._runssh(command=commandline)
+        args=['screen', '-S', screen_session, '-X', 'quit']
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('Failed get log file.\n')
         return ret
 
     def _run_in_screen(self, command, screen_session='puppet-setup', window_number=0):
-        commandline = "screen -S %(screen_session)s -p %(window_number)i -X stuff \"%(command)s\"^M" % \
-            { 'screen_session': screen_session,
-             'window_number': window_number,
-             'command': command
-             }
-        (sts, stdout, stderr) = self._runssh(commandline=commandline)
+        args=['screen', '-S', screen_session, '-p', '%i' % window_number, '-X', 'stuff', "%s^M" % command]
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('Failed run command %s in screen session %s:%i.\n' % (command, screen_session, window_number))
         return ret
 
-    def _initialize_sudo(self):
-        script = """
-tmpfile=`mktemp`
-echo "#!/bin/sh\necho \"%(sudo_password)s\"\n" > "$tmpfile"
-chmod 700 "$tmpfile"
-SUDO_ASKPASS="$tmpfile" sudo -A /bin/true; RES=$?
-if [ $RES -eq 0 ]; then
-    echo "$tmpfile"
-else
-    rm -f "$tmpfile"
-fi
-exit $RES
-""" % { 'sudo_password': self.sudo_password }
-        (sts, stdout, stderr) = self._runssh(script, useTerminal=False)
-        ret = True if sts == 0 else False
-        if not ret:
-            sys.stderr.write('Failed to add puppet server %s as %s. %s\n' % (self.puppet_server, self.puppet_server_ip, stderr))
-        else:
-            #print (sts, stdout, stderr)
-            self.sudo_askpass_script = stdout.strip()
-            self.sudo_command = 'SUDO_ASKPASS=\'%s\' sudo -A ' % self.sudo_askpass_script
-            if self.verbose:
-                print('sudo command %s' % self.sudo_command)
-        return ret
-
-    def _deinitialize_sudo(self):
-        if self.sudo_askpass_script:
-            (sts, stdout, stderr) = self._runssh(commandline="rm -f %s" % self.sudo_askpass_script)
-            ret = True if sts == 0 else False
-        else:
-            ret = True
-        return ret
-
     def _verify_sudo(self):
         if self.sudo_command:
-            (sts, stdout, stderr) = self._runssh(commandline="%sid -u" % self.sudo_command)
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=['id', '-u'], sudo=True)
             ret = True if sts == 0 else False
             if ret:
+                id = -1
                 if stdout:
                     id = int(stdout.strip())
                     ret = True if id == 0 else False
                 else:
                     ret = False
-            if not ret:
+                if not ret:
+                    sys.stderr.write('Sudo is not working on remote machine %s. Got id %i instead of 0.\n' % (self.target_hostname_full, id))
+            else:
                 sys.stderr.write('Sudo is not working on remote machine %s.\n%s\n%s\n' % (self.target_hostname_full, stdout, stderr))
         else:
             # no sudo is required, so it's ok
             ret = True
         return ret
 
+
+    def _disconnect(self):
+        self._session_key = None
+        self._sudo = None
+        if self._cxn:
+            self._cxn.close()
+            self._cxn = None
+
+    def _connect(self):
+        self._cxn = None
+        self._session_key = None
+        self._sudo = None
+
+        use_local = False
+        if self.local_fqdn == self.target_hostname_full:
+            use_local = True
+
+        if use_local:
+            self._cxn = LocalConnection(verbose=self.verbose)
+            if self.sudo_password:
+                self._sudo = LocalSudoSession(sudo_password=self.sudo_password)
+        else:
+            self._cxn = SSHConnection(hostname=self.target_hostname_full, username=self.username, keyfile=self.keyfile, verbose=self.verbose)
+            if self.keyfile is None:
+                self._session_key = SSHSessionKey(self._cxn)
+
+            if self.sudo_password:
+                self._sudo = SSHSudoSession(self._cxn, sudo_password=self.sudo_password)
+        return True
+
+
+    @property
+    def has_sudo(self):
+        return True if self._sudo else False
 
     def main(self):
         #=============================================================================================
@@ -474,6 +406,8 @@ exit $RES
 
         # get the local domain information
         (self.local_fqdn, self.local_hostname, self.local_domainname) = gethostname_tuple()
+        if self.target_hostname == 'localhost' or self.target_hostname == 'loopback':
+            self.target_hostname = self.local_fqdn
 
         if self.apt_proxy_server is None:
             self.apt_proxy_server = self._get_apt_proxy_server()
@@ -516,7 +450,8 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
 
         packages_to_install = []
         packages_to_install.append('arsoft-base')
-        packages_to_install.append('arsoft-python')
+        packages_to_install.append('python-arsoft')
+        packages_to_install.append('python3-arsoft')
         packages_to_install.append('puppet')
         
         if args.openvpn_zipfile:
@@ -526,10 +461,7 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
         ret = True
         self._screen_ready = False
         if ret:
-            ret = self._generate_key()
-
-        if ret:
-            ret = self._initialize_sudo()
+            ret = self._connect()
 
         if ret:
             ret = self._verify_sudo()
@@ -545,7 +477,8 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
                 sys.stderr.write('Failed to add PPA aroth\n')
 
         if ret:
-            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['main', 'dependencies'])
+            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['main', 'dependencies'],
+                                       distcode_remap={'utopic':'trusty', 'vivid':'trusty'})
             if not ret:
                 sys.stderr.write('Failed to add PuppetLabs APT repository\n')
 
@@ -570,10 +503,7 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
         if ret:
             ret = self._puppet_agent_run()
 
-        # clean up the sudo setup
-        self._deinitialize_sudo()
-        # in any case remove the newly install SSH key
-        self._remove_key()
+        self._disconnect()
 
         return 0 if ret else 1
 

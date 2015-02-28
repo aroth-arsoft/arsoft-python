@@ -25,6 +25,16 @@ def local_sudo():
     sudo = LocalSudoSession(cxn, sudo_password=sys.argv[2])
     cxn.runcmdAndGetData(['/usr/bin/id'], sudo=True, outputStdErr=True, outputStdOut=True)
 
+def local_screen():
+    cxn = LocalConnection(verbose=True)
+    scr = ScreenSession(cxn)
+    scr.logfile('/tmp/local_screen')
+    scr.log(True)
+    scr.echo('start')
+    scr.runcmdAndGetData(['/usr/bin/env'], useTerminal=True, outputStdErr=True, outputStdOut=True)
+    scr.echo('end')
+
 if __name__ == "__main__":
     #local_sudo()
-    ssh_sudo()
+    #ssh_sudo()
+    local_screen()

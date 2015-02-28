@@ -4,6 +4,7 @@
 
 from .utils import runcmdAndGetData, to_commandline, platform_is_windows, python_is_version3, which
 from .socket_utils import gethostname
+import sys
 import tempfile
 import os.path
 import copy, uuid
@@ -544,7 +545,8 @@ class LocalConnection(object):
     def runcmdAndGetData(self, args=[], script=None,
                 useTerminal=False, sudo=False,
                 outputStdErr=False, outputStdOut=False,
-                stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None):
+                stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None,
+                allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
 
         if not sudo:
             return runcmdAndGetData(args, script=script, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
@@ -598,3 +600,87 @@ class LocalSudoSession(SudoSessionBase):
                 pass
         self.sudo_command = None
         return True
+
+class ScreenSession(object):
+    def __init__(self, cxn, name=None, sudo=None):
+        self._cxn = cxn
+        self._sudo = sudo
+        if name is None:
+            self._name = '%s@%s' % (self.__class__.__name__, gethostname(fqdn=True))
+        else:
+            self._name = name
+        if self._cxn is not None:
+            self.start()
+
+    def __del__(self):
+        self.close()
+
+    @property
+    def verbose(self):
+        return self._cxn.verbose
+
+    def start(self, detached=True):
+        args=['screen', '-S', self._name]
+        if detached:
+            args.append('-d')
+            args.append('-m')
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args, allocateTerminal=True)
+        ret = True if sts == 0 else False
+        return ret
+
+    def _send_command(self, args, window_number=-1):
+        real_args=['screen', '-S', self._name]
+        if window_number != -1:
+            real_args.append('-p')
+            real_args.append('%i' % window_number)
+        real_args.append('-X')
+        real_args.extend(args)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=real_args)
+        ret = True if sts == 0 else False
+        return ret
+
+    def quit(self):
+        return self._send_command(['quit'])
+
+    def close(self):
+        return self.quit()
+
+    def logfile(self, filename, window_number=-1):
+        return self._send_command(['logfile', filename], window_number)
+
+    def log(self, value, window_number=-1):
+        return self._send_command(['log', 'on' if value else 'off'], window_number)
+
+    def echo(self, message, window_number=-1):
+        return self._send_command(['echo', message], window_number)
+
+    def stuff(self, data, window_number=0):
+        return self._send_command(['stuff', data], window_number)
+
+    def runcmdAndGetData(self, args=[], script=None,
+                useTerminal=False, sudo=False,
+                outputStdErr=False, outputStdOut=False,
+                stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None,
+                window_number=-1):
+
+        real_args=['screen', '-S', self._name]
+        if window_number != -1:
+            args.append('-p')
+            args.append('%i' % window_number)
+        real_args.extend(args)
+
+        if useTerminal:
+            used_stdin = sys.stdin if stdin is None else stdin
+            used_stdout = sys.stdout if stdout is None else stdout
+            used_stderr = sys.stderr if stderr is None else stderr
+        else:
+            used_stdin = None
+            used_stdout = None
+            used_stderr = None
+
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=real_args, sudo=sudo,
+                                                           outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                                            stdin=used_stdin, stdout=used_stdout, stderr=used_stderr, stderr_to_stdout=stderr_to_stdout,
+                                                            input=input, cwd=cwd, env=env)
+        ret = True if sts == 0 else False
+        return ret

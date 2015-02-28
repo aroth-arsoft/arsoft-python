@@ -72,7 +72,10 @@ def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, ou
         all_args = [str(shell)]
         all_args.append(script_tmpfile.name)
 
-    stdin_param = stdin if stdin is not None else subprocess.PIPE
+    if input is not None:
+        stdin_param = subprocess.PIPE
+    else:
+        stdin_param = stdin if stdin is not None else subprocess.PIPE
     if stdout is not None and hasattr(stdout, '__call__'):
         stdout_param = subprocess.PIPE
     else:
@@ -114,6 +117,7 @@ def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, ou
             stderrdata = None
         else:
             if input:
+                print('send %s to stdin' % input.encode())
                 (stdoutdata, stderrdata) = p.communicate(input.encode())
             else:
                 (stdoutdata, stderrdata) = p.communicate()
@@ -139,6 +143,8 @@ def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, ou
     return (sts, stdoutdata, stderrdata)
 
 def _is_quoted(s, quote_chars = '\'"'):
+    if not isinstance(s, str):
+        return False
     l = len(s)
     return True if l >= 2 and s[0] in quote_chars and s[-1] in quote_chars else False
 
