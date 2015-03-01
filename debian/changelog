@@ -1,3 +1,11 @@
+arsoft-python (1.202) utopic; urgency=medium
+
+  * major overhaul of the ssh utils
+  * add screen session
+  * fixed puppet-setup
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 01 Mar 2015 17:50:05 +0100
+
 arsoft-python (1.201) utopic; urgency=medium
 
   * fixed encoding trouble
