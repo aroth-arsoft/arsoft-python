@@ -2,6 +2,10 @@
 import sys
 from arsoft.sshutils import *
 
+def ssh_url():
+    url = SSHUrl(sys.argv[1])
+    print(url)
+
 def ssh_with_env():
     url = SSHUrl(sys.argv[1])
     cxn = SSHConnection(url, verbose=True)
@@ -17,7 +21,6 @@ def ssh_sudo():
     cxn = SSHConnection(url, verbose=True)
     key = SSHSessionKey(cxn)
     sudo = SSHSudoSession(cxn, sudo_password=sys.argv[2])
-    sudo.start()
     cxn.runcmdAndGetData(['id'], sudo=True, outputStdErr=True, outputStdOut=True)
 
 def local_sudo():
@@ -32,9 +35,42 @@ def local_screen():
     scr.log(True)
     scr.echo('start')
     scr.runcmdAndGetData(['/usr/bin/env'], useTerminal=True, outputStdErr=True, outputStdOut=True)
+
+    script_lines = []
+    script_lines.append(scr.connection.to_commandline(['id'], sudo=True))
+    script_lines.append(scr.connection.to_commandline(['env'], sudo=True))
+    script = '\n'.join(script_lines)
+
+    scr.runcmdAndGetData(script=script, useTerminal=True, outputStdErr=True, outputStdOut=True)
     scr.echo('end')
 
+def ssh_screen():
+    url = SSHUrl(sys.argv[1])
+    cxn = SSHConnection(url, verbose=True)
+    scr = ScreenSession(cxn)
+    scr.logfile('/tmp/local_screen')
+    scr.log(True)
+    scr.echo('start')
+    scr.runcmdAndGetData(['/usr/bin/env'], useTerminal=True, outputStdErr=True, outputStdOut=True)
+
+    script_lines = []
+    script_lines.append(scr.connection.to_commandline(['id'], sudo=True))
+    script_lines.append(scr.connection.to_commandline(['env'], sudo=True))
+    script = '\n'.join(script_lines)
+
+    scr.runcmdAndGetData(script=script, allocateTerminal=True, useTerminal=True, outputStdErr=True, outputStdOut=True)
+
+def ssh_temp_files():
+    url = SSHUrl(sys.argv[1])
+    cxn = SSHConnection(url, verbose=True)
+    cxn.create_temp_file('hello')
+    cxn.create_temp_file('world')
+
 if __name__ == "__main__":
+    #ssh_url()
     #local_sudo()
     #ssh_sudo()
     local_screen()
+    #ssh_screen()
+    #ssh_temp_files()
+

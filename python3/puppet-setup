@@ -220,97 +220,25 @@ managehosts add "%(hostname)s" "%(addr)s"
         return ret
 
     def _puppet_agent_run(self, screen_session='puppet-setup'):
-        commandline = """
-screen -S %(screen_session)s bash -c \"%(sudo_command)spuppet agent --enable && %(sudo_command)spuppet agent -tv --waitforcert 30 --server %(puppet_server)s 2>&1 | tee /tmp/puppet-setup.log\"
-""" % \
-        { 'sudo_command': self.sudo_command,
-        'screen_session': screen_session,
-        'puppet_server': self.puppet_server }
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=commandline, useTerminal=True, allocateTerminal=True, sudo=True)
+        screen = ScreenSession(self._cxn)
+
+        script = """
+puppet agent --enable
+puppet agent -tv --waitforcert 30 --server %s 2>&1 | tee /tmp/puppet-setup.log
+""" %  self.puppet_server
+
+        (sts, stdout, stderr) = screen.runcmdAndGetData(script=script, useTerminal=True, allocateTerminal=True, sudo=True)
+        #(sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, useTerminal=True, allocateTerminal=True, sudo=True)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('puppet run failed (%i).\n%s\n%s\n' % (sts, stdout, stderr))
+
         # next step retrieve the log file
-        script="""
-cat /tmp/puppet-setup.log
-rm /tmp/puppet-setup.log
-""" % \
-        { 'sudo_command': self.sudo_command }
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, outputStdOut=True, sudo=True)
-        if sts != 0:
-            sys.stderr.write('Failed get log file.\n')
-        return ret
-
-    def _install_screenrc(self):
-        script="""
-tmpfile=`mktemp`
-cat > "$tmpfile" <<SCREENRC_EOF
-startup_message off
-deflogin on
-vbell off
-vbell_msg "   Wuff  ----  Wuff!!  "
-defscrollback 100000
-bind ^k
-bind ^\
-bind \\ quit
-bind K kill
-bind I login on
-bind O login off
-bind } history
-termcapinfo vt100 dl=5\E[M
-hardstatus alwayslastline
-termcapinfo xterm*|rxvt*|kterm*|Eterm* hs:ts=\E]0;:fs=\007:ds=\E]0;\007
-hardstatus string '%%{= kG}[ %%{G}%%H %%{g}][%%= %%{=kw}%%?%%-Lw%%?%%{r}(%%{W}%%n*%%f%%t%%?(%%u)%%?%%{r})%%{w}%%?%%+Lw%%?%%?%%= %%{g}][%%{B}%%Y-%%m-%%d %%{W}%%c %%{g}]'
-termcapinfo xterm*|linux*|rxvt*|Eterm* OP
-termcapinfo xterm 'is=\E[r\E[m\E[2J\E[H\E[?7h\E[?1;4;6l'
-termcapinfo xterm|xterms|xs|rxvt ti@:te@
-defnonblock 5
-SCREENRC_EOF
-cat "$tmpfile"
-
-startup_message=`awk "/^startup_message/ { print \\\$2 }" '/etc/screenrc' 2>/dev/null`
-vbell=`awk "/^vbell/ { print \\\$2 }" '/etc/screenrc' 2>/dev/null`
-hardstatus=`awk "/^hardstatus/ { print \\\$2 }" '/etc/screenrc' 2>/dev/null`
-
-if [ "$vbell" != 'off' -a "$startup_message" != 'off' -a "$hardstatus" != 'alwayslastline' ]; then
-    install -m 0644 -o root -g root "$tmpfile" '/etc/screenrc'; RES=$?
-else
-    RES=0
-fi
-rm -f "$tmpfile"
-exit $RES
-"""
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script, sudo=True)
-        ret = True if sts == 0 else False
-        if not ret:
-            sys.stderr.write('Failed to set up GNU screen (Error %i).\n%s\n%s\n' % (sts, stdout, stderr))
-        return ret
-
-    def _start_screen(self, screen_session='puppet-setup', detached=True):
-        args=['screen', '-S', screen_session]
-        if detached:
-            args.append('-d')
-            args.append('-m')
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args, allocateTerminal=True)
-        ret = True if sts == 0 else False
-        if not ret:
-            sys.stderr.write('Failed start screen session %s.\n' % screen_session)
-        return ret
-
-    def _end_screen(self, screen_session='puppet-setup'):
-        args=['screen', '-S', screen_session, '-X', 'quit']
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args)
-        ret = True if sts == 0 else False
-        if not ret:
-            sys.stderr.write('Failed get log file.\n')
-        return ret
-
-    def _run_in_screen(self, command, screen_session='puppet-setup', window_number=0):
-        args=['screen', '-S', screen_session, '-p', '%i' % window_number, '-X', 'stuff', "%s^M" % command]
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args)
-        ret = True if sts == 0 else False
-        if not ret:
-            sys.stderr.write('Failed run command %s in screen session %s:%i.\n' % (command, screen_session, window_number))
+        script_lines = []
+        script_lines.append(self._cxn.to_commandline(['cat', '/tmp/puppet-setup.log']))
+        script_lines.append(self._cxn.to_commandline(['rm', '-f', '/tmp/puppet-setup.log']))
+        script = '\n'.join(script_lines)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, useTerminal=True, sudo=True)
         return ret
 
     def _verify_sudo(self):
@@ -496,9 +424,6 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
                 ret = self._install_openvpn_config(args.openvpn_zipfile)
                 if ret:
                     ret = self._add_puppet_server_host_entry()
-
-        if ret:
-            ret = self._install_screenrc()
 
         if ret:
             ret = self._puppet_agent_run()
