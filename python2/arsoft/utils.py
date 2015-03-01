@@ -72,7 +72,10 @@ def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, ou
         all_args = [str(shell)]
         all_args.append(script_tmpfile.name)
 
-    stdin_param = stdin if stdin is not None else subprocess.PIPE
+    if input is not None:
+        stdin_param = subprocess.PIPE
+    else:
+        stdin_param = stdin if stdin is not None else subprocess.PIPE
     if stdout is not None and hasattr(stdout, '__call__'):
         stdout_param = subprocess.PIPE
     else:
@@ -86,9 +89,7 @@ def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, ou
             stderr_param = stdout if stdout is not None else subprocess.PIPE
     if verbose:
         print("runcmd " + ' '.join(all_args) +
-                ' <' + str(stdin_param) +
-                ' 1>' + str(stdout_param) +
-                ' 2>' + str(stderr_param)
+                ' 0<%s 1>%s 2>%s' % (stdin_param, stdout_param, stderr_param)
                     )
 
     p = subprocess.Popen(all_args, executable=executable, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
@@ -139,16 +140,23 @@ def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, ou
     return (sts, stdoutdata, stderrdata)
 
 def _is_quoted(s, quote_chars = '\'"'):
+    if not isinstance(s, str):
+        return False
     l = len(s)
     return True if l >= 2 and s[0] in quote_chars and s[-1] in quote_chars else False
 
-def to_commandline(args, posix=True):
+def to_commandline(args, posix=True, env=None, quote_char='\''):
     ret = ''
+    if env:
+        for (env_key, env_value) in env.items():
+            if ret:
+                ret += ' '
+            ret = ret + '%s=%s%s%s' % (env_key, quote_char, env_value, quote_char)
     for arg in args:
         if ret:
             ret += ' '
         if not _is_quoted(arg):
-            ret = ret + '\'%s\'' % arg
+            ret = ret + '%s%s%s' % (quote_char, arg, quote_char)
         else:
             ret = ret + arg
     return ret

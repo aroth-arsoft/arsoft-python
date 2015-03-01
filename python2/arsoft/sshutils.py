@@ -4,6 +4,7 @@
 
 from .utils import runcmdAndGetData, to_commandline, platform_is_windows, python_is_version3, which
 from .socket_utils import gethostname
+import sys
 import tempfile
 import os.path
 import copy, uuid
@@ -46,8 +47,9 @@ def _find_scp_executable(scp=None):
 def ssh_runcmdAndGetData(server, args=[], script=None, keyfile=None, username=None, password=None,
                          sudo_command=None, sudo_env=None, shell='/bin/sh',
                          verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
+                         stderr_to_stdout=False,
                          ssh_env=None, ssh_verbose=0,
-                         allocateTerminal=False, x11Forwarding=False,
+                         allocateTerminal=False, x11Forwarding=False, quote_char='\'',
                          ssh_executable=SSH_EXECUTABLE, use_putty=SSH_USE_PUTTY):
 
     if use_putty:
@@ -86,9 +88,9 @@ def ssh_runcmdAndGetData(server, args=[], script=None, keyfile=None, username=No
 
     if script is None:
         if isinstance(args, str):
-            commandline = env_str + to_commandline([args])
+            commandline = env_str + to_commandline([args], quote_char=quote_char)
         else:
-            commandline = env_str + to_commandline(args)
+            commandline = env_str + to_commandline(args, quote_char=quote_char)
         if sudo_command:
             ssh_args.append('%s %s %s' % (sudo_env_str, sudo_command, commandline))
         else:
@@ -96,6 +98,7 @@ def ssh_runcmdAndGetData(server, args=[], script=None, keyfile=None, username=No
         input = None
         return runcmdAndGetData(ssh_args,
                                 verbose=verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                stderr_to_stdout=stderr_to_stdout,
                                 stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=ssh_env)
 
     else:
@@ -126,6 +129,7 @@ def ssh_runcmdAndGetData(server, args=[], script=None, keyfile=None, username=No
                 print(real_script)
             (sts, stdout_data, stderr_data) = runcmdAndGetData(exec_args,
                                 verbose=verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                stderr_to_stdout=stderr_to_stdout,
                                 stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd, env=ssh_env)
         else:
             (sts, stdout_data, stderr_data) = (put_sts, put_stdout, put_stderr)
@@ -188,6 +192,59 @@ def ssh_keygen(dest_filename, password=None, comment=None, keytype='rsa',
     else:
         return (None, None)
 
+def ssh_create_temp_file(server, data, keyfile=None, username=None, password=None,
+                         sudo_command=None, sudo_env=None, shell='/bin/sh',
+                         verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
+                         ssh_env=None, ssh_verbose=0,
+                         allocateTerminal=False, x11Forwarding=False,
+                         ssh_executable=SSH_EXECUTABLE, use_putty=SSH_USE_PUTTY):
+
+    if use_putty:
+        ssh_args = [ssh_executable, '-batch', '-noagent', '-a', '-x']
+        if keyfile is None and password:
+            ssh_args.extend(['-pw', password])
+    else:
+        ssh_args = [ssh_executable, '-a', '-o', 'BatchMode=yes']
+
+    while ssh_verbose > 0:
+        ssh_args.append('-v')
+        ssh_verbose = ssh_verbose - 1
+
+    if username:
+        ssh_args.extend(['-l', username ])
+    if keyfile:
+        if isinstance(keyfile, SSHSessionKey):
+            ssh_args.extend(['-i', keyfile.keyfile])
+        else:
+            ssh_args.extend(['-i', keyfile])
+
+    if not use_putty:
+        ssh_args.append( '-t' if allocateTerminal else '-T')
+        ssh_args.append( '-X' if x11Forwarding else '-x')
+
+    ssh_args.append(server)
+    sudo_env_str = ''
+    if sudo_command and sudo_env:
+        for (env_key, env_value) in sudo_env.items():
+            sudo_env_str = sudo_env_str + '%s=\'%s\'' % (env_key, env_value)
+    env_str = ''
+    if env:
+        for (env_key, env_value) in env.items():
+            env_str = env_str + '%s=\'%s\'' % (env_key, env_value)
+        env_str = env_str + ' '
+
+    tmpfile = '/tmp/arsoft_ssh_tmp_%s' % uuid.uuid4()
+    put_args = copy.deepcopy(ssh_args)
+    # do not allow anyone except ourself to execute (read/write) this script
+    put_args.append('umask 077; /bin/cat > ' + tmpfile)
+
+    (put_sts, put_stdout, put_stderr) = runcmdAndGetData(put_args, input=data,
+                            verbose=verbose, cwd=cwd, env=ssh_env)
+    if put_sts == 0:
+        return tmpfile
+    else:
+        return None
+
 def ssh_copy_id(public_keyfile, server, username=None,
                      verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, stdout=None, stderr=None, cwd=None, env=None,
                      ssh_copy_id_executable=SSH_COPY_ID_EXECUTABLE, use_putty=SSH_COPY_ID_USE_PUTTY):
@@ -223,32 +280,34 @@ class SSHUrl(object):
         idx = url.find('://')
         if idx != -1:
             self.scheme = url[0:idx]
+            scheme_idx = idx + 3
         else:
             self.scheme = scheme
-        idx = url.find('@')
+            scheme_idx = 0
+        idx = url.find('@', scheme_idx)
         if idx != -1:
-            tmp = url[0:idx]
-            idx = tmp.find(':')
+            username_and_pw = url[scheme_idx:idx]
+            hostname_and_port = url[idx+1:]
+            idx = username_and_pw.find(':')
             if idx != -1:
-                self.username = tmp[0:idx]
-                self.password = tmp[idx+1:]
+                self.username = username_and_pw[0:idx]
+                self.password = username_and_pw[idx+1:]
             else:
-                self.username = tmp
+                self.username = username_and_pw
                 self.password = None
-            tmp = url[idx + 1:]
-            idx = tmp.find(':')
+            idx = hostname_and_port.find(':')
             if idx != -1:
-                self.hostname = tmp[0:idx]
-                self.path = tmp[idx+1:]
+                self.hostname = hostname_and_port[0:idx]
+                self.path = hostname_and_port[idx+1:]
             else:
-                self.hostname = tmp
+                self.hostname = hostname_and_port
                 self.path = None
         else:
             self.username = None
             self.password = None
-            idx = url.find(':')
+            idx = url.find(':', scheme_idx)
             if idx != -1:
-                self.hostname = url[0:idx]
+                self.hostname = url[scheme_idx:idx]
                 self.path = url[idx+1:]
             else:
                 self.hostname = url
@@ -309,6 +368,17 @@ def ssh_rmdir(server, directory, recursive=False, keyfile=None, username=None, p
     (sts, stdoutdata, stderrdata) = ssh_runcmdAndGetData(server, args, keyfile=keyfile, username=username, password=password, verbose=verbose)
     return True if sts == 0 else False
 
+class ConnectionTempFile(object):
+    def __init__(self, cxn, name):
+        self._cxn = cxn
+        self.name = name
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        return self._cxn.delete_temp_file(self)
+
 class SSHConnection(object):
     def __init__(self, url=None, hostname=None, port=None, username=None, password=None, keyfile=None, verbose=False):
         if url is None:
@@ -324,21 +394,55 @@ class SSHConnection(object):
         self.keyfile = keyfile
         self.sudo_session = None
         self.verbose = verbose
+        self._temp_files = []
 
     def __del__(self):
+        for tmp in self._temp_files:
+            tmp.close()
         self.close()
 
     def __str__(self):
         return '%s(%s@%s:%i)' % (self.__class__.__name__, self.username, self.hostname, self.port)
 
     def close(self):
-        self.keyfile = None
+        if self.sudo_session:
+            self.sudo_session.close()
+        if self.keyfile:
+            self.keyfile.close()
+
+    def create_temp_file(self, data, mode=0o600):
+        ret = None
+        tmpfile = ssh_create_temp_file(self.hostname, data,
+                                        sudo_command=None, sudo_env=None,
+                                        keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+        if tmpfile:
+            ret = ConnectionTempFile(self, tmpfile)
+            self._temp_files.append(ret)
+        return ret
+
+    def delete_temp_file(self, tmpfile):
+        ret = True
+        if tmpfile.name is not None:
+            cleanup_args = ['/bin/rm', '-f', tmpfile.name]
+            (cleanup_sts, cleanup_stdout, cleanup_stderr) = ssh_runcmdAndGetData(self.hostname, cleanup_args,
+                                                                                sudo_command=None, sudo_env=None,
+                                                                                keyfile=self.keyfile, username=self.username, verbose=self.verbose)
+            if cleanup_sts == 0:
+                tmpfile.name = None
+        return ret
+
+    def to_commandline(self, args, env=None, sudo=False):
+        if self.sudo_session and sudo:
+            return self.sudo_session.to_commandline(args, env)
+        else:
+            return to_commandline([args] if isinstance(args, str) else args, env=env)
 
     def runcmdAndGetData(self, args=None, script=None,
                 useTerminal=False, sudo=False,
                 outputStdErr=False, outputStdOut=False,
-                stdin=None, stdout=None, stderr=None,
-                allocateTerminal=False, x11Forwarding=False, cwd=None, env=None):
+                stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None,
+                allocateTerminal=False, x11Forwarding=False, cwd=None, env=None,
+                quote_char='\''):
 
         if useTerminal:
             used_stdin = sys.stdin if stdin is None else stdin
@@ -361,9 +465,11 @@ class SSHConnection(object):
         return ssh_runcmdAndGetData(self.hostname, args=args, script=script,
                                                      outputStdErr=outputStdErr, outputStdOut=outputStdOut,
                                                      stdin=used_stdin, stdout=used_stdout, stderr=used_stderr,
+                                                     stderr_to_stdout=stderr_to_stdout,
                                                      cwd=cwd, env=env,
                                                      sudo_command=sudo_command, sudo_env=sudo_env,
                                                      allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
+                                                     quote_char=quote_char,
                                                      keyfile=self.keyfile, username=self.username, verbose=self.verbose)
 
     def copy_id(self, public_keyfile,
@@ -400,6 +506,16 @@ class SudoSessionBase(object):
     def environment(self):
         return self.sudo_env
 
+    def to_commandline(self, args, env=None, sudo=False):
+        sudo_env_str = ''
+        for (env_key, env_value) in self.sudo_env.items():
+            if sudo_env_str:
+                sudo_env_str += ' '
+            sudo_env_str += '%s=\'%s\'' % (env_key, env_value)
+
+        commandline = to_commandline([args] if isinstance(args, str) else args, env=env)
+        return '%s %s %s' % (sudo_env_str, self.sudo_command, commandline)
+
 class SudoSessionException(Exception):
     def __init__(self, cxn, msg):
         self.cxn = cxn
@@ -418,11 +534,8 @@ class SSHSudoSession(SudoSessionBase):
     def __del__(self):
         self.close()
 
-    def start(self, cxn=None):
-        if cxn is None:
-            cxn = self._cxn
-        else:
-            self.close()
+    def start(self):
+        self.close()
         script = """
 tmpfile=`mktemp`
 echo "#!/bin/sh\necho \"%(sudo_password)s\"\n" > "$tmpfile"
@@ -435,7 +548,7 @@ else
 fi
 exit $RES
 """ % { 'sudo_password': self.sudo_password }
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, useTerminal=False)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script)
         ret = True if sts == 0 else False
         if ret:
             #print (sts, stdout, stderr)
@@ -449,9 +562,8 @@ exit $RES
         if self.sudo_askpass_script:
             (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=['rm', '-f', self.sudo_askpass_script])
             ret = True if sts == 0 else False
-            if ret:
-                self.sudo_askpass_script = None
-                self.sudo_command = None
+            self.sudo_askpass_script = None
+            self.sudo_command = None
         else:
             ret = True
         return ret
@@ -482,26 +594,28 @@ class SSHSessionKey(object):
 
     def close(self):
         if self._public_keyfile:
-            if self.verbose:
+            if self._cxn.verbose:
                 print('remove key %s' % self._public_key_comment)
-            args = ['sed', '/%s/d' % self._public_key_comment, '-i.old', '~/.ssh/authorized_keys']
-            ret = self._cxn.runcmdAndGetData(args=args)
+            args = ['sed', '/%s/d' % self._public_key_comment, '-i.old', '$HOME/.ssh/authorized_keys']
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args, quote_char='"')
+            ret = True if sts == 0 else False
+            self._public_keyfile = None
         else:
             ret = True
-        if self._temp_directory:
-            self._temp_directory.cleanup()
+        if self._temp_directory is not None:
+            for f in os.listdir(self._temp_directory):
+                full = os.path.join(self._temp_directory, f)
+                os.remove(full)
+            os.rmdir(self._temp_directory)
             self._temp_directory = None
         return ret
 
-    def start(self, cxn=None):
-        if cxn is None:
-            cxn = self._cxn
-        else:
-            self.close()
+    def start(self):
+        self.close()
         ret = False
         if self._private_keyfile is None:
-            self._temp_directory = tempfile.TemporaryDirectory()
-            keyfile = os.path.join(self._temp_directory.name, self.__class__.__name__)
+            self._temp_directory = tempfile.mkdtemp()
+            keyfile = os.path.join(self._temp_directory, self.__class__.__name__)
 
             (private_keyfile, public_keyfile) = ssh_keygen(keyfile, comment=self._public_key_comment, verbose=self._cxn.verbose)
             if private_keyfile and public_keyfile:
@@ -512,11 +626,14 @@ class SSHSessionKey(object):
                         self._cxn.keyfile = self
                     ret = True
                 elif self.verbose:
-                    print('Failed to copy SSH key %s to %s@%s' % (public_keyfile, self.username, self.target_hostname_full))
+                    print('Failed to copy SSH key %s to %s' % (public_keyfile, str(self._cxn)))
             elif self.verbose:
                 print('Failed to generate SSH key')
             if not ret:
-                self._temp_directory.cleanup()
+                for f in os.listdir(self._temp_directory):
+                    full = os.path.join(self._temp_directory, f)
+                    os.remove(full)
+                os.rmdir(self._temp_directory)
                 self._temp_directory = None
         else:
             ret = True
@@ -531,6 +648,7 @@ class LocalConnection(object):
         self.keyfile = None
         self.sudo_session = None
         self.verbose = verbose
+        self._temp_files = []
 
     def __del__(self):
         self.close()
@@ -539,16 +657,57 @@ class LocalConnection(object):
         return '%s(%s@%s:%i)' % (self.__class__.__name__, self.username, self.hostname, self.port)
 
     def close(self):
+        for tmp in self._temp_files:
+            tmp.close()
         self.sudo_session = None
+
+    def create_temp_file(self, data, mode=0o600):
+        ret = None
+        try:
+            tmpfile = tempfile.NamedTemporaryFile(delete=False)
+            tmpfile.write(data.encode())
+            ret = ConnectionTempFile(self, tmpfile.name)
+            tmpfile.close()
+            os.chmod(tmpfile.name, mode)
+            self._temp_files.append(ret)
+        except IOError:
+            pass
+        return ret
+
+    def delete_temp_file(self, tmpfile):
+        ret = True
+        if tmpfile.name is not None:
+            if os.path.isfile(tmpfile.name):
+                os.unlink(tmpfile.name)
+            tmpfile.name = None
+        return ret
+
+    def to_commandline(self, args, env=None, sudo=False):
+        if self.sudo_session and sudo:
+            return self.sudo_session.to_commandline(args, env)
+        else:
+            return to_commandline([args] if isinstance(args, str) else args, env=env)
 
     def runcmdAndGetData(self, args=[], script=None,
                 useTerminal=False, sudo=False,
                 outputStdErr=False, outputStdOut=False,
-                stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None):
+                stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None,
+                allocateTerminal=False, x11Forwarding=False, cwd=None, env=None,
+                quote_char='\''):
+
+        if useTerminal:
+            used_stdin = sys.stdin if stdin is None else stdin
+            used_stdout = sys.stdout if stdout is None else stdout
+            used_stderr = sys.stderr if stderr is None else stderr
+        else:
+            used_stdin = None
+            used_stdout = None
+            used_stderr = None
 
         if not sudo:
             return runcmdAndGetData(args, script=script, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
-                                    stdin=stdin, stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout, input=input, cwd=cwd, env=env)
+                                    stdin=used_stdin, stdout=used_stdout, stderr=used_stderr, stderr_to_stdout=stderr_to_stdout,
+                                    input=input, cwd=cwd, env=env)
         elif self.sudo_session is None:
             # No sudo session available, so failure immediately
             raise SudoSessionException(self, 'No sudo session available')
@@ -560,7 +719,7 @@ class LocalConnection(object):
                 real_env[k] = v
 
             return runcmdAndGetData(real_args, script=script, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
-                                    stdin=stdin, stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout, input=input, cwd=cwd, env=real_env)
+                                    stdin=used_stdin, stdout=used_stdout, stderr=used_stderr, stderr_to_stdout=stderr_to_stdout, input=input, cwd=cwd, env=real_env)
 
 class LocalSudoSession(SudoSessionBase):
     def __init__(self, cxn, sudo_password=None):
@@ -574,7 +733,6 @@ class LocalSudoSession(SudoSessionBase):
     def start(self):
         self.close()
         ret = True
-
         try:
             tmpfile = tempfile.NamedTemporaryFile(delete=False)
             s = "#!/bin/sh\necho \"%s\"\n" % self.sudo_password
@@ -598,3 +756,141 @@ class LocalSudoSession(SudoSessionBase):
                 pass
         self.sudo_command = None
         return True
+
+class ScreenSession(object):
+
+    DEFAULT_CONFIG = {
+        'startup_message': 'off',
+        'deflogin': 'on',
+        'vbell': 'off',
+        'vbell_msg': '\'Bell!\'',
+        'defscrollback': 100000,
+        'defnonblock': 5,
+        'bind': ['^k','^\\', '\\\\ quit', 'K kill', 'I login on', 'O login off', '} history'],
+        'hardstatus': 'alwayslastline',
+        'hardstatus string': '\'%{= kG}[ %{G}%H %{g}][%= %{=kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B}%Y-%m-%d %{W}%c %{g}]\'',
+        'termcapinfo': [
+            'vt100 dl=5\\E[M',
+            'xterm*|rxvt*|kterm*|Eterm* hs:ts=\\E]0;:fs=\\007:ds=\\E]0;\\007',
+            'xterm*|linux*|rxvt*|Eterm* OP',
+            'xterm \'is=\\E[r\\E[m\\E[2J\\E[H\\E[?7h\\E[?1;4;6l\'',
+            'xterm|xterms|xs|rxvt ti@:te@'
+            ],
+        }
+
+    def __init__(self, cxn, name=None, sudo=None, config=None):
+        self._cxn = cxn
+        self._sudo = sudo
+        if name is None:
+            self._name = '%s@%s' % (self.__class__.__name__, gethostname(fqdn=True))
+        else:
+            self._name = name
+        self._config = config if config else self.DEFAULT_CONFIG
+        self._config_file = None
+        if self._cxn is not None:
+            self.start()
+
+    def __del__(self):
+        self.close()
+        if self._config_file is not None:
+            self._config_file.close()
+
+    @property
+    def verbose(self):
+        return self._cxn.verbose
+
+    @property
+    def connection(self):
+        return self._cxn
+
+    def start(self, detached=True):
+        args=['screen', '-S', self._name]
+        if detached:
+            args.append('-d')
+            args.append('-m')
+        if self._config:
+            config_data = ''
+            if isinstance(self._config, dict):
+                for k,v in self._config.items():
+                    if isinstance(v, list):
+                        for li in v:
+                            config_data += '%s %s\n' % (k,li)
+                    else:
+                        config_data += '%s %s\n' % (k,v)
+            self._config_file = self._cxn.create_temp_file(config_data)
+
+        if self._config_file:
+            args.append('-c')
+            args.append(self._config_file.name)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=args, allocateTerminal=True)
+        ret = True if sts == 0 else False
+        return ret
+
+    def _send_command(self, args, window_number=-1):
+        real_args=['screen']
+        if self._config_file:
+            real_args.append('-c')
+            real_args.append(self._config_file.name)
+        real_args.append('-S')
+        real_args.append(self._name)
+        if window_number != -1:
+            real_args.append('-p')
+            real_args.append('%i' % window_number)
+        real_args.append('-X')
+        real_args.extend(args)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=real_args)
+        ret = True if sts == 0 else False
+        return ret
+
+    def quit(self):
+        return self._send_command(['quit'])
+
+    def close(self):
+        return self.quit()
+
+    def logfile(self, filename, window_number=-1):
+        return self._send_command(['logfile', filename], window_number)
+
+    def log(self, value, window_number=-1):
+        return self._send_command(['log', 'on' if value else 'off'], window_number)
+
+    def echo(self, message, window_number=-1):
+        return self._send_command(['echo', message], window_number)
+
+    def stuff(self, data, window_number=0):
+        return self._send_command(['stuff', data], window_number)
+
+    def runcmdAndGetData(self, args=[], script=None,
+                useTerminal=False, sudo=False, shell='/bin/sh',
+                outputStdErr=False, outputStdOut=False,
+                stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None,
+                allocateTerminal=False, x11Forwarding=False,
+                quote_char='\'', window_number=-1):
+
+        real_args=['screen']
+        if self._config_file:
+            real_args.append('-c')
+            real_args.append(self._config_file.name)
+        real_args.append('-S')
+        real_args.append(self._name)
+        if window_number != -1:
+            real_args.append('-p')
+            real_args.append('%i' % window_number)
+
+        script_file = None
+        if script is None:
+            real_args.extend(args)
+        else:
+            script_file = self._cxn.create_temp_file(script)
+            real_args.append(shell)
+            real_args.append(script_file.name)
+
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=real_args, sudo=sudo,
+                                                           outputStdErr=outputStdErr, outputStdOut=outputStdOut,
+                                                            stdin=stdin, stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout,
+                                                            useTerminal=useTerminal, allocateTerminal=allocateTerminal, x11Forwarding=x11Forwarding,
+                                                            input=input, cwd=cwd, env=env, quote_char=quote_char)
+        if script_file:
+            script_file.close()
+
+        return (sts, stdout, stderr)

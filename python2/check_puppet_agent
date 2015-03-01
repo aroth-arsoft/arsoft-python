@@ -62,14 +62,14 @@ if running:
         exit_code = CRITICAL
         exit_message = 'Puppet agent not running'
     else:
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/puppet', ['--version'], env={'HOME':'/tmp', 'LANG':'C'})
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/usr/bin/puppet', '--version'], env={'HOME':'/tmp', 'LANG':'C'})
         if sts == 0:
             puppet_version_str = stdoutdata.strip()
             puppet_version = version_str_to_num(puppet_version_str)
             minversion = version_str_to_num(np['minversion'])
 
             if puppet_version > minversion:
-                (sts, stdoutdata, stderrdata) = runcmdAndGetData('/usr/bin/sudo', ['/bin/cat', np['statefile'] ])
+                (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/usr/bin/sudo', '/bin/cat', np['statefile'] ])
                 if sts == 0:
                     now = time.time()
                     last_run_summary = yaml.load(stdoutdata)
