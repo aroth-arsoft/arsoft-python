@@ -16,6 +16,7 @@ class Rsync(object):
                  recursive=True, relative=False,
                  preservePermissions=True, preserveOwner=True, preserveGroup=True, preserveTimes=True, 
                  preserveDevices=True, preserveSpecials=True, perserveACL=False, preserveXAttrs=False,
+                 numericIds=True,
                  verbose=False, compress=True, links=True, dryrun=False,
                  delete=False, deleteExcluded=False, force=False, delayUpdates=False,
                  rsh=None, bandwidthLimit=None,
@@ -38,6 +39,7 @@ class Rsync(object):
         self.preserveSpecials = preserveSpecials
         self.perserveACL = perserveACL
         self.preserveXAttrs = preserveXAttrs
+        self.numericIds = numericIds
         self.delete = delete
         self.deleteExcluded = deleteExcluded
         self.force = force
@@ -101,6 +103,8 @@ class Rsync(object):
             args.append('--delay-updates')
         if self.dryrun:
             args.append('--dry-run')
+        if self.numericIds:
+            args.append('--numeric-ids')
         if self.rsh:
             args.append('--rsh=' + str(self.rsh))
         elif self.use_ssh:
