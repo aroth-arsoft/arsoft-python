@@ -336,53 +336,58 @@ class BackupApp(object):
         return self.previous_backups.load(self._real_backup_dir, current_session=self.session)
 
     def prepare_destination(self, create_backup_dir=False):
-        # load all available external discs
-        disk_ready = self._diskmgr.is_disk_ready()
-        if not disk_ready:
-            if not self._diskmgr.load():
-                self.session.writelog('Failed to load external discs')
-                sys.stderr.write('Failed to load external discs\n')
-                ret = 1
-            else:
-                self.session.writelog('Waiting for disk for %f seconds' % self.config.disk_timeout)
-                self._disk_obj = self._diskmgr.wait_for_disk(timeout=self.config.disk_timeout)
-                if self._disk_obj:
-                    self.disk_loaded = True
-                    disk_ready = True
-        else:
-            # just get the present disk
-            self._disk_obj = self._diskmgr.get_disk()
-
-        if disk_ready:
-            ret = True
-            # use configure backup directory as fallback (or for disk-less backups)
+        if Rsync.is_rsync_url(self.config.backup_directory):
+            # backup using rsync, so no disk required
             self._real_backup_dir = self.config.backup_directory
-            if self._disk_obj is None:
-                # no disk required for this backup
-                pass
-            else:
-                # get the mount path of the backup disk and use it as
-                # real backup directory
-                mountpath = self._diskmgr.get_disk_mountpath(self._disk_obj)
-                if mountpath:
-                    self._real_backup_dir = mountpath
-                    self.session.writelog('Disk already available and mount to %s' % mountpath)
-                else:
-                    (result, mountpath) = self._diskmgr.disk_mount(self._disk_obj)
-                    if result:
-                        self.disk_mounted = True
-                        self._real_backup_dir = mountpath
-                        self.session.writelog('Disk mount to %s' % str(mountpath))
-                        self.plugin_notify_disk_mount()
-                    else:
-                        self.session.writelog('Failed to mount disk')
-                        ret = False
-            if ret:
-                self.plugin_notify_disk_ready()
-                if create_backup_dir:
-                    ret = self._prepare_backup_dir()
+            ret = True
         else:
-            ret = False
+            # load all available external discs
+            disk_ready = self._diskmgr.is_disk_ready()
+            if not disk_ready:
+                if not self._diskmgr.load():
+                    self.session.writelog('Failed to load external discs')
+                    sys.stderr.write('Failed to load external discs\n')
+                    ret = 1
+                else:
+                    self.session.writelog('Waiting for disk for %f seconds' % self.config.disk_timeout)
+                    self._disk_obj = self._diskmgr.wait_for_disk(timeout=self.config.disk_timeout)
+                    if self._disk_obj:
+                        self.disk_loaded = True
+                        disk_ready = True
+            else:
+                # just get the present disk
+                self._disk_obj = self._diskmgr.get_disk()
+
+            if disk_ready:
+                ret = True
+                # use configure backup directory as fallback (or for disk-less backups)
+                self._real_backup_dir = self.config.backup_directory
+                if self._disk_obj is None:
+                    # no disk required for this backup
+                    pass
+                else:
+                    # get the mount path of the backup disk and use it as
+                    # real backup directory
+                    mountpath = self._diskmgr.get_disk_mountpath(self._disk_obj)
+                    if mountpath:
+                        self._real_backup_dir = mountpath
+                        self.session.writelog('Disk already available and mount to %s' % mountpath)
+                    else:
+                        (result, mountpath) = self._diskmgr.disk_mount(self._disk_obj)
+                        if result:
+                            self.disk_mounted = True
+                            self._real_backup_dir = mountpath
+                            self.session.writelog('Disk mount to %s' % str(mountpath))
+                            self.plugin_notify_disk_mount()
+                        else:
+                            self.session.writelog('Failed to mount disk')
+                            ret = False
+                if ret:
+                    self.plugin_notify_disk_ready()
+                    if create_backup_dir:
+                        ret = self._prepare_backup_dir()
+            else:
+                ret = False
         return ret
     
     def manage_retention(self):

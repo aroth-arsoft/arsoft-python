@@ -42,7 +42,7 @@ class ARSoftBackupApp(BackupApp):
     
     def _do_rsync(self):
         backup_dir = self.session.backup_dir
-        if backup_dir is None:
+        if backup_dir is None or not backup_dir:
             return False
 
         previous_backup_dir = None
@@ -59,8 +59,7 @@ class ARSoftBackupApp(BackupApp):
                 if self._verbose:
                     print('Previous backups have not been loaded.')
 
-
-        if backup_dir[-1] != '/':
+        if backup_dir and backup_dir[-1] != '/':
             backup_dir += '/'
 
         # build the final filelist (include and exclude)
