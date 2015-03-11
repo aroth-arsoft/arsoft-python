@@ -5,11 +5,113 @@
 import tempfile
 from .filelist import *
 from .utils import runcmdAndGetData
+from .timestamp import strptime_as_timestamp
 import urlparse
 import sys
+import stat
 
 class RsyncDefaults(object):
     RSYNC_BIN = '/usr/bin/rsync'
+
+class rsync_stat_result(object):
+
+    @staticmethod
+    def str_mode2mode(str):
+        ret = 0
+        if str[0] == 'd':
+            ret += stat.S_IFDIR
+        elif str[0] == 's':
+            ret += stat.S_IFSOCK
+        elif str[0] == 'l':
+            ret += stat.S_IFLNK
+        else:
+            ret += stat.S_IFREG
+        if str[1] == 'r':
+            ret += stat.S_IRUSR
+        if str[2] == 'w':
+            ret += stat.S_IWUSR
+        if str[3] == 'x':
+            ret += stat.S_IXUSR
+        if str[4] == 'r':
+            ret += stat.S_IRGRP
+        if str[5] == 'w':
+            ret += stat.S_IWGRP
+        if str[6] == 'x':
+            ret += stat.S_IXGRP
+        if str[7] == 'r':
+            ret += stat.S_IROTH
+        if str[8] == 'w':
+            ret += stat.S_IWOTH
+        if str[9] == 'x':
+            ret += stat.S_IXOTH
+        return ret
+
+    @staticmethod
+    def str_size2size(str, base=10, default_value=0):
+        try:
+            ret = int(str.replace(',', ''), base)
+        except ValueError:
+            ret = default_value
+        return ret
+
+    @staticmethod
+    def str_mode2mode(str):
+        ret = 0
+        if str[0] == 'd':
+            ret += stat.S_IFDIR
+        elif str[0] == 's':
+            ret += stat.S_IFSOCK
+        elif str[0] == 'l':
+            ret += stat.S_IFLNK
+        else:
+            ret += stat.S_IFREG
+        if str[1] == 'r':
+            ret += stat.S_IRUSR
+        if str[2] == 'w':
+            ret += stat.S_IWUSR
+        if str[3] == 'x':
+            ret += stat.S_IXUSR
+        if str[4] == 'r':
+            ret += stat.S_IRGRP
+        if str[5] == 'w':
+            ret += stat.S_IWGRP
+        if str[6] == 'x':
+            ret += stat.S_IXGRP
+        if str[7] == 'r':
+            ret += stat.S_IROTH
+        if str[8] == 'w':
+            ret += stat.S_IWOTH
+        if str[9] == 'x':
+            ret += stat.S_IXOTH
+        return ret
+
+        return ret
+
+    def __init__(self, mode, size, date, time):
+        self.st_mode = rsync_stat_result.str_mode2mode(mode)
+        self.st_ino=0
+        self.st_dev=0
+        self.st_nlink=0
+        self.st_uid=0
+        self.st_gid=0
+        self.st_size = rsync_stat_result.str_size2size(size)
+        self.st_atime=0
+        self.st_mtime = strptime_as_timestamp(date + ' ' + time, '%Y/%m/%d %H:%M:%S')
+        self.st_ctime=0
+
+    def __str__(self):
+        return 'rsync_stat_result(st_mode=%i, st_ino=%i, st_dev=%i, st_nlink=%i, st_uid=%i, st_gid=%i, st_size=%i, st_atime=%i, st_mtime=%i, st_ctime=%i)' % (
+            self.st_mode,
+            self.st_ino,
+            self.st_dev,
+            self.st_nlink,
+            self.st_uid,
+            self.st_gid,
+            self.st_size,
+            self.st_atime,
+            self.st_mtime,
+            self.st_ctime
+            )
 
 class Rsync(object):
     def __init__(self, source, dest, include=None, exclude=None, linkDest=None,
@@ -19,6 +121,7 @@ class Rsync(object):
                  numericIds=True,
                  verbose=False, compress=True, links=True, dryrun=False,
                  delete=False, deleteExcluded=False, force=False, delayUpdates=False,
+                 listOnly=False,
                  rsh=None, bandwidthLimit=None,
                  use_ssh=False, ssh_key=None,
                  rsync_bin=RsyncDefaults.RSYNC_BIN):
@@ -49,14 +152,17 @@ class Rsync(object):
         self.use_ssh = use_ssh
         self.ssh_key = ssh_key
         self.bandwidthLimit = bandwidthLimit
+        self.listOnly = listOnly
         self._include = include
         self._exclude = exclude
 
-    def execute(self, stdout=None, stderr=None, stderr_to_stdout=False):
-        if self._source is None or \
-            (isinstance(self._source, str) and len(self._source) == 0) or \
-            (isinstance(self._source, FileList) and self._source.empty()):
-            raise ValueError('invalid source file or directory %s'%(str(self._source)))
+    def executeRaw(self, stdout=None, stderr=None, stderr_to_stdout=False):
+
+        if self.listOnly == False:
+            if self._source is None or \
+                (isinstance(self._source, str) and len(self._source) == 0) or \
+                (isinstance(self._source, FileList) and self._source.empty()):
+                raise ValueError('invalid source file or directory %s'%(str(self._source)))
 
         if self._dest is None or \
             (isinstance(self._dest, str) and len(self._dest) == 0) or \
@@ -103,6 +209,8 @@ class Rsync(object):
             args.append('--delay-updates')
         if self.dryrun:
             args.append('--dry-run')
+        if self.listOnly:
+            args.append('--list-only')
         if self.numericIds:
             args.append('--numeric-ids')
         if self.rsh:
@@ -160,11 +268,11 @@ class Rsync(object):
             if self.verbose:
                 print('Source=[%s]' % self._source)
         else:
-            args.append(self._source)
+            if not self.listOnly:
+                args.append(self._source)
         args.append(self._normalize_url(self._dest))
 
         (status_code, stdout_data, stderr_data) = runcmdAndGetData([self._rsync_bin] + args, stdout=stdout, stderr_to_stdout=stderr_to_stdout, verbose=self.verbose)
-        ret = True if status_code == 0 else False
 
         if tmp_include:
             os.remove(tmp_include)
@@ -172,7 +280,11 @@ class Rsync(object):
             os.remove(tmp_exclude)
         if tmp_source:
             os.remove(tmp_source)
-        return ret
+        return (status_code, stdout_data, stderr_data)
+
+    def execute(self, stdout=None, stderr=None, stderr_to_stdout=False):
+        (status_code, stdout_data, stderr_data) = self.executeRaw(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout)
+        return True if status_code == 0 else False
 
     @staticmethod
     def _normalize_url(url):
@@ -240,28 +352,60 @@ class Rsync(object):
         return ret
 
     @staticmethod
-    def sync_directories(source_dir, target_dir, recursive=True, relative=True, exclude=None, delete=True, deleteExcluded=True, stdout=None, stderr=None, stderr_to_stdout=False, verbose=False):
-        r = Rsync(source=source_dir, dest=target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete, deleteExcluded=deleteExcluded, verbose=verbose)
+    def sync_directories(source_dir, target_dir, recursive=True, relative=True, exclude=None, delete=True, deleteExcluded=True, stdout=None, stderr=None, stderr_to_stdout=False,
+                         use_ssh=False, ssh_key=None,
+                         verbose=False):
+        r = Rsync(source=source_dir, dest=target_dir, recursive=recursive, relative=relative, exclude=exclude,
+                  delete=delete, deleteExcluded=deleteExcluded, verbose=verbose,
+                  use_ssh=use_ssh, ssh_key=ssh_key)
         return r.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout)
 
     @staticmethod
-    def sync_file(source_file, target_file, relative=True, exclude=None, stdout=None, stderr=None, stderr_to_stdout=False, verbose=False):
+    def sync_file(source_file, target_file, relative=True, exclude=None, stdout=None, stderr=None, stderr_to_stdout=False,
+                  use_ssh=False, ssh_key=None,
+                  verbose=False):
         # first we must create the target directory
         target_dir = os.path.dirname(target_file)
         if target_dir[-1] != '/':
             target_dir += '/'
-        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False, verbose=verbose)
+        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False, use_ssh=use_ssh, ssh_key=ssh_key, verbose=verbose)
         if rdir.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout):
             # when the directory exists we can copy the file
-            r = Rsync(source=source_file, dest=target_file, recursive=False, relative=False, verbose=verbose, exclude=exclude)
+            r = Rsync(source=source_file, dest=target_file, recursive=False, relative=False, verbose=verbose, use_ssh=use_ssh, ssh_key=ssh_key, exclude=exclude)
             return r.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout)
         else:
             return False
 
-if __name__ == "__main__":
-    app = Rsync(sys.argv[1], sys.argv[2])
+    @staticmethod
+    def listdir(target_dir, use_ssh=False, ssh_key=None, verbose=False):
+        if target_dir[-1] != '/':
+            target_dir += '/'
+        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False, listOnly=True, use_ssh=use_ssh, ssh_key=ssh_key, verbose=False)
+        (status_code, stdout_data, stderr_data) = rdir.executeRaw(stdout=None, stderr=None, stderr_to_stdout=False)
 
-    if app.execute():
-        print('successful')
-    else:
-        print('failed')
+        ret = None
+        if status_code == 0:
+            ret = {}
+            for line in stdout_data.decode('utf-8').splitlines():
+                if not line:
+                    continue
+                #print(line)
+                elems = [item for item in line.split(' ') if item]
+                if len(elems) >= 5:
+                    mode, size, date, time = elems[0:4]
+                    filename = ' '.join(elems[4:])
+                    #print(mode, 'size=%s<<' % size, date, time)
+                    ret[filename] = rsync_stat_result(mode, size, date, time)
+        return ret
+
+if __name__ == "__main__":
+    files = Rsync.listdir(sys.argv[1], use_ssh=True, ssh_key=sys.argv[2], verbose=True)
+    if files is not None:
+        for f, s in files.items():
+            print(f, s)
+    #app = Rsync(sys.argv[1], sys.argv[2])
+
+    #if app.execute():
+        #print('successful')
+    #else:
+        #print('failed')

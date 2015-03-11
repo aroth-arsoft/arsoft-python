@@ -395,11 +395,22 @@ def getlogin():
             username = os.getlogin()
     return username
 
+class log_collector(object):
+    def __init__(self, data=None):
+        self.data = [] if not data else data
+
+    def __call__(self, line):
+        self.data.append(line)
+
+    def __str__(self):
+        return '\n'.join(self.data)
+
 class logfile_writer_proxy(object):
     def __init__(self, writer, prefix=None, add_timestamp=True):
         self._writer = writer
         self._prefix = prefix
         self._add_timestamp = True
+        self._notifiers = []
 
     def current_timestamp(self, timestamp=None):
         if timestamp is None:
@@ -407,6 +418,17 @@ class logfile_writer_proxy(object):
         else:
             now = datetime.datetime.fromtimestamp(timestamp)
         return now.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    def add_notify(self, fun):
+        self._notifiers.append(fun)
+
+    def remove_notify(self, fun):
+        try:
+            self._notifiers.remove(fun)
+        except ValueError:
+            pass
+        except AttributeError:
+            pass
 
     def __call__(self, line):
         self._write_line(line)
@@ -420,9 +442,12 @@ class logfile_writer_proxy(object):
         else:
             full = line + '\n'
         if self._add_timestamp:
-            self._writer.write(self.current_timestamp() + '\t' + full)
+            msg = self.current_timestamp() + '\t' + full
         else:
-            self._writer.write(full)
+            msg = full
+        self._writer.write(msg)
+        for n in self._notifiers:
+            n(msg)
 
 def hexstring(buf):
     return ' '.join(x.encode('hex') for x in buf)

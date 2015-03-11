@@ -60,9 +60,11 @@ class BackupList(object):
             else:
                 ret = False
         elif ssh_remote_backup_dir is not None:
-            remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
-                        username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password, 
-                        keyfile=self.config.ssh_identity_file, verbose=self.app.verbose)
+            #remote_items = ssh_listdir(server=ssh_remote_backup_dir.hostname, directory=ssh_remote_backup_dir.path,
+                        #username=ssh_remote_backup_dir.username, password=ssh_remote_backup_dir.password,
+                        #keyfile=self.config.ssh_identity_file, verbose=self.app.verbose)
+            remote_items = Rsync.listdir(backup_dir,
+                                         use_ssh=True, ssh_key=self.config.ssh_identity_file, verbose=self.app.verbose)
             if remote_items:
                 found_backup_dirs = []
                 for item, item_stat in remote_items.items():
@@ -316,7 +318,8 @@ class BackupApp(object):
             if Rsync.is_rsync_url(backup_dir):
                 # assume the given URL is good and there's no backup disk for
                 # remote backups
-                pass
+                self.session.backup_dir = backup_dir
+                self.session.backup_disk = None
             else:
                 if not BackupApp._mkdir(backup_dir):
                     self.session.writelog('Failed to create backup directory %s' % backup_dir)
@@ -339,6 +342,8 @@ class BackupApp(object):
         if Rsync.is_rsync_url(self.config.backup_directory):
             # backup using rsync, so no disk required
             self._real_backup_dir = self.config.backup_directory
+            if create_backup_dir:
+                ret = self._prepare_backup_dir()
             ret = True
         else:
             # load all available external discs

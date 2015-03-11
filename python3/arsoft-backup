@@ -10,6 +10,7 @@ from arsoft.backup.BackupApp import BackupApp
 from arsoft.backup.BackupConfig import BackupConfig
 from arsoft.filelist import FileList, FileListItem
 from arsoft.rsync import Rsync
+from arsoft.utils import log_collector
 
 class ARSoftBackupApp(BackupApp):
 
@@ -42,8 +43,11 @@ class ARSoftBackupApp(BackupApp):
     
     def _do_rsync(self):
         backup_dir = self.session.backup_dir
+        print(self.session)
         if backup_dir is None or not backup_dir:
-            return False
+            if self._verbose:
+                print('No backup directory.')
+            return False, 'No backup directory.'
 
         previous_backup_dir = None
         if self.config.use_filesystem_hardlinks:
@@ -78,12 +82,18 @@ class ARSoftBackupApp(BackupApp):
                 linkDest = previous_backup_dir
             else:
                 linkDest = None
+
+            lc = log_collector()
+            self.session.logfile_proxy.add_notify(lc)
+
             my_stdout = self.session.logfile_proxy
             inst = Rsync(source=source_filelist_include, dest=backup_dir, linkDest=previous_backup_dir, exclude=source_filelist_exclude,
                          delete=True, deleteExcluded=True, 
                          use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
                          dryrun=self._dryrun, verbose=self._verbose)
             ret = inst.execute(stdout=my_stdout, stderr_to_stdout=True)
+            self.session.logfile_proxy.remove_notify(lc)
+            print(str(lc))
         else:
             # everything OK since there is nothing to do
             ret = True

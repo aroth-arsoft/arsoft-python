@@ -336,6 +336,39 @@ def strptime_as_datetime(timestamp, format):
         ret = datetime.fromtimestamp(time.mktime(t))
     return ret
 
+def strptime_as_timestamp(timestamp, format):
+    tzoffset = None
+    if '%z' in format:
+        data = timestamp.split(' ')
+        tz = data[-1].upper()
+        tz = tz.upper()
+        if tz in _timezones:
+            tzoffset = _timezones[tz]
+        else:
+            try:
+                tzoffset = int(tz)
+            except ValueError:
+                pass
+        # Convert a timezone offset into seconds ; -0500 -> -18000
+        if tzoffset:
+            if tzoffset < 0:
+                tzsign = -1
+                tzoffset = -tzoffset
+            else:
+                tzsign = 1
+            tzoffset = tzsign * ( (tzoffset//100)*60 + (tzoffset % 100))
+        format = format.replace(' %z', '')
+        format = format.replace('%z', '')
+        timestamp = ' '.join(data[:-1])
+    t = time.strptime(timestamp, format)
+    if t is None:
+        return None
+    if tzoffset is not None:
+        ret = time.mktime(t)
+    else:
+        ret = time.mktime(t)
+    return ret
+
 if __name__ == "__main__":
 
     now = time.time()
