@@ -23,6 +23,10 @@ class GitBackupPluginConfig(BackupPluginConfig):
             return self.url.startswith('ssh://')
 
         @property
+        def is_http(self):
+            return self.url.startswith('ssh://')
+
+        @property
         def is_remote(self):
             idx = self.url.find('://')
             ret = True if idx > 0 else False
