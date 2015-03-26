@@ -19,7 +19,7 @@ Package: python3-arsoft
 Section: python
 Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp, python3-magic,
- python3-openssl, python3-dnspython
+ python3-openssl, python3-dnspython, python3-dbus
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 
