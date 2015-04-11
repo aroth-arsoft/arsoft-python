@@ -1,3 +1,9 @@
+arsoft-python (1.205) vivid; urgency=medium
+
+  * check_mk: fritzbox DDNS checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 11 Apr 2015 16:56:13 +0200
+
 arsoft-python (1.204) utopic; urgency=medium
 
   * fixed rsync backup
