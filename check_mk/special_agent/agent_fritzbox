@@ -48,6 +48,14 @@
 
 import getopt, sys, socket, urllib2, traceback, re, pprint
 
+import arsoft.dnsutils
+import dns.resolver
+import os
+
+def include(filename):
+    if os.path.exists(filename):
+        execfile(filename)
+
 def usage():
     sys.stderr.write("""Check_MK Fritz!Box Agent
 
@@ -65,17 +73,26 @@ OPTIONS:
                                 each API query.
   --debug                       Debug mode: let Python exceptions come through
   -o, --pre-v6                  Use old uPNP URL for device with Fritz OS < 6
+  --ddns=HOSTNAME               dynamic DNS name which is checked against the
+                                external IP address
+  -H HOSTNAME                   name of the host to be checked. Used to retrieve
+                                the list of DDNS names.
+  -C cfgfile                    name of an alternative config file. default is
+                                /etc/check_mk/main.mk
 """)
 
-short_options = 'h:t:d:o'
+short_options = 'hdot:H:C:'
 long_options  = [
-    'help', 'timeout=', 'debug', 'pre-v6'
+    'help', 'timeout=', 'debug', 'pre-v6', 'ddns='
 ]
 
 host_address      = None
 opt_debug         = False
 opt_timeout       = 10
 opt_pre_v6        = False
+opt_ddns          = []
+opt_host          = None
+opt_cfgfile       = None
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
@@ -90,18 +107,34 @@ for o,a in opts:
         opt_timeout = int(a)
     elif o in [ '-o', '--pre-v6' ]:
         opt_pre_v6 = True
+    elif o in [ '--ddns' ]:
+        opt_ddns.append(a)
+    elif o in [ '-H' ]:
+        opt_host = a
+        if host_address is None:
+            host_address = a
+    elif o in [ '-C' ]:
+        opt_cfgfile = a
     elif o in [ '-h', '--help' ]:
         usage()
         sys.exit(0)
 
-if len(args) == 1:
+if host_address is None:
+    if len(args) == 1:
+        host_address = args[0]
+    elif not args:
+        sys.stderr.write("ERROR: No host given.\n")
+        sys.exit(1)
+    else:
+        sys.stderr.write("ERROR: Please specify exactly one host.\n")
+        sys.exit(1)
+elif len(args) == 1:
     host_address = args[0]
-elif not args:
-    sys.stderr.write("ERROR: No host given.\n")
-    sys.exit(1)
-else:
-    sys.stderr.write("ERROR: Please specify exactly one host.\n")
-    sys.exit(1)
+
+if opt_cfgfile is None:
+    opt_cfgfile = '/etc/check_mk/main.mk'
+
+include(opt_cfgfile)
 
 socket.setdefaulttimeout(opt_timeout)
 
@@ -177,6 +210,28 @@ def get_upnp_info(control, namespace, action, pre_v6=False):
 
     return attrs
 
+def check_ddns_status(dnsserver_ip, names=[], external_ip=None):
+    results = {}
+    if dnsserver_ip:
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = [dnsserver_ip]
+    else:
+        resolver = None
+    for name in names:
+        answers = []
+        if resolver is not None:
+            rtype = dns.rdatatype.AAAA if name.startswith('ipv6:') else dns.rdatatype.A
+            try:
+                answers = resolver.query(name, rtype)
+            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                pass
+        r = []
+        for rdata in answers:
+            r.append(str(rdata))
+        name_ok = True if external_ip in r else False
+        results[name] = (name_ok, ','.join(r) )
+    return results
+
 try:
     status = {}
     for control, namespace, action in [
@@ -201,6 +256,14 @@ try:
     sys.stdout.write('<<<fritz:sep(59)>>>\n')
     for key, value in status.items():
         sys.stdout.write('%s;%s\n' % (key, value))
+
+    sys.stdout.write('<<<fritz_ddns:sep(59)>>>\n')
+    first_dns_server = status['NewDNSServer1'] if 'NewDNSServer1' in status else None
+    external_ip = status['NewExternalIPAddress'] if 'NewExternalIPAddress' in status else None
+    ddns_status = check_ddns_status(first_dns_server, names=opt_ddns, external_ip=external_ip)
+    for key, (name_ok, value) in ddns_status.items():
+        sys.stdout.write('ddns_%s;%s\n' % (key, value))
+        sys.stdout.write('ddns_%s_ok;%s\n' % (key, name_ok))
 
 except:
     if opt_debug:
