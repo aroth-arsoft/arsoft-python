@@ -31,10 +31,13 @@ np.add_value('precip_today', 'precipitation today', 'precipitation today', units
 np.add_value('observation_age', 'observation age', 'age of observation in seconds', units='s', has_argument=False, value=0)
 
 station_id = np['station']
-current_observation_url='http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID=' + station_id
+current_observation_url='http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID=' + str(station_id)
 
-response = urllib.request.urlopen(current_observation_url)
-current_observation = bytes(response.read()).decode(encoding='utf-8')
+if station_id:
+    response = urllib.request.urlopen(current_observation_url)
+    current_observation = bytes(response.read()).decode(encoding='utf-8')
+else:
+    current_observation = None
 
 def _get_node_float(root, name, default=0):
     node = root.find(name)
