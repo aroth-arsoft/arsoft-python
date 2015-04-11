@@ -185,6 +185,8 @@ try:
         ('WANCommonIFC1', 'urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetAddonInfos'),
         ('WANCommonIFC1', 'urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1', 'GetCommonLinkProperties'),
         ('WANDSLLinkC1', 'urn:schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDSLLinkInfo'),
+        ('WANDSLLinkC1', 'urn:schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetModulationType'),
+        ('WANDSLLinkC1', 'urn:schemas-upnp-org:service:WANDSLLinkConfig:1', 'GetDestinationAddress'),
         ]:
         try:
             status.update(get_upnp_info(control, namespace, action, opt_pre_v6))
@@ -196,9 +198,9 @@ try:
     sys.stdout.write('Version: %s\n' % g_version)
     sys.stdout.write('AgentOS: %s\n' % g_device)
 
-    sys.stdout.write('<<<fritz>>>\n')
+    sys.stdout.write('<<<fritz:sep(59)>>>\n')
     for key, value in status.items():
-        sys.stdout.write('%s %s\n' % (key, value))
+        sys.stdout.write('%s;%s\n' % (key, value))
 
 except:
     if opt_debug:
