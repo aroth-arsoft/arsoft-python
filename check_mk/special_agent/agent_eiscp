@@ -2,7 +2,7 @@
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 
 import getopt, sys
-from arsoft.eiscp.core import eISCP, command_to_iscp, iscp_to_command
+from arsoft.eiscp.core import eISCP, eISCPTimeoutError, command_to_iscp, iscp_to_command
 
 def usage():
     sys.stderr.write("""Check_MK eISCP Agent
@@ -164,6 +164,9 @@ sys.stdout.write('AgentOS: eISCP\n')
 
 sys.stdout.write('<<<eiscp:sep(59)>>>\n')
 net = eISCP(host_address, opt_port)
-for key, (cmd, resp_func) in status_maps.iteritems():
-    response = net.raw(cmd + '\r\n')      #write a string
-    sys.stdout.write('%s;%s\n' % (key, resp_func(response)))
+try:
+    for key, (cmd, resp_func) in status_maps.iteritems():
+        response = net.raw(cmd + '\r\n')      #write a string
+        sys.stdout.write('%s;%s\n' % (key, resp_func(response)))
+except eISCPTimeoutError:
+    pass

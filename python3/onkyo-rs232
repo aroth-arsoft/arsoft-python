@@ -7,7 +7,7 @@
 import sys, time
 import argparse
 import re
-from arsoft.eiscp.core import eISCP, command_to_iscp, iscp_to_command
+from arsoft.eiscp.core import eISCP, eISCPTimeoutError, command_to_iscp, iscp_to_command
 
 __version__ = '1.0'
 
@@ -311,13 +311,16 @@ class OnkyoRS232(object):
                     if raw_cmd:
                         if self.verbose:
                             print("send %s" % raw_cmd)
-                        response = self.net.raw(raw_cmd + '\r\n')      #write a string
-                        if raw_cmd[3] == 'Q':
-                            #response = iscp_to_command(response)
-                            if not self.quiet:
-                                sys.stdout.write(str(response))
-                        elif cmd_in_progress + 1 < num_commands:
-                            time.sleep(0.2)
+                        try:
+                            response = self.net.raw(raw_cmd + '\r\n')      #write a string
+                            if raw_cmd[3] == 'Q':
+                                #response = iscp_to_command(response)
+                                if not self.quiet:
+                                    sys.stdout.write(str(response))
+                            elif cmd_in_progress + 1 < num_commands:
+                                time.sleep(0.2)
+                        except eISCPTimeoutError:
+                            pass
                     cmd_in_progress = cmd_in_progress + 1
                 self.net.disconnect()
             ret = 0

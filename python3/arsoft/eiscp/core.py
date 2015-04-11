@@ -234,8 +234,15 @@ def iscp_to_command(iscp_message):
         raise ValueError(
             'Cannot convert ISCP message to command: %s' % iscp_message)
 
+class eISCPTimeoutError(Exception):
+    def __init__(self, timeout=None):
+        Exception.__init__(self)
+        self._timeout = timeout
 
-def filter_for_message(getter_func, msg):
+    def __str__(self):
+        return 'Timeout waiting for response after %s.' % self._timeout
+
+def filter_for_message(getter_func, msg, timeout=5.0):
     """Helper that calls ``getter_func`` until a matching message
     is found, or the timeout occurs. Matching means the same commands
     group, i.e. for sent message MVLUP we would accept MVL13
@@ -251,8 +258,8 @@ def filter_for_message(getter_func, msg):
         # however, the interval needed to be at least 200ms before
         # I managed to see any response, and only after 300ms
         # reproducably, so use a generous timeout.
-        if time.time() - start > 5.0:
-            raise ValueError('Timeout waiting for response.')
+        if time.time() - start > timeout:
+            raise eISCPTimeoutError(timeout)
 
 
 class eISCP(object):
@@ -372,7 +379,7 @@ class eISCP(object):
             return ISCPMessage.parse(message)
         return None
 
-    def raw(self, iscp_message):
+    def raw(self, iscp_message, timeout=5.0):
         """Send a low-level ISCP message, like ``MVL50``, and wait
         for a response.
 
@@ -393,7 +400,7 @@ class eISCP(object):
             # response to our sent command later.
             pass
         self.send(iscp_message)
-        return filter_for_message(self.get, iscp_message)
+        return filter_for_message(self.get, iscp_message, timeout=timeout)
 
     def command(self, command, arguments=None, zone=None):
         """Send a high-level command to the receiver, return the
