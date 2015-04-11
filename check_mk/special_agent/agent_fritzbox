@@ -52,10 +52,6 @@ import arsoft.dnsutils
 import dns.resolver
 import os
 
-def include(filename):
-    if os.path.exists(filename):
-        execfile(filename)
-
 def usage():
     sys.stderr.write("""Check_MK Fritz!Box Agent
 
@@ -78,7 +74,7 @@ OPTIONS:
   -H HOSTNAME                   name of the host to be checked. Used to retrieve
                                 the list of DDNS names.
   -C cfgfile                    name of an alternative config file. default is
-                                /etc/check_mk/main.mk
+                                /etc/check_mk/fritzbox.mk
 """)
 
 short_options = 'hdot:H:C:'
@@ -132,9 +128,20 @@ elif len(args) == 1:
     host_address = args[0]
 
 if opt_cfgfile is None:
-    opt_cfgfile = '/etc/check_mk/main.mk'
+    opt_cfgfile = '/etc/check_mk/fritzbox.mk'
 
-include(opt_cfgfile)
+fritzbox_ddns = {}
+if opt_cfgfile and os.path.exists(opt_cfgfile):
+    try:
+        execfile(opt_cfgfile)
+    except Exception as e:
+        sys.stderr.write('Unhandled error: %s' % traceback.format_exc())
+
+if not opt_ddns:
+    if opt_host in fritzbox_ddns:
+        opt_ddns = fritzbox_ddns[opt_host]
+    elif host_address in fritzbox_ddns:
+        opt_ddns = fritzbox_ddns[host_address]
 
 socket.setdefaulttimeout(opt_timeout)
 
@@ -262,8 +269,7 @@ try:
     external_ip = status['NewExternalIPAddress'] if 'NewExternalIPAddress' in status else None
     ddns_status = check_ddns_status(first_dns_server, names=opt_ddns, external_ip=external_ip)
     for key, (name_ok, value) in ddns_status.items():
-        sys.stdout.write('ddns_%s;%s\n' % (key, value))
-        sys.stdout.write('ddns_%s_ok;%s\n' % (key, name_ok))
+        sys.stdout.write('%s;%s;%i\n' % (key, value, 1 if name_ok else 0))
 
 except:
     if opt_debug:
