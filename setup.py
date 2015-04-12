@@ -18,7 +18,7 @@ def version_dep_scripts(scripts):
     return ret
 
 setup(name='arsoft-python',
-		version='1.205',
+		version='1.206',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -118,9 +118,7 @@ setup(name='arsoft-python',
 			('/lib/udev/rules.d', [ 'edskmgr-support/88-external-disk.rules' ]),
             ('/usr/share/check_mk/checks', [
                 'check_mk/checks/apt',
-                'check_mk/checks/mysql_slave',
                 'check_mk/checks/nginx_cert',
-                'check_mk/checks/nginx_status',
                 'check_mk/checks/rkhunter',
                 'check_mk/checks/openvpn',
                 'check_mk/checks/postfix_cert',
