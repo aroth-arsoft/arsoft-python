@@ -2,31 +2,18 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+from arsoft.check_mk import *
 import re
 import os
 import errno
 import urllib2
 import json
 
-def check_pid(pid):
-    """ Check For the existence of a unix pid. """
-    if pid is None:
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError as err:
-        if err.errno == errno.ESRCH:
-            # ESRCH == No such process
-            return False
-        elif err.errno == errno.EPERM:
-            # EPERM clearly means there's a process to deny access to
-            return True
-        else:
-            # According to "man 2 kill" possible error values are
-            # (EINVAL, EPERM, ESRCH)
-            raise
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
     else:
-        return True
+        return v.lower() in ("yes", "true", "t", "1")
 
 class jenkins_check_mk_plugin(object):
 
@@ -77,7 +64,7 @@ class jenkins_check_mk_plugin(object):
                         self._plugin_updates.append(plugin_name)
 
     def _get_slaves(self):
-        url = self._base_url + self.COMPUTER_URI + self.API_SUFFIX + '?tree=computer[displayName,executors[idle],idle,offline,offlineCause[description],temporarilyOffline]'
+        url = self._base_url + self.COMPUTER_URI + self.API_SUFFIX + '?tree=computer[displayName,idle,offline,offlineCauseReason,temporarilyOffline]'
         response = urllib2.urlopen(url)
         if response:
             computers_tree = json.loads(response.read())
@@ -85,46 +72,46 @@ class jenkins_check_mk_plugin(object):
                 computer_name = computer['displayName']
                 if computer_name == 'master':
                     continue
-                offline = computer['offline']
-                offlineCause = computer['offlineCause']
-                idle = computer['idle']
-                item = (computer_name,offline,offlineCause, idle)
-                self._slaves.append(item)
+
+                slave_item = {
+                    'display_name': computer_name,
+                    'offline': str2bool(computer['offline']),
+                    'offline_cause_reason': computer['offlineCauseReason'],
+                    'idle': str2bool(computer['idle']),
+                    'temporarily_offline': str2bool(computer['temporarilyOffline']),
+                }
+                self._slaves.append(slave_item)
 
     def _get_jobs(self):
-        url = self._base_url + self.API_SUFFIX + '?tree=jobs[name,url,buildable,lastBuild[number,building,timestamp,estimatedDuration]]';
+        url = self._base_url + self.API_SUFFIX + '?tree=jobs[name,url,buildable,color,healthReport[score,description],lastBuild[number,duration,timestamp,result,building,estimatedDuration]]';
         response = urllib2.urlopen(url)
         if response:
             job_tree = json.loads(response.read())
-            print(job_tree)
             for job in job_tree['jobs']:
-                job_name = job['name']
-                job_url = job['url']
-                buildable = job['buildable']
                 lastBuild = job['lastBuild']
-                last_build_building = lastBuild['building'] if lastBuild else False
-                last_build_number = lastBuild['number'] if lastBuild else 0
-                last_build_timestamp = lastBuild['timestamp'] if lastBuild else 0
-                last_build_duration = lastBuild['estimatedDuration'] if lastBuild else 0
-                item = (job_name,job_url,buildable, last_build_building, last_build_number, last_build_timestamp, last_build_duration)
-                self._jobs.append(item)
+
+                healthReport = job['healthReport']
+                healthReport = healthReport[0] if healthReport else None
+
+                job_item = {
+                    'name': job['name'],
+                    'url': job['url'],
+                    'color': job['color'],
+                    'buildable': str2bool(job['buildable']),
+                    'last_build_building': str2bool(lastBuild['building']) if lastBuild else False,
+                    'last_build_number': lastBuild['number'] if lastBuild else 0,
+                    'last_build_result': lastBuild['result'] if lastBuild else 'UNKNOWN',
+                    'last_build_timestamp': lastBuild['timestamp'] if lastBuild else 0,
+                    'last_build_duration': lastBuild['duration'] if lastBuild else 0,
+                    'last_build_estimated_duration': lastBuild['estimatedDuration'] if lastBuild else 0,
+                    'health_report_score': healthReport['score'] if healthReport else 0
+                }
+                self._jobs.append(job_item)
 
     def _get_process_state(self):
         if not os.path.isdir('/run/jenkins'):
             return
-
-        content = ''
-        try:
-            with open('/run/jenkins/jenkins.pid') as f:
-                content = f.readlines()
-        except IOError:
-            pass
-        try:
-            pid = int(content[0].strip())
-        except ValueError:
-            pid = None
-        self._pid = pid
-        self._running = check_pid(pid)
+        (self._pid, self._running) = check_running('/run/jenkins/jenkins.pid')
 
     def status(self):
         if self._installed:
@@ -136,20 +123,20 @@ class jenkins_check_mk_plugin(object):
             print('plugins;%s' % ','.join(self._plugins))
             print('plugin_updates;%s' % ','.join(self._plugin_updates))
             print('disabled_plugins;%s' % ','.join(self._disabled_plugins))
-            for slave in self._slaves:
-                (computer_name,offline,offlineCause, idle) = slave
-                print('slave;%s;offline;%i' % (computer_name, offline))
-                print('slave;%s;offline_cause;%s' % (computer_name, offlineCause))
-                print('slave;%s;idle;%i' % (computer_name, idle))
-            for job in self._jobs:
-                (job_name,job_url,buildable, last_build_building, last_build_number, last_build_timestamp, last_build_duration) = job
-                print('job;%s;url;%s' % (job_name, job_url))
-                print('job;%s;buildable;%i' % (job_name, buildable))
-                print('job;%s;last_build_building;%i' % (job_name, last_build_building))
-                print('job;%s;last_build_number;%i' % (job_name, last_build_number))
-                print('job;%s;last_build_timestamp;%i' % (job_name, last_build_timestamp))
-                print('job;%s;last_build_duration;%i' % (job_name, last_build_duration))
-
+            for slave_item in self._slaves:
+                display_name = slave_item['display_name']
+                for k,v in slave_item.items():
+                    if isinstance(v, bool):
+                        print('slave;%s;%s;%i' % (display_name, k, v))
+                    else:
+                        print('slave;%s;%s;%s' % (display_name, k, v))
+            for job_item in self._jobs:
+                job_name = job_item['name']
+                for k,v in job_item.items():
+                    if isinstance(v, bool):
+                        print('job;%s;%s;%i' % (job_name, k, v))
+                    else:
+                        print('job;%s;%s;%s' % (job_name, k, v))
 
 if __name__ == "__main__":
     pl = jenkins_check_mk_plugin()
