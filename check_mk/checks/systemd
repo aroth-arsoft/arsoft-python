@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+from arsoft.timestamp import format_timedelta
+
+def inventory_systemd(checkname, info):
+
+    ret = []
+    if len(info) > 1:
+        ret.append( ('daemon', {}) )
+        ret.append( ('timedate', {}) )
+    return ret
+
+def check_systemd(item, params, info):
+
+    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
+    msg = None
+    details = []
+    perfdata = []
+    data = {}
+
+    for line in info:
+        # if we don't have any upgrades listed, the line list
+        # will only contain one element, eg. "upgrades\n"
+        if len(line) < 2:
+            continue
+
+        key = line[0]
+        value = line[1]
+        data[key] = value
+
+    if item == 'daemon':
+        if len(details) == 0:
+            details.append('Version %s' % (data['version']))
+    elif item == 'timedate':
+
+        timedatctl_status = data.get('timedatctl_status')
+        timedatctl_ntp_synchronized = data.get('timedatctl_ntp_synchronized')
+        timedatctl_ntp_enabled = data.get('timedatctl_ntp_enabled')
+        timedatctl_time_zone = data.get('timedatctl_time_zone')
+        timedatctl_local_time = data.get('timedatctl_local_time')
+        timedatctl_universal_time = data.get('timedatctl_universal_time')
+        timedatctl_rtc_in_local_tz = data.get('timedatctl_rtc_in_local_tz')
+        
+        if timedatctl_ntp_enabled:
+            if not timedatctl_ntp_synchronized:
+                if level < 2:
+                    level = 2
+                details.append('Not synchronized to NTP server.')
+        else:
+            if level < 1:
+                level = 1
+            details.append('NTP synchronization disabled.')
+            
+        if not timedatctl_rtc_in_local_tz:
+            if level < 1:
+                level = 1
+            details.append('RTC is running with local time')
+
+        if len(details) == 0:
+            details.append('%s (%s)' % (timedatctl_universal_time, timedatctl_time_zone))
+
+    # Construct a the status message.
+    if level == 0:
+        msg = "OK - %s" % (','.join(details))
+    elif level == 1:
+        msg = "WARN - %s" % (','.join(details))
+    elif level == 2:
+        msg = "CRIT - %s" % (','.join(details))
+    return (level, msg, perfdata)
+
+# declare the check to Check_MK.
+check_info['systems'] = {
+    'check_function':            check_systemd,
+    'inventory_function':        inventory_systemd,
+    'service_description':       'systemd',
+    'has_perfdata':              True,
+}

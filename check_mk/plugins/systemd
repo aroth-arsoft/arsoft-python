@@ -1,0 +1,90 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+from arsoft.utils import runcmdAndGetData
+from arsoft.check_mk import *
+import re
+import os
+import errno
+
+class systemd_check_mk_plugin(object):
+
+    SYSTEMCTL = '/bin/systemctl'
+    VERSION_RE = re.compile(r'^systemd\s+(?P<version>[0-9]+)?$')
+    TIMEDATECTL = '/usr/bin/timedatectl'
+
+    def __init__(self):
+        self._version = ''
+        self._features_enabled = []
+        self._features_disabled = []
+        self._timedate_info = {}
+
+        self._get_version()
+        self._get_timedate_status()
+
+    def _get_version(self):
+        if not os.path.isfile(self.SYSTEMCTL):
+            return
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.SYSTEMCTL, '--version'])
+        if sts == 0:
+            lines = stdoutdata.splitlines()
+            if lines:
+                mo = self.VERSION_RE.match(lines[0])
+                if mo:
+                    mogrp = mo.groupdict()
+                    self._version = mo.group('version')
+                    for feature in lines[1].split(' '):
+                        if feature[0] == '+':
+                            self._features_enabled.append(feature[1:])
+                        elif feature[0] == '-':
+                            self._features_disabled.append(feature[1:])
+
+    def _get_timedate_status(self):
+        if not os.path.isfile(self.TIMEDATECTL):
+            return
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.TIMEDATECTL, '--no-pager', 'status'], env={'LANG':'C'})
+        if sts == 0:
+            for line in stdoutdata.splitlines():
+                if not ':' in line:
+                    continue
+                key, value = line.split(':', 1)
+                key = key.strip().replace(' ', '_').lower()
+                if key.startswith('next_') or key.startswith('last_'):
+                    break
+                value = value.strip()
+                if value == 'yes':
+                    value = 1
+                elif value == 'no':
+                    value = 0
+                self._timedate_info[key] = value
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.SYSTEMCTL, 'status', 'systemd-timesyncd'], env={'LANG':'C'})
+        if sts == 0:
+            for line in stdoutdata.splitlines():
+                if not ':' in line:
+                    continue
+                key, value = line.split(':', 1)
+                key = key.strip().replace(' ', '_').lower()
+                value = value.strip()
+                if len(value) > 2:
+                    if value[0] == '"' and value[-1] == '"':
+                        value = value[1:-2]
+                    if value == 'yes':
+                        value = 1
+                    elif value == 'no':
+                        value = 0
+                self._timedate_info[key] = value
+
+    def status(self):
+        if self._version:
+            print("<<<systemd:sep(59)>>>")
+            print('version;%s' % self._version)
+            print('features_enabled;%s' % ','.join(self._features_enabled))
+            print('features_disabled;%s' % ','.join(self._features_disabled))
+            for k,v in self._timedate_info.items():
+                print('timedatctl_%s;%s' % (k,v))
+
+if __name__ == "__main__":
+    pl = systemd_check_mk_plugin()
+    pl.status()
+ 
