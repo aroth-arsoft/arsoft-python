@@ -68,7 +68,7 @@ def check_systemd(item, params, info):
     return (level, msg, perfdata)
 
 # declare the check to Check_MK.
-check_info['systems'] = {
+check_info['systemd'] = {
     'check_function':            check_systemd,
     'inventory_function':        inventory_systemd,
     'service_description':       'systemd',
