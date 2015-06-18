@@ -457,7 +457,10 @@ class alog_application(object):
             try:
                 for line in self._logfile_obj:
                     if len(line.strip()) != 0:
-                        self._first_line = line.decode(self._encoding)
+                        if isinstance(line, bytes):
+                            self._first_line = line.decode(self._encoding)
+                        else:
+                            self._first_line = line
                         break
             except IOError as e:
                 self._last_error = str(e)
@@ -505,7 +508,9 @@ class alog_application(object):
                 num_outputs = 0
                 try:
                     for line in self._logfile_obj:
-                        msg_obj = self._process_line(line_re, self._find_re, timestamp_format, line.decode(self._encoding))
+                        if isinstance(line, bytes):
+                            line = line.decode(self._encoding)
+                        msg_obj = self._process_line(line_re, self._find_re, timestamp_format, line)
                         if msg_obj:
                             if self._last_msg_obj:
                                 self._output_msg(self._last_msg_obj)

@@ -1,3 +1,9 @@
+arsoft-python (1.209) vivid; urgency=medium
+
+  * alog: do not decode strings
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 18 Jun 2015 14:00:47 +0200
+
 arsoft-python (1.208) vivid; urgency=medium
 
   * check_mk: add first version of systemd check
