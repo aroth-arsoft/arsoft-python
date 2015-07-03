@@ -90,7 +90,7 @@ class pynagPlugin:
 
         ## Set verbosity level
         if int(args.verbose) in (0, 1, 2, 3):
-            self.data['verbosity'] = args.verbose
+            self.data['verbosity'] = int(args.verbose)
         else:
             self.data['verbosity'] = 0
 

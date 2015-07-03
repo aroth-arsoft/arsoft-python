@@ -65,11 +65,19 @@ def _get_node_str(root, name, default=''):
     return ret
 
 def _clean_string(s):
-    return filter(lambda x: x in string.printable, s)
+    return ''.join(filter(lambda x: x in string.printable, s))
+
 
 if current_observation:
+    if np['verbosity'] > 0:
+        print(current_observation)
+
     tree = ET.fromstring(current_observation)
     if tree is not None:
+        station_full_name = None
+        actual_station_id = _get_node_str(tree, 'station_id')
+        station_type = _get_node_str(tree, 'station_type')
+        
         location_node = tree.find('location')
         if location_node is not None:
             station_full_name = _get_node_str(location_node, 'full')
@@ -77,11 +85,12 @@ if current_observation:
                 station_full_name = _clean_string(station_full_name.strip())
                 while station_full_name[-1] in ',.':
                     station_full_name = station_full_name[:-1]
-        else:
-            station_full_name = None
-        if station_full_name is not None and len(station_full_name) != 0:
-            np.set_value('temp_c', _get_node_float(tree, 'temp_c'))
-            np.set_value('temp_f', _get_node_float(tree, 'temp_f'))
+
+        if station_full_name is not None and len(station_full_name) != 0 and actual_station_id == station_id:
+            temp_c =_get_node_float(tree, 'temp_c')
+            temp_f = _get_node_float(tree, 'temp_f')
+            np.set_value('temp_c', temp_c)
+            np.set_value('temp_f', temp_f)
             
             np.set_value('wind_degrees', _get_node_float(tree, 'wind_degrees'))
             np.set_value('wind_mph', _get_node_float(tree, 'wind_mph'))
@@ -102,7 +111,7 @@ if current_observation:
             
             (exit_code, exit_message) = np.check_values()
             if exit_code == OK:
-                exit_message = '%s' % (station_full_name)
+                exit_message = '%s, %s C/%s F' % (station_full_name, temp_c, temp_f)
         else:
             exit_code = CRITICAL
             exit_message = 'invalid station id %s' % (station_id)
