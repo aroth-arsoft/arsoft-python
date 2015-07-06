@@ -9,7 +9,7 @@ def inventory_fritz_ddns(checkname, info):
             # will only contain one element, eg. "upgrades\n"
             if len(line) < 3:
                 continue
-            (name, ip, status) = line[:3]
+            name = line[0]
             ret.append( (name, {}) )
     return ret
 
@@ -24,20 +24,25 @@ def check_fritz_ddns(item, params, info):
     for line in info:
         # if we don't have any upgrades listed, the line list
         # will only contain one element, eg. "upgrades\n"
-        if len(line) < 3:
+        line_len = len(line)
+        if line_len < 3:
             continue
-        (name, ip, status) = line[:3]
+        if line_len == 3:
+            (name, ip, status) = line[:3]
+            wan_ip = None
+        else:
+            (name, ip, wan_ip, status) = line[:4]
         status = saveint(status)
-        data[name] = (ip, status)
+        data[name] = (ip, wan_ip, status)
 
     if item in data:
-        (ip, status) = data[item]
+        (ip, wan_ip, status) = data[item]
         if status:
             level = 0
             details.append('%s matches %s' % (ip, item))
         else:
             level = 1
-            details.append('%s does not match %s' % (ip, item))
+            details.append('%s!=%s does not match %s' % (ip, wan_ip, item))
     else:
         level = 2
         details.append('%s not found in agent data' % (item))

@@ -269,7 +269,7 @@ try:
     external_ip = status['NewExternalIPAddress'] if 'NewExternalIPAddress' in status else None
     ddns_status = check_ddns_status(first_dns_server, names=opt_ddns, external_ip=external_ip)
     for key, (name_ok, value) in ddns_status.items():
-        sys.stdout.write('%s;%s;%i\n' % (key, value, 1 if name_ok else 0))
+        sys.stdout.write('%s;%s;%s;%i\n' % (key, value, external_ip, 1 if name_ok else 0))
 
 except:
     if opt_debug:
