@@ -130,6 +130,8 @@ setup(name='arsoft-python',
                 'check_mk/checks/slapd_cert',
                 'check_mk/checks/eiscp',
                 'check_mk/checks/cyrus_imapd',
+                'check_mk/checks/fritz_ddns',
+                'check_mk/checks/systemd',
                     ] ),
             ('/usr/lib/check_mk_agent/plugins', [
                     'check_mk/plugins/apache_status',
