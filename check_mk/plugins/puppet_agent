@@ -13,7 +13,7 @@ class puppet_agent_check_mk_plugin(object):
 
     DEFAULTS = '/etc/default/puppet'
     STATEFILE = '/var/lib/puppet/state/last_run_summary.yaml'
-    PIDFILE = '/var/run/puppet/agent.pid'
+    PIDFILE = '/var/run/puppetlabs/puppet.pid'
 
     def __init__(self):
         self._time_last_run = 0
@@ -71,22 +71,22 @@ class puppet_agent_check_mk_plugin(object):
         self._time_since_last = now - self._time_last_run
 
     def status(self):
-        print('time_last_run %i' % self._time_last_run)
-        print('version %s' % self._version)
-        print('config %i' % self._config_num)
-        print('num_failed %i' % self._num_failed)
-        print('num_failed_to_restart %i' % self._num_failed_to_restart)
-        print('num_changed %i' % self._num_changed)
-        print('num_skipped %i' % self._num_skipped)
-        print('num_restarted %i' % self._num_restarted)
-        print('num_out_of_sync %i' % self._num_out_of_sync)
-        print('num_total %i' % self._num_total)
-        print('pid %i' % self._pid)
-        print('start %i' % self._start)
-        print('running %i' % self._running)
+        print('time_last_run;%i' % self._time_last_run)
+        print('version;%s' % self._version)
+        print('config;%i' % self._config_num)
+        print('num_failed;%i' % self._num_failed)
+        print('num_failed_to_restart;%i' % self._num_failed_to_restart)
+        print('num_changed;%i' % self._num_changed)
+        print('num_skipped;%i' % self._num_skipped)
+        print('num_restarted;%i' % self._num_restarted)
+        print('num_out_of_sync;%i' % self._num_out_of_sync)
+        print('num_total;%i' % self._num_total)
+        print('pid;%i' % self._pid)
+        print('start;%i' % self._start)
+        print('running;%i' % self._running)
 
 if __name__ == "__main__":
-    print("<<<puppet_agent>>>")
+    print("<<<puppet_agent:sep(59)>>>")
     pl = puppet_agent_check_mk_plugin()
     pl.status()
 
