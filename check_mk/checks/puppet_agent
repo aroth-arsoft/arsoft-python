@@ -11,7 +11,7 @@ def inventory_puppet_agent(checkname, info):
     ret = []
     data = {}
     if len(info) > 1:
-        ret.append( ('daemon', (True) ) )
+        ret.append( ('daemon', (True, True) ) )
         ret.append( ('config', (default_warn_time, default_crit_time) ) )
     return ret
 
@@ -21,7 +21,21 @@ def check_puppet_agent(item, params, info):
     msg = None
     details = []
     perfdata = []
-    data = {}
+    data = {
+        'running':0,
+        'enabled':1,
+        'start':1,
+        'pid':0,
+        'disabled_message':'',
+        'time_last_run':0,
+        'num_failed':0,
+        'num_failed_to_restart':0,
+        'num_changed':0,
+        'num_skipped':0,
+        'num_restarted':0,
+        'num_out_of_sync':0,
+        'num_total':0,
+        }
 
     for line in info:
         # if we don't have any upgrades listed, the line list
