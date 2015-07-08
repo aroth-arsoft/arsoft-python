@@ -9,6 +9,7 @@ default_crit_time = 48
 def inventory_puppet_agent(checkname, info):
 
     ret = []
+    data = {}
     if len(info) > 1:
         ret.append( ('daemon', (True) ) )
         ret.append( ('config', (default_warn_time, default_crit_time) ) )
@@ -30,26 +31,40 @@ def check_puppet_agent(item, params, info):
 
         key = line[0]
         value = line[1]
-        if key != 'version':
+        if key != 'version' and key != 'disabled_message':
             value = saveint(value)
         data[key] = value
 
     if item == 'daemon':
         if params:
-            (must_be_running, ) = params
+            (must_be_running, enabled) = params
         else:
-            (must_be_running, ) = (True,)
-
+            (must_be_running, enabled) = (True, True)
+            
+        actually_running = False if data['running'] == 0 or data['pid'] == 0 else True
+        actually_enabled = True if data['enabled'] else False
+            
         if must_be_running:
-            if data['running'] == 0 or data['pid'] == 0:
+            if not actually_running:
                 if level < 2:
                     level = 2
                 details.append('Agent not running')
         else:
-            if data['running'] != 0 or data['pid'] != 0:
+            if actually_running:
                 if level < 2:
                     level = 2
                 details.append('Agent is running, but it should be stopped')
+                
+        if enabled:
+            if not actually_enabled:
+                if level < 2:
+                    level = 2
+                details.append('Agent is disabled (%s)' % data['disabled_message'])
+        else:
+            if actually_enabled:
+                if level < 2:
+                    level = 2
+                details.append('Agent is enabled, but it should be disabled')
 
         if len(details) == 0:
             details.append('Version %s' % (data['version']))

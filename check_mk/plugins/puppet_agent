@@ -12,8 +12,10 @@ from arsoft.check_mk import *
 class puppet_agent_check_mk_plugin(object):
 
     DEFAULTS = '/etc/default/puppet'
-    STATEFILE = '/var/lib/puppet/state/last_run_summary.yaml'
-    PIDFILE = '/var/run/puppetlabs/puppet.pid'
+    STATE_DIR = '/var/lib/puppet/state'
+    LOCKFILE = STATE_DIR + '/agent_disabled.lock'
+    STATEFILE = STATE_DIR + '/last_run_summary.yaml'
+    PIDFILE = '/var/run/puppet/agent.pid'
 
     def __init__(self):
         self._time_last_run = 0
@@ -27,13 +29,17 @@ class puppet_agent_check_mk_plugin(object):
         self._num_out_of_sync = 0
         self._num_total = 0
         self._last_run_summary = {}
+        self._lock_file = {}
         self._pid = 0
         self._running = False
+        self._enabled = True
+        self._disabled_message = ''
         self._start = True
 
         self._get_config()
         self._pid, self._running = check_running(self.PIDFILE)
         self._load_last_run_summary()
+        self._load_lock_file()
 
     def _get_config(self):
         if os.path.isfile(self.DEFAULTS):
@@ -44,6 +50,19 @@ class puppet_agent_check_mk_plugin(object):
                     self._start = True if s == 'yes' else False
                 except ValueError:
                     pass
+
+    def _load_lock_file(self):
+        try:
+            with open(self.LOCKFILE, 'r') as f:
+                self._lock_file = yaml.load(f)
+        except IOError:
+            pass
+        
+        try:
+            self._disabled_message = self._lock_file['disabled_message']
+            self._enabled = False
+        except KeyError:
+            pass
 
     def _load_last_run_summary(self):
         now = time.time()
@@ -73,6 +92,8 @@ class puppet_agent_check_mk_plugin(object):
     def status(self):
         print('time_last_run;%i' % self._time_last_run)
         print('version;%s' % self._version)
+        print('enabled;%i' % self._enabled)
+        print('disabled_message;%s' % self._disabled_message)
         print('config;%i' % self._config_num)
         print('num_failed;%i' % self._num_failed)
         print('num_failed_to_restart;%i' % self._num_failed_to_restart)
