@@ -1,17 +1,17 @@
 #!/usr/bin/env python
-memory_usage_warn_threshold = None
-memory_usage_crit_threshold = None
+default_memory_usage_warn_threshold = None
+default_memory_usage_crit_threshold = None
 
-queuesize_warn_threshold = 2
-queuesize_crit_threshold = 5
+default_queuesize_warn_threshold = 2
+default_queuesize_crit_threshold = 5
 
 def inventory_puppetdb(checkname, info):
 
     ret = []
     if len(info) > 1:
         ret.append( ('daemon', {}) )
-        ret.append( ('memory', {}) )
-        ret.append( ('queue', {}) )
+        ret.append( ('memory', (default_memory_usage_warn_threshold, default_memory_usage_crit_threshold) ) )
+        ret.append( ('queue', (default_queuesize_warn_threshold, default_queuesize_crit_threshold) ) )
     return ret
 
 def check_puppetdb(item, params, info):
@@ -50,6 +50,11 @@ def check_puppetdb(item, params, info):
         if len(details) == 0:
             details.append('Version %s' % (data['version']))
     elif item == 'memory':
+        if params:
+            (memory_usage_warn_threshold, memory_usage_crit_threshold) = params
+        else:
+            (memory_usage_warn_threshold, memory_usage_crit_threshold) = (default_memory_usage_warn_threshold, default_memory_usage_crit_threshold)
+            
         if data['running'] == 0 or data['pid'] == 0:
             level = 3
             details.append('puppetdb not running')
@@ -77,8 +82,8 @@ def check_puppetdb(item, params, info):
             nonheapmemoryusage = float(nonheapmemoryusage_used) / float(nonheapmemoryusage_max)
             heapmemoryusage = float(heapmemoryusage_used) / float(heapmemoryusage_max)
 
-            perfdata.append( ('nonheapmemoryusage', nonheapmemoryusage) )
-            perfdata.append( ('heapmemoryusage', heapmemoryusage) )
+            perfdata.append( ('nonheapmemoryusage', nonheapmemoryusage, memory_usage_warn_threshold, memory_usage_crit_threshold) )
+            perfdata.append( ('heapmemoryusage', heapmemoryusage, memory_usage_warn_threshold, memory_usage_crit_threshold) )
 
             if memory_usage_crit_threshold is not None and memory_usage_warn_threshold is not None:
                 if nonheapmemoryusage >= memory_usage_crit_threshold:
@@ -100,13 +105,17 @@ def check_puppetdb(item, params, info):
             if len(details) == 0:
                 details.append('Non-Heap %i %%, Heap %i %%' % (int(nonheapmemoryusage * 100), int(heapmemoryusage * 100)))
     elif item == 'queue':
+        if params:
+            (queuesize_warn_threshold, queuesize_crit_threshold) = params
+        else:
+            (queuesize_warn_threshold, queuesize_crit_threshold) = (default_queuesize_warn_threshold, default_queuesize_crit_threshold)
         if data['running'] == 0 or data['pid'] == 0:
             level = 3
             details.append('puppetdb not running')
         else:
             queuesize = data['queued_queuesize']
 
-            perfdata.append( ('queuesize', data['queued_queuesize']) )
+            perfdata.append( ('queuesize', data['queued_queuesize'], queuesize_warn_threshold, queuesize_crit_threshold) )
             perfdata.append( ('dispatchcount', data['queued_dispatchcount']) )
             perfdata.append( ('averageenqueuetime', data['queued_averageenqueuetime']) )
 
