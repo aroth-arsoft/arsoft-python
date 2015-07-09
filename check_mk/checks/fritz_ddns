@@ -40,6 +40,9 @@ def check_fritz_ddns(item, params, info):
         if status:
             level = 0
             details.append('%s matches %s' % (ip, item))
+        elif not ip:
+            level = 2
+            details.append('No address for %s (should be %s)' % (item, wan_ip))
         else:
             level = 1
             details.append('%s!=%s does not match %s' % (ip, wan_ip, item))
