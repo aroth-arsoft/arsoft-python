@@ -81,6 +81,8 @@ def check_puppet_agent(item, params, info):
                 details.append('Agent is enabled, but it should be disabled')
 
         if len(details) == 0:
+            details.append('Running' if actually_running else 'Stopped')
+            details.append('Enabled' if actually_enabled else 'Disabled')
             details.append('Version %s' % (data['version']))
     elif item == 'config':
         if params:
