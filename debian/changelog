@@ -1,3 +1,9 @@
+arsoft-python (1.214) vivid; urgency=medium
+
+  * check_mk: improve puppetdb checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 09 Jul 2015 07:40:23 +0200
+
 arsoft-python (1.213) vivid; urgency=medium
 
   * check_mk: improvements to puppet_agent checks
