@@ -60,6 +60,8 @@ def initialize_settings(settings_module, setttings_file):
 
     if 'BASE_PATH' in os.environ:
         settings_obj.BASE_PATH = os.environ['BASE_PATH']
+        if settings_obj.BASE_PATH[-1] == '/':
+            settings_obj.BASE_PATH = settings_obj.BASE_PATH[:-1]
     else:
         settings_obj.BASE_PATH = ''
 
