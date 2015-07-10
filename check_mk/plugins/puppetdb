@@ -7,39 +7,12 @@ import json
 import os
 import errno
 from arsoft.inifile import IniFile
-
-def check_pid(pid):
-    """ Check For the existence of a unix pid. """
-    if pid is None:
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError as err:
-        if err.errno == errno.ESRCH:
-            # ESRCH == No such process
-            return False
-        elif err.errno == errno.EPERM:
-            # EPERM clearly means there's a process to deny access to
-            return True
-        else:
-            # According to "man 2 kill" possible error values are
-            # (EINVAL, EPERM, ESRCH)
-            raise
-    else:
-        return True
-
-def saveint(v):
-    if v is None:
-        return 0
-    try:
-        return int(v)
-    except ValueError:
-        return 0
+from arsoft.check_mk import *
 
 class puppetdb_check_mk_plugin(object):
 
-    JETTY_INI = '/etc/puppetdb/conf.d/jetty.ini'
-    PIDFILE = '/var/run/puppetdb.pid'
+    JETTY_INI = '/etc/puppetlabs/puppetdb/conf.d/jetty.ini'
+    PIDFILE = '/var/run/puppetlabs/puppetdb/puppetdb.pid'
 
     def __init__(self):
         self._hostname = 'localhost'
@@ -54,7 +27,7 @@ class puppetdb_check_mk_plugin(object):
         self._get_config()
 
         if self._port:
-            self._check_running()
+            self._pid, self._running = check_running(self.PIDFILE)
             self._beans['memory'] = '/v2/metrics/mbean/java.lang:type=Memory'
             self._beans['catalogs_dups'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.scf.storage:type=default,name=duplicate-pct'
             self._beans['resources_dups'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.query.population:type=default,name=pct-resource-dupes'
@@ -73,20 +46,6 @@ class puppetdb_check_mk_plugin(object):
                     self._sslport = int(inifile.get('jetty', 'ssl-port', 8081))
                 except ValueError:
                     pass
-
-    def _check_running(self):
-        if os.path.isfile(self.PIDFILE):
-            content = ''
-            try:
-                with open(self.PIDFILE) as f:
-                    content = f.readlines()
-            except IOError:
-                pass
-            try:
-                self._pid = saveint(content[0].strip())
-            except ValueError:
-                pass
-            self._running = check_pid(self._pid)
 
     def _get_bean(self, bean):
         url = 'http%s://%s:%d%s' % ('s' if self._https else '', self._hostname, self._port, bean)
