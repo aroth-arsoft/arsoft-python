@@ -126,8 +126,7 @@ def check_puppet_agent(item, params, info):
             if level < 2:
                 level = 2
             details.append('%i services failed to restart' % data['num_failed_to_restart'])
-        if len(details) == 0:
-            details.append('Config has been updated %s' % format_timedelta(time_last_run - now))
+        details.append('Config updated %s' % format_timedelta(time_last_run - now))
 
     # Construct a the status message.
     if level == 0:
