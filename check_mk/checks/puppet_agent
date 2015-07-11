@@ -95,6 +95,9 @@ def check_puppet_agent(item, params, info):
         crit_time = now - (crit_time_hours * 3600)
         time_last_run = saveint(data['time_last_run'])
 
+        actually_running = False if data['running'] == 0 or data['pid'] == 0 else True
+        actually_enabled = True if data['enabled'] else False
+
         perfdata.append( ('config_age', (time_last_run - now)/3600 if time_last_run else 0, warn_time_hours, crit_time_hours) )
         perfdata.append( ('num_failed', data['num_failed']) )
         perfdata.append( ('num_failed_to_restart', data['num_failed_to_restart']) )
@@ -104,13 +107,16 @@ def check_puppet_agent(item, params, info):
         perfdata.append( ('num_out_of_sync', data['num_out_of_sync']) )
         perfdata.append( ('num_total', data['num_total']) )
 
-        if level == 0 and time_last_run != 0 and data['start']:
-            if time_last_run < crit_time:
-                level = 2
-                msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
-            elif time_last_run < warn_time:
-                level = 1
-                msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
+        if actually_running and actually_enabled:
+            if level == 0 and time_last_run != 0 and data['start']:
+                if time_last_run < crit_time:
+                    if level < 2:
+                        level = 2
+                    msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
+                elif time_last_run < warn_time:
+                    if level < 1:
+                        level = 1
+                    msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
 
         if data['num_failed'] != 0:
             if level < 2:
