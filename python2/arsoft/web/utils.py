@@ -36,7 +36,7 @@ def _is_running_in_devserver(appdir):
     else:
         return False
 
-def initialize_settings(settings_module, setttings_file):
+def initialize_settings(settings_module, setttings_file, options={}):
     settings_obj = sys.modules[settings_module]
     settings_obj_type = type(settings_obj)
     appname = settings_module
@@ -67,7 +67,10 @@ def initialize_settings(settings_module, setttings_file):
 
     #print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver) + ' basepath=' + str(settings_obj.BASE_PATH))
 
-    settings_obj.DEBUG = in_devserver
+    if 'debug' in options:
+        settings_obj.DEBUG = options['debug']
+    else:
+        settings_obj.DEBUG = in_devserver
     settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
 
     settings_obj.ADMINS = _get_default_admin()
@@ -229,19 +232,19 @@ def initialize_settings(settings_module, setttings_file):
             },
             'loggers': {
                 'django.request': {
-                    'handlers': ['mail_admins', 'logfile'],
-                    'level': 'ERROR',
+                    'handlers': ['mail_admins', 'logfile'] if not settings_obj.DEBUG else ['logfile'],
+                    'level': 'ERROR' if not settings_obj.DEBUG else 'DEBUG',
                     'propagate': True,
                 },
                 # Might as well log any errors anywhere else in Django
                 'django': {
                     'handlers': ['logfile'],
-                    'level': 'ERROR',
+                    'level': 'ERROR' if not settings_obj.DEBUG else 'DEBUG',
                     'propagate': True,
                 },
                 appname: {
                     'handlers': ['console', 'logfile'],
-                    'level': 'DEBUG',
+                    'level': 'ERROR' if not settings_obj.DEBUG else 'DEBUG',
                     'propagate': True,
                 },
             }
@@ -321,6 +324,7 @@ def django_request_info_view(request):
 
 def django_env_info_view(request):
     from django.http import HttpResponse
+    from django.utils.html import escape
     body = ''
     body += '<html><head><style>\n'
     body += 'table { border-collapse:collapse; vertical-align:top; }\n'
@@ -333,20 +337,27 @@ def django_env_info_view(request):
     body += 'padding:1px 3px 1px 3px;\n'
     body += '}\n'
     body += '</style></head>\n'
-    ret += '<table border=\'1\'>\n'
-    ret += '<tr><td>os.environ</td><td>\n' % escape(str(attr))
-    ret += '<table border=\'1\'>\n'
-    for key in os.environ:
+    body += '<table border=\'1\'>\n'
+    body += '<tr><td>os.environ</td><td>\n'
+    body += '<table border=\'1\'>\n'
+    for key in sorted(os.environ):
         value = os.environ[key]
-        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
-    ret += '</table>\n'
-    ret += '</td></tr>\n'
-    ret += '</table>\n'
+        body += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+    body += '</table>\n'
+    body += '</td></tr>\n'
+    body += '</table>\n'
     body += '</html>\n'
     return HttpResponse(body, content_type='text/html')
 
-def django_debug_urls(urls_module, urls_file):
+def django_debug_urls(urls_module, urls_file, options={}):
     from django.conf.urls import patterns, include, url
+
+    # import the logging library
+    import logging
+    # Get an instance of a logger
+    logger = logging.getLogger(__name__)
+    # Log an error message
+    logger.error('django_debug_urls(%s, %s)' % (urls_module, urls_file))
 
     urls_module_obj = sys.modules[urls_module]
     urls_module_obj_type = type(urls_module_obj)
