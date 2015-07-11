@@ -28,14 +28,20 @@ class puppetdb_check_mk_plugin(object):
 
         if self._port:
             self._pid, self._running = check_running(self.PIDFILE)
-            self._beans['memory'] = '/v2/metrics/mbean/java.lang:type=Memory'
-            self._beans['catalogs_dups'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.scf.storage:type=default,name=duplicate-pct'
-            self._beans['resources_dups'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.query.population:type=default,name=pct-resource-dupes'
-            self._beans['num_resources'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.query.population:type=default,name=num-resources'
-            self._beans['num_nodes'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.query.population:type=default,name=num-nodes'
-            self._beans['processed'] = '/v2/metrics/mbean/com.puppetlabs.puppetdb.command:type=global,name=processed'
-            self._beans['queued'] = '/v2/metrics/mbean/org.apache.activemq:BrokerName=localhost,Type=Queue,Destination=com.puppetlabs.puppetdb.commands'
-            self._beans['version'] = '/v4/version'
+            self._beans['memory'] = '/metrics/v1/mbeans/java.lang:type=Memory'
+            self._beans['threading'] = '/metrics/v1/mbeans/java.lang:type=Threading'
+            
+            self._beans['catalogs_dups']  = '/metrics/v1/mbeans/puppetlabs.puppetdb.scf.storage:type=default,name=duplicate-pct'
+            self._beans['resources_dups'] = '/metrics/v1/mbeans/puppetlabs.puppetdb.query.population:type=default,name=pct-resource-dupes'
+            self._beans['num_resources']  = '/metrics/v1/mbeans/puppetlabs.puppetdb.query.population:type=default,name=num-resources'
+            self._beans['num_nodes']      = '/metrics/v1/mbeans/puppetlabs.puppetdb.query.population:type=default,name=num-nodes'
+            
+            self._beans['avg_resources_per_node'] = '/metrics/v1/mbeans/puppetlabs.puppetdb.query.population:type=default,name=avg-resources-per-node'
+            
+            self._beans['db'] = '/metrics/v1/mbeans/com.jolbox.bonecp:type=BoneCP'
+            self._beans['mq'] = '/metrics/v1/mbeans/org.apache.activemq:type=Broker,brokerName=localhost,destinationType=Queue,destinationName=puppetlabs.puppetdb.commands'
+            
+            self._beans['version'] = '/pdb/meta/v1/version'
 
     def _get_config(self):
         if os.path.isfile(self.JETTY_INI):
@@ -50,7 +56,7 @@ class puppetdb_check_mk_plugin(object):
     def _get_bean(self, bean):
         url = 'http%s://%s:%d%s' % ('s' if self._https else '', self._hostname, self._port, bean)
         headers = { 'Accept': 'application/json' }
-
+        #print(url)
         ret = None
         req = urllib2.Request(url, None, headers)
         try:
