@@ -28,7 +28,31 @@ def check_puppetdb(item, params, info):
     msg = None
     details = []
     perfdata = []
-    data = {}
+    data = {
+        'running':0,
+        'pid':0,
+        'version':'',
+        'memory_heapmemoryusage_max':0,
+        'memory_heapmemoryusage_init':0,
+        'memory_heapmemoryusage_used':0,
+        'memory_heapmemoryusage_committed':0,
+        'memory_nonheapmemoryusage_max':0,
+        'memory_nonheapmemoryusage_init':0,
+        'memory_nonheapmemoryusage_used':0,
+        'memory_nonheapmemoryusage_committed':0,
+                
+        'threading_threadcount':0,
+        'threading_daemonthreadcount':0,
+        
+        'mq_queuesize':0,
+        'mq_averageenqueuetime':0.0,
+        'mq_dispatchcount':0,
+    
+        'db_statementexecutetimeavg':0.0,
+        'db_cachemiss':0,
+        'db_cachehits':0,
+        
+        }
 
     for line in info:
         # if we don't have any upgrades listed, the line list
@@ -206,7 +230,10 @@ def check_puppetdb(item, params, info):
             cachemiss = data['db_cachemiss']
             cachehits = data['db_cachehits']
             cachetotal = data['db_cachemiss'] + data['db_cachehits']
-            cacheratio = float(cachehits) / float(cachetotal)
+            if cachetotal != 0:
+                cacheratio = float(cachehits) / float(cachetotal)
+            else:
+                cacheratio = 0.0
 
             perfdata.append( ('cachehits', cachehits) )
             perfdata.append( ('cachemiss', cachemiss) )
