@@ -61,6 +61,14 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
                 self._exclude_list = None
             #print('_exclude_list=%s' % (self._exclude_list))
 
+        def __str__(self):
+            if self._directory_list is None:
+                return 'None'
+            if self._exclude_list is None:
+                return str(self.directory_list)
+            else:
+                return '%s (exclude %s)' % (self.directory_list, self._exclude_list)
+
     def __init__(self, parent):
         BackupPluginConfig.__init__(self, parent, 'dir')
         self._items = []
@@ -88,7 +96,8 @@ class DirectoryBackupPluginConfig(BackupPluginConfig):
 
     def __str__(self):
         ret = BackupPluginConfig.__str__(self)
-        ret = ret + 'items: ' + ','.join(self.items) + '\n'
+        for item in self._items:
+            ret = ret + ' item %s\n' % str(item)
         return ret
 
 class DirectoryBackupPlugin(BackupPlugin):

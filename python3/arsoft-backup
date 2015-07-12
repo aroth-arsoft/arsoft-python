@@ -43,7 +43,6 @@ class ARSoftBackupApp(BackupApp):
     
     def _do_rsync(self):
         backup_dir = self.session.backup_dir
-        print(self.session)
         if backup_dir is None or not backup_dir:
             if self._verbose:
                 print('No backup directory.')

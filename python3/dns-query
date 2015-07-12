@@ -73,7 +73,7 @@ class dns_query_app(object):
                 sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, dnsserver))
                 hostaddr = None
             if hostaddr:
-                print(('%s %s' % (host, hostaddr)))
+                print('%s %s' % (host, hostaddr))
         return ret
 
     def _parse_query_args(self, args):
@@ -148,28 +148,28 @@ class dns_query_app(object):
             if self.batch:
                 # output in the form of host:port
                 target = str(rdata.target)
-                print(( '%s:%i' % (target[:-1], rdata.port) ))
+                print( '%s:%i' % (target[:-1], rdata.port) )
             else:
-                print(( '%i %i %i %s' % (rdata.priority, rdata.weight, rdata.port, rdata.target) ))
+                print( '%i %i %i %s' % (rdata.priority, rdata.weight, rdata.port, rdata.target) )
         elif rdata.rdtype == dns.rdatatype.TXT:
             if len(rdata.strings) == 0:
                 pass
             elif len(rdata.strings) == 1:
-                print(( rdata.strings[0] ))
+                print( rdata.strings[0] )
             else:
-                print(( rdata.strings ))
+                print( rdata.strings )
         elif rdata.rdtype == dns.rdatatype.MX:
             if self.batch:
                 exchange = str(rdata.exchange)
-                print(( '%s' % (exchange[:-1]) ))
+                print( '%s' % (exchange[:-1]) )
             else:
-                print((rdata.exchange))
+                print(rdata.exchange)
         else:
-            print(( str(rdata) ))
+            print( str(rdata) )
 
     def _execute_query(self, query_list):
         if self.verbose:
-            print(('DNS server %s' % (self.dnsserver)))
+            print('DNS server %s' % (self.dnsserver))
         resolver = arsoft.dnsutils._get_resolver(self.dnsserver)
         if not resolver:
             ret = False
@@ -178,8 +178,8 @@ class dns_query_app(object):
             for (record_type, query_args) in query_list:
                 query_string = ' '.join(query_args)
                 if self.verbose:
-                    print(('Record type: %s' % dns.rdatatype.to_text(record_type)))
-                    print(('Query: %s' % query_string))
+                    print('Record type: %s' % dns.rdatatype.to_text(record_type))
+                    print('Query: %s' % query_string)
                 try:
                     answers = resolver.query(query_string, record_type)
                     if answers:

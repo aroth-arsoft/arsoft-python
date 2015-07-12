@@ -42,6 +42,16 @@ class SysfsEfiVariables(EfiVariables):
 
     sysfs_efi_vars_dir = '/sys/firmware/efi/vars'
     
+    @staticmethod
+    def read_efi_value(fname):
+        ret = None
+        try:
+            with open(fname, 'rb') as f:
+                ret = f.read()
+        except (IOError, OSError):
+            pass
+        return ret
+    
     def read(self, name, guid):
         assert re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", guid)
         filename = self.sysfs_efi_vars_dir + "/%s-%s/data" % (name, guid)
@@ -65,11 +75,11 @@ class SysfsEfiVariables(EfiVariables):
             raise StopIteration
 
     def __getitem__(self, key):
-        filename = self.sysfs_efi_vars_dir + "/%s-%s/data" % key
+        filename = self.sysfs_efi_vars_dir + "/%s/data" % key
         if not os.path.exists(filename):
             # variable not found
             return None
-        return file(filename).read()
+        return SysfsEfiVariables.read_efi_value(filename)
 
     
 class WinApiEfiVariables(EfiVariables):
