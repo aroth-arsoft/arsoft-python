@@ -36,7 +36,7 @@ def _is_running_in_devserver(appdir):
     else:
         return False
 
-def initialize_settings(settings_module, setttings_file):
+def initialize_settings(settings_module, setttings_file, options={}):
     settings_obj = sys.modules[settings_module]
     settings_obj_type = type(settings_obj)
     appname = settings_module
@@ -60,12 +60,17 @@ def initialize_settings(settings_module, setttings_file):
 
     if 'BASE_PATH' in os.environ:
         settings_obj.BASE_PATH = os.environ['BASE_PATH']
+        if settings_obj.BASE_PATH[-1] == '/':
+            settings_obj.BASE_PATH = settings_obj.BASE_PATH[:-1]
     else:
         settings_obj.BASE_PATH = ''
 
     #print('initialize_settings for ' + appname + ' appdir ' + appdir + ' debug=' + str(in_devserver) + ' basepath=' + str(settings_obj.BASE_PATH))
 
-    settings_obj.DEBUG = in_devserver
+    if 'debug' in options:
+        settings_obj.DEBUG = options['debug']
+    else:
+        settings_obj.DEBUG = in_devserver
     settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
 
     settings_obj.ADMINS = _get_default_admin()
@@ -227,19 +232,19 @@ def initialize_settings(settings_module, setttings_file):
             },
             'loggers': {
                 'django.request': {
-                    'handlers': ['mail_admins', 'logfile'],
-                    'level': 'ERROR',
+                    'handlers': ['mail_admins', 'logfile'] if not settings_obj.DEBUG else ['logfile'],
+                    'level': 'ERROR' if not settings_obj.DEBUG else 'DEBUG',
                     'propagate': True,
                 },
                 # Might as well log any errors anywhere else in Django
                 'django': {
                     'handlers': ['logfile'],
-                    'level': 'ERROR',
+                    'level': 'ERROR' if not settings_obj.DEBUG else 'DEBUG',
                     'propagate': True,
                 },
                 appname: {
                     'handlers': ['console', 'logfile'],
-                    'level': 'DEBUG',
+                    'level': 'ERROR' if not settings_obj.DEBUG else 'DEBUG',
                     'propagate': True,
                 },
             }
@@ -289,7 +294,7 @@ def _django_request_info_view_impl(request, attr_names):
                         ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
                     ret += '</table>\n'
                 else:
-                    ret += '<i>empty</o>\n'
+                    ret += '<i>empty</i>\n'
             else:
                 ret += '<pre>%s (%s)</pre>\n' % (escape(str(d)), escape(str(type(d))))
         else:
@@ -297,6 +302,52 @@ def _django_request_info_view_impl(request, attr_names):
         ret += '</td></tr>\n'
     ret += '</table>\n'
     return ret
+
+def _django_settings(request):
+    from django.conf import settings
+    from django.utils.html import escape
+    ret = ''
+    ret += '<table border=\'1\'>\n'
+    
+    for attr in dir(settings):
+        if attr.startswith('__') and attr.endswith('__'):
+            continue
+        ret += '<tr><td>%s</td><td>\n' % escape(str(attr))
+        if hasattr(settings, attr):
+            d = getattr(settings, attr)
+            if isinstance(d, dict):
+                d_keys = sorted(d.keys())
+                if d_keys:
+                    ret += '<table border=\'1\'>\n'
+                    for key in d_keys:
+                        value = d[key]
+                        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+                    ret += '</table>\n'
+                else:
+                    ret += '<i>empty</i>\n'
+            else:
+                ret += '<pre>%s (%s)</pre>\n' % (escape(str(d)), escape(str(type(d))))
+        else:
+            ret += 'NA'
+        ret += '</td></tr>\n'
+    ret += '</table>\n'
+    return ret
+
+
+def _django_url_handler_info(request):
+    from django.core.urlresolvers import get_script_prefix
+    from django.utils.html import escape
+    data={}
+    data['script_prefix'] = get_script_prefix()
+
+    ret = ''
+    ret += '<table border=\'1\'>\n'
+    for key in data:
+        value = data[key]
+        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+    ret += '</table>\n'
+    return ret
+
 
 def django_request_info_view(request):
     from django.http import HttpResponse
@@ -314,10 +365,43 @@ def django_request_info_view(request):
     body += '</style></head>\n'
     body += _django_request_info_view_impl(request, ['META', 'GET', 'POST', 'REQUEST', 'FILES', 'COOKIES',
                                                      'scheme', 'method', 'path', 'path_info', 'user', 'session', 'urlconf', 'resolver_match'])
+    
+    body += '<h2>Settings</h2>\n';
+    body += _django_settings(request)
+    body += '<h2>URL handler info</h2>\n';
+    body += _django_url_handler_info(request)
+
     body += '</html>\n'
     return HttpResponse(body, content_type='text/html')
 
 def django_env_info_view(request):
+    from django.http import HttpResponse
+    from django.utils.html import escape
+    body = ''
+    body += '<html><head><style>\n'
+    body += 'table { border-collapse:collapse; vertical-align:top; }\n'
+    body += 'tr, th, td, tbody {\n'
+    body += 'border-style: inherit;\n'
+    body += 'border-color: inherit;\n'
+    body += 'border-width: inherit;\n'
+    body += 'text-align: left;\n'
+    body += 'vertical-align: top;\n'
+    body += 'padding:1px 3px 1px 3px;\n'
+    body += '}\n'
+    body += '</style></head>\n'
+    body += '<table border=\'1\'>\n'
+    body += '<tr><td>os.environ</td><td>\n'
+    body += '<table border=\'1\'>\n'
+    for key in sorted(os.environ):
+        value = os.environ[key]
+        body += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+    body += '</table>\n'
+    body += '</td></tr>\n'
+    body += '</table>\n'
+    body += '</html>\n'
+    return HttpResponse(body, content_type='text/html')
+
+def django_settings_view(request):
     from django.http import HttpResponse
     body = ''
     body += '<html><head><style>\n'
@@ -331,19 +415,11 @@ def django_env_info_view(request):
     body += 'padding:1px 3px 1px 3px;\n'
     body += '}\n'
     body += '</style></head>\n'
-    ret += '<table border=\'1\'>\n'
-    ret += '<tr><td>os.environ</td><td>\n' % escape(str(attr))
-    ret += '<table border=\'1\'>\n'
-    for key in os.environ:
-        value = os.environ[key]
-        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
-    ret += '</table>\n'
-    ret += '</td></tr>\n'
-    ret += '</table>\n'
+    body += _django_settings(request)
     body += '</html>\n'
     return HttpResponse(body, content_type='text/html')
 
-def django_debug_urls(urls_module, urls_file):
+def django_debug_urls(urls_module, urls_file, options={}):
     from django.conf.urls import patterns, include, url
 
     urls_module_obj = sys.modules[urls_module]
@@ -352,3 +428,4 @@ def django_debug_urls(urls_module, urls_file):
     # add debug handler here
     urls_module_obj.urlpatterns.append(url(r'^debug/request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'))
     urls_module_obj.urlpatterns.append(url(r'^debug/env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'))
+    urls_module_obj.urlpatterns.append(url(r'^debug/settings$', 'arsoft.web.utils.django_settings_view', name='debug_django_settings'))

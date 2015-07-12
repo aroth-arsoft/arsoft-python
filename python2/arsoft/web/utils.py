@@ -294,7 +294,7 @@ def _django_request_info_view_impl(request, attr_names):
                         ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
                     ret += '</table>\n'
                 else:
-                    ret += '<i>empty</o>\n'
+                    ret += '<i>empty</i>\n'
             else:
                 ret += '<pre>%s (%s)</pre>\n' % (escape(str(d)), escape(str(type(d))))
         else:
@@ -302,6 +302,52 @@ def _django_request_info_view_impl(request, attr_names):
         ret += '</td></tr>\n'
     ret += '</table>\n'
     return ret
+
+def _django_settings(request):
+    from django.conf import settings
+    from django.utils.html import escape
+    ret = ''
+    ret += '<table border=\'1\'>\n'
+    
+    for attr in dir(settings):
+        if attr.startswith('__') and attr.endswith('__'):
+            continue
+        ret += '<tr><td>%s</td><td>\n' % escape(str(attr))
+        if hasattr(settings, attr):
+            d = getattr(settings, attr)
+            if isinstance(d, dict):
+                d_keys = sorted(d.keys())
+                if d_keys:
+                    ret += '<table border=\'1\'>\n'
+                    for key in d_keys:
+                        value = d[key]
+                        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+                    ret += '</table>\n'
+                else:
+                    ret += '<i>empty</i>\n'
+            else:
+                ret += '<pre>%s (%s)</pre>\n' % (escape(str(d)), escape(str(type(d))))
+        else:
+            ret += 'NA'
+        ret += '</td></tr>\n'
+    ret += '</table>\n'
+    return ret
+
+
+def _django_url_handler_info(request):
+    from django.core.urlresolvers import get_script_prefix
+    from django.utils.html import escape
+    data={}
+    data['script_prefix'] = get_script_prefix()
+
+    ret = ''
+    ret += '<table border=\'1\'>\n'
+    for key in data:
+        value = data[key]
+        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
+    ret += '</table>\n'
+    return ret
+
 
 def django_request_info_view(request):
     from django.http import HttpResponse
@@ -319,6 +365,12 @@ def django_request_info_view(request):
     body += '</style></head>\n'
     body += _django_request_info_view_impl(request, ['META', 'GET', 'POST', 'REQUEST', 'FILES', 'COOKIES',
                                                      'scheme', 'method', 'path', 'path_info', 'user', 'session', 'urlconf', 'resolver_match'])
+    
+    body += '<h2>Settings</h2>\n';
+    body += _django_settings(request)
+    body += '<h2>URL handler info</h2>\n';
+    body += _django_url_handler_info(request)
+
     body += '</html>\n'
     return HttpResponse(body, content_type='text/html')
 
@@ -349,15 +401,26 @@ def django_env_info_view(request):
     body += '</html>\n'
     return HttpResponse(body, content_type='text/html')
 
+def django_settings_view(request):
+    from django.http import HttpResponse
+    body = ''
+    body += '<html><head><style>\n'
+    body += 'table { border-collapse:collapse; vertical-align:top; }\n'
+    body += 'tr, th, td, tbody {\n'
+    body += 'border-style: inherit;\n'
+    body += 'border-color: inherit;\n'
+    body += 'border-width: inherit;\n'
+    body += 'text-align: left;\n'
+    body += 'vertical-align: top;\n'
+    body += 'padding:1px 3px 1px 3px;\n'
+    body += '}\n'
+    body += '</style></head>\n'
+    body += _django_settings(request)
+    body += '</html>\n'
+    return HttpResponse(body, content_type='text/html')
+
 def django_debug_urls(urls_module, urls_file, options={}):
     from django.conf.urls import patterns, include, url
-
-    # import the logging library
-    import logging
-    # Get an instance of a logger
-    logger = logging.getLogger(__name__)
-    # Log an error message
-    logger.error('django_debug_urls(%s, %s)' % (urls_module, urls_file))
 
     urls_module_obj = sys.modules[urls_module]
     urls_module_obj_type = type(urls_module_obj)
@@ -365,3 +428,4 @@ def django_debug_urls(urls_module, urls_file, options={}):
     # add debug handler here
     urls_module_obj.urlpatterns.append(url(r'^debug/request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'))
     urls_module_obj.urlpatterns.append(url(r'^debug/env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'))
+    urls_module_obj.urlpatterns.append(url(r'^debug/settings$', 'arsoft.web.utils.django_settings_view', name='debug_django_settings'))
