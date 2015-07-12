@@ -8,6 +8,9 @@ default_thread_count_crit_threshold = None
 default_queuesize_warn_threshold = 2
 default_queuesize_crit_threshold = 5
 
+default_cacheratio_warn_threshold = None
+default_cacheratio_crit_threshold = None
+
 def inventory_puppetdb(checkname, info):
 
     ret = []
@@ -16,7 +19,7 @@ def inventory_puppetdb(checkname, info):
         ret.append( ('memory', (default_memory_usage_warn_threshold, default_memory_usage_crit_threshold) ) )
         ret.append( ('threads', (default_thread_count_warn_threshold, default_thread_count_crit_threshold) ) )
         ret.append( ('queue', (default_queuesize_warn_threshold, default_queuesize_crit_threshold) ) )
-        ret.append( ('database', (default_queuesize_warn_threshold, default_queuesize_crit_threshold) ) )
+        ret.append( ('database', (default_cacheratio_warn_threshold, default_cacheratio_crit_threshold) ) )
     return ret
 
 def check_puppetdb(item, params, info):
@@ -35,7 +38,9 @@ def check_puppetdb(item, params, info):
 
         key = line[0]
         value = line[1]
-        if '.' in value:
+        if key == 'version':
+            pass
+        elif '.' in value:
             try:
                 value = float(value)
             except ValueError:
@@ -55,10 +60,12 @@ def check_puppetdb(item, params, info):
             if data['running'] != 0 or data['pid'] != 0:
                 if level < 2:
                     level = 2
-                details.append('Running')
+                details.append('Running PID %i' % data['pid'])
 
         if len(details) == 0:
             details.append('Version %s' % (data['version']))
+            if data['running'] != 0:
+                details.append('PID %i' % (data['pid']))
     elif item == 'memory':
         if params:
             (memory_usage_warn_threshold, memory_usage_crit_threshold) = params
@@ -154,7 +161,7 @@ def check_puppetdb(item, params, info):
                         level = 1
                     details.append('High daemon thread count %i' % (int(threading_daemonthreadcount)))
             if len(details) == 0:
-                details.append('%i threads, %i Daemon threads' % (int(threading_threadcount), int(threading_daemonthreadcount) ))
+                details.append('%i threads, %i daemon threads' % (int(threading_threadcount), int(threading_daemonthreadcount) ))
     elif item == 'queue':
         if params:
             (queuesize_warn_threshold, queuesize_crit_threshold) = params
@@ -181,16 +188,16 @@ def check_puppetdb(item, params, info):
                     level = 1
                 details.append('Queue size %i' % (queuesize))
             if len(details) == 0:
-                details.append('Avg enqueue time %ss' % (averageenqueuetime))
+                details.append('Avg enqueue time %0.1fs' % (averageenqueuetime))
                 if queuesize == 0:
                     details.append('Queue is empty')
                 else:
                     details.append('Queue size %i' % (queuesize))
     elif item == 'database':
         if params:
-            (queuesize_warn_threshold, queuesize_crit_threshold) = params
+            (cacheratio_warn_threshold, cacheratio_crit_threshold) = params
         else:
-            (queuesize_warn_threshold, queuesize_crit_threshold) = (default_queuesize_warn_threshold, default_queuesize_crit_threshold)
+            (cacheratio_warn_threshold, cacheratio_crit_threshold) = (default_cacheratio_warn_threshold, default_cacheratio_crit_threshold)
         if data['running'] == 0 or data['pid'] == 0:
             level = 3
             details.append('puppetdb not running')
@@ -198,12 +205,27 @@ def check_puppetdb(item, params, info):
             statementexecutetimeavg = data['db_statementexecutetimeavg']
             cachemiss = data['db_cachemiss']
             cachehits = data['db_cachehits']
+            cachetotal = data['db_cachemiss'] + data['db_cachehits']
+            cacheratio = float(cachehits) / float(cachetotal)
 
-            perfdata.append( ('db_cachehits', cachehits) )
-            perfdata.append( ('db_cachemiss', cachemiss) )
-            perfdata.append( ('db_avgquerytime', statementexecutetimeavg) )
+            perfdata.append( ('cachehits', cachehits) )
+            perfdata.append( ('cachemiss', cachemiss) )
+            perfdata.append( ('cacheratio', cacheratio, cacheratio_warn_threshold, cacheratio_crit_threshold) )
+            perfdata.append( ('avgquerytime', statementexecutetimeavg) )
+
+            if cacheratio_warn_threshold is not None and cacheratio_crit_threshold is not None:
+                if cacheratio < cacheratio_warn_threshold:
+                    if level < 1:
+                        level = 1
+                    details.append('Cache ratio %i %% below %i %%' % (int(cacheratio*100), int(cacheratio_warn_threshold*100)))
+                elif cacheratio < cacheratio_crit_threshold:
+                    if level < 2:
+                        level = 2
+                    details.append('Cache ratio %i %% below %i %%' % (int(cacheratio*100), int(cacheratio_crit_threshold*100)))
+            
             if len(details) == 0:
-                details.append('Avg query time %ss, %i:%i Cache hits:misses' % (statementexecutetimeavg, cachehits, cachemiss))
+                details.append('Avg query time %0.1fs' % (statementexecutetimeavg))
+                details.append('Cache ratio %i %%' % (int(cacheratio*100)))
 
     # Construct a the status message.
     if level == 0:
