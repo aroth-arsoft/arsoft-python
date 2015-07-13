@@ -261,7 +261,7 @@ def use_key_file(update_obj, keyfile, format=KeyFileFormat.Zone):
         ret = False
     return ret
 
-def _get_resolver(dnsserver=None):
+def _get_resolver(dnsserver=None, timeout=None):
     if dnsserver is not None:
         nameservers = []
         if not isinstance(dnsserver, list):
@@ -283,6 +283,9 @@ def _get_resolver(dnsserver=None):
             ret.nameservers = nameservers
     else:
        ret = dns.resolver.Resolver()
+    if ret is not None and timeout is not None:
+        ret.timeout = float(timeout)
+        ret.lifetime = float(timeout)
     return ret
 
 def get_dns_zone_for_name(Name, Origin=None):
@@ -306,11 +309,11 @@ def get_dns_zone_for_name(Name, Origin=None):
             Name = None
         return Origin, Name
 
-def get_dns_srv_record(service, domain=None, default_value=None, tcp=True, dnsserver=None):
+def get_dns_srv_record(service, domain=None, default_value=None, tcp=True, dnsserver=None, timeout=None):
     if domain is None:
         domain = getdomainname()
     query = '_%s.%s.%s.' % (service.lower(), '_tcp' if tcp else '_udp', domain)
-    resolver = _get_resolver(dnsserver)
+    resolver = _get_resolver(dnsserver, timeout)
     if resolver:
         ret = []
         answers = resolver.query(query, 'SRV')
@@ -320,7 +323,7 @@ def get_dns_srv_record(service, domain=None, default_value=None, tcp=True, dnsse
         ret = None
     return ret
 
-def get_dns_host_record(query=None, hostname=None, domain=None, default_value=None, ipv6=False, dnsserver=None, with_cname=False):
+def get_dns_host_record(query=None, hostname=None, domain=None, default_value=None, ipv6=False, dnsserver=None, with_cname=False, timeout=None):
     if query is None:
         (local_fqdn, local_hostname, local_domain) = gethostname_tuple()
         if domain is None:
@@ -331,7 +334,7 @@ def get_dns_host_record(query=None, hostname=None, domain=None, default_value=No
     else:
         if query[-1] != '.':
             query += '.'
-    resolver = _get_resolver(dnsserver)
+    resolver = _get_resolver(dnsserver, timeout)
     if resolver:
         ret = set()
         final_queries = set(query)
@@ -362,7 +365,7 @@ def get_dns_host_record(query=None, hostname=None, domain=None, default_value=No
         ret = None
     return ret
 
-def get_dns_cname_record(query=None, hostname=None, domain=None, default_value=None, dnsserver=None):
+def get_dns_cname_record(query=None, hostname=None, domain=None, default_value=None, dnsserver=None, timeout=None):
     if query is None:
         (local_fqdn, local_hostname, local_domain) = gethostname_tuple()
         if domain is None:
@@ -370,7 +373,7 @@ def get_dns_cname_record(query=None, hostname=None, domain=None, default_value=N
         if hostname is None:
             hostname = local_hostname
         query = '%s.%s.' % (hostname.lower(), domain)
-    resolver = _get_resolver(dnsserver)
+    resolver = _get_resolver(dnsserver, timeout)
     if resolver:
         ret = []
         answers = resolver.query(query, 'CNAME')
@@ -381,8 +384,8 @@ def get_dns_cname_record(query=None, hostname=None, domain=None, default_value=N
         ret = None
     return ret
 
-def get_dns_ptr_record(address=None, default_value=None, dnsserver=None):
-    resolver = _get_resolver(dnsserver)
+def get_dns_ptr_record(address=None, default_value=None, dnsserver=None, timeout=None):
+    resolver = _get_resolver(dnsserver, timeout)
     if resolver:
         query = dns.reversename.from_address(address)
         ret = []

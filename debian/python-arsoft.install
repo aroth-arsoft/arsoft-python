@@ -13,7 +13,6 @@ usr/lib/python2*/dist-packages/arsoft/nfs/*.py
 usr/lib/python2*/dist-packages/arsoft/xdg/*.py
 usr/lib/python2*/dist-packages/arsoft/xmpp/*.py
 usr/bin/ini-util
-usr/bin/dns-query
 usr/bin/arsoft-mailer
 usr/bin/ssdp-discover
 usr/bin/slapd-config
@@ -25,4 +24,3 @@ usr/bin/cups-admin
 usr/bin/managehosts
 usr/bin/autofs-ldap-auth
 usr/bin/puppet-setup
-usr/bin/dns-update

@@ -34,6 +34,7 @@ class dns_update_app(object):
     DEFAULT_TTL = 86400
     DEFAULT_SERVER = 'localhost'
     DEFAULT_KEYFILE = None
+    DEFAULT_TIMEOUT = 5
 
     def __init__(self):
         self.verbose = False
@@ -281,15 +282,16 @@ class dns_update_app(object):
         ipv6 = True if self.rrtype == 'AAAA' else False
         ret = True
         for host in hosts_to_lookup:
+            hostaddr = None
             try:
-                hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=dnsserver, with_cname=True)
+                hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=dnsserver, with_cname=True, timeout=self.timeout)
             except dns.resolver.NoAnswer as e:
                 sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (host, dnsserver))
-                hostaddr = None
             except dns.resolver.NXDOMAIN as e:
                 sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, dnsserver))
-                hostaddr = None
-            if hostaddr:
+            except dns.exception.Timeout as e:
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - timeout.\n" % (host, dnsserver))
+            if hostaddr is not None:
                 print('%s %s' % (host, hostaddr))
         return ret
 
@@ -306,6 +308,7 @@ class dns_update_app(object):
         parser.add_argument('--rrtype', dest='rrtype', default=self.DEFAULT_RRTYPE, help='specify the RR type for the next operation')
         parser.add_argument('--ttl', dest='ttl', default=self.DEFAULT_TTL, help='specify the TTL for the records')
         parser.add_argument('-k', '--key', dest='keyfile', default=self.DEFAULT_KEYFILE, help='key to use for the update')
+        parser.add_argument('-t', '--timeout', dest='timeout', default=self.DEFAULT_TIMEOUT, help='set the timeout for DNS queries and updates')
 
         parser.add_argument('-l', '--lookup', dest='lookup', nargs='+', help='look up the given DNS record')
         parser.add_argument('-a', '--add', dest='add', nargs='+', help='adds the given DNS record; name value')
@@ -324,6 +327,7 @@ class dns_update_app(object):
         self.rrtype = args.rrtype
         self.server = args.server
         self.keyfile = args.keyfile
+        self.timeout = args.timeout
 
         perform_update = True
 

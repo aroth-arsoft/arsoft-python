@@ -27,3 +27,5 @@ usr/bin/certinfo
 usr/bin/alog
 usr/bin/efiinfo
 usr/bin/system-info
+usr/bin/dns-query
+usr/bin/dns-update

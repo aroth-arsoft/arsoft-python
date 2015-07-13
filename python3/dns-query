@@ -9,6 +9,25 @@ import arsoft.dnsutils
 import dns
 import dns.rdatatype
 
+def cmp_to_key(mycmp):
+    'Convert a cmp= function into a key= function'
+    class K(object):
+        def __init__(self, obj, *args):
+            self.obj = obj
+        def __lt__(self, other):
+            return mycmp(self.obj, other.obj) < 0
+        def __gt__(self, other):
+            return mycmp(self.obj, other.obj) > 0
+        def __eq__(self, other):
+            return mycmp(self.obj, other.obj) == 0
+        def __le__(self, other):
+            return mycmp(self.obj, other.obj) <= 0
+        def __ge__(self, other):
+            return mycmp(self.obj, other.obj) >= 0
+        def __ne__(self, other):
+            return mycmp(self.obj, other.obj) != 0
+    return K
+
 def _dns_answer_sort(lhs, rhs):
     if lhs.rdclass == rhs.rdclass and lhs.rdtype == rhs.rdtype:
         if lhs.rdtype == dns.rdatatype.MX:
@@ -31,6 +50,7 @@ class dns_query_app(object):
     DEFAULT_RRTYPE = 'A'
     DEFAULT_TTL = 86400
     DEFAULT_SERVER = None
+    DEFAULT_TIMEOUT = 5
 
     def __init__(self):
         self.verbose = False
@@ -170,7 +190,7 @@ class dns_query_app(object):
     def _execute_query(self, query_list):
         if self.verbose:
             print('DNS server %s' % (self.dnsserver))
-        resolver = arsoft.dnsutils._get_resolver(self.dnsserver)
+        resolver = arsoft.dnsutils._get_resolver(self.dnsserver, timeout=self.timeout)
         if not resolver:
             ret = False
         else:
@@ -184,7 +204,7 @@ class dns_query_app(object):
                     answers = resolver.query(query_string, record_type)
                     if answers:
                         ret = True
-                        sorted_answers = sorted(answers, cmp=_dns_answer_sort)
+                        sorted_answers = sorted(answers, key=cmp_to_key(_dns_answer_sort))
                         got_answer = None
                         if self.prefered_value:
                             for rdata in sorted_answers:
@@ -228,6 +248,7 @@ class dns_query_app(object):
         parser.add_argument('-b', '--batch', dest='batch', action='store_true', help='enable for batch operation.')
         parser.add_argument('--prefered-value', dest='prefered_value', help='can be use in combination with batch operation to return the same order of the results as in a previous query.')
         parser.add_argument('--first', dest='first', action='store_true', help='only output the first value.')
+        parser.add_argument('-t', '--timeout', dest='timeout', default=self.DEFAULT_TIMEOUT, help='set the timeout for DNS queries and updates')
         parser.add_argument('query', nargs='+', help='query string')
 
         args = parser.parse_args()
@@ -237,6 +258,7 @@ class dns_query_app(object):
         self.first = args.first
         self.dnsserver = self.DEFAULT_SERVER
         self.prefered_value = args.prefered_value
+        self.timeout = args.timeout
         (fqdn, self.hostname, domain) = arsoft.dnsutils.gethostname_tuple()
 
         self.domain = dns.name.from_text(domain)
