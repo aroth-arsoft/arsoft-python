@@ -447,17 +447,17 @@ def django_urls_view(request):
     return HttpResponse(t.render(c), content_type='text/html')
 
 
-def django_debug_urls(urls_module, urls_file, options={}):
-    from django.conf.urls import patterns, include, url
-
-    urls_module_obj = sys.modules[urls_module]
-    urls_module_obj_type = type(urls_module_obj)
+def django_debug_urls(options={}):
+    from django.conf.urls import patterns, url
 
     # add debug handler here
-    urls_module_obj.urlpatterns.append(url(r'^debug/request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'))
-    urls_module_obj.urlpatterns.append(url(r'^debug/env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'))
-    urls_module_obj.urlpatterns.append(url(r'^debug/settings$', 'arsoft.web.utils.django_settings_view', name='debug_django_settings'))
-    urls_module_obj.urlpatterns.append(url(r'^debug/urls$', 'arsoft.web.utils.django_urls_view', name='debug_django_urls'))
+    urlpatterns = patterns('',
+        url(r'^request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'),
+        url(r'^env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'),
+        url(r'^settings$', 'arsoft.web.utils.django_settings_view', name='debug_django_settings'),
+        url(r'^urls$', 'arsoft.web.utils.django_urls_view', name='debug_django_urls'),
+        )
+    return urlpatterns
 
 
 DEBUG_REQUEST_VIEW_TEMPLATE = """
@@ -949,6 +949,7 @@ DEBUG_SETTINGS_VIEW_TEMPLATE = """
 """
 
 DEBUG_URLS_VIEW_TEMPLATE = """
+{% load type %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1044,10 +1045,22 @@ DEBUG_URLS_VIEW_TEMPLATE = """
       <ol>
         {% for pattern in urlpatterns %}
           <li>
-            {{ pattern.regex.pattern }}
+            {{ pattern.regex.pattern }}&nbsp;({{pattern|type}})
             {% if pattern.name.strip %}&nbsp;[name='{{pattern.name}}']{% endif %}
             {% if pattern.callback %}&nbsp;[callback='{{pattern.callback}}']{% endif %}
             {% if pattern.name.default_args %}&nbsp;[args='{{pattern.default_args|join:", "}}']{% endif %}
+            {% if pattern.url_patterns %}
+              <ol>
+                {% for child_pattern in pattern.url_patterns %}
+                    <li>
+                        {{ child_pattern.regex.pattern }}&nbsp;({{child_pattern|type}})
+                        {% if child_pattern.name.strip %}&nbsp;[name='{{child_pattern.name}}']{% endif %}
+                        
+                        {% if child_pattern.name.default_args %}&nbsp;[args='{{child_pattern.default_args|join:", "}}']{% endif %}
+                    </li>
+                {% endfor %}
+              </ol>
+            {% endif %}
           </li>
         {% endfor %}
       </ol>
