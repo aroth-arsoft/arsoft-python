@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 import sys
+import types
+import re
 import os.path
 
 def _get_system_language_code():
@@ -33,6 +35,50 @@ def _is_running_in_devserver(appdir):
         return True
     elif '--in-development' in sys.argv:
         return True
+    else:
+        return False
+
+
+HIDDEN_SETTINGS = re.compile('API|TOKEN|KEY|SECRET|PASS|PROFANITIES_LIST|SIGNATURE')
+
+CLEANSED_SUBSTITUTE = '********************'
+
+def cleanse_setting(key, value):
+    """Cleanse an individual setting key/value of sensitive content.
+
+    If the value is a dictionary, recursively cleanse the keys in
+    that dictionary.
+    """
+    try:
+        if HIDDEN_SETTINGS.search(key):
+            cleansed = CLEANSED_SUBSTITUTE
+        else:
+            if isinstance(value, dict):
+                cleansed = dict((k, cleanse_setting(k, v)) for k, v in value.items())
+            else:
+                cleansed = value
+    except TypeError:
+        # If the key isn't regex-able, just return as-is.
+        cleansed = value
+
+    if callable(cleansed):
+        # For fixing #21345 and #23070
+        cleansed = CallableSettingWrapper(cleansed)
+    return cleansed
+
+def get_safe_settings():
+    from django.conf import settings
+    "Returns a dictionary of the settings module, with sensitive settings blurred out."
+    settings_dict = {}
+    for k in dir(settings):
+        if k.isupper():
+            settings_dict[k] = cleanse_setting(k, getattr(settings, k))
+    return settings_dict
+
+def is_debug_info_disabled():
+    from django.conf import settings
+    if hasattr(settings, 'DISABLE_DEBUG_INFO_PAGE'):
+        return bool(getattr(settings, 'DISABLE_DEBUG_INFO_PAGE'))
     else:
         return False
 
@@ -72,6 +118,9 @@ def initialize_settings(settings_module, setttings_file, options={}):
     else:
         settings_obj.DEBUG = in_devserver
     settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
+
+    # If DISABLE_DEBUG_INFO_PAGE is set the 
+    settings_obj.DISABLE_DEBUG_INFO_PAGE = False
 
     settings_obj.ADMINS = _get_default_admin()
     settings_obj.MANAGERS = settings_obj.ADMINS
@@ -130,6 +179,8 @@ def initialize_settings(settings_module, setttings_file, options={}):
         ]
 
     settings_obj.AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
+
+    settings_obj.SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
     
     # Additional locations of static files and the  List of finder classes 
     # that know how to find static files in various locations.
@@ -257,167 +308,144 @@ def initialize_settings(settings_module, setttings_file, options={}):
 
     #print(settings_obj.INSTALLED_APPS)
 
-def _django_request_info_view_dict(request, dict_name):
-    from django.utils.html import escape
-    ret = ''
-    if hasattr(request, dict_name):
-        ret += '<h1>%s</h1>' % dict_name
-        d = getattr(request, dict_name)
-        if isinstance(d, dict):
-            d_keys = sorted(d.keys())
-            ret += '<table border=\'1\'>'
-            for key in d_keys:
-                value = d[key]
-                ret += '<tr><td>%s</td><td>%s</td></tr>' % (escape(str(key)), escape(str(value)))
-            ret += '</table>'
-        else:
-            ret += '<pre>%s</pre>' % (escape(str(d)))
-    else:
-        ret += '<h1>%s (not available)</h1>' % dict_name
-    return ret
-
-def _django_request_info_view_impl(request, attr_names):
-    from django.utils.html import escape
-    ret = ''
-    ret += '<table border=\'1\'>\n'
-    for attr in attr_names:
-        ret += '<tr><td>%s</td><td>\n' % escape(str(attr))
-
-        if hasattr(request, attr):
-            d = getattr(request, attr)
-            if isinstance(d, dict):
-                d_keys = sorted(d.keys())
-                if d_keys:
-                    ret += '<table border=\'1\'>\n'
-                    for key in d_keys:
-                        value = d[key]
-                        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
-                    ret += '</table>\n'
-                else:
-                    ret += '<i>empty</i>\n'
-            else:
-                ret += '<pre>%s (%s)</pre>\n' % (escape(str(d)), escape(str(type(d))))
-        else:
-            ret += 'NA'
-        ret += '</td></tr>\n'
-    ret += '</table>\n'
-    return ret
-
-def _django_settings(request):
-    from django.conf import settings
-    from django.utils.html import escape
-    ret = ''
-    ret += '<table border=\'1\'>\n'
-    
-    for attr in dir(settings):
-        if attr.startswith('__') and attr.endswith('__'):
-            continue
-        ret += '<tr><td>%s</td><td>\n' % escape(str(attr))
-        if hasattr(settings, attr):
-            d = getattr(settings, attr)
-            if isinstance(d, dict):
-                d_keys = sorted(d.keys())
-                if d_keys:
-                    ret += '<table border=\'1\'>\n'
-                    for key in d_keys:
-                        value = d[key]
-                        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
-                    ret += '</table>\n'
-                else:
-                    ret += '<i>empty</i>\n'
-            else:
-                ret += '<pre>%s (%s)</pre>\n' % (escape(str(d)), escape(str(type(d))))
-        else:
-            ret += 'NA'
-        ret += '</td></tr>\n'
-    ret += '</table>\n'
-    return ret
-
-
-def _django_url_handler_info(request):
-    from django.core.urlresolvers import get_script_prefix
-    from django.utils.html import escape
-    data={}
-    data['script_prefix'] = get_script_prefix()
-
-    ret = ''
-    ret += '<table border=\'1\'>\n'
-    for key in data:
-        value = data[key]
-        ret += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
-    ret += '</table>\n'
-    return ret
-
-
 def django_request_info_view(request):
+    import datetime
     from django.http import HttpResponse
-    body = ''
-    body += '<html><head><style>\n'
-    body += 'table { border-collapse:collapse; vertical-align:top; }\n'
-    body += 'tr, th, td, tbody {\n'
-    body += 'border-style: inherit;\n'
-    body += 'border-color: inherit;\n'
-    body += 'border-width: inherit;\n'
-    body += 'text-align: left;\n'
-    body += 'vertical-align: top;\n'
-    body += 'padding:1px 3px 1px 3px;\n'
-    body += '}\n'
-    body += '</style></head>\n'
-    body += _django_request_info_view_impl(request, ['META', 'GET', 'POST', 'REQUEST', 'FILES', 'COOKIES',
-                                                     'scheme', 'method', 'path', 'path_info', 'user', 'session', 'urlconf', 'resolver_match'])
-    
-    body += '<h2>Settings</h2>\n';
-    body += _django_settings(request)
-    body += '<h2>URL handler info</h2>\n';
-    body += _django_url_handler_info(request)
+    from django.template import Template, Context
+    from django.core.urlresolvers import get_script_prefix
+    from django import get_version
 
-    body += '</html>\n'
-    return HttpResponse(body, content_type='text/html')
+    disable = is_debug_info_disabled()
+    if disable:
+        return HttpResponseForbidden('Debug info pages disabled.', content_type='text/plain')
+
+    script_prefix = get_script_prefix()
+
+    env = []
+    for key in sorted(os.environ.keys()):
+        env.append( (key, os.environ[key]) )
+    request_base_fields = []
+    for attr in ['scheme', 'method', 'path', 'path_info', 'user', 'session', 'urlconf', 'resolver_match']:
+        request_base_fields.append( (attr, getattr(request, attr) if hasattr(request, attr) else None) )
+    t = Template(DEBUG_REQUEST_VIEW_TEMPLATE, name='Debug request template')
+    c = Context({
+        'request_path': request.path_info,
+        'environment': env,
+        'request': request,
+        'request_base_fields': request_base_fields,
+        'settings': get_safe_settings(),
+        'script_prefix': script_prefix,
+        'sys_executable': sys.executable,
+        'sys_version_info': '%d.%d.%d' % sys.version_info[0:3],
+        'server_time': datetime.datetime.now(),
+        'django_version_info': get_version(),
+        'sys_path': sys.path,
+    })
+    return HttpResponse(t.render(c), content_type='text/html')
 
 def django_env_info_view(request):
-    from django.http import HttpResponse
-    from django.utils.html import escape
-    body = ''
-    body += '<html><head><style>\n'
-    body += 'table { border-collapse:collapse; vertical-align:top; }\n'
-    body += 'tr, th, td, tbody {\n'
-    body += 'border-style: inherit;\n'
-    body += 'border-color: inherit;\n'
-    body += 'border-width: inherit;\n'
-    body += 'text-align: left;\n'
-    body += 'vertical-align: top;\n'
-    body += 'padding:1px 3px 1px 3px;\n'
-    body += '}\n'
-    body += '</style></head>\n'
-    body += '<table border=\'1\'>\n'
-    body += '<tr><td>os.environ</td><td>\n'
-    body += '<table border=\'1\'>\n'
-    for key in sorted(os.environ):
-        value = os.environ[key]
-        body += '<tr><td>%s</td><td>%s</td></tr>\n' % (escape(str(key)), escape(str(value)))
-    body += '</table>\n'
-    body += '</td></tr>\n'
-    body += '</table>\n'
-    body += '</html>\n'
-    return HttpResponse(body, content_type='text/html')
+    import datetime
+    from django.http import HttpResponse, HttpResponseForbidden
+    from django.template import Template, Context
+    from django.core.urlresolvers import get_script_prefix
+    from django import get_version
+
+    script_prefix = get_script_prefix()
+
+    env = []
+    for key in sorted(os.environ.keys()):
+        env.append( (key, os.environ[key]) )
+    t = Template(DEBUG_ENV_VIEW_TEMPLATE, name='Debug environment template')
+    c = Context({
+        'request_path': request.path_info,
+        'environment': env,
+        'request': request,
+        'settings': get_safe_settings(),
+        'script_prefix': script_prefix,
+        'sys_executable': sys.executable,
+        'sys_version_info': '%d.%d.%d' % sys.version_info[0:3],
+        'server_time': datetime.datetime.now(),
+        'django_version_info': get_version(),
+        'sys_path': sys.path,
+    })
+    return HttpResponse(t.render(c), content_type='text/html')
 
 def django_settings_view(request):
-    from django.http import HttpResponse
-    body = ''
-    body += '<html><head><style>\n'
-    body += 'table { border-collapse:collapse; vertical-align:top; }\n'
-    body += 'tr, th, td, tbody {\n'
-    body += 'border-style: inherit;\n'
-    body += 'border-color: inherit;\n'
-    body += 'border-width: inherit;\n'
-    body += 'text-align: left;\n'
-    body += 'vertical-align: top;\n'
-    body += 'padding:1px 3px 1px 3px;\n'
-    body += '}\n'
-    body += '</style></head>\n'
-    body += _django_settings(request)
-    body += '</html>\n'
-    return HttpResponse(body, content_type='text/html')
+    import datetime
+    from django.conf import settings
+    from django.http import HttpResponse, HttpResponseForbidden
+    from django.template import Template, Context
+    from django.utils.encoding import force_bytes, smart_text
+    from django.core.urlresolvers import get_script_prefix
+    from django import get_version
+
+    disable = is_debug_info_disabled()
+    if disable:
+        return HttpResponseForbidden('Debug info pages disabled.', content_type='text/plain')
+
+    script_prefix = get_script_prefix()
+
+    urlconf = getattr(request, 'urlconf', settings.ROOT_URLCONF)
+    if isinstance(urlconf, types.ModuleType):
+        urlconf = urlconf.__name__
+
+    t = Template(DEBUG_SETTINGS_VIEW_TEMPLATE, name='Debug settings template')
+    c = Context({
+        'urlconf': urlconf,
+        'root_urlconf': settings.ROOT_URLCONF,
+        'request_path': request.path_info,
+        'reason': 'N/A',
+        'request': request,
+        'settings': get_safe_settings(),
+        'script_prefix': script_prefix,
+        'sys_executable': sys.executable,
+        'sys_version_info': '%d.%d.%d' % sys.version_info[0:3],
+        'server_time': datetime.datetime.now(),
+        'django_version_info': get_version(),
+        'sys_path': sys.path,
+    })
+    return HttpResponse(t.render(c), content_type='text/html')
+
+def django_urls_view(request):
+    import datetime
+    from django.conf import settings
+    from django.http import HttpResponse, HttpResponseForbidden
+    from django.template import Template, Context
+    from django.utils.encoding import force_bytes, smart_text
+    from django.core.urlresolvers import get_script_prefix, get_resolver
+    from django import get_version
+
+    disable = is_debug_info_disabled()
+    if disable:
+        return HttpResponseForbidden('Debug info pages disabled.', content_type='text/plain')
+
+    script_prefix = get_script_prefix()
+
+    urlconf = getattr(request, 'urlconf', settings.ROOT_URLCONF)
+    if isinstance(urlconf, types.ModuleType):
+        urlconf = urlconf.__name__
+    #urlpatterns = get_resolver(None)
+    urlpatterns = get_resolver(None).url_patterns
+    #urlpatterns = resolver_data.items()
+
+    t = Template(DEBUG_URLS_VIEW_TEMPLATE, name='Debug URL handlers template')
+    c = Context({
+        'urlconf': urlconf,
+        'root_urlconf': settings.ROOT_URLCONF,
+        'request_path': request.path_info,
+        'urlpatterns': urlpatterns,
+        'reason': 'N/A',
+        'request': request,
+        'settings': get_safe_settings(),
+        'script_prefix': script_prefix,
+        'sys_executable': sys.executable,
+        'sys_version_info': '%d.%d.%d' % sys.version_info[0:3],
+        'server_time': datetime.datetime.now(),
+        'django_version_info': get_version(),
+        'sys_path': sys.path,
+    })
+    return HttpResponse(t.render(c), content_type='text/html')
+
 
 def django_debug_urls(urls_module, urls_file, options={}):
     from django.conf.urls import patterns, include, url
@@ -429,3 +457,610 @@ def django_debug_urls(urls_module, urls_file, options={}):
     urls_module_obj.urlpatterns.append(url(r'^debug/request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'))
     urls_module_obj.urlpatterns.append(url(r'^debug/env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'))
     urls_module_obj.urlpatterns.append(url(r'^debug/settings$', 'arsoft.web.utils.django_settings_view', name='debug_django_settings'))
+    urls_module_obj.urlpatterns.append(url(r'^debug/urls$', 'arsoft.web.utils.django_urls_view', name='debug_django_urls'))
+
+
+DEBUG_REQUEST_VIEW_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <title>Request information</title>
+  <meta name="robots" content="NONE,NOARCHIVE">
+  <style type="text/css">
+    html * { padding:0; margin:0; }
+    body * { padding:10px 20px; }
+    body * * { padding:0; }
+    body { font:small sans-serif; background:#eee; }
+    body>div { border-bottom:1px solid #ddd; }
+    h1 { font-weight:normal; margin-bottom:.4em; }
+    h1 span { font-size:60%; color:#666; font-weight:normal; }
+    h2 { margin-bottom:.8em; }
+    h2 span { font-size:80%; color:#666; font-weight:normal; }
+    h3 { margin:1em 0 .5em 0; }
+    h4 { margin:0 0 .5em 0; font-weight: normal; }
+    table { border:none; border-collapse: collapse; width:100%; }
+    tr.settings { border-bottom: 1px solid #ccc; }
+    tr.req { border-bottom: 1px solid #ccc; }
+    td, th { vertical-align:top; padding:2px 3px; }
+    th { width:12em; text-align:right; color:#666; padding-right:.5em; }
+    th.settings { text-align:left; }
+    th.req { text-align:left; }
+    div { padding-bottom: 10px; }
+    #info { background:#f6f6f6; }
+    #info ol { margin: 0.5em 4em; }
+    #info ol li { font-family: monospace; }
+    #summary { background: #ffc; }
+    #explanation { background:#eee; border-bottom: 0px none; }
+  </style>
+</head>
+<body>
+  <div id="summary">
+    <h1>Request information</h1>
+    <table class="meta">
+      <tr>
+        <th>Request Method:</th>
+        <td>{{ request.META.REQUEST_METHOD }}</td>
+      </tr>
+      <tr>
+        <th>Request URL:</th>
+        <td>{{ request.build_absolute_uri|escape }}</td>
+      </tr>
+    <tr>
+      <th>Script prefix:</th>
+      <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+      <tr>
+        <th>Django Version:</th>
+        <td>{{ django_version_info }}</td>
+      </tr>
+      <tr>
+        <th>Python Version:</th>
+        <td>{{ sys_version_info }}</td>
+      </tr>
+    <tr>
+      <th>Python Executable:</th>
+      <td>{{ sys_executable|escape }}</td>
+    </tr>
+    <tr>
+      <th>Python Version:</th>
+      <td>{{ sys_version_info }}</td>
+    </tr>
+    <tr>
+      <th>Python Path:</th>
+      <td><pre>{{ sys_path|pprint }}</pre></td>
+    </tr>
+    <tr>
+      <th>Server time:</th>
+      <td>{{server_time|date:"r"}}</td>
+    </tr>
+      <tr>
+        <th>Installed Applications:</th>
+        <td><ul>
+          {% for item in settings.INSTALLED_APPS %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>Installed Middleware:</th>
+        <td><ul>
+          {% for item in settings.MIDDLEWARE_CLASSES %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>settings module:</th>
+        <td><code>{{ settings.SETTINGS_MODULE }}</code></td>
+      </tr>
+    </table>
+  </div>
+
+<div id="requestinfo">
+  <h2>Request information</h2>
+
+{% if request %}
+  <h3 id="basic-info">base</h3>
+    <table class="req">
+      <thead>
+        <tr class="req">
+          <th class="req">Variable</th>
+          <th class="req">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for var in request_base_fields %}
+          <tr class="req">
+            <td>{{ var.0 }}</td>
+            <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  
+
+
+  <h3 id="get-info">GET</h3>
+  {% if request.GET %}
+    <table class="req">
+      <thead>
+        <tr class="req">
+          <th class="req">Variable</th>
+          <th class="req">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for var in request.GET.items %}
+          <tr class="req">
+            <td>{{ var.0 }}</td>
+            <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No GET data</p>
+  {% endif %}
+
+  <h3 id="post-info">POST</h3>
+  {% if filtered_POST %}
+    <table class="req">
+      <thead>
+        <tr class="req">
+          <th class="req">Variable</th>
+          <th class="req">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for var in filtered_POST.items %}
+          <tr class="req">
+            <td>{{ var.0 }}</td>
+            <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No POST data</p>
+  {% endif %}
+  <h3 id="files-info">FILES</h3>
+  {% if request.FILES %}
+    <table class="req">
+        <thead>
+            <tr class="req">
+                <th class="req">Variable</th>
+                <th class="req">Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for var in request.FILES.items %}
+                <tr class="req">
+                    <td>{{ var.0 }}</td>
+                    <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+  {% else %}
+    <p>No FILES data</p>
+  {% endif %}
+
+
+  <h3 id="cookie-info">COOKIES</h3>
+  {% if request.COOKIES %}
+    <table class="req">
+      <thead>
+        <tr class="req">
+          <th class="req">Variable</th>
+          <th class="req">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for var in request.COOKIES.items %}
+          <tr class="req">
+            <td>{{ var.0 }}</td>
+            <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No cookie data</p>
+  {% endif %}
+
+  <h3 id="meta-info">META</h3>
+  <table class="req">
+    <thead>
+      <tr class="req">
+        <th class="req">Variable</th>
+        <th class="req">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for var in request.META.items|dictsort:"0" %}
+        <tr class="req">
+          <td>{{ var.0 }}</td>
+          <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>Request data not supplied</p>
+{% endif %}
+
+  <div id="settings">
+  <h3 id="settings">Settings</h3>
+  <table class="settings">
+    <thead>
+      <tr>
+        <th class="settings">Setting</th>
+        <th class="settings">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for var in settings.items|dictsort:"0" %}
+        <tr class="settings">
+          <td>{{ var.0 }}</td>
+          <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>  
+  </div>
+
+  <div id="explanation">
+    <p>
+      This page contains information to investigate issues with this web application.
+    </p>
+  </div>
+</body>
+</html>
+"""
+
+DEBUG_ENV_VIEW_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <title>Environment info</title>
+  <meta name="robots" content="NONE,NOARCHIVE">
+  <style type="text/css">
+    html * { padding:0; margin:0; }
+    body * { padding:10px 20px; }
+    body * * { padding:0; }
+    body { font:small sans-serif; background:#eee; }
+    body>div { border-bottom:1px solid #ddd; }
+    h1 { font-weight:normal; margin-bottom:.4em; }
+    h1 span { font-size:60%; color:#666; font-weight:normal; }
+    table { border:none; border-collapse: collapse; width:100%; }
+    td, th { vertical-align:top; padding:2px 3px; }
+    tr.env { border-bottom: 1px solid #ccc; }
+    th { width:12em; text-align:right; color:#666; padding-right:.5em; }
+    #info { background:#f6f6f6; }
+    #info ol { margin: 0.5em 4em; }
+    #info ol li { font-family: monospace; }
+    #summary { background: #ffc; }
+    #explanation { background:#eee; border-bottom: 0px none; }
+  </style>
+</head>
+<body>
+  <div id="summary">
+    <h1>Environment info</h1>
+    <table class="meta">
+      <tr>
+        <th>Request Method:</th>
+        <td>{{ request.META.REQUEST_METHOD }}</td>
+      </tr>
+      <tr>
+        <th>Request URL:</th>
+        <td>{{ request.build_absolute_uri|escape }}</td>
+      </tr>
+    <tr>
+      <th>Script prefix:</th>
+      <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+      <tr>
+        <th>Django Version:</th>
+        <td>{{ django_version_info }}</td>
+      </tr>
+      <tr>
+        <th>Python Version:</th>
+        <td>{{ sys_version_info }}</td>
+      </tr>
+    <tr>
+      <th>Python Executable:</th>
+      <td>{{ sys_executable|escape }}</td>
+    </tr>
+    <tr>
+      <th>Python Version:</th>
+      <td>{{ sys_version_info }}</td>
+    </tr>
+    <tr>
+      <th>Python Path:</th>
+      <td><pre>{{ sys_path|pprint }}</pre></td>
+    </tr>
+    <tr>
+      <th>Server time:</th>
+      <td>{{server_time|date:"r"}}</td>
+    </tr>
+      <tr>
+        <th>Installed Applications:</th>
+        <td><ul>
+          {% for item in settings.INSTALLED_APPS %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>Installed Middleware:</th>
+        <td><ul>
+          {% for item in settings.MIDDLEWARE_CLASSES %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>settings module:</th>
+        <td><code>{{ settings.SETTINGS_MODULE }}</code></td>
+      </tr>
+    </table>
+  </div>
+  <div id="info">
+    {% if environment %}
+       <table>
+        {% for item in environment %}
+          <tr class="env">
+            <td>{{item.0|escape}}</td><td>{{item.1|escape}}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p>{{ reason }}</p>
+    {% endif %}
+  </div>
+
+  <div id="explanation">
+    <p>
+      This page contains information to investigate issues with this web application.
+    </p>
+  </div>
+</body>
+</html>
+"""
+
+DEBUG_SETTINGS_VIEW_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <title>Settings</title>
+  <meta name="robots" content="NONE,NOARCHIVE">
+  <style type="text/css">
+    html * { padding:0; margin:0; }
+    body * { padding:10px 20px; }
+    body * * { padding:0; }
+    body { font:small sans-serif; background:#eee; }
+    body>div { border-bottom:1px solid #ddd; }
+    h1 { font-weight:normal; margin-bottom:.4em; }
+    h1 span { font-size:60%; color:#666; font-weight:normal; }
+    table { border:none; border-collapse: collapse; width:100%; }
+    tr.settings { border-bottom: 1px solid #ccc; }
+    td, th { vertical-align:top; padding:2px 3px; }
+    th { width:12em; text-align:right; color:#666; padding-right:.5em; }
+    th.settings { text-align:left; }
+    #info { background:#f6f6f6; }
+    #info ol { margin: 0.5em 4em; }
+    #info ol li { font-family: monospace; }
+    #summary { background: #ffc; }
+    #explanation { background:#eee; border-bottom: 0px none; }
+  </style>
+</head>
+<body>
+  <div id="summary">
+    <h1>Settings</h1>
+    <table class="meta">
+      <tr>
+        <th>Request Method:</th>
+        <td>{{ request.META.REQUEST_METHOD }}</td>
+      </tr>
+      <tr>
+        <th>Request URL:</th>
+        <td>{{ request.build_absolute_uri|escape }}</td>
+      </tr>
+    <tr>
+      <th>Script prefix:</th>
+      <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+      <tr>
+        <th>Django Version:</th>
+        <td>{{ django_version_info }}</td>
+      </tr>
+      <tr>
+        <th>Python Version:</th>
+        <td>{{ sys_version_info }}</td>
+      </tr>
+    <tr>
+      <th>Python Executable:</th>
+      <td>{{ sys_executable|escape }}</td>
+    </tr>
+    <tr>
+      <th>Python Version:</th>
+      <td>{{ sys_version_info }}</td>
+    </tr>
+    <tr>
+      <th>Python Path:</th>
+      <td><pre>{{ sys_path|pprint }}</pre></td>
+    </tr>
+    <tr>
+      <th>Server time:</th>
+      <td>{{server_time|date:"r"}}</td>
+    </tr>
+      <tr>
+        <th>Installed Applications:</th>
+        <td><ul>
+          {% for item in settings.INSTALLED_APPS %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>Installed Middleware:</th>
+        <td><ul>
+          {% for item in settings.MIDDLEWARE_CLASSES %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>settings module:</th>
+        <td><code>{{ settings.SETTINGS_MODULE }}</code></td>
+      </tr>
+    </table>
+  </div>
+  
+  <div id="info">
+  <table class="settings">
+    <thead>
+      <tr>
+        <th class="settings">Setting</th>
+        <th class="settings">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for var in settings.items|dictsort:"0" %}
+        <tr class="settings">
+          <td>{{ var.0 }}</td>
+          <td class="code"><pre>{{ var.1|pprint }}</pre></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>  
+  </div>
+
+  <div id="explanation">
+    <p>
+      This page contains information to investigate issues with this web application.
+    </p>
+  </div>
+</body>
+</html>
+"""
+
+DEBUG_URLS_VIEW_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <title>URL handler info</title>
+  <meta name="robots" content="NONE,NOARCHIVE">
+  <style type="text/css">
+    html * { padding:0; margin:0; }
+    body * { padding:10px 20px; }
+    body * * { padding:0; }
+    body { font:small sans-serif; background:#eee; }
+    body>div { border-bottom:1px solid #ddd; }
+    h1 { font-weight:normal; margin-bottom:.4em; }
+    h1 span { font-size:60%; color:#666; font-weight:normal; }
+    table { border:none; border-collapse: collapse; width:100%; }
+    td, th { vertical-align:top; padding:2px 3px; }
+    th { width:12em; text-align:right; color:#666; padding-right:.5em; }
+    #info { background:#f6f6f6; }
+    #info ol { margin: 0.5em 4em; }
+    #info ol li { font-family: monospace; }
+    #summary { background: #ffc; }
+    #explanation { background:#eee; border-bottom: 0px none; }
+  </style>
+</head>
+<body>
+  <div id="summary">
+    <h1>URL handler info</h1>
+    <table class="meta">
+      <tr>
+        <th>Request Method:</th>
+        <td>{{ request.META.REQUEST_METHOD }}</td>
+      </tr>
+      <tr>
+        <th>Request URL:</th>
+        <td>{{ request.build_absolute_uri|escape }}</td>
+      </tr>
+    <tr>
+      <th>Script prefix:</th>
+      <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+      <tr>
+        <th>Django Version:</th>
+        <td>{{ django_version_info }}</td>
+      </tr>
+      <tr>
+        <th>Python Version:</th>
+        <td>{{ sys_version_info }}</td>
+      </tr>
+    <tr>
+      <th>Python Executable:</th>
+      <td>{{ sys_executable|escape }}</td>
+    </tr>
+    <tr>
+      <th>Python Version:</th>
+      <td>{{ sys_version_info }}</td>
+    </tr>
+    <tr>
+      <th>Python Path:</th>
+      <td><pre>{{ sys_path|pprint }}</pre></td>
+    </tr>
+    <tr>
+      <th>Server time:</th>
+      <td>{{server_time|date:"r"}}</td>
+    </tr>
+      <tr>
+        <th>Installed Applications:</th>
+        <td><ul>
+          {% for item in settings.INSTALLED_APPS %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>Installed Middleware:</th>
+        <td><ul>
+          {% for item in settings.MIDDLEWARE_CLASSES %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>settings module:</th>
+        <td><code>{{ settings.SETTINGS_MODULE }}</code></td>
+      </tr>
+    </table>
+  </div>
+  <div id="info">
+    {% if urlpatterns %}
+      <p>
+      Using the URLconf defined in <code>{{ urlconf }}</code>,
+      Django tried these URL patterns, in this order:
+      </p>
+      <ol>
+        {% for pattern in urlpatterns %}
+          <li>
+            {{ pattern.regex.pattern }}
+            {% if pattern.name.strip %}&nbsp;[name='{{pattern.name}}']{% endif %}
+            {% if pattern.callback %}&nbsp;[callback='{{pattern.callback}}']{% endif %}
+            {% if pattern.name.default_args %}&nbsp;[args='{{pattern.default_args|join:", "}}']{% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p>{{ reason }}</p>
+    {% endif %}
+  </div>
+
+  <div id="explanation">
+    <p>
+      This page contains information to investigate issues with this web application.
+    </p>
+  </div>
+</body>
+</html>
+"""
