@@ -461,6 +461,9 @@ def django_debug_urls(options={}):
 
 
 DEBUG_REQUEST_VIEW_TEMPLATE = """
+{% load base_url %}
+{% load static_url %}
+{% load media_url %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -509,6 +512,18 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
     <tr>
       <th>Script prefix:</th>
       <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+    <tr>
+      <th>Base URL:</th>
+      <td><pre>{% base_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Static URL:</th>
+      <td><pre>{% static_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Media URL:</th>
+      <td><pre>{% media_url %}</pre></td>
     </tr>
       <tr>
         <th>Django Version:</th>
@@ -720,6 +735,9 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
 """
 
 DEBUG_ENV_VIEW_TEMPLATE = """
+{% load base_url %}
+{% load static_url %}
+{% load media_url %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -760,6 +778,18 @@ DEBUG_ENV_VIEW_TEMPLATE = """
     <tr>
       <th>Script prefix:</th>
       <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+    <tr>
+      <th>Base URL:</th>
+      <td><pre>{% base_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Static URL:</th>
+      <td><pre>{% static_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Media URL:</th>
+      <td><pre>{% media_url %}</pre></td>
     </tr>
       <tr>
         <th>Django Version:</th>
@@ -831,6 +861,9 @@ DEBUG_ENV_VIEW_TEMPLATE = """
 """
 
 DEBUG_SETTINGS_VIEW_TEMPLATE = """
+{% load base_url %}
+{% load static_url %}
+{% load media_url %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -872,6 +905,18 @@ DEBUG_SETTINGS_VIEW_TEMPLATE = """
     <tr>
       <th>Script prefix:</th>
       <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+    <tr>
+      <th>Base URL:</th>
+      <td><pre>{% base_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Static URL:</th>
+      <td><pre>{% static_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Media URL:</th>
+      <td><pre>{% media_url %}</pre></td>
     </tr>
       <tr>
         <th>Django Version:</th>
@@ -950,6 +995,9 @@ DEBUG_SETTINGS_VIEW_TEMPLATE = """
 
 DEBUG_URLS_VIEW_TEMPLATE = """
 {% load type %}
+{% load base_url %}
+{% load static_url %}
+{% load media_url %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -989,6 +1037,18 @@ DEBUG_URLS_VIEW_TEMPLATE = """
     <tr>
       <th>Script prefix:</th>
       <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+    <tr>
+      <th>Base URL:</th>
+      <td><pre>{% base_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Static URL:</th>
+      <td><pre>{% static_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Media URL:</th>
+      <td><pre>{% media_url %}</pre></td>
     </tr>
       <tr>
         <th>Django Version:</th>
