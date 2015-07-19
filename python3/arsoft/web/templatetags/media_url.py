@@ -10,7 +10,7 @@ register = template.Library()
 
 class MediaURLNode(template.Node):
     def __init__(self, url):
-        self._url = ''
+        self._url = get_script_prefix()
         try:
             self._url = getattr(settings,'MEDIA_URL')
         except AttributeError as e:
@@ -22,13 +22,16 @@ class MediaURLNode(template.Node):
         return self._url
 
 def do_media_url(parser, token):
-    try:
-        # split_contents() knows not to split quoted strings.
-        tag_name, url = token.split_contents()
-    except ValueError:
-        raise template.TemplateSyntaxError("%r tag requires a single argument" % token.contents.split()[0])
-    if not (url[0] == url[-1] and url[0] in ('"', "'")):
-        raise template.TemplateSyntaxError("%r tag's argument should be in quotes" % tag_name)
-    return MediaURLNode(url[1:-1])
+    url = None
+    # split_contents() knows not to split quoted strings.
+    e = token.split_contents()
+    if len(e) >= 2:
+        url = e[1]
+    tag_name = e[0] if e else None
+    if url:
+        if not (url[0] == url[-1] and url[0] in ('"', "'")):
+            raise template.TemplateSyntaxError("%r tag's argument should be in quotes" % tag_name)
+        url = url[1:-1]
+    return MediaURLNode(url)
 
 register.tag('media_url', do_media_url)
