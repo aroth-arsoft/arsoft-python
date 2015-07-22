@@ -22,6 +22,14 @@ SECONDS_ONE_WEEK = 7 * SECONDS_ONE_DAY
 SECONDS_ONE_MONTH = 30 * SECONDS_ONE_DAY
 SECONDS_ONE_YEAR = 365 * SECONDS_ONE_DAY
 
+STDOFFSET = timedelta(seconds = -time.timezone)
+if time.daylight:
+    DSTOFFSET = timedelta(seconds = -time.altzone)
+else:
+    DSTOFFSET = STDOFFSET
+
+DSTDIFF = DSTOFFSET - STDOFFSET
+
 class ParseError(Exception):
     """Raised when there is a problem parsing a date string"""
 
@@ -60,6 +68,33 @@ class FixedOffset(tzinfo):
     
     def __repr__(self):
         return "<FixedOffset %r>" % self.__name
+
+class LocalTimezone(tzinfo):
+
+    def utcoffset(self, dt):
+        if self._isdst(dt):
+            return DSTOFFSET
+        else:
+            return STDOFFSET
+
+    def dst(self, dt):
+        if self._isdst(dt):
+            return DSTDIFF
+        else:
+            return ZERO
+
+    def tzname(self, dt):
+        return time.tzname[self._isdst(dt)]
+
+    def _isdst(self, dt):
+        tt = (dt.year, dt.month, dt.day,
+              dt.hour, dt.minute, dt.second,
+              dt.weekday(), 0, 0)
+        stamp = time.mktime(tt)
+        tt = time.localtime(stamp)
+        return tt.tm_isdst > 0
+
+LOCAL_TZ = LocalTimezone()
 
 def parse_timezone(tzstring, default_timezone=UTC):
     """Parses ISO 8601 time zone specs into tzinfo offsets
@@ -369,6 +404,12 @@ def strptime_as_timestamp(timestamp, format):
         ret = time.mktime(t)
     return ret
 
+def utc_timestamp_to_datetime(ts):
+    return datetime.fromtimestamp(ts, UTC)
+
+def as_local_time(dt):
+    return dt.astimezone(LOCAL_TZ)
+
 if __name__ == "__main__":
 
     now = time.time()
@@ -379,3 +420,10 @@ if __name__ == "__main__":
     for t in [0, -1, 1, now - begin_of_time, begin_of_time - now, last_month, last_week, SECONDS_ONE_WEEK - SECONDS_ONE_DAY]:
         print('timedelta=%s => %s' % (str(t), format_timedelta(t)))
 
+
+    begin_of_time = datetime.utcfromtimestamp(0)
+    print(begin_of_time)
+    
+    begin_of_time = utc_timestamp_to_datetime(0)
+    print(begin_of_time)
+    
