@@ -180,6 +180,9 @@ def initialize_settings(settings_module, setttings_file, options={}):
 
     settings_obj.AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
 
+    # use sendmail as email backend by default
+    settings_obj.EMAIL_BACKEND = 'arsoft.web.backends.SendmailBackend'
+
     settings_obj.SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
     
     # Additional locations of static files and the  List of finder classes 
