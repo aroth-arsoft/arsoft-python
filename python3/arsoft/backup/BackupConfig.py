@@ -7,6 +7,7 @@ import datetime
 from arsoft.inifile import IniFile
 from arsoft.filelist import *
 from arsoft.socket_utils import getportbyname
+from arsoft.timestamp import parse_timedelta
 
 class BackupConfigDefaults(object):
     ROOT_DIR = None
@@ -354,7 +355,12 @@ class BackupConfig(object):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(filename)
         self.filesystem = inifile.get(None, 'Filesystem', BackupConfigDefaults.FILESYSTEM)
-        self.retention_time = datetime.timedelta(seconds=float(inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)))
+        self.retention_time = None
+        tmp = inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)
+        if isinstance(tmp, str):
+            self.retention_time = parse_timedelta(tmp)
+        if self.retention_time is None:
+            self.retention_time = datetime.timedelta(seconds=float(tmp))
         self.retention_count = int(inifile.get(None, 'RetentionCount', BackupConfigDefaults.RETENTION_COUNT))
         self.backup_directory = self._chroot_dir(inifile.get(None, 'BackupDirectory', BackupConfigDefaults.BACKUP_DIR))
         self.restore_directory = self._chroot_dir(inifile.get(None, 'RestoreDirectory', BackupConfigDefaults.RESTORE_DIR))

@@ -437,10 +437,13 @@ class logfile_writer_proxy(object):
         self._write_line('\t'.join(args))
 
     def _write_line(self, line):
+        add_newline = True if line and line[-1] != '\n' else False
         if self._prefix:
-            full = self._prefix + line + '\n'
+            full = self._prefix + line
         else:
-            full = line + '\n'
+            full = line
+        if add_newline:
+            full = full + '\n'
         if self._add_timestamp:
             msg = self.current_timestamp() + '\t' + full
         else:

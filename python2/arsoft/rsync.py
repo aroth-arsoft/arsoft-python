@@ -121,7 +121,7 @@ class Rsync(object):
                  numericIds=True,
                  verbose=False, compress=True, links=True, dryrun=False,
                  delete=False, deleteExcluded=False, force=False, delayUpdates=False,
-                 listOnly=False,
+                 listOnly=False, pruneEmptyDirs=False,
                  rsh=None, bandwidthLimit=None,
                  use_ssh=False, ssh_key=None,
                  rsync_bin=RsyncDefaults.RSYNC_BIN):
@@ -153,6 +153,7 @@ class Rsync(object):
         self.ssh_key = ssh_key
         self.bandwidthLimit = bandwidthLimit
         self.listOnly = listOnly
+        self.pruneEmptyDirs = pruneEmptyDirs
         self._include = include
         self._exclude = exclude
 
@@ -213,6 +214,9 @@ class Rsync(object):
             args.append('--list-only')
         if self.numericIds:
             args.append('--numeric-ids')
+        if self.pruneEmptyDirs:
+            args.append('--prune-empty-dirs')
+
         if self.rsh:
             args.append('--rsh=' + str(self.rsh))
         elif self.use_ssh:
@@ -396,6 +400,21 @@ class Rsync(object):
                     filename = ' '.join(elems[4:])
                     #print(mode, 'size=%s<<' % size, date, time)
                     ret[filename] = rsync_stat_result(mode, size, date, time)
+        return ret
+
+    @staticmethod
+    def rmdir(target_dir, recursive=True, force=True, stdout=None, stderr=None, stderr_to_stdout=False,
+                  use_ssh=False, ssh_key=None,
+                  verbose=False):
+        if target_dir[-1] != '/':
+            target_dir += '/'
+        empty_dir = tempfile.mkdtemp()
+        if empty_dir[-1] != '/':
+            empty_dir += '/'
+        rdir = Rsync(source=empty_dir, dest=target_dir, recursive=recursive, relative=False, use_ssh=use_ssh, ssh_key=ssh_key,
+                     delete=True, deleteExcluded=True, pruneEmptyDirs=True, force=force, verbose=verbose)
+        ret = rdir.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout)
+        os.rmdir(empty_dir)
         return ret
 
 if __name__ == "__main__":

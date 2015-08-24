@@ -22,6 +22,8 @@ class BackupList(object):
             self.fullpath = fullpath
             self.timestamp = timestamp
             self.session = session
+        def __str__(self):
+            return 'BackupItem(%s,%s,%s)' % (self.fullpath, self.timestamp, self.session)
     
     def __init__(self, app):
         self.app = app
@@ -103,7 +105,7 @@ class BackupList(object):
             num_to_delete = len(self._items) - max_count
             #print('numbers to delete %i' % num_to_delete)
             for i in range(0, num_to_delete):
-                #print('delete num %i=%s' % (i, self._items[0]))
+                self.app.session.writelog('Remove backup %s because more than %i backups found' % (self._items[0].fullpath, max_count) )
                 self.__delitem__(0)
 
         if isinstance(max_age, datetime.datetime):
@@ -117,7 +119,7 @@ class BackupList(object):
 
         while len(self._items) > 0 and len(self._items) <= min_count:
             if self._items[0].timestamp < max_rentention_time:
-                #print('remove old item %s' % (self._items[i]))
+                self.app.session.writelog('Remove backup %s because backup exceeds retention time of %s' % (self._items[0].fullpath, max_rentention_time) )
                 self.__delitem__(0)
             else:
                 break
@@ -133,15 +135,18 @@ class BackupList(object):
         return self._items[index]
 
     def __delitem__(self, index):
-        #print('delitem %i' % index)
         item = self._items[index]
         if Rsync.is_rsync_url(item.fullpath):
             url = Rsync.parse_url(item.fullpath)
-            ssh_rmdir(server=url.hostname, directory=url.path, recursive=True,
-                        username=url.username, password=url.password,
-                        keyfile=self.config.ssh_identity_file)
+            result = Rsync.rmdir(item.fullpath, recursive=True,
+                                 use_ssh=True, ssh_key=self.config.ssh_identity_file,
+                                 verbose=self.app.verbose)
         else:
             rmtree(item.fullpath)
+            result = True
+        if not result:
+            sys.stderr.write('Failed to remove backup %s\n' % (item.fullpath) )
+            self.app.session.writelog('Failed to remove backup %s\n' % (item.fullpath) )
         del self._items[index]
 
     @property
