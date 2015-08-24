@@ -23,6 +23,13 @@ Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp,
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 
+Package: python3-arsoft-web
+Section: python
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-arsoft, python3-django
+Description: module for django web applications
+ This package includes all common files for the django web applications.
+
 Package: arsoft-netconfig
 Architecture: all
 Depends: python-arsoft, ${python:Depends}, ${misc:Depends}
