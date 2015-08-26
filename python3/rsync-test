@@ -1,0 +1,25 @@
+#!/usr/bin/python3
+import sys
+from arsoft.rsync import *
+
+def rsync_listdir():
+    files = Rsync.listdir(sys.argv[1], use_ssh=True, ssh_key=sys.argv[2] if len(sys.argv) > 2 else None, recursive=True, verbose=True)
+    if files is not None:
+        for f, s in files.items():
+            print(f, s)
+
+def rsync_listdir_with_stats():
+    files, stats = Rsync.listdir(sys.argv[1], use_ssh=True, ssh_key=sys.argv[2] if len(sys.argv) > 2 else None, stats=True, recursive=True, verbose=True)
+    if files is not None:
+        for f, s in files.items():
+            print(f, s)
+
+    if stats is not None:
+        print('Stats:')
+        for f, s in stats.items():
+            print(f, s)
+
+if __name__ == "__main__":
+    #rsync_listdir()
+    rsync_listdir_with_stats()
+

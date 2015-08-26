@@ -17,6 +17,8 @@ class rsync_stat_result(object):
 
     @staticmethod
     def str_mode2mode(str):
+        if len(str) < 10:
+            return None
         ret = 0
         if str[0] == 'd':
             ret += stat.S_IFDIR
@@ -54,39 +56,6 @@ class rsync_stat_result(object):
             ret = default_value
         return ret
 
-    @staticmethod
-    def str_mode2mode(str):
-        ret = 0
-        if str[0] == 'd':
-            ret += stat.S_IFDIR
-        elif str[0] == 's':
-            ret += stat.S_IFSOCK
-        elif str[0] == 'l':
-            ret += stat.S_IFLNK
-        else:
-            ret += stat.S_IFREG
-        if str[1] == 'r':
-            ret += stat.S_IRUSR
-        if str[2] == 'w':
-            ret += stat.S_IWUSR
-        if str[3] == 'x':
-            ret += stat.S_IXUSR
-        if str[4] == 'r':
-            ret += stat.S_IRGRP
-        if str[5] == 'w':
-            ret += stat.S_IWGRP
-        if str[6] == 'x':
-            ret += stat.S_IXGRP
-        if str[7] == 'r':
-            ret += stat.S_IROTH
-        if str[8] == 'w':
-            ret += stat.S_IWOTH
-        if str[9] == 'x':
-            ret += stat.S_IXOTH
-        return ret
-
-        return ret
-
     def __init__(self, mode, size, date, time):
         self.st_mode = rsync_stat_result.str_mode2mode(mode)
         self.st_ino=0
@@ -121,7 +90,7 @@ class Rsync(object):
                  numericIds=True,
                  verbose=False, compress=True, links=True, dryrun=False,
                  delete=False, deleteExcluded=False, force=False, delayUpdates=False,
-                 listOnly=False, pruneEmptyDirs=False,
+                 listOnly=False, pruneEmptyDirs=False, stats=False,
                  rsh=None, bandwidthLimit=None,
                  use_ssh=False, ssh_key=None,
                  rsync_bin=RsyncDefaults.RSYNC_BIN):
@@ -153,6 +122,7 @@ class Rsync(object):
         self.ssh_key = ssh_key
         self.bandwidthLimit = bandwidthLimit
         self.listOnly = listOnly
+        self.stats = stats
         self.pruneEmptyDirs = pruneEmptyDirs
         self._include = include
         self._exclude = exclude
@@ -212,6 +182,8 @@ class Rsync(object):
             args.append('--dry-run')
         if self.listOnly:
             args.append('--list-only')
+        if self.stats:
+            args.append('--stats')
         if self.numericIds:
             args.append('--numeric-ids')
         if self.pruneEmptyDirs:
@@ -276,7 +248,9 @@ class Rsync(object):
                 args.append(self._source)
         args.append(self._normalize_url(self._dest))
 
-        (status_code, stdout_data, stderr_data) = runcmdAndGetData([self._rsync_bin] + args, stdout=stdout, stderr_to_stdout=stderr_to_stdout, verbose=self.verbose)
+        rsync_env = os.environ
+        rsync_env['LANG'] = 'C'
+        (status_code, stdout_data, stderr_data) = runcmdAndGetData([self._rsync_bin] + args, stdout=stdout, stderr_to_stdout=stderr_to_stdout, env=rsync_env, verbose=self.verbose)
 
         if tmp_include:
             os.remove(tmp_include)
@@ -381,26 +355,115 @@ class Rsync(object):
             return False
 
     @staticmethod
-    def listdir(target_dir, use_ssh=False, ssh_key=None, verbose=False):
+    def parse_number(str):
+        ret = None
+        if ' ' in str:
+            elems = str.split(' ')
+            try:
+                if ',' in elems[0]:
+                    elems[0] = elems[0].replace(',','')
+                ret = int(elems[0])
+            except ValueError:
+                pass
+        else:
+            try:
+                if ',' in str:
+                    str = str.replace(',','')
+                ret = int(str)
+            except ValueError:
+                pass
+        return ret
+
+    @staticmethod
+    def listdir(target_dir, use_ssh=False, ssh_key=None, recursive=False, stats=False, verbose=False):
         if target_dir[-1] != '/':
             target_dir += '/'
-        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=False, relative=False, listOnly=True, use_ssh=use_ssh, ssh_key=ssh_key, verbose=False)
+        rdir = Rsync(source='/dev/null', dest=target_dir, recursive=recursive, relative=False, listOnly=True, stats=stats, use_ssh=use_ssh, ssh_key=ssh_key, verbose=verbose)
         (status_code, stdout_data, stderr_data) = rdir.executeRaw(stdout=None, stderr=None, stderr_to_stdout=False)
 
         ret = None
-        if status_code == 0:
+        ret_stats = None
+        # See http://wpkg.org/Rsync_exit_codes
+        # 0 -> successful, 23 -> Partial transfer due to error (e.g. permision denied for some files)
+        if status_code == 0 or status_code == 23:
             ret = {}
+            ret_stats = {}
+            parse_stats = False
             for line in stdout_data.decode('utf-8').splitlines():
                 if not line:
+                    parse_stats = True
                     continue
-                #print(line)
-                elems = [item for item in line.split(' ') if item]
-                if len(elems) >= 5:
-                    mode, size, date, time = elems[0:4]
-                    filename = ' '.join(elems[4:])
-                    #print(mode, 'size=%s<<' % size, date, time)
-                    ret[filename] = rsync_stat_result(mode, size, date, time)
-        return ret
+                if parse_stats and stats:
+                    #print(line)
+                    idx = line.find(':')
+                    if idx > 0:
+                        key = line[0:idx]
+                        value = line[idx+1:].strip()
+                        skip = False
+                        if key == 'Number of files':
+                            details = {}
+                            # 18 (reg: 4, dir: 12, special: 2)
+                            total = 0
+                            start = value.find('(')
+                            end = value.find(')')
+                            if start > 0 and end > 0:
+                                total = Rsync.parse_number(value[0:start])
+                                for e in value[start+1:end].split(','):
+                                    #print(e)
+                                    idx = e.find(':')
+                                    if idx > 0:
+                                        k = e[0:idx].strip()
+                                        v = Rsync.parse_number(e[idx+1:].strip())
+                                        details[k] = v
+                            ret_stats['num_total_files'] = total
+                            ret_stats['num_regular_files'] = details.get('reg', 0)
+                            ret_stats['num_special_files'] = details.get('special', 0)
+                            ret_stats['num_dirs'] = details.get('dir', 0)
+                            skip = True
+                        elif key == 'Total file size':
+                            skip = True
+                            ret_stats['total_file_size'] = Rsync.parse_number(value)
+                        elif key == 'Total transferred file size':
+                            skip = True
+                            ret_stats['total_transferred_file_size'] = Rsync.parse_number(value)
+                        elif key == 'File list size':
+                            skip = True
+                            ret_stats['file_list_size'] = Rsync.parse_number(value)
+                        elif key.startswith('Total bytes'):
+                            skip = True
+                            if key == 'Total bytes received':
+                                ret_stats['total_bytes_received'] = Rsync.parse_number(value)
+                            elif key == 'Total bytes sent':
+                                ret_stats['total_bytes_sent'] = Rsync.parse_number(value)
+                            else:
+                                skip = False
+                        elif key.startswith('Number of'):
+                            skip = True
+                            if key == 'Number of created files':
+                                ret_stats['num_created_files'] = Rsync.parse_number(value)
+                            elif key == 'Number of deleted files':
+                                ret_stats['num_deleted_files'] = Rsync.parse_number(value)
+                            elif 'Number of regular files transferred':
+                                ret_stats['num_regular_files_transferred'] = Rsync.parse_number(value)
+                            else:
+                                skip = False
+
+                        if not skip:
+                            ret_stats[key] = value
+                else:
+                    if line.startswith('receiving') or line.startswith('sent') or line.startswith('total size'):
+                        continue
+                    #print(line)
+                    elems = [item for item in line.split(' ') if item]
+                    if len(elems) >= 5:
+                        mode, size, date, time = elems[0:4]
+                        filename = ' '.join(elems[4:])
+                        #print(mode, 'size=%s<<' % size, date, time)
+                        ret[filename] = rsync_stat_result(mode, size, date, time)
+        if stats:
+            return ret, ret_stats
+        else:
+            return ret
 
     @staticmethod
     def rmdir(target_dir, recursive=True, force=True, stdout=None, stderr=None, stderr_to_stdout=False,
