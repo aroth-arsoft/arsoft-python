@@ -10,7 +10,7 @@ from arsoft.backup.BackupApp import BackupApp
 from arsoft.backup.BackupConfig import BackupConfig
 from arsoft.filelist import FileList, FileListItem
 from arsoft.rsync import Rsync
-from arsoft.utils import log_collector
+from arsoft.utils import log_collector, bytes2human
 
 class ARSoftBackupApp(BackupApp):
 
@@ -146,7 +146,35 @@ class ARSoftBackupApp(BackupApp):
         else:
             ret = -1
         return ret
-    
+
+    def _get_backup_statistics(self, item, num_big_files=15):
+        ret = None
+        if Rsync.is_rsync_url(item.fullpath):
+            files, stats = Rsync.listdir(item.fullpath,
+                                            use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
+                                            stats=True, recursive=True, verbose=self._verbose)
+            ret = {}
+            ret['num_files'] = stats.get('num_total_files', 0)
+            ret['num_dirs'] = stats.get('num_dirs', 0)
+            ret['total_size'] = stats.get('total_file_size', 0)
+
+
+            files_sorted_by_size = sorted(files.items(), key=lambda f: f[1].st_size, reverse=True)
+            ret['biggest_files'] = files_sorted_by_size[0:num_big_files]
+
+        return ret
+
+    def _show_backup_stats(self, item):
+        stats = self._get_backup_statistics(item)
+        if stats is not None:
+            print('  Statistics')
+            print('    Size: %s' % (bytes2human(stats.get('total_size', 0))))
+            print('    Number of files: %i' % (stats.get('num_files', 0)))
+            print('    Number of directories: %i' % (stats.get('num_dirs', 0)))
+            print('    Biggest files:')
+            for name, fstat in stats.get('biggest_files', []):
+                print('      %7s %s' % (bytes2human(fstat.st_size), name))
+
     def _show_status(self, load_disk=True):
         if not self._check_config():
             return 1
@@ -198,6 +226,7 @@ class ARSoftBackupApp(BackupApp):
                 print('Last backup:      None')
         else:
             print('Last backup:      N/A')
+        print('Backups:          %i' % (len(self.job_state.history)))
 
         for item in self.job_state.history:
             print('%s (%s)' % (item.date, 'Success' if item.success else 'Failure'))
@@ -207,6 +236,8 @@ class ARSoftBackupApp(BackupApp):
             print('  Directory: %s' % (item.backup_dir))
             if item.backup_disk:
                 print('  Disk:      %s' % (item.backup_disk))
+            if self._show_details and (self._show_details_all or item.unique_name in self._show_details_list):
+                self._show_backup_stats(item)
 
         if self.previous_backups:
             print('Previous backups:')
@@ -215,6 +246,9 @@ class ARSoftBackupApp(BackupApp):
                     print('  %s in %s' % (bak.timestamp, bak.fullpath))
                 else:
                     print('  %s in %s (got session)' % (bak.timestamp, bak.fullpath))
+            if self.previous_backups.last_full_backup:
+                if self._show_details and (self._show_details_last):
+                    self._show_backup_stats(self.previous_backups.last_full_backup)
 
         if load_disk:
             if not BackupApp.shutdown_destination(self):
@@ -289,6 +323,7 @@ class ARSoftBackupApp(BackupApp):
         parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
         parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
         parser.add_argument('--status', dest='show_status', action='store_true', help='shows the status of the backup.')
+        parser.add_argument('--details', dest='details', nargs='*', help='shows detailed information about the selected backups.')
         parser.add_argument('--cleanup', dest='cleanup', action='store_true', help='clean up the backups')
         parser.add_argument('--log', dest='show_log', action='store_true', help='shows the log/history of the backup.')
 
@@ -296,7 +331,14 @@ class ARSoftBackupApp(BackupApp):
 
         self._verbose = args.verbose
         self._dryrun = args.dryrun
-        
+        self._show_details = True if args.details is not None else False
+        self._show_details_all = True if args.details is not None and 'all' in args.details else False
+        self._show_details_last = True if args.details is not None and 'last' in args.details else False
+        self._show_details_list = args.details
+        if self._show_details:
+            if not self._show_details_all and not self._show_details_last and not self._show_details_list:
+                self._show_details_last = True
+
         root_dir = os.path.abspath(args.root_dir)
         if not os.path.isdir(root_dir):
             sys.stderr.write('Given root directory %s does not exist.\n' % (root_dir))

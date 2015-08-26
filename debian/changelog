@@ -1,3 +1,9 @@
+arsoft-python (1.220) vivid; urgency=medium
+
+  * show details/statistics for backups
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 26 Aug 2015 15:22:13 +0200
+
 arsoft-python (1.219) vivid; urgency=medium
 
   * get backup retention working with rsync
