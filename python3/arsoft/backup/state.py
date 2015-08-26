@@ -23,6 +23,7 @@ class BackupJobHistoryItem(object):
         (self.state_dir, basename) = os.path.split(self.filename)
         (self.basename, self.extension) = os.path.splitext(basename)
         history_date_str = self.basename[len(BackupStateDefaults.HISTORY_FILE_PREFIX):]
+        self.unique_name = history_date_str
         self.date = datetime.datetime.strptime(history_date_str, BackupStateDefaults.TIMESTAMP_FORMAT)
         self.timestamp = timestamp_from_datetime(self.date)
         self.logfile = os.path.join(self.state_dir, self.basename + BackupStateDefaults.LOG_FILE_EXTENSION)
@@ -88,6 +89,10 @@ class BackupJobHistoryItem(object):
     @backup_dir.setter
     def backup_dir(self, value):
         self._backup_dir = value
+
+    @property
+    def fullpath(self):
+        return self.backup_dir
 
     @property
     def backup_disk(self):
