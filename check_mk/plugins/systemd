@@ -3,10 +3,12 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.utils import runcmdAndGetData
+from arsoft.timestamp import strptime_as_timestamp
 from arsoft.check_mk import *
 import re
 import os
 import errno
+import time
 
 class systemd_check_mk_plugin(object):
 
@@ -57,6 +59,12 @@ class systemd_check_mk_plugin(object):
                     value = 1
                 elif value == 'no':
                     value = 0
+                if key.endswith('time'):
+                    if key == 'rtc_time':
+                        fmt = '%a %Y-%m-%d %H:%M:%S'
+                    else:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                    value = strptime_as_timestamp(value, fmt)
                 self._timedate_info[key] = value
         (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.SYSTEMCTL, 'status', 'systemd-timesyncd'], env={'LANG':'C'})
         if sts == 0:
@@ -64,7 +72,7 @@ class systemd_check_mk_plugin(object):
                 if not ':' in line:
                     continue
                 key, value = line.split(':', 1)
-                key = key.strip().replace(' ', '_').lower()
+                key = key.strip().replace(' ', '_').replace('-', '_').lower()
                 value = value.strip()
                 if len(value) > 2:
                     if value[0] == '"' and value[-1] == '"':
@@ -73,6 +81,19 @@ class systemd_check_mk_plugin(object):
                         value = 1
                     elif value == 'no':
                         value = 0
+                if key == 'status':
+                    print('got tm %s' % value)
+                    idx = value.find('time server')
+                    if idx >= 0:
+                        server_info = value[idx + 12:]
+                        if ' ' in server_info:
+                            addr, name = server_info.split(' ', 1)
+                            if name[0] == '(' and name[-1] == ')':
+                                name = name[1:-1]
+                        else:
+                            addr = server_info
+                            name = server_info
+                        self._timedate_info['time_server'] = [ addr, name ]
                 self._timedate_info[key] = value
 
     def status(self):
@@ -82,7 +103,10 @@ class systemd_check_mk_plugin(object):
             print('features_enabled;%s' % ','.join(self._features_enabled))
             print('features_disabled;%s' % ','.join(self._features_disabled))
             for k,v in self._timedate_info.items():
-                print('timedatctl_%s;%s' % (k,v))
+                if isinstance(v, list):
+                    print('timedatectl_%s;%s' % (k,';'.join(v)))
+                else:
+                    print('timedatectl_%s;%s' % (k,v))
 
 if __name__ == "__main__":
     pl = systemd_check_mk_plugin()
