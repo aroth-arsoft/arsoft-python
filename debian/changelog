@@ -1,3 +1,9 @@
+arsoft-python (1.221) wily; urgency=medium
+
+  * check_mk: improve systemd timedate check and info display
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 09 Oct 2015 18:26:09 +0200
+
 arsoft-python (1.220) vivid; urgency=medium
 
   * show details/statistics for backups
