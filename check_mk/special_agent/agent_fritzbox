@@ -217,26 +217,44 @@ def get_upnp_info(control, namespace, action, pre_v6=False):
 
     return attrs
 
-def check_ddns_status(dnsserver_ip, names=[], external_ip=None):
+def check_ddns_status(dnsserver_ip, names=[], external_ip=None, timeout=4):
     results = {}
     if dnsserver_ip:
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dnsserver_ip]
+        resolver.timeout = timeout
     else:
         resolver = None
     for name in names:
-        answers = []
-        if resolver is not None:
+        name_ips = ''
+        error_text = ''
+        if external_ip is None:
+            # If we do not have an external IP this check if quite pointless
+            # so let's assume the DDNS names are ok
+            name_status = 3 # unknown
+            error_text = 'No external IP'
+        else:
+            answers = None
             rtype = dns.rdatatype.AAAA if name.startswith('ipv6:') else dns.rdatatype.A
-            try:
-                answers = resolver.query(name, rtype)
-            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                pass
-        r = []
-        for rdata in answers:
-            r.append(str(rdata))
-        name_ok = True if external_ip in r else False
-        results[name] = (name_ok, ','.join(r) )
+            if resolver is not None:
+                try:
+                    answers = resolver.query(name, rtype)
+                except (dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN, dns.resolver.Timeout) as e:
+                    error_text = str(e)
+            if answers is None:
+                name_status = 3 # unknown
+                if not error_text:
+                    error_text = 'No answer for %s:%s' % (dns.rdatatype.to_text(rtype), name)
+            else:
+                r = []
+                for rdata in answers:
+                    r.append(str(rdata))
+                name_ips = ','.join(r)
+                if external_ip in r:
+                    name_status = 0 # OK
+                else:
+                    name_status = 2 # Critical
+        results[name] = (name_status, name_ips, error_text )
     return results
 
 try:
@@ -265,11 +283,15 @@ try:
         sys.stdout.write('%s;%s\n' % (key, value))
 
     sys.stdout.write('<<<fritz_ddns:sep(59)>>>\n')
-    first_dns_server = status['NewDNSServer1'] if 'NewDNSServer1' in status else None
-    external_ip = status['NewExternalIPAddress'] if 'NewExternalIPAddress' in status else None
-    ddns_status = check_ddns_status(first_dns_server, names=opt_ddns, external_ip=external_ip)
-    for key, (name_ok, value) in ddns_status.items():
-        sys.stdout.write('%s;%s;%s;%i\n' % (key, value, external_ip, 1 if name_ok else 0))
+    dns_server = status.get('NewDNSServer1', None)
+    if dns_server is None:
+        dns_server = status.get('NewDNSServer2', None)
+
+    #dns_server = '193.113.32.157'
+    external_ip = status.get('NewExternalIPAddress', None)
+    ddns_status = check_ddns_status(dns_server, names=opt_ddns, external_ip=external_ip)
+    for key, (name_status, name_ips, error_text) in ddns_status.items():
+        sys.stdout.write('%s;%i;%s;%s;%s\n' % (key, name_status, name_ips, '' if not external_ip else str(external_ip), error_text))
 
 except:
     if opt_debug:
