@@ -1,3 +1,9 @@
+arsoft-python (1.222) wily; urgency=medium
+
+  * check_mk: better fritz box DDNS handling
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 15 Dec 2015 19:44:41 +0100
+
 arsoft-python (1.221) wily; urgency=medium
 
   * check_mk: improve systemd timedate check and info display
