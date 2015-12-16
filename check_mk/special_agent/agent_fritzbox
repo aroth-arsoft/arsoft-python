@@ -64,7 +64,7 @@ ARGUMENTS:
 OPTIONS:
   -h, --help                    Show this help message and exit
   -t, --timeout SEC             Set the network timeout to <SEC> seconds.
-                                Default is 10 seconds. Note: the timeout is not
+                                Default is 4 seconds. Note: the timeout is not
                                 applied to the whole check, instead it is used for
                                 each API query.
   --debug                       Debug mode: let Python exceptions come through
@@ -75,20 +75,24 @@ OPTIONS:
                                 the list of DDNS names.
   -C cfgfile                    name of an alternative config file. default is
                                 /etc/check_mk/fritzbox.mk
+  -E, --ext-dns                 Use DNS servers of the WAN interface.
+  -D=DNS                        Use given DNS servers (must be a valid IP address).
 """)
 
-short_options = 'hdot:H:C:'
+short_options = 'Ehdot:H:C:D:'
 long_options  = [
-    'help', 'timeout=', 'debug', 'pre-v6', 'ddns='
+    'help', 'timeout=', 'debug', 'pre-v6', 'ddns=', 'ext-dns'
 ]
 
 host_address      = None
 opt_debug         = False
-opt_timeout       = 10
+opt_timeout       = 4
 opt_pre_v6        = False
 opt_ddns          = []
 opt_host          = None
 opt_cfgfile       = None
+opt_ext_dns       = False
+opt_dns_server    = None
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
@@ -100,11 +104,20 @@ for o,a in opts:
     if o in [ '--debug' ]:
         opt_debug = True
     elif o in [ '-t', '--timeout' ]:
-        opt_timeout = int(a)
+        try:
+            opt_timeout = float(a)
+        except ValueError:
+            sys.stderr.write("ERROR: Value %s for timeout is not a valid number.\n" % a)
+            sys.exit(1)
+
     elif o in [ '-o', '--pre-v6' ]:
         opt_pre_v6 = True
     elif o in [ '--ddns' ]:
         opt_ddns.append(a)
+    elif o in [ '-E', '--ext-dns' ]:
+        opt_ext_dns = True
+    elif o in [ '-D' ]:
+        opt_dns_server = a
     elif o in [ '-H' ]:
         opt_host = a
         if host_address is None:
@@ -217,11 +230,11 @@ def get_upnp_info(control, namespace, action, pre_v6=False):
 
     return attrs
 
-def check_ddns_status(dnsserver_ip, names=[], external_ip=None, timeout=4):
+def check_ddns_status(dnsservers, names=[], external_ip=None, timeout=4):
     results = {}
-    if dnsserver_ip:
+    if dnsservers:
         resolver = dns.resolver.Resolver()
-        resolver.nameservers = [dnsserver_ip]
+        resolver.nameservers = dnsservers
         resolver.timeout = timeout
     else:
         resolver = None
@@ -233,18 +246,21 @@ def check_ddns_status(dnsserver_ip, names=[], external_ip=None, timeout=4):
             # so let's assume the DDNS names are ok
             name_status = 3 # unknown
             error_text = 'No external IP'
+        elif resolver is None:
+            # No resolver because no DNS servers available
+            name_status = 3 # unknown
+            error_text = 'No DNS servers available'
         else:
             answers = None
             rtype = dns.rdatatype.AAAA if name.startswith('ipv6:') else dns.rdatatype.A
-            if resolver is not None:
-                try:
-                    answers = resolver.query(name, rtype)
-                except (dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN, dns.resolver.Timeout) as e:
-                    error_text = str(e)
+            try:
+                answers = resolver.query(name, rtype)
+            except (dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN, dns.resolver.Timeout) as e:
+                error_text = str(e)
             if answers is None:
                 name_status = 3 # unknown
                 if not error_text:
-                    error_text = 'No answer for %s:%s' % (dns.rdatatype.to_text(rtype), name)
+                    error_text = 'No answer for %s:%s, nameservers %s' % (dns.rdatatype.to_text(rtype), name, ','.join(resolver.nameservers))
             else:
                 r = []
                 for rdata in answers:
@@ -258,6 +274,16 @@ def check_ddns_status(dnsserver_ip, names=[], external_ip=None, timeout=4):
     return results
 
 try:
+    if not arsoft.dnsutils.is_valid_ipv4(host_address):
+        resolver = dns.resolver.Resolver()
+        rtype = dns.rdatatype.A
+        try:
+            answers = resolver.query(host_address, rtype)
+            if answers:
+                host_address = str(answers[0])
+        except (dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.NXDOMAIN, dns.resolver.Timeout) as e:
+            pass
+    
     status = {}
     for control, namespace, action in [
         ('WANIPConn1', 'urn:schemas-upnp-org:service:WANIPConnection:1', 'GetStatusInfo'),
@@ -283,13 +309,24 @@ try:
         sys.stdout.write('%s;%s\n' % (key, value))
 
     sys.stdout.write('<<<fritz_ddns:sep(59)>>>\n')
-    dns_server = status.get('NewDNSServer1', None)
-    if dns_server is None:
-        dns_server = status.get('NewDNSServer2', None)
+    dns_servers = []
+    if opt_dns_server is not None:
+        dns_servers.append(opt_dns_server)
+    else:
+        if opt_ext_dns:
+            prim_dns = status.get('NewDNSServer1', None)
+            second_dns = status.get('NewDNSServer2', None)
+            if prim_dns is not None:
+                dns_servers.append(prim_dns)
+            if second_dns is not None:
+                dns_servers.append(second_dns)
+                
+        dns_servers.append(host_address)
 
-    #dns_server = '193.113.32.157'
+    #print(dns_servers)
+    #print(opt_ddns)
     external_ip = status.get('NewExternalIPAddress', None)
-    ddns_status = check_ddns_status(dns_server, names=opt_ddns, external_ip=external_ip)
+    ddns_status = check_ddns_status(dns_servers, names=opt_ddns, external_ip=external_ip, timeout=opt_timeout)
     for key, (name_status, name_ips, error_text) in ddns_status.items():
         sys.stdout.write('%s;%i;%s;%s;%s\n' % (key, name_status, name_ips, '' if not external_ip else str(external_ip), error_text))
 
