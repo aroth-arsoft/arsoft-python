@@ -1,3 +1,10 @@
+arsoft-python (1.223) wily; urgency=medium
+
+  * this should fix the wily build
+  * check_mk: use fritz box as DNS relay
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 16 Dec 2015 07:34:00 +0100
+
 arsoft-python (1.222) wily; urgency=medium
 
   * check_mk: better fritz box DDNS handling
