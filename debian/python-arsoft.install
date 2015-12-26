@@ -23,4 +23,3 @@ usr/bin/nsswitch-winbind
 usr/bin/cups-admin
 usr/bin/managehosts
 usr/bin/autofs-ldap-auth
-usr/bin/puppet-setup

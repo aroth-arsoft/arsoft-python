@@ -18,7 +18,7 @@ def version_dep_scripts(scripts):
     return ret
 
 setup(name='arsoft-python',
-		version='1.223',
+		version='1.224',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -78,7 +78,8 @@ setup(name='arsoft-python',
             ('slapd-config', 2),
             ('pxeconfig', 2),
             ('autofs-ldap-auth', 2),
-            ('puppet-setup', 2),
+            ('puppet-setup', 3),
+            ('puppet-template-check', 3),
             ('heimdal-password-expire', 2),
             ('dns-update', 3),
             ]),

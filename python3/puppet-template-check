@@ -1,0 +1,170 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import os.path, os
+import argparse
+import io
+import re
+import subprocess
+from arsoft.utils import runcmdAndGetData
+
+class puppet_template_check(object):
+    def __init__(self):
+        self._verbose = False
+        self._erb_bin = '/usr/bin/erb'
+        self._ruby_bin = '/usr/bin/ruby'
+
+    @staticmethod
+    def _try_utf8(data):
+        "Returns a Unicode object on success, or None on failure"
+        try:
+            return data.decode('utf-8')
+        except UnicodeDecodeError:
+            return None
+        
+    def _check_encoding(self, filename):
+        ret = False
+        try:
+            f = open(filename, 'rb')
+            data = f.read()
+        except IOError:
+            sys.stderr.write('Failed to read %s\n' % (filename))
+            data = None
+
+        if data:
+            ret = puppet_template_check._try_utf8(data) is not None
+            if not ret:
+                sys.stderr.write('File %s cannot be decoded as UTF-8.\n' % (filename))
+        return ret
+
+    def _compile_erb(self, filename):
+        args = [ self._erb_bin, '-x', '-T', '-', filename ]
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args)
+        if stdoutdata is not None:
+            stdoutdata = stdoutdata.decode('utf-8')
+        if stderrdata is not None:
+            stderrdata = stderrdata.decode('utf-8')
+        return (sts, stdoutdata, stderrdata)
+    
+    def _ruby_check(self, script):
+        args = [ self._ruby_bin, '-c' ]
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args, stdin=io.StringIO(script))
+        if stdoutdata is not None:
+            stdoutdata = stdoutdata.decode('utf-8')
+        if stderrdata is not None:
+            stderrdata = stderrdata.decode('utf-8')
+        return (sts, stdoutdata, stderrdata)
+    
+    def _erb_syntax_check(self, filename):
+        erb_args = [ self._erb_bin, '-x', '-T', '-', filename ]
+        ruby_args = [ self._ruby_bin, '-c' ]
+        p = subprocess.Popen(' '.join(erb_args + ['|'] + ruby_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=None, shell=True)
+        if p:
+            (stdoutdata, stderrdata) = p.communicate()
+            if stdoutdata is not None:
+                stdoutdata = stdoutdata.decode('utf-8')
+            if stderrdata is not None:
+                stderrdata = stderrdata.decode('utf-8')
+            sts = p.returncode
+        else:
+            sts = -1
+            stdoutdata = None
+            stderrdata = None
+        return (sts, stdoutdata, stderrdata)
+
+    def _check_syntax(self, filename):
+
+        (sts, stdoutdata, stderrdata) = self._erb_syntax_check(filename)
+        if sts == 0:
+            if self._verbose:
+                print('Syntax %s OK' % filename)
+        else:
+            if stderrdata[0] == '-' and stderrdata[1] == ':':
+                msg = 'Line ' + stderrdata[2:-1]
+            else:
+                msg = stderrdata[:-1]
+            sys.stderr.write('Syntax error in %s: %s\n' % (filename, msg))
+        return True
+    
+    def _extract_variables(self, filename):
+        (sts, stdoutdata, stderrdata) = self._compile_erb(filename)
+        if sts == 0:
+            print('Variables in %s' % filename)
+            re_var_to_s = re.compile('\( (?P<var>@?[a-zA-Z_][a-zA-Z0-9_]*) \)\.to_s')
+            for l in stdoutdata.splitlines():
+                #print(l)
+                m = re_var_to_s.search(l)
+                if m:
+                    print(m.group('var'))
+        return True
+        
+    
+    def _check_file(self, filename):
+        ret = True
+        if self._verbose:
+            print('Check file %s' % filename)
+
+        if self._perform_encoding_only:
+            if not self._check_encoding(filename):
+                ret = False
+        if self._perform_syntax_check:
+            if not self._check_syntax(filename):
+                ret = False
+        if self._show_variabes:
+            if not self._extract_variables(filename):
+                ret = False
+            
+        return ret
+    
+    def _check_dir(self, path):
+        ret = True
+        is_template_dir = True if os.path.basename(path) == 'templates' else False
+        for f in os.listdir(path):
+            full = os.path.join(path, f)
+            if os.path.isdir(full):
+                if not self._check_dir(full):
+                    ret = False
+            elif os.path.isfile(full):
+                if is_template_dir:
+                    if not self._check_file(full):
+                        ret = False
+        return 0
+    
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='check one or more puppet template files for syntax and encoding errors.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+        parser.add_argument('-q', '--quiet', dest='quiet', action='store_true', help='disable all output messages')
+        parser.add_argument('-l', '--variables', dest='show_variabes', action='store_true', help='show all variables used in the template')
+        parser.add_argument('-S', dest='syntax_only', action='store_true', help='syntax check only')
+        parser.add_argument('-E', dest='encoding_only', action='store_true', help='encoding check only')
+        parser.add_argument('file', help='file or directory to check')
+
+        args = parser.parse_args()
+        self._verbose = args.verbose
+        self._show_variabes = True if args.show_variabes else False
+        self._perform_syntax_check = True if not args.encoding_only else False
+        self._perform_encoding_only = True if not args.syntax_only else False
+        
+        filename = os.path.realpath(args.file)
+        if not os.path.exists(filename):
+            sys.stderr.write('File %s does not exist.\n' % (filename))
+            ret = 2
+        else:
+            ret = 0
+            if os.path.isdir(filename):
+                if not self._check_dir(filename):
+                    ret = 1
+            else:
+                if not self._check_file(filename):
+                    ret = 1
+
+        return ret
+
+if __name__ == "__main__":
+    app =  puppet_template_check()
+    sys.exit(app.main())

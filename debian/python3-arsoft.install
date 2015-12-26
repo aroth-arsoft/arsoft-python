@@ -29,3 +29,5 @@ usr/bin/efiinfo
 usr/bin/system-info
 usr/bin/dns-query
 usr/bin/dns-update
+usr/bin/puppet-setup
+usr/bin/puppet-template-check

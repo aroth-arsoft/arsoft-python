@@ -1,3 +1,9 @@
+arsoft-python (1.224) wily; urgency=medium
+
+  * add python version of puppet-template-check
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 26 Dec 2015 17:26:16 +0100
+
 arsoft-python (1.223) wily; urgency=medium
 
   * this should fix the wily build
