@@ -5,13 +5,13 @@ action=''
 nsswitch_winbind_modify() {
 	local enable="$1"
 	if [ $enable -eq 0 ]; then
-		/usr/sbin/nsswitch-config \
+		/usr/bin/nsswitch-config \
 			--set passwd files \
 			--set group files \
 			--set shadow files
 		RES=$?
 	else
-		/usr/sbin/nsswitch-config \
+		/usr/bin/nsswitch-config \
 			--set passwd files winbind \
 			--set group files winbind \
 			--set shadow files
