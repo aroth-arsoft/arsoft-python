@@ -21,6 +21,9 @@ class PuppetSetupApp(object):
         self.verbose = False
         self._config = None
         self._apt_update_required = False
+        self._cxn = None
+        self._session_key = None
+        self._sudo = None
         self.puppet_server = None
         self.puppet_server_ip = None
         self.puppet_server_port = 8140
