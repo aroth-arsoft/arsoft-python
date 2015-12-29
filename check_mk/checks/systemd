@@ -32,7 +32,7 @@ def check_systemd(item, params, info):
             details.append('Version %s' % (data['version']))
     elif item == 'timedate':
 
-        timedatectl_status = data.get('timedatectl_status')
+        #timedatectl_status = data.get('timedatectl_status')
         timedatectl_ntp_synchronized = data.get('timedatectl_ntp_synchronized')
         timedatectl_ntp_enabled = data.get('timedatectl_ntp_enabled')
         timedatectl_network_time_on = data.get('timedatectl_network_time_on')
