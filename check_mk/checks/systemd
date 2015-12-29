@@ -45,7 +45,7 @@ def check_systemd(item, params, info):
         if timedatectl_ntp_enabled or timedatectl_network_time_on:
             if timedatectl_ntp_synchronized:
                 timedatectl_time_server = data.get('timedatectl_time_server')
-                if len(timedatectl_time_server) > 1:
+                if timedatectl_time_server is not None and len(timedatectl_time_server) > 1:
                     addr, name = timedatectl_time_server
                     timedatectl_time_server = '%s (%s)' % (name, addr)
             else:
