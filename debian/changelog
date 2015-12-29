@@ -1,3 +1,9 @@
+arsoft-python (1.227) wily; urgency=medium
+
+  * check_mk: fixes for systemd/timedate checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 29 Dec 2015 15:39:00 +0100
+
 arsoft-python (1.226) wily; urgency=medium
 
   * fixed nsswitch-winbind
