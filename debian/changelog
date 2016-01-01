@@ -1,3 +1,9 @@
+arsoft-python (1.228) wily; urgency=medium
+
+  * add stub for samba4 password expire check
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 01 Jan 2016 15:59:53 +0100
+
 arsoft-python (1.227) wily; urgency=medium
 
   * check_mk: fixes for systemd/timedate checks
