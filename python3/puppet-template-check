@@ -93,11 +93,16 @@ class puppet_template_check(object):
         if sts == 0:
             print('Variables in %s' % filename)
             re_var_to_s = re.compile('\( (?P<var>@?[a-zA-Z_][a-zA-Z0-9_]*) \)\.to_s')
+            re_scope_var_to_s = re.compile('scope\[\'(?P<var>@?[a-zA-Z_][a-zA-Z0-9_:]*)\'\]')
             for l in stdoutdata.splitlines():
                 #print(l)
                 m = re_var_to_s.search(l)
                 if m:
                     print(m.group('var'))
+                else:
+                    m = re_scope_var_to_s.search(l)
+                    if m:
+                        print(m.group('var'))
         return True
         
     
@@ -115,7 +120,15 @@ class puppet_template_check(object):
         if self._show_variabes:
             if not self._extract_variables(filename):
                 ret = False
-            
+        if self._compile:
+            (sts, stdoutdata, stderrdata) = self._compile_erb(filename)
+            if sts == 0:
+                print('File %s:' % filename)
+                print(stdoutdata)
+
+        if not self._quiet and not self._compile:
+            if ret:
+                print('File %s OK' % filename)
         return ret
     
     def _check_dir(self, path):
@@ -139,6 +152,7 @@ class puppet_template_check(object):
         parser = argparse.ArgumentParser(description='check one or more puppet template files for syntax and encoding errors.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('-q', '--quiet', dest='quiet', action='store_true', help='disable all output messages')
+        parser.add_argument('-c', '--compile', dest='compile', action='store_true', help='compile template and show result.')
         parser.add_argument('-l', '--variables', dest='show_variabes', action='store_true', help='show all variables used in the template')
         parser.add_argument('-S', dest='syntax_only', action='store_true', help='syntax check only')
         parser.add_argument('-E', dest='encoding_only', action='store_true', help='encoding check only')
@@ -146,6 +160,8 @@ class puppet_template_check(object):
 
         args = parser.parse_args()
         self._verbose = args.verbose
+        self._quiet = args.quiet
+        self._compile = args.compile
         self._show_variabes = True if args.show_variabes else False
         self._perform_syntax_check = True if not args.encoding_only else False
         self._perform_encoding_only = True if not args.syntax_only else False
