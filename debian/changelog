@@ -1,3 +1,9 @@
+arsoft-python (1.229) wily; urgency=medium
+
+  * openvpn-admin: show log of given vpn
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 03 Jan 2016 16:36:20 +0100
+
 arsoft-python (1.228) wily; urgency=medium
 
   * add stub for samba4 password expire check
