@@ -102,9 +102,9 @@ class Config(object):
         return list(self._names.keys())
     
     def _invoke_rc_d_openvpn(self, action, args):
-        invoke_args = ['openvpn', action]
+        invoke_args = ['/usr/sbin/invoke-rc.d', 'openvpn', action]
         invoke_args.extend(args)
-        (sts, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData('/usr/sbin/invoke-rc.d', invoke_args)
+        (sts, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData(invoke_args)
         if sts == 0:
             self.last_error = None
             ret = True

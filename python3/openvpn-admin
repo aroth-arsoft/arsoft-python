@@ -518,16 +518,11 @@ to use the provided configuration.
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
             self._get_config()
-            if self._config.is_running(vpnname):
-                # already started
+            if self._config.start(vpnname):
                 print('Started %s' % vpnname)
                 ret = self.ExitCode.Success
             else:
-                if self._config.start(vpnname):
-                    print('Started %s' % vpnname)
-                    ret = self.ExitCode.Success
-                else:
-                    sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, self._config.last_error))
+                sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, self._config.last_error))
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
             ret = self.ExitCode.VPNNotFound
@@ -537,17 +532,12 @@ to use the provided configuration.
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
             self._get_config()
-            if self._config.is_running(vpnname):
-                if self._config.stop(vpnname):
-                    ret = self.ExitCode.Success
-                    print('Stopped %s' % vpnname)
-                else:
-                    ret = self.ExitCode.Failure
-                    sys.stderr.write('Failed to stop VPN %s. %s\n' % (vpnname, self._config.last_error))
-            else:
-                # VPN already stopped
+            if self._config.stop(vpnname):
                 ret = self.ExitCode.Success
                 print('Stopped %s' % vpnname)
+            else:
+                ret = self.ExitCode.Failure
+                sys.stderr.write('Failed to stop VPN %s. %s\n' % (vpnname, self._config.last_error))
         else:
             ret = self.ExitCode.VPNNotFound
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
@@ -557,16 +547,12 @@ to use the provided configuration.
         cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
         if cfgfile.valid:
             self._get_config()
-            if self._config.is_running(vpnname):
-                if self._config.restart(vpnname):
-                    ret = self.ExitCode.Success
-                    print('Restart %s' % vpnname)
-                else:
-                    ret = self.ExitCode.Failure
-                    sys.stderr.write('Failed to restart VPN %s. %s\n' % (vpnname, self._config.last_error))
+            if self._config.restart(vpnname):
+                ret = self.ExitCode.Success
+                print('Restart %s' % vpnname)
             else:
-                ret = self.ExitCode.NotRunning
-                sys.stderr.write('VPN %s not running\n' % (vpnname))
+                ret = self.ExitCode.Failure
+                sys.stderr.write('Failed to restart VPN %s. %s\n' % (vpnname, self._config.last_error))
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
             ret = self.ExitCode.VPNNotFound
@@ -586,6 +572,28 @@ to use the provided configuration.
             else:
                 ret = self.ExitCode.NotRunning
                 sys.stderr.write('Failed to reload VPN %s because VPN not running\n' % (vpnname))
+        else:
+            sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
+            ret = self.ExitCode.VPNNotFound
+        return ret
+
+    def action_log(self, vpnname):
+        cfgfile = arsoft.openvpn.ConfigFile(config_name=vpnname)
+        if cfgfile.valid:
+            logfile = cfgfile.logfile if cfgfile.logfile else cfgfile.logfile_append
+            if logfile is None:
+                ret = self.ExitCode.Failure
+                sys.stderr.write('VPN %s does not use a logfile.\n' % (vpnname))
+            else:
+                try:
+                    f = open(logfile, 'r')
+                    content = f.read()
+                    f.close()
+                    sys.stdout.write(content)
+                    ret = self.ExitCode.Success
+                except IOError as e:
+                    ret = self.ExitCode.Failure
+                    sys.stderr.write('Failed to read log file %s (%s)\n' % (logfile, str(e)))
         else:
             sys.stderr.write('Failed to open configuration for VPN %s. %s\n' % (vpnname, cfgfile.last_error))
             ret = self.ExitCode.VPNNotFound
@@ -658,6 +666,7 @@ to use the provided configuration.
         parser.add_argument('--stop', dest='action_stop', metavar='VPNNAME', help='stops the specified VPN')
         parser.add_argument('--restart', dest='action_restart', metavar='VPNNAME', help='restart the specified VPN')
         parser.add_argument('--reload', dest='action_reload', metavar='VPNNAME', help='reload the configuration of the specified VPN')
+        parser.add_argument('--log', dest='action_log', metavar='VPNNAME', help='show the log file of the specified VPN')
         parser.add_argument('--recipient', dest='recipient', metavar='RECIPIENT', help='override the mail recipient of the VPN configuration.')
         parser.add_argument('--force-notify', dest='force_notify', action='store_true', help='send notification even if the configuration is unchanged.')
         parser.add_argument('--no-mail', dest='no_mail', action='store_true', help='to not mail notifications.')
@@ -704,6 +713,8 @@ to use the provided configuration.
             ret = self.action_restart(args.action_restart)
         elif args.action_reload is not None:
             ret = self.action_reload(args.action_reload)
+        elif args.action_log is not None:
+            ret = self.action_log(args.action_log)
         elif args.action_add_ccd:
             if len(args.action_add_ccd) >= 2:
                 ret = self.action_add_ccd(args.action_add_ccd[0], args.action_add_ccd[1:])
