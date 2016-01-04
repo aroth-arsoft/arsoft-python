@@ -106,7 +106,7 @@ def initialize_settings(settings_module, setttings_file, options={}):
 
     if 'BASE_PATH' in os.environ:
         settings_obj.BASE_PATH = os.environ['BASE_PATH']
-        if settings_obj.BASE_PATH[-1] == '/':
+        if len(settings_obj.BASE_PATH) > 2 and settings_obj.BASE_PATH[-1] == '/':
             settings_obj.BASE_PATH = settings_obj.BASE_PATH[:-1]
     else:
         settings_obj.BASE_PATH = ''
@@ -663,39 +663,7 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
     #explanation { background:#eee; border-bottom: 0px none; }
   </style>
 </head>
-<body>  <div id="info">
-    {% if urlpatterns %}
-      <p>
-      Using the URLconf defined in <code>{{ urlconf }}</code>,
-      Django tried these URL patterns, in this order:
-      </p>
-      <ol>
-        {% for pattern in urlpatterns %}
-          <li>
-            {{ pattern.regex.pattern }}&nbsp;({{pattern|type}})
-            {% if pattern.name.strip %}&nbsp;[name='{{pattern.name}}']{% endif %}
-            {% if pattern.callback %}&nbsp;[callback='{{pattern.callback}}']{% endif %}
-            {% if pattern.name.default_args %}&nbsp;[args='{{pattern.default_args|join:", "}}']{% endif %}
-            {% if pattern.url_patterns %}
-              <ol>
-                {% for child_pattern in pattern.url_patterns %}
-                    <li>
-                        {{ child_pattern.regex.pattern }}&nbsp;({{child_pattern|type}})
-                        {% if child_pattern.name.strip %}&nbsp;[name='{{child_pattern.name}}']{% endif %}
-                        
-                        {% if child_pattern.name.default_args %}&nbsp;[args='{{child_pattern.default_args|join:", "}}']{% endif %}
-                    </li>
-                {% endfor %}
-              </ol>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ol>
-    {% else %}
-      <p>{{ reason }}</p>
-    {% endif %}
-  </div>
-
+<body>  
   <div id="summary">
     <h1>Request information</h1>
     <table class="meta">
@@ -920,7 +888,7 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
         </tr>
       {% endfor %}
     </tbody>
-  </table>  
+  </table>
   </div>
 
   <div id="explanation">
