@@ -106,7 +106,7 @@ def initialize_settings(settings_module, setttings_file, options={}):
 
     if 'BASE_PATH' in os.environ:
         settings_obj.BASE_PATH = os.environ['BASE_PATH']
-        if settings_obj.BASE_PATH[-1] == '/':
+        if len(settings_obj.BASE_PATH) > 2 and settings_obj.BASE_PATH[-1] == '/':
             settings_obj.BASE_PATH = settings_obj.BASE_PATH[:-1]
     else:
         settings_obj.BASE_PATH = ''
@@ -449,12 +449,45 @@ def django_urls_view(request):
     })
     return HttpResponse(t.render(c), content_type='text/html')
 
+def django_debug_info(request):
+    import datetime
+    from django.conf import settings
+    from django.http import HttpResponse, HttpResponseForbidden
+    from django.template import Template, Context
+    from django.utils.encoding import force_bytes, smart_text
+    from django.core.urlresolvers import get_script_prefix, get_resolver
+    from django import get_version
+
+    disable = is_debug_info_disabled()
+    if disable:
+        return HttpResponseForbidden('Debug info pages disabled.', content_type='text/plain')
+
+    script_prefix = get_script_prefix()
+
+    urlpatterns = django_debug_urls()
+
+    t = Template(DEBUG_INFO_VIEW_TEMPLATE, name='Debug Info template')
+    c = Context({
+        'request_path': request.path_info,
+        'urlpatterns': urlpatterns,
+        'reason': 'N/A',
+        'request': request,
+        'settings': get_safe_settings(),
+        'script_prefix': script_prefix,
+        'sys_executable': sys.executable,
+        'sys_version_info': '%d.%d.%d' % sys.version_info[0:3],
+        'server_time': datetime.datetime.now(),
+        'django_version_info': get_version(),
+        'sys_path': sys.path,
+    })
+    return HttpResponse(t.render(c), content_type='text/html')
 
 def django_debug_urls(options={}):
     from django.conf.urls import patterns, url
 
     # add debug handler here
     urlpatterns = patterns('',
+        url(r'^$', 'arsoft.web.utils.django_debug_info', name='debug_django_info'),
         url(r'^request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'),
         url(r'^env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'),
         url(r'^settings$', 'arsoft.web.utils.django_settings_view', name='debug_django_settings'),
@@ -462,6 +495,136 @@ def django_debug_urls(options={}):
         )
     return urlpatterns
 
+DEBUG_INFO_VIEW_TEMPLATE = """
+{% load base_url %}
+{% load static_url %}
+{% load media_url %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <title>Request information</title>
+  <meta name="robots" content="NONE,NOARCHIVE">
+  <style type="text/css">
+    html * { padding:0; margin:0; }
+    body * { padding:10px 20px; }
+    body * * { padding:0; }
+    body { font:small sans-serif; background:#eee; }
+    body>div { border-bottom:1px solid #ddd; }
+    h1 { font-weight:normal; margin-bottom:.4em; }
+    h1 span { font-size:60%; color:#666; font-weight:normal; }
+    h2 { margin-bottom:.8em; }
+    h2 span { font-size:80%; color:#666; font-weight:normal; }
+    h3 { margin:1em 0 .5em 0; }
+    h4 { margin:0 0 .5em 0; font-weight: normal; }
+    table { border:none; border-collapse: collapse; width:100%; }
+    tr.settings { border-bottom: 1px solid #ccc; }
+    tr.req { border-bottom: 1px solid #ccc; }
+    td, th { vertical-align:top; padding:2px 3px; }
+    th { width:12em; text-align:right; color:#666; padding-right:.5em; }
+    th.settings { text-align:left; }
+    th.req { text-align:left; }
+    div { padding-bottom: 10px; }
+    #info { background:#f6f6f6; }
+    #info ol { margin: 0.5em 4em; }
+    #info ol li { font-family: monospace; }
+    #summary { background: #ffc; }
+    #explanation { background:#eee; border-bottom: 0px none; }
+  </style>
+</head>
+<body>
+  <div id="summary">
+    <h1>Available debug helpers</h1>
+    <table class="meta">
+      <tr>
+        <th>Request Method:</th>
+        <td>{{ request.META.REQUEST_METHOD }}</td>
+      </tr>
+      <tr>
+        <th>Request URL:</th>
+        <td>{{ request.build_absolute_uri|escape }}</td>
+      </tr>
+    <tr>
+      <th>Script prefix:</th>
+      <td><pre>{{ script_prefix|escape }}</pre></td>
+    </tr>
+    <tr>
+      <th>Base URL:</th>
+      <td><pre>{% base_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Static URL:</th>
+      <td><pre>{% static_url %}</pre></td>
+    </tr>
+    <tr>
+      <th>Media URL:</th>
+      <td><pre>{% media_url %}</pre></td>
+    </tr>
+      <tr>
+        <th>Django Version:</th>
+        <td>{{ django_version_info }}</td>
+      </tr>
+      <tr>
+        <th>Python Version:</th>
+        <td>{{ sys_version_info }}</td>
+      </tr>
+    <tr>
+      <th>Python Executable:</th>
+      <td>{{ sys_executable|escape }}</td>
+    </tr>
+    <tr>
+      <th>Python Version:</th>
+      <td>{{ sys_version_info }}</td>
+    </tr>
+    <tr>
+      <th>Python Path:</th>
+      <td><pre>{{ sys_path|pprint }}</pre></td>
+    </tr>
+    <tr>
+      <th>Server time:</th>
+      <td>{{server_time|date:"r"}}</td>
+    </tr>
+      <tr>
+        <th>Installed Applications:</th>
+        <td><ul>
+          {% for item in settings.INSTALLED_APPS %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>Installed Middleware:</th>
+        <td><ul>
+          {% for item in settings.MIDDLEWARE_CLASSES %}
+            <li><code>{{ item }}</code></li>
+          {% endfor %}
+        </ul></td>
+      </tr>
+      <tr>
+        <th>settings module:</th>
+        <td><code>{{ settings.SETTINGS_MODULE }}</code></td>
+      </tr>
+    </table>
+  </div>
+  
+  <div id="info">
+      <ol>
+        {% for pattern in urlpatterns %}
+          <li>
+            <a href="{% url pattern.name %}">{{ pattern.name }}</a> ({{ pattern.regex.pattern }})
+          </li>
+        {% endfor %}
+      </ol>
+  </div>
+
+  <div id="explanation">
+    <p>
+      This page contains information to investigate issues with this web application.
+    </p>
+  </div>
+</body>
+</html>
+"""
 
 DEBUG_REQUEST_VIEW_TEMPLATE = """
 {% load base_url %}
@@ -725,7 +888,7 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
         </tr>
       {% endfor %}
     </tbody>
-  </table>  
+  </table>
   </div>
 
   <div id="explanation">
@@ -1109,7 +1272,7 @@ DEBUG_URLS_VIEW_TEMPLATE = """
         {% for pattern in urlpatterns %}
           <li>
             {{ pattern.regex.pattern }}&nbsp;({{pattern|type}})
-            {% if pattern.name.strip %}&nbsp;[name='{{pattern.name}}']{% endif %}
+            {% if pattern.name.strip %}&nbsp;[{% url pattern.name as the_url %}{% if the_url %}<a href="{{the_url}}">{% endif %}name='{{pattern.name}}'{% if the_url %}</a>{% endif %}]{% endif %}
             {% if pattern.callback %}&nbsp;[callback='{{pattern.callback}}']{% endif %}
             {% if pattern.name.default_args %}&nbsp;[args='{{pattern.default_args|join:", "}}']{% endif %}
             {% if pattern.url_patterns %}
@@ -1117,8 +1280,8 @@ DEBUG_URLS_VIEW_TEMPLATE = """
                 {% for child_pattern in pattern.url_patterns %}
                     <li>
                         {{ child_pattern.regex.pattern }}&nbsp;({{child_pattern|type}})
-                        {% if child_pattern.name.strip %}&nbsp;[name='{{child_pattern.name}}']{% endif %}
-                        
+                        {% if child_pattern.name.strip %}&nbsp;[{% url child_pattern.name as the_url %}{% if the_url %}<a href="{{the_url}}">{% endif %}name='{{child_pattern.name}}'{% if the_url %}</a>{% endif %}]{% endif %}
+
                         {% if child_pattern.name.default_args %}&nbsp;[args='{{child_pattern.default_args|join:", "}}']{% endif %}
                     </li>
                 {% endfor %}

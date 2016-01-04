@@ -663,7 +663,7 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
     #explanation { background:#eee; border-bottom: 0px none; }
   </style>
 </head>
-<body>  
+<body>
   <div id="summary">
     <h1>Request information</h1>
     <table class="meta">
@@ -875,7 +875,7 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
   <h3 id="settings">Settings</h3>
   <table class="settings">
     <thead>
-      <tr>            
+      <tr>
         <th class="settings">Setting</th>
         <th class="settings">Value</th>
       </tr>
