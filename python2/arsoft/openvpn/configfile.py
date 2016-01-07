@@ -535,15 +535,22 @@ class ConfigFile(object):
 
     @property
     def remote(self):
+        ret = None
         if self._conf is not None:
-            f = self._conf.get(section=None, key='remote', default=None)
-            if f:
-                fe = f.split(' ')
-                ret = (fe[0], int(fe[1]))
-            else:
-                ret = None
-        else:
-            ret = None
+            remote_entries = self._conf.getAsArray(section=None, key='remote', default=None)
+            if remote_entries:
+                ret = []
+                for e in remote_entries:
+                    fe = e.split(' ', 1)
+                    if len(fe) >= 2:
+                        try:
+                            port = int(fe[1])
+                        except ValueError:
+                            port = 1194
+                        srv_port = (fe[0], port)
+                    else:
+                        srv_port = (e, 1194)
+                    ret.append(srv_port)
         return ret
 
     @property
