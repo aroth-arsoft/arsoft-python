@@ -36,7 +36,7 @@ class ManagementInterface(object):
         if sock:
             self._socket = sock
             self._socket.setblocking(0)
-            self._socket.sendall('\n')
+            self._socket.sendall(b'\n')
             self._header = self._read_header(self._timeout)
             if self._header is not None:
                 ret = True
@@ -70,7 +70,7 @@ class ManagementInterface(object):
             return ret
 
     def _read_header(self, timeout):
-        data = ''
+        data = b''
         s_reply = ([self._socket], [], [])
         s_args = s_reply
         if timeout is not None:
@@ -86,8 +86,8 @@ class ManagementInterface(object):
             else:
                 data = data + buf
 
-            if data.endswith("\r\n"):
-                ret = data.split('\r\n')[0]
+            if data.endswith(b"\r\n"):
+                ret = data.split(b'\r\n')[0]
                 break
             if timeout is not None:
                 elapsed = time() - time_start
@@ -97,7 +97,7 @@ class ManagementInterface(object):
         return ret
 
     def _read_response(self, timeout, has_end_marker=False):
-        data = ''
+        data = b''
         s_reply = ([self._socket], [], [])
         s_args = s_reply
         if timeout is not None:
@@ -114,13 +114,13 @@ class ManagementInterface(object):
                 data = data + buf
 
             if has_end_marker:
-                if data.endswith("END\r\n"):
-                    ret = data.split('\r\n')
+                if data.endswith(b"END\r\n"):
+                    ret = data.decode('utf8').split('\r\n')
                     if len(ret) > 0 and not ret[-1]:
                         del ret[-1]
                     break
-            elif data.endswith("\r\n"):
-                ret = data.split('\r\n')
+            elif data.endswith(b"\r\n"):
+                ret = data.decode('utf8').split('\r\n')
                 if len(ret) > 0 and not ret[-1]:
                     del ret[-1]
                 break
@@ -132,7 +132,7 @@ class ManagementInterface(object):
         return ret
 
     def _send_command(self, command, has_end_marker=True):
-        self._socket.sendall(command + '\n')
+        self._socket.sendall(command.encode('utf8') + b'\n')
         return self._read_response(self._timeout, has_end_marker=has_end_marker)
 
     def status(self, version=3):

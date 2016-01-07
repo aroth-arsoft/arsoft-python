@@ -197,6 +197,10 @@ class OpenVPNAdmin(object):
                                 for (clientname, clientinfo) in status_file.connected_clients.items():
                                     print('    %s' % (clientinfo))
                         else:
+                            server_addr = []
+                            for (srv, port) in config_file.remote:
+                                server_addr.append('%s:%i' % (srv,port))
+                            print('  Server address: %s' % ','.join(server_addr))
                             print('  Remote address: %s' % status_file.state.remoteip)
                             print('  Local address: %s' % status_file.state.localip)
 
