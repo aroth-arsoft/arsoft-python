@@ -96,7 +96,7 @@ class Mail(object):
                 if self._bodytext is not None:
                     self._msg.attach(MIMEText(self._bodytext))
             else:
-                self._msg = MIMEText(self._bodytext)
+                self._msg = MIMEText(self._bodytext if self._bodytext is not None else '')
 
             self._msg['Subject'] = self._subject
             self._msg['From'] = self._from

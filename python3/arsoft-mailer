@@ -8,7 +8,7 @@ import argparse
 from arsoft.mail import *
 import arsoft.utils
 import arsoft.dnsutils
-from email.Utils import formatdate
+from email.utils import formatdate
 
 class ARSoftMailer(object):
 
@@ -106,17 +106,19 @@ class ARSoftMailer(object):
                 sys.stderr.write('Mail server refused sender %s\n' % str(e))
                 ret = 1
             except smtplib.SMTPRecipientsRefused as e:
-                mail_server_errors = e[0]
-                for (recipient, error_desc) in list(mail_server_errors.items()):
+                for (recipient, error_desc) in e.recipients.items():
                     (status_code, error_msg) = error_desc
-                    sys.stderr.write('Mail server refused recipients %s: %i %s\n' % (recipient, status_code, error_msg))
+                    sys.stderr.write('Mail server %s refused recipients %s: %i %s\n' % (self._smtp_server, recipient, status_code, error_msg.decode('utf8')))
                 ret = 1
             except smtplib.SMTPConnectError as e:
                 sys.stderr.write('Failed to establish connection to mail server %s: %s\n' % (self._smtp_server, str(e)))
                 ret = 1
             except smtplib.SMTPAuthenticationError as e:
-                (status_code, error_msg) = e
+                (status_code, error_msg) = (e.errno, str(e))
                 sys.stderr.write('Authentication error on mail server %s: %i %s\n' % (self._smtp_server, status_code, error_msg))
+                ret = 1
+            except smtplib.SMTPServerDisconnected as e:
+                sys.stderr.write('Mail server %s disconnected: %s\n' % (self._smtp_server, str(e)))
                 ret = 1
 
         return ret
