@@ -96,13 +96,19 @@ class puppet_template_check(object):
             re_scope_var_to_s = re.compile('scope\[\'(?P<var>@?[a-zA-Z_][a-zA-Z0-9_:]*)\'\]')
             for l in stdoutdata.splitlines():
                 #print(l)
-                m = re_var_to_s.search(l)
-                if m:
-                    print(m.group('var'))
-                else:
-                    m = re_scope_var_to_s.search(l)
+                start_index = 0
+                while True:
+                    m = re_var_to_s.search(l, start_index)
                     if m:
                         print(m.group('var'))
+                        start_index = m.end() + 1
+                    else:
+                        m = re_scope_var_to_s.search(l, start_index)
+                        if m:
+                            print(m.group('var'))
+                            start_index = m.end() + 1
+                        else:
+                            break
         return True
         
     

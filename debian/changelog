@@ -1,3 +1,10 @@
+arsoft-python (1.232) wily; urgency=medium
+
+  * puppet-template-check: allow multiple variables per line
+  * arsoft-mailer: fixed errors caused by python3 conversion
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 06 Feb 2016 17:18:41 +0100
+
 arsoft-python (1.231) wily; urgency=medium
 
   * openvpn: allow multiple remote addresses
