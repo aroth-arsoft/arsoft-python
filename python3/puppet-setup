@@ -408,8 +408,8 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
                 sys.stderr.write('Failed to add PPA aroth\n')
 
         if ret:
-            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['main', 'dependencies'],
-                                       distcode_remap={'utopic':'trusty', 'vivid':'trusty'})
+            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['PC1'],
+                                       distcode_remap={'xenial':'wily'})
             if not ret:
                 sys.stderr.write('Failed to add PuppetLabs APT repository\n')
 
