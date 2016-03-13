@@ -1,3 +1,10 @@
+arsoft-python (1.233) wily; urgency=medium
+
+  * install check_mk_agent_apt as python3 script for wily and xenial
+  * puppet-setup: xenial related adjustments
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 13 Mar 2016 18:00:26 +0100
+
 arsoft-python (1.232) wily; urgency=medium
 
   * puppet-template-check: allow multiple variables per line

@@ -3,12 +3,14 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import sys
+import platform
 import os.path
 from distutils.core import setup
 
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 is_python2 = True if sys.version_info[0] == 2 else False
 is_python3 = True if sys.version_info[0] == 3 else False
+target_distribution = os.environ.get('TARGET_DISTRIBUTION', 'unknown')
 
 def version_dep_scripts(scripts, prefix=None):
     ret = []
@@ -20,8 +22,19 @@ def version_dep_scripts(scripts, prefix=None):
                 ret.append(os.path.join(prefix, source_dir, s))
     return ret
 
+def distribution_dep_scripts(scripts, prefix=None):
+    ret = []
+    sys.stderr.write('distribution_dep_scripts dd=%s\n' % target_distribution)
+    for (s, d) in scripts:
+        if target_distribution in d or d is None:
+            if prefix is None:
+                ret.append(s)
+            else:
+                ret.append(os.path.join(prefix, s))
+    return ret
+
 setup(name='arsoft-python',
-		version='1.232',
+		version='1.233',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -89,9 +102,10 @@ setup(name='arsoft-python',
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients'] +
-                         version_dep_scripts([
-                             ('check_mk_agent_apt', None),
-                             ], prefix='check_mk/cron')  ),
+                         distribution_dep_scripts([
+                             ('check_mk/cron/python2/check_mk_agent_apt', ['precise', 'trusty']),
+                             ('check_mk/cron/python3/check_mk_agent_apt', ['wily', 'xenial']),
+                             ] )  ),
 			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
                            'config/default_pattern.conf', 'config/default_shortcuts.conf']),
             ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),

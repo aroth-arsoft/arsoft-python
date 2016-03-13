@@ -49,11 +49,11 @@ override_dh_auto_install:
 	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr/hook.d
 
 	set -ex && for i in $(buildvers); do \
-	  python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/tmp; \
+	  TARGET_DISTRIBUTION=$(TARGET_DISTRIBUTION) python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/tmp; \
 	done
 
 	set -ex && for i in $(build3vers); do \
-	  python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/tmp; \
+	  TARGET_DISTRIBUTION=$(TARGET_DISTRIBUTION) python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/tmp; \
 	done
 
 	#install -d $(CURDIR)/debian/tmp/usr/lib/python3
