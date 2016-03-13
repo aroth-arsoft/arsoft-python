@@ -10,11 +10,14 @@ source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 is_python2 = True if sys.version_info[0] == 2 else False
 is_python3 = True if sys.version_info[0] == 3 else False
 
-def version_dep_scripts(scripts):
+def version_dep_scripts(scripts, prefix=None):
     ret = []
     for (s, v) in scripts:
         if sys.version_info[0] == v or v is None:
-            ret.append(os.path.join(source_dir, s))
+            if prefix is None:
+                ret.append(os.path.join(source_dir, s))
+            else:
+                ret.append(os.path.join(prefix, source_dir, s))
     return ret
 
 setup(name='arsoft-python',
@@ -85,7 +88,10 @@ setup(name='arsoft-python',
             ]),
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
-			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients', 'check_mk/cron/check_mk_agent_apt' ]),
+			('/etc/cron.hourly', ['cron/update-dhcpd-pxeclients'] +
+                         version_dep_scripts([
+                             ('check_mk_agent_apt', None),
+                             ], prefix='check_mk/cron')  ),
 			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
                            'config/default_pattern.conf', 'config/default_shortcuts.conf']),
             ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),
