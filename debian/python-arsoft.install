@@ -20,6 +20,7 @@ usr/bin/svnbackup
 usr/bin/nsswitch-config
 usr/bin/nsswitch-ldap
 usr/bin/nsswitch-winbind
+usr/bin/nsswitch-sss
 usr/bin/cups-admin
 usr/bin/managehosts
 usr/bin/autofs-ldap-auth

@@ -34,7 +34,7 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.234',
+		version='1.236',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -122,6 +122,7 @@ setup(name='arsoft-python',
                     os.path.join(source_dir, 'onkyo-remote'),
                     os.path.join(source_dir, 'nsswitch-ldap'),
                     os.path.join(source_dir, 'nsswitch-winbind'),
+                    os.path.join(source_dir, 'nsswitch-sss'),
                     os.path.join(source_dir, 'openvpn-status'),
                     ]),
 			('/usr/lib/nagios', [os.path.join(source_dir, 'send_xmpp_notification')]),

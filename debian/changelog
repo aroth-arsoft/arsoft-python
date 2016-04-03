@@ -1,3 +1,15 @@
+arsoft-python (1.236) xenial; urgency=medium
+
+  * add nsswitch-sss script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 03 Apr 2016 16:19:11 +0200
+
+arsoft-python (1.235) xenial; urgency=medium
+
+  * build for xenial
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 29 Mar 2016 07:36:00 +0200
+
 arsoft-python (1.234) wily; urgency=medium
 
   * check_mk: properly detect if agent start is disabled
