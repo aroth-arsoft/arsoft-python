@@ -168,8 +168,9 @@ def _read_key_data_tsig(data):
         keyname = dns.name.from_text(m.group(1))
         key_data = m.group(2)
         keyalgorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
-        secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
-        secret = base64.decodestring(secret)
+        secret_str = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
+        secret_bytes = secret_str.encode('ascii')
+        secret = base64.decodebytes(secret_bytes)
     except AttributeError:
         keyname = None
         raise

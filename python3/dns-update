@@ -44,9 +44,17 @@ class dns_update_app(object):
     def _split_arg(arg):
         if '=' in arg:
             (key, value) = arg.split('=', 1)
-            return (key, value)
+            if '/' in key:
+                (key, rrtype) = key.split('/', 1)
+            else:
+                rrtype = None
+            return (key, value, rrtype)
         else:
-            return (arg, None)
+            if '/' in arg:
+                (key, rrtype) = arg.split('/', 1)
+            else:
+                key, rrtype = (arg, None)
+            return (key, None, rrtype)
 
     @staticmethod
     def _split_args(args):
@@ -72,21 +80,21 @@ class dns_update_app(object):
         return ret
     
     def _add_record(self, args):
-        for (name, payload) in args:
+        for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
             update.add(name, self.ttl, self.rrtype, payload)
         return True
 
     def _delete_record(self, args):
-        for (name, payload) in args:
+        for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            update.delete(name, self.rrtype)
+            update.delete(name, self.rrtype if rrtype is None else rrtype)
         return True
 
     def _update_record(self, args):
-        for (name, payload) in args:
+        for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            update.replace(name, self.ttl, self.rrtype, payload)
+            update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
         return True
 
     def _update_host(self, args):
