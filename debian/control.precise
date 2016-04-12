@@ -23,13 +23,6 @@ Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp,
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 
-Package: arsoft-netconfig
-Architecture: all
-Depends: python-arsoft, ${python:Depends}, ${misc:Depends}
-Description: common files for the AR Soft netconfig framework
- This package includes all files of the AR Soft netconfig
- framework and all binaries.
-
 Package: arsoft-crypto
 Architecture: all
 Depends: python-arsoft, python-openssl, ${python:Depends}, ${misc:Depends}

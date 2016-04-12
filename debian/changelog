@@ -1,3 +1,10 @@
+arsoft-python (1.237) xenial; urgency=medium
+
+  * drop arsoft-netconfig package
+  * fixed encoding issues in dns-update
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 12 Apr 2016 16:58:42 +0200
+
 arsoft-python (1.236) xenial; urgency=medium
 
   * add nsswitch-sss script
