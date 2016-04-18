@@ -41,7 +41,7 @@ class puppet_template_check(object):
 
     def _compile_erb(self, filename):
         args = [ self._erb_bin, '-x', '-T', '-', filename ]
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args)
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args, verbose=self._verbose)
         if stdoutdata is not None:
             stdoutdata = stdoutdata.decode('utf-8')
         if stderrdata is not None:
@@ -50,7 +50,7 @@ class puppet_template_check(object):
     
     def _ruby_check(self, script):
         args = [ self._ruby_bin, '-c' ]
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args, stdin=io.StringIO(script))
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args, stdin=io.StringIO(script), verbose=self._verbose)
         if stdoutdata is not None:
             stdoutdata = stdoutdata.decode('utf-8')
         if stderrdata is not None:
@@ -76,17 +76,19 @@ class puppet_template_check(object):
 
     def _check_syntax(self, filename):
 
+        ret = False
         (sts, stdoutdata, stderrdata) = self._erb_syntax_check(filename)
         if sts == 0:
             if self._verbose:
                 print('Syntax %s OK' % filename)
+            ret = True
         else:
             if stderrdata[0] == '-' and stderrdata[1] == ':':
                 msg = 'Line ' + stderrdata[2:-1]
             else:
                 msg = stderrdata[:-1]
             sys.stderr.write('Syntax error in %s: %s\n' % (filename, msg))
-        return True
+        return ret
     
     def _extract_variables(self, filename):
         (sts, stdoutdata, stderrdata) = self._compile_erb(filename)
@@ -126,11 +128,14 @@ class puppet_template_check(object):
         if self._show_variabes:
             if not self._extract_variables(filename):
                 ret = False
-        if self._compile:
+        if ret and self._compile:
             (sts, stdoutdata, stderrdata) = self._compile_erb(filename)
             if sts == 0:
                 print('File %s:' % filename)
                 print(stdoutdata)
+            else:
+                print('Failed to compile file %s, error %i' % (filename, sts))
+                ret = False
 
         if not self._quiet and not self._compile:
             if ret:
