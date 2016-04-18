@@ -5,6 +5,7 @@ import sys
 import types
 import re
 import os.path
+import collections
 
 def _get_system_language_code():
     # Language code for this installation. All choices can be found here:
@@ -61,7 +62,7 @@ def cleanse_setting(key, value):
         # If the key isn't regex-able, just return as-is.
         cleansed = value
 
-    if callable(cleansed):
+    if isinstance(cleansed, collections.Callable):
         # For fixing #21345 and #23070
         cleansed = CallableSettingWrapper(cleansed)
     return cleansed
@@ -307,7 +308,7 @@ def initialize_settings(settings_module, setttings_file, options={}):
     custom_settings_file = os.path.join(settings_obj.CONFIG_DIR, 'settings.py')
     #print(custom_settings_file)
     if os.path.exists(custom_settings_file):
-        execfile(custom_settings_file)
+        exec(compile(open(custom_settings_file).read(), custom_settings_file, 'exec'))
 
     #print(settings_obj.INSTALLED_APPS)
 
