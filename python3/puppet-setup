@@ -427,7 +427,7 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
         if ret:
             ret = self._add_apt_source('puppetlabs-pc1', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['PC1'],
                                        has_source=False,
-                                       distcode_remap={'xenial':'wily'})
+                                       distcode_remap={'yakkety':'xenial'})
             if not ret:
                 sys.stderr.write('Failed to add PuppetLabs APT repository\n')
 

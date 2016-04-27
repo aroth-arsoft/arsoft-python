@@ -21,6 +21,9 @@ class PuppetSetupApp(object):
         self.verbose = False
         self._config = None
         self._apt_update_required = False
+        self._cxn = None
+        self._session_key = None
+        self._sudo = None
         self.puppet_server = None
         self.puppet_server_ip = None
         self.puppet_server_port = 8140
@@ -53,11 +56,15 @@ line_deb_src="deb-src $url $distro_cs %(components_str)s"
 tmpfile=`mktemp`
 echo "# Automatically generate source file for APT" > "$tmpfile"
 echo "$line_deb" >> "$tmpfile"
-echo "$line_deb_src" >> "$tmpfile"
+[ %(has_source)i -ne 0 ] && echo "$line_deb_src" >> "$tmpfile"
 if [ -f "%(sourcefilename)s" ]; then
 
     has_deb_line=`grep -E -o "^${line_deb}[[:space:]]*\$" "%(sourcefilename)s" 2>/dev/null`
-    has_deb_src_line=`grep -E -o "^${line_deb_src}[[:space:]]*\$" "%(sourcefilename)s" 2>/dev/null`
+    if [ %(has_source)i -ne 0 ]; then
+        has_deb_src_line=`grep -E -o "^${line_deb_src}[[:space:]]*\$" "%(sourcefilename)s" 2>/dev/null`
+    else
+        has_deb_src_line='not needed'
+    fi
 
     if [ -z "$has_deb_line" -o -z "$has_deb_src_line" ]; then
         install -m 0644 -o root -g root "$tmpfile" "%(sourcefilename)s"; RES=$?
@@ -80,6 +87,7 @@ exit $RES
        'url':url,
        'keyid':keyid,
        'components_str':components_str, 
+       'has_source':has_source,
        'sourcename':sourcename,
        'sourcefilename':sourcefilename }
         (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
@@ -223,8 +231,20 @@ managehosts add "%(hostname)s" "%(addr)s"
         screen = ScreenSession(self._cxn)
 
         script = """
-puppet agent --enable
-puppet agent -tv --waitforcert 30 --server %s 2>&1 | tee /tmp/puppet-setup.log
+puppet_bin=`which puppet`
+logfile='/tmp/puppet-setup.log'
+vardir='/var/lib/puppet'
+ssldir='/var/lib/puppet/ssl'
+if [ -z "$puppet_bin" ]; then
+    [ -x '/opt/puppetlabs/puppet/bin/puppet' ] && puppet_bin='/opt/puppetlabs/puppet/bin/puppet' || true
+fi
+if [ -z "$puppet_bin" ]; then
+    echo "Unable to find puppet agent executable." | tee --append "$logfile"
+    exit 2
+fi
+echo "Use puppet executable: $puppet_bin" | tee --append "$logfile"
+"$puppet_bin" agent --enable | tee --append "$logfile"
+"$puppet_bin" agent -tv --waitforcert 30 --server "%s" --vardir "$vardir" --ssldir "$ssldir" 2>&1 | tee --append "$logfile"
 """ %  self.puppet_server
 
         (sts, stdout, stderr) = screen.runcmdAndGetData(script=script, useTerminal=True, allocateTerminal=True, sudo=True)
@@ -380,7 +400,7 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
         packages_to_install.append('arsoft-base')
         packages_to_install.append('python-arsoft')
         packages_to_install.append('python3-arsoft')
-        packages_to_install.append('puppet')
+        packages_to_install.append('puppet-agent')
         
         if args.openvpn_zipfile:
             packages_to_install.append('openvpn')
@@ -405,8 +425,9 @@ Unable to continue without it. Make sure the hostname is correct and DNS is work
                 sys.stderr.write('Failed to add PPA aroth\n')
 
         if ret:
-            ret = self._add_apt_source('puppetlabs', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['main', 'dependencies'],
-                                       distcode_remap={'utopic':'trusty', 'vivid':'trusty'})
+            ret = self._add_apt_source('puppetlabs-pc1', 'http://apt.puppetlabs.com/', keyid='4BD6EC30', components=['PC1'],
+                                       has_source=False,
+                                       distcode_remap={'yakkety':'xenial'})
             if not ret:
                 sys.stderr.write('Failed to add PuppetLabs APT repository\n')
 

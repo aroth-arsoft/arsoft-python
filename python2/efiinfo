@@ -17,7 +17,7 @@ class efiinfo(object):
         # process command line
         #=============================================================================================
         parser = argparse.ArgumentParser(description='shows information from EFI environment')
-        parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
         parser.add_argument('--available', dest='available', action='store_true', help='checks if EFI is available on this machine.')
         parser.add_argument('--vars', dest='vars', action='store_true', help='outputs all EFI variables.')
         parser.add_argument('--values', dest='show_values', action='store_true', help='show the EFI variable values.')

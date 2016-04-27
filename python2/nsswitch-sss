@@ -10,7 +10,8 @@ nsswitch_sss_modify() {
 			--set group files \
 			--set shadow files \
 			--set netgroup files \
-			--set services db files
+			--set services db files \
+			--set sudoers files
 		RES=$?
 	else
 		/usr/bin/nsswitch-config \
@@ -18,7 +19,8 @@ nsswitch_sss_modify() {
 			--set group files sss \
 			--set shadow files sss \
 			--set netgroup files sss \
-			--set services db files sss
+			--set services db files sss \
+			--set sudoers files sss
 		RES=$?
 	fi
 	if [ $RES -ne 0 ]; then
