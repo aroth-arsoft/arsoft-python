@@ -131,13 +131,13 @@ class dns_update_app(object):
         if args is None:
             return False
         ret = True
-        for (host, payload) in args:
+        for (name, payload, rrtype) in args:
             if isinstance(payload, list):
                 addr_list = payload
             else:
                 addr_list = payload.split(',')
 
-            name = dns.name.from_text(host)
+            name = dns.name.from_text(name)
             update = self._get_update_object(host)
             update.delete(name, self.rrtype)
             
@@ -160,11 +160,11 @@ class dns_update_app(object):
         anotherserver = None
         hosts_to_import = []
 
-        for (host, payload) in args:
-            if host[0] == '@':
-                anotherserver = host[1:]
+        for (name, payload, rrtype) in args:
+            if name[0] == '@':
+                anotherserver = name[1:]
             else:
-                hosts_to_import.append(host)
+                hosts_to_import.append( (name, rrtype) )
 
         if anotherserver is None:
             sys.stderr.write("No DNS server to query specified.\n")
@@ -172,7 +172,7 @@ class dns_update_app(object):
         else:
             ipv6 = True if self.rrtype == 'AAAA' else False
             ret = True
-            for host in hosts_to_import:
+            for (host,rrtype) in hosts_to_import:
                 target_hostaddr = None
                 try:
                     target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server)
