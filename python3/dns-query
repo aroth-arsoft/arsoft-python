@@ -31,19 +31,16 @@ def cmp_to_key(mycmp):
 def _dns_answer_sort(lhs, rhs):
     if lhs.rdclass == rhs.rdclass and lhs.rdtype == rhs.rdtype:
         if lhs.rdtype == dns.rdatatype.MX:
-            return cmp(lhs.preference, rhs.preference)
+            return lhs.preference == rhs.preference
         elif lhs.rdtype == dns.rdatatype.SRV:
             if lhs.priority == rhs.priority:
-                return cmp(lhs.weight, rhs.weight)
+                return lhs.weight == rhs.weight
             else:
-                return cmp(lhs.priority, rhs.priority)
+                return lhs.priority == rhs.priority
         elif lhs.rdtype == dns.rdatatype.TXT:
             # keep original sort order
-            return 0
-        else:
-            return cmp(lhs, rhs)
-    else:
-        return cmp(lhs, rhs)
+            return True
+    return lhs == rhs
 
 class dns_query_app(object):
 
@@ -54,47 +51,6 @@ class dns_query_app(object):
 
     def __init__(self):
         self.verbose = False
-        self._updates = {}
-
-    @staticmethod
-    def _split_arg(arg):
-        if '=' in arg:
-            (key, value) = arg.split('=', 1)
-            return (key, value)
-        else:
-            return (arg, None)
-
-    @staticmethod
-    def _split_args(args):
-        ret = []
-        for arg in args:
-            ret.append(dns_update_app._split_arg(arg))
-        return ret
-
-    def _lookup_hosts(self, args):
-        dnsserver = self.dnsserver
-        hosts_to_lookup = []
-
-        for (host, payload) in args:
-            if host[0] == '@':
-                dnsserver = host[1:]
-            else:
-                hosts_to_lookup.append(host)
-
-        ipv6 = True if self.rrtype == 'AAAA' else False
-        ret = True
-        for host in hosts_to_lookup:
-            try:
-                hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=dnsserver, with_cname=True)
-            except dns.resolver.NoAnswer as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (host, dnsserver))
-                hostaddr = None
-            except dns.resolver.NXDOMAIN as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, dnsserver))
-                hostaddr = None
-            if hostaddr:
-                print('%s %s' % (host, hostaddr))
-        return ret
 
     def _parse_query_args(self, args):
         dnsserver = None
@@ -271,6 +227,7 @@ class dns_query_app(object):
         if query_list:
             ret = self._execute_query(query_list)
         else:
+            sys.stderr.write("No query specified.\n")
             ret = False
         return 0 if ret else 1
 

@@ -44,16 +44,33 @@ class dns_update_app(object):
     def _split_arg(arg):
         if '=' in arg:
             (key, value) = arg.split('=', 1)
-            return (key, value)
+            if '/' in key:
+                (key, rrtype) = key.split('/', 1)
+            else:
+                rrtype = None
+            return (key, value, rrtype)
         else:
-            return (arg, None)
+            if '/' in arg:
+                (key, rrtype) = arg.split('/', 1)
+            else:
+                key, rrtype = (arg, None)
+            return (key, None, rrtype)
 
     @staticmethod
     def _split_args(args):
+        ok = True
         ret = []
         for arg in args:
-            ret.append(dns_update_app._split_arg(arg))
-        return ret
+            (key, value, rrtype) = dns_update_app._split_arg(arg)
+            if isinstance(key, str):
+                if key[-1] != '.':
+                    sys.stderr.write("Missing dot at the end of \"%s\". This is most likely unintentional and cause wrongful DNS records.\n" % (key))
+                    ok = False
+            ret.append( (key, value, rrtype) )
+        if ok:
+            return ret
+        else:
+            return None
 
     def _get_update_object(self, name):
         if name in self._updates:
@@ -70,34 +87,57 @@ class dns_update_app(object):
                     arsoft.dnsutils.use_key_file(ret, self.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic)
                 self._updates[name] = ret
         return ret
-    
+
     def _add_record(self, args):
-        for (name, payload) in args:
+        if args is None:
+            return False
+        ret = True
+        for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            update.add(name, self.ttl, self.rrtype, payload)
-        return True
+            try:
+                update.add(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
+            except dns.exception.SyntaxError as e:
+                sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                ret = False
+        return ret
 
     def _delete_record(self, args):
-        for (name, payload) in args:
+        if args is None:
+            return False
+        ret = True
+        for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            update.delete(name, self.rrtype)
-        return True
+            try:
+                update.delete(name, self.rrtype if rrtype is None else rrtype)
+            except dns.exception.SyntaxError as e:
+                sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                ret = False
+        return ret
 
     def _update_record(self, args):
-        for (name, payload) in args:
+        if args is None:
+            return False
+        ret = True
+        for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            update.replace(name, self.ttl, self.rrtype, payload)
-        return True
+            try:
+                update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
+            except dns.exception.SyntaxError as e:
+                sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                ret = False
+        return ret
 
     def _update_host(self, args):
+        if args is None:
+            return False
         ret = True
-        for (host, payload) in args:
+        for (name, payload, rrtype) in args:
             if isinstance(payload, list):
                 addr_list = payload
             else:
                 addr_list = payload.split(',')
 
-            name = dns.name.from_text(host)
+            name = dns.name.from_text(name)
             update = self._get_update_object(host)
             update.delete(name, self.rrtype)
             
@@ -115,14 +155,16 @@ class dns_update_app(object):
         return ret
 
     def _import_host(self, args):
+        if args is None:
+            return False
         anotherserver = None
         hosts_to_import = []
 
-        for (host, payload) in args:
-            if host[0] == '@':
-                anotherserver = host[1:]
+        for (name, payload, rrtype) in args:
+            if name[0] == '@':
+                anotherserver = name[1:]
             else:
-                hosts_to_import.append(host)
+                hosts_to_import.append( (name, rrtype) )
 
         if anotherserver is None:
             sys.stderr.write("No DNS server to query specified.\n")
@@ -130,7 +172,7 @@ class dns_update_app(object):
         else:
             ipv6 = True if self.rrtype == 'AAAA' else False
             ret = True
-            for host in hosts_to_import:
+            for (host,rrtype) in hosts_to_import:
                 target_hostaddr = None
                 try:
                     target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server)
@@ -148,7 +190,7 @@ class dns_update_app(object):
 
                 anotherserver_hostaddr = None
                 try:
-                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver, with_cname=True)
+                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver)
                 except dns.resolver.NoAnswer as e:
                     sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s - no answer.\n" % (host, anotherserver))
                 except dns.resolver.NXDOMAIN as e:
@@ -223,6 +265,8 @@ class dns_update_app(object):
                         print(indent + "data: %s" % str(rdata))
 
     def _update_file(self, args, origin=None):
+        if args is None:
+            return False
         ret = True
         for f in args:
             zone = None
@@ -270,29 +314,31 @@ class dns_update_app(object):
         return ret
 
     def _lookup_hosts(self, args):
+        if args is None:
+            return False
         dnsserver = self.server
         hosts_to_lookup = []
 
-        for (host, payload) in args:
-            if host[0] == '@':
-                dnsserver = host[1:]
+        for (name, payload, rrtype) in args:
+            if name[0] == '@':
+                dnsserver = name[1:]
             else:
-                hosts_to_lookup.append(host)
+                hosts_to_lookup.append((name, payload, rrtype))
 
         ipv6 = True if self.rrtype == 'AAAA' else False
         ret = True
-        for host in hosts_to_lookup:
+        for (name, payload, rrtype) in hosts_to_lookup:
             hostaddr = None
             try:
-                hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=dnsserver, with_cname=True, timeout=self.timeout)
+                hostaddr = arsoft.dnsutils.get_dns_host_record(name, ipv6=ipv6, dnsserver=dnsserver, timeout=self.timeout)
             except dns.resolver.NoAnswer as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (host, dnsserver))
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (name, dnsserver))
             except dns.resolver.NXDOMAIN as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (host, dnsserver))
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (name, dnsserver))
             except dns.exception.Timeout as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - timeout.\n" % (host, dnsserver))
+                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - timeout.\n" % (name, dnsserver))
             if hostaddr is not None:
-                print('%s %s' % (host, hostaddr))
+                print('%s %s' % (name, hostaddr))
         return ret
 
     def main(self):

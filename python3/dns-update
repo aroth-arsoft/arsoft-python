@@ -87,7 +87,7 @@ class dns_update_app(object):
                     arsoft.dnsutils.use_key_file(ret, self.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic)
                 self._updates[name] = ret
         return ret
-    
+
     def _add_record(self, args):
         if args is None:
             return False
@@ -190,7 +190,7 @@ class dns_update_app(object):
 
                 anotherserver_hostaddr = None
                 try:
-                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver, with_cname=True)
+                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver)
                 except dns.resolver.NoAnswer as e:
                     sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s - no answer.\n" % (host, anotherserver))
                 except dns.resolver.NXDOMAIN as e:
@@ -330,7 +330,7 @@ class dns_update_app(object):
         for (name, payload, rrtype) in hosts_to_lookup:
             hostaddr = None
             try:
-                hostaddr = arsoft.dnsutils.get_dns_host_record(name, ipv6=ipv6, dnsserver=dnsserver, with_cname=True, timeout=self.timeout)
+                hostaddr = arsoft.dnsutils.get_dns_host_record(name, ipv6=ipv6, dnsserver=dnsserver, timeout=self.timeout)
             except dns.resolver.NoAnswer as e:
                 sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (name, dnsserver))
             except dns.resolver.NXDOMAIN as e:

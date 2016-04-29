@@ -324,7 +324,7 @@ def get_dns_srv_record(service, domain=None, default_value=None, tcp=True, dnsse
         ret = None
     return ret
 
-def get_dns_host_record(query=None, hostname=None, domain=None, default_value=None, ipv6=False, dnsserver=None, with_cname=False, timeout=None):
+def get_dns_host_record(query=None, hostname=None, domain=None, default_value=None, ipv6=False, dnsserver=None, timeout=None):
     if query is None:
         (local_fqdn, local_hostname, local_domain) = gethostname_tuple()
         if domain is None:
@@ -338,29 +338,14 @@ def get_dns_host_record(query=None, hostname=None, domain=None, default_value=No
     resolver = _get_resolver(dnsserver, timeout)
     if resolver:
         ret = set()
-        final_queries = set(query)
-        if with_cname:
-            try:
-                answers = resolver.query(query, dns.rdatatype.CNAME)
-                for rdata in answers:
-                    if isinstance(rdata, dns.rdtypes.ANY.CNAME.CNAME):
-                        final_queries.add( rdata.target )
-            except dns.resolver.NoAnswer:
-                # no CNAME records found, which is ok
-                pass
-            except dns.resolver.NXDOMAIN:
-                # no domain does not exist, which is ok
-                pass
-
-        for q in final_queries:
-            answers = resolver.query(query, dns.rdatatype.AAAA if ipv6 else dns.rdatatype.A)
-            for rdata in answers:
-                if isinstance(rdata, dns.rdtypes.IN.A.A):
-                    if not ipv6:
-                        ret.add( rdata.address )
-                elif isinstance(rdata, dns.rdtypes.IN.AAAA.AAAA):
-                    if ipv6:
-                        ret.add( rdata.address )
+        answers = resolver.query(query, dns.rdatatype.AAAA if ipv6 else dns.rdatatype.A)
+        for rdata in answers:
+            if isinstance(rdata, dns.rdtypes.IN.A.A):
+                if not ipv6:
+                    ret.add( rdata.address )
+            elif isinstance(rdata, dns.rdtypes.IN.AAAA.AAAA):
+                if ipv6:
+                    ret.add( rdata.address )
         ret = list(ret)
     else:
         ret = None

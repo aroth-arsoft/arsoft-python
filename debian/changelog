@@ -1,3 +1,9 @@
+arsoft-python (1.240) xenial; urgency=medium
+
+  * avoid duplicated DNS queries for host records
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 29 Apr 2016 08:04:10 +0200
+
 arsoft-python (1.239) xenial; urgency=medium
 
   * sync python2 and python3
