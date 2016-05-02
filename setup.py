@@ -95,7 +95,7 @@ setup(name='arsoft-python',
             ('autofs-ldap-auth', 3),
             ('puppet-setup', 3),
             ('puppet-template-check', 3),
-            ('heimdal-password-expire', 3),
+            ('heimdal-password-expire', 2),
             ('dns-update', 3),
             ]),
 		data_files=[ 
