@@ -1,3 +1,9 @@
+arsoft-python (1.241) xenial; urgency=medium
+
+  * ini-util: add command clear to remove all values from a section
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 02 May 2016 07:46:46 +0200
+
 arsoft-python (1.240) xenial; urgency=medium
 
   * avoid duplicated DNS queries for host records

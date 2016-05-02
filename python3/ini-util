@@ -131,6 +131,7 @@ class iniutil(object):
         parser.add_argument('-g', '--get', dest='values_get', metavar='value', nargs='+', help='specifies values to get.')
         parser.add_argument('-e', '--edit', dest='values_edit', metavar='value', nargs='+', help='specifies values to set.')
         parser.add_argument('-d', '--delete', dest='values_delete', metavar='value', nargs='+', help='specifies values to delete.')
+        parser.add_argument('-c', '--clear', dest='sections_clear', metavar='section', nargs='+', help='removes all values from the given section.')
         parser.add_argument('-a', '--add', dest='values_add', metavar='value', nargs='+', help='specifies values to add.')
         parser.add_argument('-m', '--merge', dest='files_merge', metavar='value', nargs='+', help='merge in values from specified file.')
         parser.add_argument('-r', '--replace', dest='files_replace', metavar='value', nargs='+', help='replaces values with the one from the specified file.')
@@ -187,6 +188,11 @@ class iniutil(object):
             cmdfile = CmdFile()
 
             modified = False
+
+            if args.sections_clear is not None:
+                for section in args.sections_clear:
+                    cmdfile.add_command('clear', section, None, None)
+
             if args.values_edit is not None:
                 for line in args.values_edit:
                     (section, key, value) = self.parse_value(line)
@@ -237,6 +243,14 @@ class iniutil(object):
                     success = self.inifile.remove(section, key)
                     if not success:
                         sys.stderr.write('failed to delete ' + section + '/' + key + '\n')
+                        ret = False
+                    else:
+                        modified = True
+                elif action == 'clear':
+                    # remove all values from the given section
+                    success = self.inifile.remove(section, '*')
+                    if not success:
+                        sys.stderr.write('failed to clear ' + section + '\n')
                         ret = False
                     else:
                         modified = True
