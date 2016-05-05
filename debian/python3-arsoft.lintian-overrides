@@ -7,12 +7,17 @@ python3-arsoft: binary-without-manpage usr/bin/cups-admin
 python3-arsoft: binary-without-manpage usr/bin/dns-query
 python3-arsoft: binary-without-manpage usr/bin/dns-update
 python3-arsoft: binary-without-manpage usr/bin/efiinfo
+python3-arsoft: binary-without-manpage usr/bin/fritzbox-status
 python3-arsoft: binary-without-manpage usr/bin/ini-util
 python3-arsoft: binary-without-manpage usr/bin/managehosts
 python3-arsoft: binary-without-manpage usr/bin/nsswitch-config
 python3-arsoft: binary-without-manpage usr/bin/nsswitch-ldap
 python3-arsoft: binary-without-manpage usr/bin/nsswitch-sss
 python3-arsoft: binary-without-manpage usr/bin/nsswitch-winbind
+python3-arsoft: binary-without-manpage usr/bin/onkyo-remote
+python3-arsoft: binary-without-manpage usr/bin/onkyo-rs232
+python3-arsoft: binary-without-manpage usr/bin/openvpn-admin
+python3-arsoft: binary-without-manpage usr/bin/openvpn-status
 python3-arsoft: binary-without-manpage usr/bin/puppet-setup
 python3-arsoft: binary-without-manpage usr/bin/puppet-template-check
 python3-arsoft: binary-without-manpage usr/bin/slapd-config

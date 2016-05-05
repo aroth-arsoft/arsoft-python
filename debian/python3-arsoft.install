@@ -31,12 +31,17 @@ usr/bin/cups-admin
 usr/bin/dns-query
 usr/bin/dns-update
 usr/bin/efiinfo
+usr/bin/fritzbox-status
 usr/bin/ini-util
 usr/bin/managehosts
 usr/bin/nsswitch-config
 usr/bin/nsswitch-ldap
 usr/bin/nsswitch-sss
 usr/bin/nsswitch-winbind
+usr/bin/onkyo-remote
+usr/bin/onkyo-rs232
+usr/bin/openvpn-admin
+usr/bin/openvpn-status
 usr/bin/puppet-setup
 usr/bin/puppet-template-check
 usr/bin/slapd-config

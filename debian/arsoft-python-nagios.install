@@ -6,6 +6,7 @@ etc/nagios-plugins/config/puppet_agent.cfg
 etc/nagios-plugins/config/rkhunter.cfg
 etc/nagios-plugins/config/weather.cfg
 etc/nagios-plugins/config/xmpp_notify.cfg
+etc/nagios-plugins/config/openvpn.cfg
 usr/lib/nagios/send_xmpp_notification
 usr/lib/nagios/plugins/check_fritzbox
 usr/lib/nagios/plugins/check_ipp
@@ -14,3 +15,4 @@ usr/lib/nagios/plugins/check_puppet_agent
 usr/lib/nagios/plugins/check_rkhunter
 usr/lib/nagios/plugins/check_weather
 usr/lib/nagios/plugins/test_data
+usr/lib/nagios/plugins/check_openvpn
