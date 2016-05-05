@@ -12,10 +12,15 @@ from arsoft.utils import runcmd
 
 class Config(object):
 
-    def __init__(self, filename=None, email=None, password=None, quality='high'):
+    def __init__(self, filename=None, email=None, password=None, quality='high', geo=None, language=None, country=None, devtype=None, productid=None):
         self.email = email
         self.password = password
         self.quality = quality
+        self.geo = geo
+        self.language = language
+        self.country = country
+        self.devtype = devtype
+        self.productid = productid
         if filename is not None:
             self.open(filename)
 
@@ -26,6 +31,11 @@ class Config(object):
         self.email = inifile.get(None, 'EMail', '')
         self.password = inifile.get(None, 'Password', '')
         self.quality = inifile.get(None, 'VideoQuality', 'high')
+        self.geo = inifile.get(None, 'Geo', None)
+        self.language = inifile.get(None, 'Language', None)
+        self.country = inifile.get(None, 'Country', None)
+        self.devtype = inifile.getAsInteger(None, 'DeviceType', None)
+        self.productid = inifile.getAsInteger(None, 'ProductId', None)
         return True
 
     def save(self, filename):
@@ -35,26 +45,78 @@ class Config(object):
         inifile.set(None, 'EMail', self.email)
         inifile.set(None, 'Password', self.password)
         inifile.set(None, 'VideoQuality', self.quality)
+        inifile.set(None, 'Geo', self.geo)
+        inifile.set(None, 'Language', self.language)
+        inifile.set(None, 'Country', self.country)
+        inifile.setAsInteger(None, 'DeviceType', self.devtype)
+        inifile.setAsInteger(None, 'ProductId', self.productid)
         return inifile.save(filename)
 
     def __str__(self):
         ret = ''
         ret = ret + 'email=' + str(self.email) + ','
         ret = ret + 'password=' + str(self.password) + ','
-        ret = ret + 'quality=' + str(self.quality)
+        ret = ret + 'quality=' + str(self.quality) + ','
+        ret = ret + 'geo=' + str(self.geo) + ','
+        ret = ret + 'language=' + str(self.language) + ','
+        ret = ret + 'country=' + str(self.country) + ','
+        ret = ret + 'devtype=' + str(self.devtype) + ','
+        ret = ret + 'productid=' + str(self.productid)
         return ret
 
 
 class Client(object):
 
     #Convert locale id to isolanguagecode
-    l2c = {"en":"0", "de":"1", "en-GB":"2", "fr":"3", "it":"4", "nl":"5", "es":"6", "se":"7", "dk":"11", "fi":"12",
-            "no":"13", "pl":"14", "ru":"15"}
+    l2c = {"en":0, "de":1, "en-gb":2, "fr":3, "it":4, "nl":5, "es":6, "se":7, "dk":11, "fi":12, "no":13, "pl":14, "ru":15}
+    # only list the special cases; all other language simply use the uppercase language code
+    l2g = {"en":'GB',"en-gb":'GB'}
+    DEFAULT_LOGIN_PARAMETERS = {
+        "c": "EUR",
+        "d": 4,
+        "s": 1,
+        "v": "2.2.2",
+        "p": "1",
+        "b": "google",
+        "ap": 21,
+        "mi": "LRX22G",
+        "mn": "Nexus 7",
+        "ma": "LGE",
+        "tt": "Phone",
+        "di": "dimension=1196x768,density=319,79x318,74,scale=2,00x2,00",
+        "o": "11",
+        "osn": "Android",
+        "osv": "5.0.1",
+        "g": "GB",
+        "l": "gb",
+        "st": "2"
+    }
+
+    @staticmethod
+    def get_locale_id(language_code):
+        if language_code is None:
+            return 0
+        code = language_code.lower()
+        if code in Client.l2c:
+            return Client.l2c[code]
+        else:
+            return 0
+
+    @staticmethod
+    def get_geoloc_id(language_code):
+        if language_code is None:
+            return 'GB'
+        code = language_code.lower()
+        if code in Client.l2g:
+            return Client.l2g[code]
+        else:
+            return language_code.upper()
 
     def __init__(self, email, password, options={}):
 
         self.base_url   = 'http://www.eurosportplayer.com'
 
+        self._debug = options.get('debug', False)
         self.headers    = {
                             'User-Agent':  'Kodi',
                             'Referer'   :  self.base_url
@@ -65,7 +127,7 @@ class Client(object):
         self.CRM_UNLINK = self.CRM_URL + 'Unlink'
 
         self.VS_URL         = 'http://videoshop.ext.eurosport.com/JsonProductService.svc/'
-        if options.get('devtype', '2') == '2':
+        if options.get('devtype', None) == 2:
             self.VIDEO_PRODUCTS = self.VS_URL + 'GetAllProductsByDeviceMobile'
         else:
             self.VIDEO_PRODUCTS = self.VS_URL + 'GetAllProductsCache'
@@ -73,20 +135,22 @@ class Client(object):
         self.VIDEO_TOKEN    = self.VS_URL + 'GetToken'
 
         self.login_data = {'email':email, 'password':password, 'udid':'00000000-0000-0000-0000-000000000000'}
-        self.context    = {'g':options.get('geoloc',''),
-                           'd':options.get('devtype', '2'),
-                           'l':options.get('languageid', ''),
-                           'p':options.get('productid', '1'),
+        self.context    = {'g':Client.get_geoloc_id(options.get('geoloc',None)),
+                           'd':str(options.get('devtype', 4)),
+                           'l':str(Client.get_locale_id(options.get('language', None))),
+                           'p':str(options.get('productid', 1)),
+                           'v':options.get('version', ''),
+                           'c':options.get('country', 'EUR'),
                            's':'1',
                            'b':'Desktop',
                            }
-        self.dvs        = {'userid':'', 'hkey':'', 'languageid':options.get('languageid', ''), 'isbroadcasted':'1', 'isfullaccess':'0', 'withouttvscheduleliveevents':True}
 
-        if not self.context['g'] or not self.dvs['languageid']:
-            self.set_location()
+        self.dvs        = {'userid':'', 'hkey':'', 'languageid':options.get('language', ''), 'isbroadcasted':'1', 'isfullaccess':'0', 'withouttvscheduleliveevents':True}
+
+        #if not self.context['g'] or not self.dvs['languageid']:
+        #    self.set_location()
 
     def set_location(self):
-        print('set_location')
         try:
             data = self.get_data(self.base_url)
 
@@ -120,12 +184,25 @@ class Client(object):
 
     def get_products(self):
         user_ref = self.ep_login()
+
+        if user_ref is None:
+            return None
+        success = False
+        if 'Response' in user_ref:
+            if 'Success' in user_ref['Response']:
+                success = True if int(user_ref["Response"]["Success"]) != 0 else False
+        if not success:
+            return None
+
         #print('[eurosportplayer] login: %s' % (user_ref['Response']['Message'].encode('utf-8')))
         (d, c) = self.get_dvs_context(user_ref)
-        print(d, c)
+        if self._debug:
+            print('data: %s' % json.dumps(d, indent='  '))
+            print('context: %s' % json.dumps(c, indent='  '))
         encoded = urllib.parse.urlencode({'data': json.dumps(d), 'context' : json.dumps(c)})
         channelsUrl = self.VIDEO_PRODUCTS + '?' + encoded
-        print(channelsUrl)
+        if self._debug:
+            print('url: %s' % channelsUrl)
         result = {}
         try:
             req = urllib.request.Request(channelsUrl, headers=self.headers)
@@ -153,12 +230,16 @@ class Client(object):
     def ep_login(self):
         result = {'Response': {'Message': 'Login Request Failed'}}
         try:
+            if self._debug:
+                print('data: %s' % json.dumps(self.login_data, indent='  '))
+                print('context: %s' % json.dumps(self.context, indent='  '))
             encodedData = urllib.parse.urlencode({'data': json.dumps(self.login_data), 'context' : json.dumps(self.context)})
             loginUrl = self.CRM_LOGIN + '?' + encodedData
             req = urllib.request.Request(loginUrl, headers=self.headers)
             with urllib.request.urlopen(req) as f:
                 data = json.loads(f.read().decode('utf-8'))
-            print(data)
+            if self._debug:
+                print('login response: %s' % json.dumps(data, indent='  '))
             return data
         except:
             pass
@@ -336,13 +417,14 @@ class eurosport_stream_app(object):
         default_config_file = os.path.expanduser('~/.config/eurosport-stream')
         parser = argparse.ArgumentParser(description='send e-mail')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debug mode.')
         parser.add_argument('--config', dest='config_file', default=default_config_file, help='Specify config file')
         parser.add_argument('--email', dest='email', help='Eurosport login account name')
         parser.add_argument('--password', dest='password', help='Eurosport password')
-        parser.add_argument('--lang', dest='language', default=1, help='Language channel id')
-        parser.add_argument('--geo', dest='geo', default='DE', help='Geo-location code')
-        parser.add_argument('--devtype', dest='devtype', default='2', help='Overwrite device type')
-        parser.add_argument('--product', dest='productid', default='1', help='Overwrite product id')
+        parser.add_argument('--lang', dest='language', help='Language of the stream; e.g. de, en, fr')
+        parser.add_argument('--geo', dest='geo', help='Geo-location code')
+        parser.add_argument('--devtype', dest='devtype', help='Overwrite device type')
+        parser.add_argument('--product', dest='productid', help='Overwrite product id')
         parser.add_argument('-l', '--live', dest='live_only', action='store_true', help='only show live channels.')
         parser.add_argument('channel', help='select channel for playback')
 
@@ -350,6 +432,7 @@ class eurosport_stream_app(object):
 
         args = parser.parse_args()
         self._verbose = args.verbose
+        self._debug = args.debug
 
         save_config = False
         self._config = Config(filename=args.config_file)
@@ -360,55 +443,76 @@ class eurosport_stream_app(object):
             self._config.password = args.password
             save_config = True
 
+        if args.geo is not None:
+            self._config.geo = args.geo
+            save_config = True
+        if args.language is not None:
+            self._config.language = args.language
+            save_config = True
+        if args.devtype is not None:
+            self._config.devtype = args.devtype
+            save_config = True
+        if args.productid is not None:
+            self._config.productid = args.productid
+            save_config = True
+
         if save_config:
-            print('save config')
+            #print('save config')
             self._config.save(filename=args.config_file)
 
         #print(self._config)
 
         options = {}
-        if args.geo:
-            options['geoloc'] = args.geo
-        if args.language:
-            options['languageid'] = args.language
-        if args.devtype:
-            options['devtype'] = args.devtype
-        if args.productid:
-            options['productid'] = args.productid
+        options['debug'] = self._debug
+        if self._config.geo is not None:
+            options['geoloc'] = self._config.geo
+        if self._config.country is not None:
+            options['country'] = self._config.country
+        if self._config.language is not None:
+            options['language'] = self._config.language
+        if self._config.devtype is not None:
+            options['devtype'] = self._config.devtype
+        if self._config.productid is not None:
+            options['productid'] = self._config.productid
 
         self._client = Client(self._config.email, self._config.password, options)
 
         data = self._client.get_products()
-        f = open('/tmp/prod.json', 'w')
-        json.dump(data, f, indent='  ')
-        f.close()
-
-        channels = get_channel_items(data)
-
-        if args.channel == 'list' or args.channel == '*':
-            for ch in channels:
-                if not args.live_only or (args.live_only and ch['live']):
-                    print('%s - %s' % (ch['title'], ch['subtitle']))
-                    print('Audio: %s' % (ch['audio']))
-                    print(ch['url'])
-                    url = self.get_path(ch['url'])
-                    print('  %s' % url)
+        if data is None:
+            sys.stderr.write('Unable to login to Eurosport\n')
+            ret = 5
         else:
-            try:
-                channel_no = int(args.channel)
-            except ValueError:
-                channel_no = 0
+            f = open('/tmp/prod.json', 'w')
+            json.dump(data, f, indent='  ')
+            f.close()
 
-            try:
-                ch = channels[channel_no]
-            except IndexError:
-                ch = None
+            channels = get_channel_items(data)
 
-            if ch:
-                url = self.get_path(ch['url'])
-                self.start_livestreamer(url)
+            if args.channel == 'list' or args.channel == '*':
+                for ch in channels:
+                    if not args.live_only or (args.live_only and ch['live']):
+                        print('%s - %s' % (ch['title'], ch['subtitle']))
+                        print('Audio: %s' % (ch['audio']))
+                        print(ch['url'])
+                        url = self.get_path(ch['url'])
+                        print('  %s' % url)
             else:
-                sys.stderr.write('Unable to find channel %s\n' %channel_no)
+                try:
+                    channel_no = int(args.channel)
+                except ValueError:
+                    channel_no = 0
+
+                try:
+                    ch = channels[channel_no]
+                except IndexError:
+                    ch = None
+
+                if ch:
+                    url = self.get_path(ch['url'])
+                    self.start_livestreamer(url)
+                else:
+                    sys.stderr.write('Unable to find channel %s\n' %channel_no)
+                    ret = 2
 
         return ret
 

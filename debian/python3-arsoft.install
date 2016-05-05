@@ -31,6 +31,7 @@ usr/bin/cups-admin
 usr/bin/dns-query
 usr/bin/dns-update
 usr/bin/efiinfo
+usr/bin/eurosport-stream
 usr/bin/fritzbox-status
 usr/bin/ini-util
 usr/bin/managehosts

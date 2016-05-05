@@ -1,3 +1,9 @@
+arsoft-python (1.243) xenial; urgency=medium
+
+  * add eurosport-stream script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 05 May 2016 16:08:10 +0200
+
 arsoft-python (1.242) xenial; urgency=medium
 
   * clean up package structure
