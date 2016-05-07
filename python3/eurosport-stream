@@ -5,346 +5,15 @@
 import os, sys
 import argparse
 import datetime
-import urllib.request, urllib.parse, urllib.error, json, re
-from arsoft.inifile import IniFile
-from arsoft.utils import runcmd
+import subprocess
 
+from arsoft.eurosport.Config import Config
+from arsoft.eurosport.Login import Login
+from arsoft.eurosport.Program import Program
+from arsoft.eurosport.Stream import StreamDownloader
+from sys import stdin
+import time
 
-class Config(object):
-
-    def __init__(self, filename=None, email=None, password=None, quality='high', geo=None, language=None, country=None, devtype=None, productid=None):
-        self.email = email
-        self.password = password
-        self.quality = quality
-        self.geo = geo
-        self.language = language
-        self.country = country
-        self.devtype = devtype
-        self.productid = productid
-        if filename is not None:
-            self.open(filename)
-
-    def open(self, filename):
-        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-        inifile.open(filename)
-
-        self.email = inifile.get(None, 'EMail', '')
-        self.password = inifile.get(None, 'Password', '')
-        self.quality = inifile.get(None, 'VideoQuality', 'high')
-        self.geo = inifile.get(None, 'Geo', None)
-        self.language = inifile.get(None, 'Language', None)
-        self.country = inifile.get(None, 'Country', None)
-        self.devtype = inifile.getAsInteger(None, 'DeviceType', None)
-        self.productid = inifile.getAsInteger(None, 'ProductId', None)
-        return True
-
-    def save(self, filename):
-        inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
-        inifile.open(filename)
-
-        inifile.set(None, 'EMail', self.email)
-        inifile.set(None, 'Password', self.password)
-        inifile.set(None, 'VideoQuality', self.quality)
-        inifile.set(None, 'Geo', self.geo)
-        inifile.set(None, 'Language', self.language)
-        inifile.set(None, 'Country', self.country)
-        inifile.setAsInteger(None, 'DeviceType', self.devtype)
-        inifile.setAsInteger(None, 'ProductId', self.productid)
-        return inifile.save(filename)
-
-    def __str__(self):
-        ret = ''
-        ret = ret + 'email=' + str(self.email) + ','
-        ret = ret + 'password=' + str(self.password) + ','
-        ret = ret + 'quality=' + str(self.quality) + ','
-        ret = ret + 'geo=' + str(self.geo) + ','
-        ret = ret + 'language=' + str(self.language) + ','
-        ret = ret + 'country=' + str(self.country) + ','
-        ret = ret + 'devtype=' + str(self.devtype) + ','
-        ret = ret + 'productid=' + str(self.productid)
-        return ret
-
-
-class Client(object):
-
-    #Convert locale id to isolanguagecode
-    l2c = {"en":0, "de":1, "en-gb":2, "fr":3, "it":4, "nl":5, "es":6, "se":7, "dk":11, "fi":12, "no":13, "pl":14, "ru":15}
-    # only list the special cases; all other language simply use the uppercase language code
-    l2g = {"en":'GB',"en-gb":'GB'}
-    DEFAULT_LOGIN_PARAMETERS = {
-        "c": "EUR",
-        "d": 4,
-        "s": 1,
-        "v": "2.2.2",
-        "p": "1",
-        "b": "google",
-        "ap": 21,
-        "mi": "LRX22G",
-        "mn": "Nexus 7",
-        "ma": "LGE",
-        "tt": "Phone",
-        "di": "dimension=1196x768,density=319,79x318,74,scale=2,00x2,00",
-        "o": "11",
-        "osn": "Android",
-        "osv": "5.0.1",
-        "g": "GB",
-        "l": "gb",
-        "st": "2"
-    }
-
-    @staticmethod
-    def get_locale_id(language_code):
-        if language_code is None:
-            return 0
-        code = language_code.lower()
-        if code in Client.l2c:
-            return Client.l2c[code]
-        else:
-            return 0
-
-    @staticmethod
-    def get_geoloc_id(language_code):
-        if language_code is None:
-            return 'GB'
-        code = language_code.lower()
-        if code in Client.l2g:
-            return Client.l2g[code]
-        else:
-            return language_code.upper()
-
-    def __init__(self, email, password, options={}):
-
-        self.base_url   = 'http://www.eurosportplayer.com'
-
-        self._debug = options.get('debug', False)
-        self.headers    = {
-                            'User-Agent':  'Kodi',
-                            'Referer'   :  self.base_url
-                            }
-
-        self.CRM_URL    = 'https://playercrm.ssl.eurosport.com/JsonPlayerCrmApi.svc/'
-        self.CRM_LOGIN  = self.CRM_URL + 'Login'
-        self.CRM_UNLINK = self.CRM_URL + 'Unlink'
-
-        self.VS_URL         = 'http://videoshop.ext.eurosport.com/JsonProductService.svc/'
-        if options.get('devtype', None) == 2:
-            self.VIDEO_PRODUCTS = self.VS_URL + 'GetAllProductsByDeviceMobile'
-        else:
-            self.VIDEO_PRODUCTS = self.VS_URL + 'GetAllProductsCache'
-        self.VIDEO_CATCHUPS = self.VS_URL + 'GetAllCatchupCache'
-        self.VIDEO_TOKEN    = self.VS_URL + 'GetToken'
-
-        self.login_data = {'email':email, 'password':password, 'udid':'00000000-0000-0000-0000-000000000000'}
-        self.context    = {'g':Client.get_geoloc_id(options.get('geoloc',None)),
-                           'd':str(options.get('devtype', 4)),
-                           'l':str(Client.get_locale_id(options.get('language', None))),
-                           'p':str(options.get('productid', 1)),
-                           'v':options.get('version', ''),
-                           'c':options.get('country', 'EUR'),
-                           's':'1',
-                           'b':'Desktop',
-                           }
-
-        self.dvs        = {'userid':'', 'hkey':'', 'languageid':options.get('language', ''), 'isbroadcasted':'1', 'isfullaccess':'0', 'withouttvscheduleliveevents':True}
-
-        #if not self.context['g'] or not self.dvs['languageid']:
-        #    self.set_location()
-
-    def set_location(self):
-        try:
-            data = self.get_data(self.base_url)
-
-            #f = open('/tmp/es_main.html', 'w')
-            #f.write(data)
-            #f.close()
-            c = re.search("crmlanguageid:'(\d+)'", data).group(1)
-
-            self.dvs['languageid'] = c
-            self.context['l'] = c
-            g = re.search("geoloc:'(\w+)'", data).group(1)
-            self.context['g'] = g
-        except:
-            pass
-
-    def get_dvs_context(self, user_ref):
-        if user_ref:
-            try:
-                self.dvs['userid'] = user_ref['Id']
-                self.dvs['hkey'] = user_ref['Hkey']
-            except KeyError:
-                pass
-        else:
-            try:
-                self.dvs['userid'] = addon.getSetting('userid')
-                self.dvs['hkey'] = addon.getSetting('hkey')
-            except:
-                pass
-
-        return (self.dvs, self.context)
-
-    def get_products(self):
-        user_ref = self.ep_login()
-
-        if user_ref is None:
-            return None
-        success = False
-        if 'Response' in user_ref:
-            if 'Success' in user_ref['Response']:
-                success = True if int(user_ref["Response"]["Success"]) != 0 else False
-        if not success:
-            return None
-
-        #print('[eurosportplayer] login: %s' % (user_ref['Response']['Message'].encode('utf-8')))
-        (d, c) = self.get_dvs_context(user_ref)
-        if self._debug:
-            print('data: %s' % json.dumps(d, indent='  '))
-            print('context: %s' % json.dumps(c, indent='  '))
-        encoded = urllib.parse.urlencode({'data': json.dumps(d), 'context' : json.dumps(c)})
-        channelsUrl = self.VIDEO_PRODUCTS + '?' + encoded
-        if self._debug:
-            print('url: %s' % channelsUrl)
-        result = {}
-        try:
-            req = urllib.request.Request(channelsUrl, headers=self.headers)
-            with urllib.request.urlopen(req) as f:
-                data = json.loads(f.read().decode('utf-8'))
-            return data
-        except:
-            pass
-        return result
-
-    def get_catchups(self):
-        (d, c) = self.get_dvs_context(user_ref=False)
-        encoded = urllib.parse.urlencode({'data': json.dumps(d), 'context' : json.dumps(c)})
-        videosUrl = self.VIDEO_CATCHUPS + '?' + encoded
-        result = {}
-        try:
-            req = urllib.request.Request(videosUrl, headers=self.headers)
-            with urllib.request.urlopen(req) as f:
-                data = json.loads(f.read().decode('utf-8'))
-            return data
-        except:
-            pass
-        return result
-
-    def ep_login(self):
-        result = {'Response': {'Message': 'Login Request Failed'}}
-        try:
-            if self._debug:
-                print('data: %s' % json.dumps(self.login_data, indent='  '))
-                print('context: %s' % json.dumps(self.context, indent='  '))
-            encodedData = urllib.parse.urlencode({'data': json.dumps(self.login_data), 'context' : json.dumps(self.context)})
-            loginUrl = self.CRM_LOGIN + '?' + encodedData
-            req = urllib.request.Request(loginUrl, headers=self.headers)
-            with urllib.request.urlopen(req) as f:
-                data = json.loads(f.read().decode('utf-8'))
-            if self._debug:
-                print('login response: %s' % json.dumps(data, indent='  '))
-            return data
-        except:
-            pass
-        return result
-
-    def get_token(self):
-        (d, c) = self.get_dvs_context(user_ref=False)
-        encoded = urllib.parse.urlencode({'data': json.dumps(d), 'context' : json.dumps(c)})
-        tokenUrl = self.VIDEO_TOKEN + '?' + encoded
-        result = {}
-        try:
-            req = urllib.request.Request(tokenUrl, headers=self.headers)
-            with urllib.request.urlopen(req) as f:
-                data = json.loads(f.read().decode('utf-8'))
-            return data
-        except:
-            pass
-        return result
-
-    def get_data(self, url):
-        result = None
-        try:
-            req = urllib.request.Request(url, headers=self.headers)
-            with urllib.request.urlopen(req) as f:
-                data = f.read().decode('utf-8')
-            return data
-        except:
-            pass
-        return result
-
-
-def get_channel_items(data):
-    items = []
-    obj = data.get('PlayerObj', None)
-    if obj:
-        for i in obj:
-            live = None
-            s = None
-            label = ''
-            sublabel = ''
-            label = i['channellivelabel']
-            sublabel = i['channellivesublabel']
-            plot = sublabel
-            livestreams = i['livestreams'][0]
-            url = livestreams['url']
-            audio = livestreams['audio']
-            vignetteurl = i['vignetteurl']
-            u = 'http://i.eurosportplayer.com/'
-            image = u+vignetteurl
-
-            if i['tvscheduleliveevents']:
-                s = find_current_show(i['tvscheduleliveevents'])
-            elif i['tvschedules']:
-                s = find_current_show(i['tvschedules'])
-                if s:
-                    sublabel = s.get('name', '')
-                    if not sublabel:
-                        sublabel = i['channellivesublabel']
-            if not sublabel:
-                sublabel = livestreams['name']
-                sublabel = re.sub('(  .+?)$', '', sublabel)
-                live = 1
-            if s:
-                if not live == 1:
-                    live = s.get('transmissiontypeid', 0)
-                name = s['name']
-                description = s['description']
-                duration = s['duration']
-                startdate = s['startdate']
-                sdate = startdate['technicaldate']
-                stime = startdate['time']
-                enddate = s['enddate']
-                edate = enddate['technicaldate']
-                etime = enddate['time']
-                plot = '%s (%s)\n%s\nStart: %s %s\nEnd: %s %s' % (name,audio,description,sdate,stime,edate,etime)
-
-            items.append({'live':True if live else False, 'title':label, 'subtitle':sublabel, 'url':url, 'audio':audio, 'description':plot, 'image':image})
-    return items
-
-def find_current_show(tvschedules):
-    now = datetime.datetime.now()
-    for s in tvschedules:
-        endtime = convert_date(s['enddate']['datetime'])
-        starttime = convert_date(s['startdate']['datetime'])
-        if now < endtime and now >= starttime:
-            return s
-    return None
-
-def convert_date(dateString):
-    date_regex = re.compile('Date\(([0-9]*?)\+([0-9]*?)\)')
-    r = date_regex.search(dateString)
-    (time, offset) = r.groups()
-    time = int(time)
-    time = time / 1000
-    return datetime.datetime.fromtimestamp(time)
-
-
-def get_token(data):
-    token = ''
-    try:
-        o = data['PlayerObj']
-        token = o['token']
-    except:
-        pass
-    return token
 
 class eurosport_stream_app(object):
 
@@ -352,63 +21,6 @@ class eurosport_stream_app(object):
         self._verbose = False
         self._script_name = os.path.basename(__file__)
         self._config = None
-
-
-    def get_index(self, data):
-        try:
-            q = ['low', 'medium', 'high', 'very high'].index(self._config.quality)
-        except ValueError:
-            q = 2
-
-        y = [600000,1200000,2000000,4000000]
-        z = y[q]
-        result = None
-        list = []
-        pattern = 'bandwidth=(\d+).*?\n(http.*?)$'
-        match = re.findall(pattern, data, re.I|re.M)
-        if match:
-            for b,u in match:
-                list.append({'bandwidth':int(b), 'url':u})
-        if list:
-            list = sorted(list, key=lambda k:k['bandwidth'])
-            for x in list:
-                if x['bandwidth'] < z:
-                    index = x['url']
-                else:
-                    break
-            return index
-        return result
-
-    def select_index(self, master_video_url):
-        data = self._client.get_data(master_video_url)
-        if data:
-            index = self.get_index(data)
-            if index:
-                return index
-        return master_video_url
-
-    def get_path(self, id):
-        data = self._client.get_token()
-        if data:
-            token = get_token(data)
-            if '?' in id:
-                master = '%s&%s' % (id,token)
-            else:
-                master = '%s?%s' % (id,token)
-            index = self.select_index(master)
-            if not 'token' in index or not 'hdnea' in index:
-                if '?' in index:
-                    path = '%s&%s' % (index,token)
-                else:
-                    path = '%s?%s' % (index,token)
-            else:
-                path = index
-            return path
-        return id
-
-    def start_livestreamer(self, url):
-        args = ['livestreamer', 'hls://' + url, 'best']
-        runcmd(args)
 
     def main(self, argv=None):
         #=============================================================================================
@@ -425,7 +37,6 @@ class eurosport_stream_app(object):
         parser.add_argument('--geo', dest='geo', help='Geo-location code')
         parser.add_argument('--devtype', dest='devtype', help='Overwrite device type')
         parser.add_argument('--product', dest='productid', help='Overwrite product id')
-        parser.add_argument('-l', '--live', dest='live_only', action='store_true', help='only show live channels.')
         parser.add_argument('channel', help='select channel for playback')
 
         ret = 0
@@ -460,7 +71,6 @@ class eurosport_stream_app(object):
             #print('save config')
             self._config.save(filename=args.config_file)
 
-        #print(self._config)
 
         options = {}
         options['debug'] = self._debug
@@ -475,41 +85,99 @@ class eurosport_stream_app(object):
         if self._config.productid is not None:
             options['productid'] = self._config.productid
 
-        self._client = Client(self._config.email, self._config.password, options)
+        Login.configure(self._config.email, self._config.password, options)
+        ret = 0
 
-        data = self._client.get_products()
-        if data is None:
-            sys.stderr.write('Unable to login to Eurosport\n')
+        channels = None
+        try:
+            channels = Program.get_channel_list()
+        except Login.IsNotConfigured:
+            sys.stderr.write('Missing login credentials.\n')
+            ret = 1
+        except Login.NetworkError:
+            sys.stderr.write('Network error. Unable to login to Eurosport.\n')
+            ret = 2
+        except Login.LoginIncorrect:
+            sys.stderr.write('Invalid login credentials.\n')
             ret = 5
-        else:
-            f = open('/tmp/prod.json', 'w')
-            json.dump(data, f, indent='  ')
-            f.close()
 
-            channels = get_channel_items(data)
-
+        if channels:
             if args.channel == 'list' or args.channel == '*':
+                i = 0
                 for ch in channels:
-                    if not args.live_only or (args.live_only and ch['live']):
-                        print('%s - %s' % (ch['title'], ch['subtitle']))
-                        print('Audio: %s' % (ch['audio']))
-                        print(ch['url'])
-                        url = self.get_path(ch['url'])
-                        print('  %s' % url)
-            else:
-                try:
-                    channel_no = int(args.channel)
-                except ValueError:
-                    channel_no = 0
+                    i += 1
+                    print('#%i: %s' % (i, ch.name))
+                    if self._verbose:
+                        print('  Url: %s' % (ch.stream_url))
 
+                    streams = None
+                    try:
+                        ch.download_playlist()
+                        streams = sorted(ch.streams, key=lambda stream: stream.bandwidth)
+                    except Channel.InvalidData:
+                        pass
+
+                    if streams:
+                        print('  Streams:')
+
+                        stream_no = 0
+
+                        for stream in streams:
+                            stream_no += 1
+                            print('    %i: %i bits/sec' % (stream_no, stream.bandwidth))
+            else:
+                if '/' in args.channel:
+                    (channel_no, quality) = args.channel.split('/', 1)
+                elif '@' in args.channel:
+                    (channel_no, quality) = args.channel.split('@', 1)
+                else:
+                    channel_no = args.channel
+                    quality = self._config.quality
                 try:
-                    ch = channels[channel_no]
+                    channel_no = int(channel_no)
+                except ValueError:
+                    channel_no = -1
+                try:
+                    quality = int(quality)
+                except ValueError:
+                    quality = None
+
+                ch = None
+                try:
+                    if channel_no >= 0:
+                        ch = channels[channel_no]
                 except IndexError:
-                    ch = None
+                    pass
 
                 if ch:
-                    url = self.get_path(ch['url'])
-                    self.start_livestreamer(url)
+                    try:
+                        ch.download_playlist()
+                        if quality < 100:
+                            quality_options = ch.get_available_quality_options()
+                            if quality > len(quality_options):
+                                sys.stderr.write('Invalid stream index %i (max %i)\n' %(quality, len(quality_options)))
+                            else:
+                                quality = quality_options[quality]
+                        ch.set_quality(quality)
+                    except Channel.InvalidData:
+                        ch = None
+
+                if ch:
+                    sd = StreamDownloader(ch.active_stream)
+
+                    vlc_args = ['vlc', '-']
+                    p = subprocess.Popen(vlc_args, stdout=sys.stderr, stderr=sys.stderr, stdin=subprocess.PIPE, shell=False)
+                    if p:
+                        while 1:
+                            try:
+                                p.stdin.write(sd.get_next_part())
+                            except StreamDownloader.NoDataAvailable:
+                                time.sleep(1)
+                                continue
+                            except KeyboardInterrupt:
+                                sd.stop()
+                                break
+                        p.terminate()
                 else:
                     sys.stderr.write('Unable to find channel %s\n' %channel_no)
                     ret = 2

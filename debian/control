@@ -12,6 +12,8 @@ Section: python
 Architecture: all
 Replaces: arsoft-python
 Depends: ${python:Depends}, ${misc:Depends}, python-sleekxmpp, python-daemon, python-magic
+Conflicts: arsoft-python-openvpn, arsoft-openvpn, arsoft-python-fritzbox, arsoft-crypto,
+ arsoft-python-git, arsoft-onkyo
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
 

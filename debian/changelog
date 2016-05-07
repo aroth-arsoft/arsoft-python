@@ -1,3 +1,9 @@
+arsoft-python (1.244) xenial; urgency=medium
+
+  * eurosport-stream: download stream directly and feed to VLC
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 07 May 2016 10:18:33 +0200
+
 arsoft-python (1.243) xenial; urgency=medium
 
   * add eurosport-stream script
