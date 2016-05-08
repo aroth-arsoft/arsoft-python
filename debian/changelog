@@ -1,3 +1,9 @@
+arsoft-python (1.245) xenial; urgency=medium
+
+  * eurosport-stream: better quality selection
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 08 May 2016 14:33:54 +0200
+
 arsoft-python (1.244) xenial; urgency=medium
 
   * eurosport-stream: download stream directly and feed to VLC

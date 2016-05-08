@@ -8,11 +8,13 @@ usr/lib/python3*/dist-packages/arsoft/crypto/*.py
 usr/lib/python3*/dist-packages/arsoft/disks/*.py
 usr/lib/python3*/dist-packages/arsoft/efi/*.py
 usr/lib/python3*/dist-packages/arsoft/eiscp/*.py
+usr/lib/python3*/dist-packages/arsoft/eurosport/*.py
 usr/lib/python3*/dist-packages/arsoft/fritzbox/*.py
 usr/lib/python3*/dist-packages/arsoft/git/*.py
 usr/lib/python3*/dist-packages/arsoft/kerberos/*.py
 usr/lib/python3*/dist-packages/arsoft/ldap/*.py
 usr/lib/python3*/dist-packages/arsoft/ldap/slapd/*.py
+usr/lib/python3*/dist-packages/arsoft/m3u8/*.py
 usr/lib/python3*/dist-packages/arsoft/mail/*.py
 usr/lib/python3*/dist-packages/arsoft/mount/*.py
 usr/lib/python3*/dist-packages/arsoft/nagios/*.py
