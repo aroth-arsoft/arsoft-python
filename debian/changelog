@@ -1,3 +1,9 @@
+arsoft-python (1.246) xenial; urgency=medium
+
+  * fixed several dependency issues
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 09 May 2016 08:34:24 +0200
+
 arsoft-python (1.245) xenial; urgency=medium
 
   * eurosport-stream: better quality selection

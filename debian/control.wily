@@ -11,6 +11,8 @@ Package: python-arsoft
 Section: python
 Architecture: all
 Replaces: arsoft-python
+Conflicts: arsoft-python-openvpn, arsoft-openvpn, arsoft-python-fritzbox, arsoft-crypto,
+ arsoft-python-git, arsoft-onkyo
 Depends: ${python:Depends}, ${misc:Depends}, python-sleekxmpp, python-daemon, python-magic
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
@@ -34,8 +36,7 @@ Description: module for django web applications
 
 Package: arsoft-python-nagios
 Architecture: all
-Depends: python-arsoft, arsoft-python-fritzbox, python-yaml,
- ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-yaml, ${python:Depends}, ${misc:Depends}
 Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
  includes ready to use plugins for nagios to monitor an AVM FritzBox
