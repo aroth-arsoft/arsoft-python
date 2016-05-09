@@ -38,10 +38,22 @@ class Config(object):
 
         inifile.set(None, 'EMail', self.email)
         inifile.set(None, 'Password', self.password)
-        inifile.set(None, 'VideoQuality', self.quality)
-        inifile.set(None, 'Geo', self.geo)
-        inifile.set(None, 'Language', self.language)
-        inifile.set(None, 'Country', self.country)
+        if self.quality is not None:
+            inifile.set(None, 'VideoQuality', self.quality)
+        else:
+            inifile.remove(None, 'VideoQuality')
+        if self.geo is not None:
+            inifile.set(None, 'Geo', self.geo)
+        else:
+            inifile.remove(None, 'Geo')
+        if self.language is not None:
+            inifile.set(None, 'Language', self.language)
+        else:
+            inifile.remove(None, 'Language')
+        if self.country is not None:
+            inifile.set(None, 'Country', self.country)
+        else:
+            inifile.remove(None, 'Country')
         inifile.setAsInteger(None, 'DeviceType', self.devtype)
         inifile.setAsInteger(None, 'ProductId', self.productid)
         return inifile.save(filename)
