@@ -21,11 +21,11 @@ __version__ = '1.0'
 
 class PrivateKeyPasswordFile(object):
     def __init__(self, filename):
-        self._conf = IniFile(filename=filename, commentPrefix='#', keyValueSeperator=' ', disabled_values=False)
+        self._conf = IniFile(filename=filename, commentPrefix=None, keyValueSeperator=' ', disabled_values=False)
 
     def __contains__(self, key):
         value = self._conf.get(section=None, key=key, default=None)
-        return True if value else False
+        return True if value is not None else False
 
     def __getitem__(self, key):
         return self._conf.get(section=None, key=key, default=None)
@@ -43,7 +43,7 @@ class OpenVPNAdmin(object):
     ExitCode = enum(Success=0, Failure=1, FileNotFound=2, ArgumentError=3, 
                     NoOperation=4, AccessDenied=5, VPNNotFound=6, ConfigurationError=7,
                     NotImplemented=8,
-                    AlreadyRunning=10, AlreadyStopped=11, NotRunning=12)
+                    AlreadyRunning=10, AlreadyStopped=11, NotRunning=12, IOError=13)
 
     def __init__(self):
         self.verbose = False
@@ -267,7 +267,14 @@ class OpenVPNAdmin(object):
                 self._private_key_passwords[output_zip_file_basename] = key_passphrase
 
             outfile_obj = tempfile.NamedTemporaryFile() if os.path.exists(output_zip_file) and not self.force_notify else None
-            zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file, key_passphrase=key_passphrase)
+            zipcfg = None
+            try:
+                zipcfg = arsoft.openvpn.ZippedConfigFile.create(config_file, outfile_obj if outfile_obj else output_zip_file, key_passphrase=key_passphrase)
+            except IOError as e:
+                sys.stderr.write('Failed to compress VPN %s to %s: %s\n' % (vpn_display_name, output_zip_file, str(e)))
+            except arsoft.openvpn.ZipError as e:
+                sys.stderr.write('Failed to compress VPN %s to %s: %s\n' % (vpn_display_name, output_zip_file, str(e)))
+
             zip_ok = True if zipcfg and zipcfg.last_error is None else False
 
             if zip_ok:
@@ -317,6 +324,13 @@ class OpenVPNAdmin(object):
             if len(selected_vpns) == 0:
                 print('No VPNs configured.')
             else:
+                if not os.path.isdir(output_directory):
+                    try:
+                        os.makedirs(output_directory, 0o755, exist_ok=True)
+                    except IOError as e:
+                        sys.stderr.write('Failed to create output directory %s, %s\n' % (output_directory, str(e)))
+                        return self.ExitCode.IOError
+
                 list_of_changed_zip_files = []
                 ret = self.ExitCode.Success
                 for vpnname in selected_vpns:

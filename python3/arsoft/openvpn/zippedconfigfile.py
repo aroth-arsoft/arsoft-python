@@ -14,6 +14,9 @@ import arsoft.utils
 import zipfile
 import io
 
+class ZipError(Exception):
+    pass
+
 class ZippedConfigFile(object):
 
     def __init__(self, filename=None, mode='r'):
@@ -89,7 +92,7 @@ class ZippedConfigFile(object):
         return (ret, error)
 
     @staticmethod
-    def _create_add_key_file_to_zip(zipfile_fobj, cfgfile, file_to_add, key_passphrase, arcname=None):
+    def _create_add_key_file_to_zip(zipfile_fobj, cfgfile, file_to_add, key_passphrase=None, arcname=None):
         if cfgfile.config_directory:
             source_file = os.path.join(cfgfile.config_directory, file_to_add)
         else:
@@ -99,7 +102,7 @@ class ZippedConfigFile(object):
             
             ret = org_keyfile.open()
             if ret:
-                zip_keyfile_stream = io.StringIO()
+                zip_keyfile_stream = io.BytesIO()
                 ret = org_keyfile.export(zip_keyfile_stream, key_passphrase)
                 if ret:
                     data = zip_keyfile_stream.getvalue()
@@ -129,10 +132,14 @@ class ZippedConfigFile(object):
                     if ret:
                         zip_cfgfile.cert_filename = zip_private_directory + 'cert.pem'
                 if ret and cfgfile.key_filename:
-                    if key_passphrase:
-                        ret, error = ZippedConfigFile._create_add_key_file_to_zip(fobj, cfgfile, cfgfile.key_filename, key_passphrase, zip_private_directory + 'key.pem')
-                    else:
-                        ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, zip_private_directory + 'key.pem')
+                    try:
+                        if key_passphrase:
+                            ret, error = ZippedConfigFile._create_add_key_file_to_zip(fobj, cfgfile, cfgfile.key_filename, key_passphrase, zip_private_directory + 'key.pem')
+                        else:
+                            ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.key_filename, zip_private_directory + 'key.pem')
+                    except arsoft.crypto.PrivateKeyError as e:
+                        error = e
+                        ret = False
                     if ret:
                         zip_cfgfile.key_filename = zip_private_directory + 'key.pem'
                 if ret and cfgfile.ca_filename:
@@ -161,27 +168,25 @@ class ZippedConfigFile(object):
                             break
                 if ret:
                     zip_cfgfile.name = cfgfile.name
-                    zip_cfgfile_stream = io.StringIO()
+                    zip_cfgfile_buf = io.BytesIO()
+                    zip_cfgfile_stream = io.TextIOWrapper(zip_cfgfile_buf)
                     ret = zip_cfgfile.save(zip_cfgfile_stream)
                     if ret:
-                        fobj.writestr(zip_cfgfile.suggested_filename, zip_cfgfile_stream.getvalue())
+                        fobj.writestr(zip_cfgfile.suggested_filename, zip_cfgfile_buf.getvalue())
                 fobj.close()
                 output_zip = ZippedConfigFile(output_file)
                 if not ret:
-                    if hasattr(output_file, 'write'):
-                        os.remove(output_file.name)
-                    else:
-                        os.remove(output_file)
+                    #if hasattr(output_file, 'write'):
+                    #    os.remove(output_file.name)
+                    #else:
+                    #    os.remove(output_file)
                     output_zip.last_error = error
                 ret = output_zip
             else:
                 ret = None
         except zipfile.BadZipfile as e:
-            ret = None
-        except IOError as e:
-            ret = None
+            raise ZipError(e)
         return ret
-        
 
     @property
     def valid(self):

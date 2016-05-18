@@ -5,5 +5,5 @@
 from .statusfile import *
 from .config import *
 from .configfile import *
-from .zippedconfigfile import ZippedConfigFile
+from .zippedconfigfile import ZippedConfigFile, ZipError
 from .systemconfig import SystemConfig

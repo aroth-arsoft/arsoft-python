@@ -6,13 +6,23 @@ import os
 from .pem import *
 from OpenSSL import crypto
 
+def _empty_passphrase_callback(*args):
+    return b''
+
+class PrivateKeyError(Exception):
+    def __str__(self):
+        return 'Error: Wrong private key'
+
 class KeyItem(PEMItem):
     def __init__(self, pemitem, private=True, passphrase=None):
         PEMItem.__init__(self, pemitem.blockindex, pemitem.blocktype, pemitem.blockdata)
-        if passphrase is None:
-            self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, self.blockdata)
-        else:
-            self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, self.blockdata, passphrase)
+        try:
+            if passphrase is None:
+                self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, self.blockdata, _empty_passphrase_callback)
+            else:
+                self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, self.blockdata, passphrase)
+        except crypto.Error as e:
+            raise PrivateKeyError
         self.private=private
         
     def get_bits(self):
@@ -59,8 +69,11 @@ class KeyItem(PEMItem):
                     fobj.write(prefix + ('Private' if self.private else 'Public') + " Key:\n")
             fobj.write(prefix + "  Bits: " + self.get_type_str() + '/' + str(self.get_bits()) + '\n')
 
-    def export(self, passphrase=None):
-        return crypto.dump_privatekey(crypto.FILETYPE_PEM, self.key, "blowfish", passphrase)
+    def export(self, passphrase=None, cipher='blowfish', encoding='utf8'):
+        if passphrase is None:
+            return crypto.dump_privatekey(crypto.FILETYPE_PEM, self.key, cipher=cipher)
+        else:
+            return crypto.dump_privatekey(crypto.FILETYPE_PEM, self.key, cipher=cipher, passphrase=bytes(passphrase, encoding=encoding) if isinstance(passphrase,str) else passphrase)
 
 class KeyList:
     def __init__(self):
@@ -181,7 +194,7 @@ class KeyPEMFile(PEMFile):
     def keys(self):
         return self.m_keys
  
-    def export(self, filename, passphrase=None):
+    def export(self, filename, passphrase=None, encoding='utf8'):
         if filename is None:
             filename = self.m_filename
 
@@ -198,7 +211,7 @@ class KeyPEMFile(PEMFile):
         if f:
             for pemitem in self.m_blocks:
                 keyitem = KeyItem(pemitem)
-                keyblock = keyitem.export(passphrase)
+                keyblock = keyitem.export(passphrase, encoding=encoding)
                 f.write(keyblock)
             if call_file_close:
                 f.close()
@@ -207,14 +220,15 @@ class KeyPEMFile(PEMFile):
             ret = False
         return ret
 
-def compare_pem_key(key_a, key_b, passphrase=None):
+def compare_pem_key(key_a, key_b, passphrase=None, encoding='utf8'):
     if passphrase is not None:
+        pw = passphrase=bytes(passphrase, encoding=encoding) if isinstance(passphrase,str) else passphrase
         try:
-            key_a_bin = crypto.load_privatekey(crypto.FILETYPE_PEM, key_a, passphrase)
+            key_a_bin = crypto.load_privatekey(crypto.FILETYPE_PEM, key_a, passphrase=pw)
         except crypto.Error:
             key_a_bin = None
         try:
-            key_b_bin = crypto.load_privatekey(crypto.FILETYPE_PEM, key_b, passphrase)
+            key_b_bin = crypto.load_privatekey(crypto.FILETYPE_PEM, key_b, passphrase=pw)
         except crypto.Error:
             key_b_bin = None
 
