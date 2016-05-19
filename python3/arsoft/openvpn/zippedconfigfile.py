@@ -155,7 +155,7 @@ class ZippedConfigFile(object):
                     if ret:
                         zip_cfgfile.crl_filename = zip_private_directory + 'crl.pem'
                 if ret and cfgfile.auth_user_pass_file:
-                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.crl_filename, zip_private_directory + 'auth_pass')
+                    ret, error = ZippedConfigFile._create_add_file_to_zip(fobj, cfgfile, cfgfile.auth_user_pass_file, zip_private_directory + 'auth_pass')
                     if ret:
                         zip_cfgfile.auth_user_pass_file = zip_private_directory + 'auth_pass'
                 if ret and cfgfile.client_config_directory:
@@ -172,6 +172,7 @@ class ZippedConfigFile(object):
                     zip_cfgfile_stream = io.TextIOWrapper(zip_cfgfile_buf)
                     ret = zip_cfgfile.save(zip_cfgfile_stream)
                     if ret:
+                        zip_cfgfile_stream.flush()
                         fobj.writestr(zip_cfgfile.suggested_filename, zip_cfgfile_buf.getvalue())
                 fobj.close()
                 output_zip = ZippedConfigFile(output_file)
@@ -237,7 +238,11 @@ class ZippedConfigFile(object):
     def config_file(self):
         self._find_config_file()
         fp = self._zip.open(self._config_file_info.filename, self.mode) if self._config_file_info else None
-        ret = ConfigFile(fp, zipfile=self) if fp else None
+        if not fp:
+            return None
+        # need to create a text IO wrapper because the ConfigFile requires a text stream and not a binary one
+        txtfp = io.TextIOWrapper(fp)
+        ret = ConfigFile(txtfp, zipfile=self)
         return ret
     
     def get_files_in_directory(self, dirname):
