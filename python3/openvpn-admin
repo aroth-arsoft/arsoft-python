@@ -31,7 +31,10 @@ class PrivateKeyPasswordFile(object):
         return self._conf.get(section=None, key=key, default=None)
 
     def __setitem__(self, key, value):
-        ret = self._conf.set(section=None, key=key, value=value)
+        if value is None:
+            ret = self._conf.remove(section=None, key=key)
+        else:
+            ret = self._conf.set(section=None, key=key, value=value)
         if ret:
             #print('self.m_filename=%s' % (self._conf.m_filename))
             ret = self._conf.save()
@@ -264,13 +267,18 @@ class OpenVPNAdmin(object):
 
             output_zip_file = os.path.join(output_directory, output_zip_file_basename)
 
-            if output_zip_file_basename in self._private_key_passwords:
-                key_passphrase = self._private_key_passwords[output_zip_file_basename]
+            if config_file.disable_private_key_encryption is not None and config_file.disable_private_key_encryption:
+                key_passphrase = None
+                if output_zip_file_basename in self._private_key_passwords:
+                    self._private_key_passwords[output_zip_file_basename] = None
             else:
-                key_passphrase = arsoft.crypto.pwgen(pw_length=20, num_pw=1, no_numerals=False, no_capitalize=False, capitalize=False,
-                         numerals=False, no_symbols=False, symbols=False, allowed_symbols=None,
-                         no_ambiguous=False)
-                self._private_key_passwords[output_zip_file_basename] = key_passphrase
+                if output_zip_file_basename in self._private_key_passwords:
+                    key_passphrase = self._private_key_passwords[output_zip_file_basename]
+                else:
+                    key_passphrase = arsoft.crypto.pwgen(pw_length=20, num_pw=1, no_numerals=False, no_capitalize=False, capitalize=False,
+                            numerals=False, no_symbols=False, symbols=False, allowed_symbols=None,
+                            no_ambiguous=False)
+                    self._private_key_passwords[output_zip_file_basename] = key_passphrase
 
             outfile_obj = tempfile.NamedTemporaryFile() if os.path.exists(output_zip_file) and not self.force_notify else None
             zipcfg = None
@@ -710,6 +718,7 @@ to use the provided configuration.
         self.disable_notify = args.disable_notify
         self.notfication_recipient = args.recipient
         self.notification_reason = args.notification_reason
+        self._password_file = args.password_file
 
         if args.version:
             return self.version()
