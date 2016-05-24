@@ -1,3 +1,10 @@
+arsoft-python (1.249) xenial; urgency=medium
+
+  * openvpn-admin: fixed password file
+  * openvpn-admin: allow to disable private key encryption
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 24 May 2016 18:18:25 +0200
+
 arsoft-python (1.248) xenial; urgency=medium
 
   * openvpn-admin: fixed config zip files
