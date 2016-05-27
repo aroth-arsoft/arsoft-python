@@ -47,7 +47,7 @@ class certinfo:
                     filename_result = True
             if not filename_result:
                 ret = False
-                print("Failed to add " + str(filename))
+                sys.stderr.write("Failed to add %s\n" % str(filename))
         return ret
 
     def find(self, term, output_number=True):
