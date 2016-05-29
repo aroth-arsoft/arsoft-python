@@ -49,6 +49,7 @@ class SFUSettings(object):
 class ADUser(object):
     def __init__(self, name):
         self.name = name
+        self.uid_number = 0
         self.account_control = 0
         self.account_expires = None
         self.password_last_set = None
@@ -83,6 +84,17 @@ class ADUser(object):
     def must_change_password(self):
         return self._must_change_password
 
+    def __str__(self):
+        return 'ADUser(%s/%i)' % (self.name, self.uid_number)
+
+class ADGroup(object):
+    def __init__(self, name):
+        self.name = name
+        self.gid_number = 0
+        self.members = []
+
+    def __str__(self):
+        return 'ADGroup(%s/%i)' % (self.name, self.gid_number)
 
 class NoConnection(Exception):
     pass
@@ -208,15 +220,14 @@ class ActiveDirectoryDomain(object):
 
         searchBase = self._base
         searchFilter = '(objectClass=user)'
-        attrsFilter = ['name', 'sAMAccountName', 'pwdLastSet', 'accountExpires', 'userAccountControl']
+        attrsFilter = ['name', 'sAMAccountName', 'pwdLastSet', 'accountExpires', 'userAccountControl',
+                       'userPrincipalName', 'displayName', 'primaryGroupID', 'memberOf',
+                       'unixHomeDirectory', 'loginShell', 'uidNumber', 'gidNumber',   ]
         self.verbose('Search %s (%s)' % (searchBase, searchFilter))
 
         result = self._cxn.search(searchBase, searchFilter, attrsFilter, scope=SUBTREE)
         if result is not None:
             for entry in result:
-                #uid = entry['name']
-                #samaccountname = entry['sAMAccountName']
-                uid = entry['sAMAccountName']
                 useraccountcontrol = int(entry.get('userAccountControl', 0))
                 pwdlastset_raw = int(entry.get('pwdLastSet', 0))
                 pwdlastset = ad_timestamp_to_datetime( pwdlastset_raw )
@@ -229,4 +240,31 @@ class ActiveDirectoryDomain(object):
                 user.password_last_set = pwdlastset
                 user._must_change_password = True if pwdlastset_raw == 0 else False
                 ret.append(user)
+        return ret
+
+    @property
+    def groups(self):
+        if self._cxn is None:
+            raise NoConnection
+
+        ret = []
+
+        searchBase = self._base
+        searchFilter = '(objectClass=group)'
+        attrsFilter = ['name', 'sAMAccountName', 'member', 'gidNumber',   ]
+        self.verbose('Search %s (%s)' % (searchBase, searchFilter))
+
+        result = self._cxn.search(searchBase, searchFilter, attrsFilter, scope=SUBTREE)
+        if result is not None:
+            for entry in result:
+                name = entry['sAMAccountName']
+                useraccountcontrol = int(entry.get('userAccountControl', 0))
+                pwdlastset_raw = int(entry.get('pwdLastSet', 0))
+                pwdlastset = ad_timestamp_to_datetime( pwdlastset_raw )
+                accountexpires = ad_timestamp_to_datetime( int(entry.get('accountExpires', 0)) )
+                mailaddr = None
+
+                group = ADGroup(entry['sAMAccountName'])
+                group.members = entry['member']
+                ret.append(group)
         return ret

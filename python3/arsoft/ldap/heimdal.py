@@ -164,3 +164,6 @@ class HeimdalDomain(object):
         return ret
 
 
+    @property
+    def groups(self):
+        return []
