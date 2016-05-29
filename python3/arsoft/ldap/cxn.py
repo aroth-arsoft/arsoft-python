@@ -7,6 +7,10 @@ import ldap3
 
 from .utils import *
 
+SUBTREE = ldap3.SUBTREE
+LEVEL = ldap3.LEVEL
+BASE = ldap3.BASE
+
 class ResultEntry(object):
     def __init__(self, entry):
         self._entry = entry
