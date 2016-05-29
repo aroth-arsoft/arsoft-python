@@ -35,21 +35,46 @@ class SFUSettings(object):
     DEFAULT_MAX_GID_NUMBER = 10000
     DEFAULT_MAX_UID_NUMBER = 10000
 
-    def __init__(self):
-        self.max_gid_number = None
-        self.max_uid_number = None
+    def __init__(self, cxn=None):
+        self._max_gid_number = None
+        self._max_uid_number = None
+        self._cxn = cxn
 
     @staticmethod
-    def defaults():
-        ret = SFUSettings()
-        ret.max_gid_number = SFUSettings.DEFAULT_MAX_GID_NUMBER
-        ret.max_uid_number = SFUSettings.DEFAULT_MAX_UID_NUMBER
+    def defaults(cxn=None):
+        ret = SFUSettings(cxn)
+        ret._max_gid_number = SFUSettings.DEFAULT_MAX_GID_NUMBER
+        ret._max_uid_number = SFUSettings.DEFAULT_MAX_UID_NUMBER
         return ret
+
+    @property
+    def max_gid_number(self):
+        return self._max_gid_number
+
+    @max_gid_number.setter
+    def max_gid_number(self, value):
+        self._max_gid_number = value
+        if self._cxn is not None:
+            self._cxn.update_sfu_settings(self)
+
+    @property
+    def max_uid_number(self):
+        return self._max_uid_number
+
+    @max_uid_number.setter
+    def max_uid_number(self, value):
+        self._max_uid_number = value
+        if self._cxn is not None:
+            self._cxn.update_sfu_settings(self)
 
 class ADUser(object):
     def __init__(self, name):
         self.name = name
         self.uid_number = 0
+        self.gid_number = 0
+        self.unix_home = None
+        self.login_shell = None
+        self.primary_gid = None
         self.account_control = 0
         self.account_expires = None
         self.password_last_set = None
@@ -112,6 +137,7 @@ class ActiveDirectoryDomain(object):
         else:
             self._domain_name = domain_name
         self.set_base(None)
+        self.set_domain(None)
 
     def __del__(self):
         if self._cxn is not None:
@@ -163,7 +189,7 @@ class ActiveDirectoryDomain(object):
         if self._cxn is None:
             raise NoConnection
 
-        ret = SFUSettings.defaults()
+        ret = SFUSettings.defaults(self)
         searchBase = 'CN=%s,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,' % self._samba_domain + self._base
         searchFilter = None
         attrsFilter = ['msSFU30MaxGidNumber', 'msSFU30MaxUidNumber']
@@ -174,6 +200,17 @@ class ActiveDirectoryDomain(object):
             if 'msSFU30MaxUidNumber' in result[0]:
                 ret.max_uid_number = int(result[0]['msSFU30MaxUidNumber'])
         return ret
+
+    def update_sfu_settings(self, sfu):
+        if self._cxn is None:
+            raise NoConnection
+        print('update_sfu_settings')
+        dn = 'CN=%s,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,' % self._samba_domain + self._base
+        changes = {
+            'msSFU30MaxGidNumber': [ (ldap3.MODIFY_REPLACE, [ sfu.max_gid_number ] ) ],
+            'msSFU30MaxUidNumber': [ (ldap3.MODIFY_REPLACE, [ sfu.max_uid_number ] ) ],
+            }
+        self._cxn.modify(dn, changes)
 
     @property
     def password_settings(self):
@@ -239,6 +276,12 @@ class ActiveDirectoryDomain(object):
                 user.account_expires = accountexpires
                 user.password_last_set = pwdlastset
                 user._must_change_password = True if pwdlastset_raw == 0 else False
+                user.primary_gid = int(entry['primaryGroupID']) if 'primaryGroupID' in entry else 0
+                user.uid_number = int(entry['uidNumber']) if 'uidNumber' in entry else 0
+                user.gid_number = int(entry['gidNumber']) if 'gidNumber' in entry else 0
+                user.unix_home = int(entry['unixHomeDirectory']) if 'unixHomeDirectory' in entry else None
+                user.login_shell = int(entry['loginShell']) if 'loginShell' in entry else None
+
                 ret.append(user)
         return ret
 
@@ -265,6 +308,9 @@ class ActiveDirectoryDomain(object):
                 mailaddr = None
 
                 group = ADGroup(entry['sAMAccountName'])
-                group.members = entry['member']
+                if 'member' in entry:
+                    group.members = entry['member']
+                group.gid_number = int(entry['gidNumber']) if 'gidNumber' in entry else 0
+
                 ret.append(group)
         return ret

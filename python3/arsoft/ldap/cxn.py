@@ -142,14 +142,11 @@ class LdapConnection(object):
             result_set = None
         return result_set
 
-    def modify(self, dn, old_values, new_values):
+    def modify(self, dn, values):
         self._verbose('dn %s' % dn)
-        self._verbose('old_values %s' % str(old_values))
-        self._verbose('new_values %s' % str(new_values))
-        mod_attrs = ldap3.modlist.modifyModlist(old_values, new_values)
-        self._verbose('mod_attrs %s' % str(mod_attrs))
+        self._verbose('values %s' % str(values))
         try:
-            self._cxn.modify_s(dn, mod_attrs)
+            self._cxn.modify(dn, values)
             ret = True
         except ldap3.LDAPException as e:
             self._error('ldap modify %s failed: %s' % (dn, str(e)) )
