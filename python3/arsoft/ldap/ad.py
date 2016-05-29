@@ -3,7 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from .cxn import *
-
+import struct
 from arsoft.timestamp import ad_timestamp_to_datetime
 
 AD_UF_ACCOUNTDISABLE = 0x0002
@@ -67,11 +67,36 @@ class SFUSettings(object):
         if self._cxn is not None:
             self._cxn.update_sfu_settings(self)
 
-class ADUser(object):
-    def __init__(self, name):
+class RIDSet(object):
+    def __init__(self):
+        self.allocation_pool = None
+        self.next_rid = None
+        self.previous_allocation_pool = None
+        self.used_ool = None
+
+class ADSamAccount(object):
+    def __init__(self, name, object_sid):
         self.name = name
+        self.object_sid = object_sid
+        if isinstance(object_sid, bytes) and len(object_sid) > 4:
+            t = struct.unpack('<L', object_sid[-4:])
+            self.rid = t[0]
+        else:
+            self.rid = 0
+    @property
+    def object_sid_as_string(self):
+        return str(self.rid)
+
+    @property
+    def is_builtin(self):
+        return True if self.rid < 1000 else False
+
+class ADUser(ADSamAccount):
+    def __init__(self, name, object_sid):
+        ADSamAccount.__init__(self, name, object_sid)
         self.uid_number = 0
         self.gid_number = 0
+        self.nis_domain = None
         self.unix_home = None
         self.login_shell = None
         self.primary_gid = None
@@ -110,16 +135,73 @@ class ADUser(object):
         return self._must_change_password
 
     def __str__(self):
-        return 'ADUser(%s/%i)' % (self.name, self.uid_number)
+        return 'ADUser(%s/%i - %s/%i)' % (self.name, self.uid_number, self.object_sid_as_string, self.rid)
 
-class ADGroup(object):
-    def __init__(self, name):
-        self.name = name
+class ADGroup(ADSamAccount):
+    def __init__(self, name, object_sid):
+        ADSamAccount.__init__(self, name, object_sid)
         self.gid_number = 0
+        self.nis_domain = None
         self.members = []
 
     def __str__(self):
-        return 'ADGroup(%s/%i)' % (self.name, self.gid_number)
+        return 'ADGroup(%s/%i - %s/%i)' % (self.name, self.gid_number, self.object_sid_as_string, self.rid)
+
+class ADIdMap(object):
+    def __init__(self, cxn):
+        self._cxn = cxn
+        self._users = None
+        self._groups = None
+        self._object_sid_map = {}
+        self._uid_map = {}
+        self._gid_map = {}
+        self._rid_map = {}
+
+    @property
+    def groups(self):
+        if self._cxn is None:
+            raise NoConnection
+
+        if self._groups is None:
+            self._groups = self._cxn.groups
+            for group in self._groups:
+                self._object_sid_map[group.object_sid] = group
+                self._rid_map[group.rid] = group
+                if group.gid_number != 0:
+                    self._gid_map[group.gid_number] = group
+        return self._groups
+
+    @property
+    def users(self):
+        if self._cxn is None:
+            raise NoConnection
+
+        if self._users is None:
+            self._users = self._cxn.users
+            for user in self._users:
+                self._object_sid_map[user.object_sid] = user
+                self._rid_map[user.rid] = user
+                if user.uid_number != 0:
+                    self._uid_map[user.uid_number] = user
+        return self._users
+
+    def get_group_by_rid(self, rid):
+        if self._groups is None:
+            self.groups
+        if rid in self._rid_map:
+            ret = self._rid_map[rid]
+            if isinstance(ret, ADGroup):
+                return ret
+        return None
+
+    def get_user_by_rid(self, rid):
+        if self._users is None:
+            self.users
+        if rid in self._rid_map:
+            ret = self._rid_map[rid]
+            if isinstance(ret, ADUser):
+                return ret
+        return None
 
 class NoConnection(Exception):
     pass
@@ -225,7 +307,6 @@ class ActiveDirectoryDomain(object):
         attrsFilter = ["pwdProperties", "pwdHistoryLength", "minPwdLength",
                  "minPwdAge", "maxPwdAge", "lockoutDuration", "lockoutThreshold",
                  "lockOutObservationWindow"]
-        cur_max_pwd_age = 0
 
         res = self._cxn.search(searchBase, searchFilter, attrsFilter, scope=BASE)
         if res is not None:
@@ -249,6 +330,24 @@ class ActiveDirectoryDomain(object):
         return ret
 
     @property
+    def rid_set(self):
+        if self._cxn is None:
+            raise NoConnection
+
+        domain_controller = 'OSSRV'
+        ret = RIDSet()
+        searchBase = 'CN=RID Set,CN=%s,OU=Domain Controllers,' % domain_controller + self._base
+        searchFilter = None
+        attrsFilter = ["rIDAllocationPool", "rIDNextRID", "rIDPreviousAllocationPool", 'rIDUsedPool' ]
+        res = self._cxn.search(searchBase, searchFilter, attrsFilter, scope=BASE)
+        if res is not None:
+            ret.allocation_pool = int(res[0]["rIDAllocationPool"][0])
+            ret.next_rid = int(res[0]["rIDNextRID"][0])
+            ret.previous_allocation_pool = int(res[0]["rIDPreviousAllocationPool"][0])
+            ret.used_ool = int(res[0]["rIDUsedPool"][0])
+        return ret
+
+    @property
     def users(self):
         if self._cxn is None:
             raise NoConnection
@@ -258,29 +357,33 @@ class ActiveDirectoryDomain(object):
         searchBase = self._base
         searchFilter = '(objectClass=user)'
         attrsFilter = ['name', 'sAMAccountName', 'pwdLastSet', 'accountExpires', 'userAccountControl',
+                       'objectSid',
                        'userPrincipalName', 'displayName', 'primaryGroupID', 'memberOf',
-                       'unixHomeDirectory', 'loginShell', 'uidNumber', 'gidNumber',   ]
+                       'unixHomeDirectory', 'loginShell', 'uidNumber', 'gidNumber', 'msSFU30NisDomain'  ]
         self.verbose('Search %s (%s)' % (searchBase, searchFilter))
 
         result = self._cxn.search(searchBase, searchFilter, attrsFilter, scope=SUBTREE)
         if result is not None:
             for entry in result:
+                entry_attrs = entry.entry_get_attribute_names()
                 useraccountcontrol = int(entry.get('userAccountControl', 0))
                 pwdlastset_raw = int(entry.get('pwdLastSet', 0))
                 pwdlastset = ad_timestamp_to_datetime( pwdlastset_raw )
                 accountexpires = ad_timestamp_to_datetime( int(entry.get('accountExpires', 0)) )
                 mailaddr = None
 
-                user = ADUser(entry['sAMAccountName'])
+                user = ADUser(entry['sAMAccountName'].value, entry['objectSid'].value)
                 user.account_control = useraccountcontrol
                 user.account_expires = accountexpires
                 user.password_last_set = pwdlastset
                 user._must_change_password = True if pwdlastset_raw == 0 else False
-                user.primary_gid = int(entry['primaryGroupID']) if 'primaryGroupID' in entry else 0
-                user.uid_number = int(entry['uidNumber']) if 'uidNumber' in entry else 0
-                user.gid_number = int(entry['gidNumber']) if 'gidNumber' in entry else 0
-                user.unix_home = int(entry['unixHomeDirectory']) if 'unixHomeDirectory' in entry else None
-                user.login_shell = int(entry['loginShell']) if 'loginShell' in entry else None
+
+                user.primary_gid = int(entry['primaryGroupID'].value) if 'primaryGroupID' in entry_attrs else 0
+                user.uid_number = int(entry['uidNumber'].value) if 'uidNumber' in entry_attrs else 0
+                user.gid_number = int(entry['gidNumber'].value) if 'gidNumber' in entry_attrs else 0
+                user.nis_domain = str(entry['msSFU30NisDomain'].value) if 'msSFU30NisDomain' in entry_attrs else None
+                user.unix_home = int(entry['unixHomeDirectory'].value) if 'unixHomeDirectory' in entry_attrs else None
+                user.login_shell = int(entry['loginShell'].value) if 'loginShell' in entry_attrs else None
 
                 ret.append(user)
         return ret
@@ -294,23 +397,33 @@ class ActiveDirectoryDomain(object):
 
         searchBase = self._base
         searchFilter = '(objectClass=group)'
-        attrsFilter = ['name', 'sAMAccountName', 'member', 'gidNumber',   ]
+        attrsFilter = ['name', 'sAMAccountName', 'member', 'gidNumber', 'objectSid', 'msSFU30NisDomain'  ]
         self.verbose('Search %s (%s)' % (searchBase, searchFilter))
 
         result = self._cxn.search(searchBase, searchFilter, attrsFilter, scope=SUBTREE)
         if result is not None:
             for entry in result:
-                name = entry['sAMAccountName']
+                entry_attrs = entry.entry_get_attribute_names()
+
                 useraccountcontrol = int(entry.get('userAccountControl', 0))
                 pwdlastset_raw = int(entry.get('pwdLastSet', 0))
                 pwdlastset = ad_timestamp_to_datetime( pwdlastset_raw )
                 accountexpires = ad_timestamp_to_datetime( int(entry.get('accountExpires', 0)) )
                 mailaddr = None
 
-                group = ADGroup(entry['sAMAccountName'])
-                if 'member' in entry:
+                group = ADGroup(entry['sAMAccountName'].value, entry['objectSid'].value)
+                if 'member' in entry_attrs:
                     group.members = entry['member']
-                group.gid_number = int(entry['gidNumber']) if 'gidNumber' in entry else 0
+                group.nis_domain = str(entry['msSFU30NisDomain'].value) if 'msSFU30NisDomain' in entry_attrs else None
+                group.gid_number = int(entry['gidNumber'].value) if 'gidNumber' in entry_attrs else 0
 
                 ret.append(group)
         return ret
+
+    @property
+    def idmap(self):
+        if self._cxn is None:
+            raise NoConnection
+
+        return ADIdMap(self)
+
