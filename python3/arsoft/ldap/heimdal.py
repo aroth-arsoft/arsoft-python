@@ -2,6 +2,26 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+from .cxn import *
+
+from arsoft.timestamp import parse_date
+
+
+class PasswordSettings(object):
+    def __init__(self):
+        self.password_properties = None
+        self.password_history_len = 0
+        self.min_password_len = 0
+        self.min_password_age = 0
+        self.max_password_age = 0
+        self.lockout_duration = 0
+        self.lockout_threshold = 0
+        self.lockout_observation_window = None
+
+    @property
+    def is_password_expire_enabled(self):
+        return True
+
 class HeimdalUser(object):
     def __init__(self, name):
         self.name = name
@@ -9,6 +29,7 @@ class HeimdalUser(object):
         self.samba_account_flags = 0
         self.account_expires = None
         self.password_last_set = None
+        self.password_expire = None
 
     @property
     def uid(self):
@@ -42,11 +63,12 @@ class HeimdalUser(object):
 class HeimdalDomain(object):
 
 
-    def __init__(self, domain_name=None, username=None, password=None, saslmech=None):
+    def __init__(self, domain_name=None, username=None, password=None, saslmech=None, logger=None):
         self._cxn = None
         self._username = username
         self._password = password
         self._saslmech = saslmech
+        self._logger = logger
         if domain_name is None:
             (fqdn, hostname, self._domain_name) = gethostname_tuple()
         else:
@@ -54,6 +76,18 @@ class HeimdalDomain(object):
         self.set_base(None)
 
     def __del__(self):
+        if self._cxn is not None:
+            self._cxn.close()
+
+    def verbose(self, msg):
+        if self._logger is not None:
+            self._logger.verbose(msg)
+
+    def error(self, msg):
+        if self._logger is not None:
+            self._logger.error(msg)
+
+    def close(self):
         if self._cxn is not None:
             self._cxn.close()
 
@@ -82,6 +116,14 @@ class HeimdalDomain(object):
     def connect(self):
         self._cxn = LdapConnection(uri, self._username, self._password, self._saslmech, logger=self)
         return self._cxn.connect()
+
+    @property
+    def sfu_settings(self):
+        return None
+
+    @property
+    def password_settings(self):
+        return PasswordSettings()
 
     @propery
     def users(self):

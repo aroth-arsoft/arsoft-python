@@ -52,6 +52,7 @@ class ADUser(object):
         self.account_control = 0
         self.account_expires = None
         self.password_last_set = None
+        self.password_expire = None
         self._must_change_password = False
 
     @property
