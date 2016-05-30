@@ -75,7 +75,8 @@ class RIDSet(object):
         self.used_ool = None
 
 class ADSamAccount(object):
-    def __init__(self, name, object_sid):
+    def __init__(self, dn, name, object_sid):
+        self.dn = dn
         self.name = name
         self.object_sid = object_sid
         if isinstance(object_sid, bytes) and len(object_sid) > 4:
@@ -92,8 +93,8 @@ class ADSamAccount(object):
         return True if self.rid < 1000 else False
 
 class ADUser(ADSamAccount):
-    def __init__(self, name, object_sid):
-        ADSamAccount.__init__(self, name, object_sid)
+    def __init__(self, dn, name, object_sid):
+        ADSamAccount.__init__(self, dn, name, object_sid)
         self.uid_number = 0
         self.gid_number = 0
         self.nis_domain = None
@@ -138,8 +139,8 @@ class ADUser(ADSamAccount):
         return 'ADUser(%s/%i - %s/%i)' % (self.name, self.uid_number, self.object_sid_as_string, self.rid)
 
 class ADGroup(ADSamAccount):
-    def __init__(self, name, object_sid):
-        ADSamAccount.__init__(self, name, object_sid)
+    def __init__(self, dn, name, object_sid):
+        ADSamAccount.__init__(self, dn, name, object_sid)
         self.gid_number = 0
         self.nis_domain = None
         self.members = []
@@ -202,6 +203,15 @@ class ADIdMap(object):
             if isinstance(ret, ADUser):
                 return ret
         return None
+
+    def modify(self, obj):
+        if isinstance(obj, ADUser):
+            return self._cxn.modify_user(obj)
+        elif isinstance(obj, ADGroup):
+            return self._cxn.modify_group(obj)
+        else:
+            return False
+
 
 class NoConnection(Exception):
     pass
@@ -372,7 +382,7 @@ class ActiveDirectoryDomain(object):
                 accountexpires = ad_timestamp_to_datetime( int(entry.get('accountExpires', 0)) )
                 mailaddr = None
 
-                user = ADUser(entry['sAMAccountName'].value, entry['objectSid'].value)
+                user = ADUser(entry.entry_get_dn(), entry['sAMAccountName'].value, entry['objectSid'].value)
                 user.account_control = useraccountcontrol
                 user.account_expires = accountexpires
                 user.password_last_set = pwdlastset
@@ -382,8 +392,8 @@ class ActiveDirectoryDomain(object):
                 user.uid_number = int(entry['uidNumber'].value) if 'uidNumber' in entry_attrs else 0
                 user.gid_number = int(entry['gidNumber'].value) if 'gidNumber' in entry_attrs else 0
                 user.nis_domain = str(entry['msSFU30NisDomain'].value) if 'msSFU30NisDomain' in entry_attrs else None
-                user.unix_home = int(entry['unixHomeDirectory'].value) if 'unixHomeDirectory' in entry_attrs else None
-                user.login_shell = int(entry['loginShell'].value) if 'loginShell' in entry_attrs else None
+                user.unix_home = str(entry['unixHomeDirectory'].value) if 'unixHomeDirectory' in entry_attrs else None
+                user.login_shell = str(entry['loginShell'].value) if 'loginShell' in entry_attrs else None
 
                 ret.append(user)
         return ret
@@ -411,7 +421,7 @@ class ActiveDirectoryDomain(object):
                 accountexpires = ad_timestamp_to_datetime( int(entry.get('accountExpires', 0)) )
                 mailaddr = None
 
-                group = ADGroup(entry['sAMAccountName'].value, entry['objectSid'].value)
+                group = ADGroup(entry.entry_get_dn(), entry['sAMAccountName'].value, entry['objectSid'].value)
                 if 'member' in entry_attrs:
                     group.members = entry['member']
                 group.nis_domain = str(entry['msSFU30NisDomain'].value) if 'msSFU30NisDomain' in entry_attrs else None
@@ -426,4 +436,29 @@ class ActiveDirectoryDomain(object):
             raise NoConnection
 
         return ADIdMap(self)
+
+    def modify_user(self, user):
+        if self._cxn is None:
+            raise NoConnection
+
+        changes = {
+            #'primaryGroupID': [ (ldap3.MODIFY_REPLACE, [ user.primary_gid ] ) ],
+            'uidNumber': [ (ldap3.MODIFY_REPLACE, [ user.uid_number ] ) ],
+            'gidNumber': [ (ldap3.MODIFY_REPLACE, [ user.gid_number ] ) ],
+            'msSFU30NisDomain': [ (ldap3.MODIFY_REPLACE, [ user.nis_domain ] ) ],
+            'unixHomeDirectory': [ (ldap3.MODIFY_REPLACE, [ user.unix_home ] ) ],
+            'loginShell': [ (ldap3.MODIFY_REPLACE, [ user.login_shell ] ) ],
+            }
+        return self._cxn.modify(user.dn, changes)
+
+
+    def modify_group(self, group):
+        if self._cxn is None:
+            raise NoConnection
+
+        changes = {
+            'msSFU30NisDomain': [ (ldap3.MODIFY_REPLACE, [ group.nis_domain ] ) ],
+            'gidNumber': [ (ldap3.MODIFY_REPLACE, [ group.gid_number ] ) ],
+            }
+        return self._cxn.modify(group.dn, changes)
 

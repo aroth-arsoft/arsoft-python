@@ -1,0 +1,146 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import socket
+
+from arsoft.socket_utils import gethostname_tuple
+
+class ad_rfc2307:
+    
+
+    def verbose(self, msg):
+        if self._verbose:
+            print(msg)
+            
+    def error(self, msg):
+        sys.stderr.write(msg + '\n')
+
+    def __init__(self):
+        self._verbose = False
+        self._uri = None
+        self._ldapbase = None
+        self._username = None
+        self._password = None
+        self._saslmech = None
+        self._cxn = None
+        self._actually_sendmail = True
+        (self._fqdn, self._hostname, self._domain) = gethostname_tuple()
+        self._samba_domain = self._domain
+        if '.' in self._samba_domain:
+            self._samba_domain = self._samba_domain[0:self._samba_domain.find('.')]
+
+    def connect(self):
+        try:
+            import ldap3
+        except ImportError:
+            self.error('Unable to load ldap3 extension. Please make sure that python3-ldap3 is installed.')
+            return False
+        
+        try:
+            import gssapi
+        except ImportError:
+            self.error('Unable to load gssapi extension. Please make sure that python3-gssapi is installed.')
+            return False
+        from arsoft.ldap.ad import ActiveDirectoryDomain
+        self._backend = ActiveDirectoryDomain(domain_name=self._domain, username=self._username, password=self._password, saslmech=self._saslmech, logger=self)
+        return self._backend.connect()
+
+    def close(self):
+        if self._backend is not None:
+            self._backend.close()
+
+    def setup_idmap(self):
+        if self._backend.sfu_settings is None:
+            return
+
+        idmap = self._backend.idmap
+        max_uid_number = self._backend.sfu_settings.max_uid_number
+        max_gid_number = self._backend.sfu_settings.max_gid_number
+
+        # create a set of all groups required for all users to map their primary group
+        all_primary_groups = set()
+        for user in idmap.users:
+            if user.normal_account:
+                all_primary_groups.add(user.primary_gid)
+
+        # first map all groups so we can use them later for the users
+        for group in idmap.groups:
+            if group.gid_number == 0:
+                add = True
+                # skip all builtin groups (with low RID) and if these group is not used as primary group by a user
+                if group.is_builtin and group.rid not in all_primary_groups:
+                    add = False
+
+                if add:
+                    nis_domain = group.name.lower().replace(' ', '')
+                    group.nis_domain = nis_domain
+                    group.gid_number = max_gid_number
+
+                    idmap.modify(group)
+                    max_gid_number += 1
+
+                    self._backend.sfu_settings.max_gid_number = max_gid_number
+                    print('Map group %s for unix with GID %i (%s)' % (group.name, group.gid_number, nis_domain) )
+                else:
+                    self.verbose('Skip group %s for unix' % (group.name))
+            else:
+                self.verbose('Skip already mapped group %s (%i)' % (group.name, group.gid_number))
+
+        for user in idmap.users:
+            if not user.normal_account:
+                self.verbose('Skip user %s for unix (no normal user account)' % (user.name))
+                continue
+            if user.uid_number == 0:
+                primary_group = idmap.get_group_by_rid(user.primary_gid)
+                if primary_group is None:
+                    self.verbose('Skip user %s because primary group %i is unknown' % (user.name, user.primary_gid))
+                    continue
+                user.uid_number = max_uid_number
+                user.nis_domain = primary_group.nis_domain
+                user.gid_number = primary_group.gid_number
+                user.login_shell = '/bin/bash'
+                user.unix_home = '/home/%s' % user.name
+                idmap.modify(user)
+                max_uid_number += 1
+                self._backend.sfu_settings.max_uid_number = max_uid_number
+                print('Map user %s for unix with UID %i, GID %i (%s)' % (user.name, user.uid_number, user.gid_number, user.nis_domain))
+            else:
+                self.verbose('Skip already mapped user %s (%i)' % (user.name, user.uid_number))
+        return 0
+
+    def run(self):
+        self.setup_idmap()
+        return 0
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='show and modify RFC2307 information in Active Directory.')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--username', dest='username', type=str, help='specify the user to access the ldap directory.')
+        parser.add_argument('--password', dest='password', type=str, help='password for the ldap user.')
+        parser.add_argument('-Y', '--saslmech', dest='saslmech', type=str, default='gssapi', help='specify mechanism used to SASL authentication.')
+
+        args = parser.parse_args()
+
+        self._verbose = args.verbose
+        self._saslmech = args.saslmech
+        self._username = args.username
+        self._password = args.password
+
+        if self.connect():
+            ret = self.run()
+            self.close()
+        else:
+            sys.stderr.write('Failed to connect to AD for domain %s\n' % (self._domain))
+            ret = 1
+
+        return ret
+
+if __name__ == "__main__":
+    app =  ad_rfc2307()
+    sys.exit(app.main())
