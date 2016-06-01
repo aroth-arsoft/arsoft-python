@@ -18,23 +18,38 @@ import subprocess
 import argparse
 
 # config
-TRAC_ENV = '/var/www/trac/myproject'
+SUDO_BIN = '/usr/bin/sudo'
+TRAC_ENV = None
 GIT_PATH = '/usr/bin/git'
 TRAC_ADMIN = '/usr/bin/trac-admin'
 REPO_NAME = '"(default)"'   # The original one have no "", I change it and work
+SUDO_USER = 'www-data'
 LOG_FILE = None     #"/tmp/traggitplugin.log"
 VERBOSE = False
 
 # if you are using gitolite or sth similar, you can get the repo name from environemt
 # REPO_NAME = os.getenv('GL_REPO')
 
+def error(v):
+    sys.stderr.write(v + '\n')
+    if LOG_FILE is not None:
+        try:
+            f = open(LOG_FILE, "a+")
+            f.write(str(v) + '\n')
+            f.close()
+        except IOError:
+            pass
+
 def log(v):
     if VERBOSE:
         print(v)
     if LOG_FILE is not None:
-        f = open(LOG_FILE, "a+")
-        f.write(str(v) + '\n')
-        f.close()
+        try:
+            f = open(LOG_FILE, "a+")
+            f.write(str(v) + '\n')
+            f.close()
+        except IOError:
+            pass
 
 def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, input=None):
     all_args = [str(exe)]
@@ -44,7 +59,7 @@ def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdO
         stdin_param = stdin
     else:
         stdin_param = subprocess.PIPE
-    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin_param, shell=False)
+    p = subprocess.Popen(all_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=stdin_param, shell=False)
     if p:
         (stdoutdata, stderrdata) = p.communicate(input)
         if stdoutdata is not None and outputStdOut:
@@ -74,16 +89,20 @@ def call_git(command, args, input=None):
     if sts == 0:
         return stdoutdata
     else:
-        log(stderrdata)
+        error(stdoutdata)
         return ''
 
-def call_trac_admin(args, input=None):
-    (sts, stdoutdata, stderrdata) = runcmdAndGetData(TRAC_ADMIN, [TRAC_ENV] + args, input=input)
-    if sts == 0:
-        return stdoutdata
+def call_trac_admin(args, input=None, use_sudo=False):
+    real_exe = SUDO_BIN if use_sudo else TRAC_ADMIN
+    if use_sudo:
+        real_args = ['-u', SUDO_USER, TRAC_ADMIN, TRAC_ENV] + args
     else:
-        log(stderrdata)
-        return ''
+        real_args = [TRAC_ENV] + args
+
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(real_exe, real_args, input=input)
+    if sts != 0:
+        error('Command %s %s failed with status %i: %s' % (real_exe, ' '.join(real_args), sts, stdoutdata) )
+    return (sts, stdoutdata, stderrdata)
 
 def get_new_commits(ref_updates):
     """ Gets a list uf updates from git running post-receive,
@@ -117,17 +136,20 @@ def get_new_commits(ref_updates):
     return new_commits
 
 
-def handle_trac(commits):
+def handle_trac(commits, use_sudo=False):
     if not (os.path.exists(TRAC_ENV) and os.path.isdir(TRAC_ENV)):
-        print "Trac path (%s) is not a directory." % TRAC_ENV
+        error("Trac path (%s) is not a directory." % TRAC_ENV)
+        return 2
 
     if len(commits) == 0:
-        return
+        error("No commits")
+        return 3
 
     args = ['changeset', 'added', REPO_NAME] + commits 
     log('handle_trac ' + str(args))
-    msg = call_trac_admin(args)
-    log('handle_trac returned ' + str(msg))
+    (sts, stdoutdata, stderrdata) = call_trac_admin(args, use_sudo=use_sudo)
+    log('handle_trac returned ' + str(stdoutdata))
+    return sts
 
 # main
 if __name__ == '__main__':
@@ -138,8 +160,10 @@ if __name__ == '__main__':
     parser.add_argument('tracenv', help='specifies the trac environment')
     parser.add_argument('--trac-admin', dest='trac_admin', default=TRAC_ADMIN, help='path to the trac-admin executable.')
     parser.add_argument('--repo-name', dest='repo_name', default=REPO_NAME, help='name of the GIT repository within trac.')
-    parser.add_argument('--logfile', dest='logfile', help='name of the logfile for debug purposes.')
-    parser.add_argument('--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+    parser.add_argument('-l', '--logfile', dest='logfile', help='name of the logfile for debug purposes.')
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output.')
+    parser.add_argument('--sudo', dest='use_sudo', action='store_true', help='use sudo to run trac-admin')
+    parser.add_argument('-u', '--user', dest='user', default=SUDO_USER, help='name of the user to run trac-admin')
 
     args = parser.parse_args()
 
@@ -148,7 +172,8 @@ if __name__ == '__main__':
     LOG_FILE = args.logfile
     TRAC_ADMIN = args.trac_admin
     VERBOSE = args.verbose
-    
+    SUDO_USER = args.user
+
     # gather all commits, to call trac-admin only once
     lines = sys.stdin.readlines()
     log('lines=' + str(lines))
@@ -158,4 +183,5 @@ if __name__ == '__main__':
     log('commits=' + str(commits))
 
     # call trac-admin
-    handle_trac(commits)
+    sys.exit(handle_trac(commits, use_sudo=args.use_sudo))
+

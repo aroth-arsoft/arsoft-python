@@ -24,10 +24,8 @@ GIT_PATH = '/usr/bin/git'
 TRAC_ADMIN = '/usr/bin/trac-admin'
 REPO_NAME = '"(default)"'   # The original one have no "", I change it and work
 SUDO_USER = 'www-data'
-#LOG_FILE = None     #"/tmp/traggitplugin.log"
-#VERBOSE = False
-LOG_FILE = "/tmp/traggitplugin.log"
-VERBOSE = True
+LOG_FILE = None     #"/tmp/traggitplugin.log"
+VERBOSE = False
 
 # if you are using gitolite or sth similar, you can get the repo name from environemt
 # REPO_NAME = os.getenv('GL_REPO')
@@ -35,17 +33,23 @@ VERBOSE = True
 def error(v):
     sys.stderr.write(v + '\n')
     if LOG_FILE is not None:
-        f = open(LOG_FILE, "a+")
-        f.write(str(v) + '\n')
-        f.close()
+        try:
+            f = open(LOG_FILE, "a+")
+            f.write(str(v) + '\n')
+            f.close()
+        except IOError:
+            pass
 
 def log(v):
     if VERBOSE:
         print(v)
     if LOG_FILE is not None:
-        f = open(LOG_FILE, "a+")
-        f.write(str(v) + '\n')
-        f.close()
+        try:
+            f = open(LOG_FILE, "a+")
+            f.write(str(v) + '\n')
+            f.close()
+        except IOError:
+            pass
 
 def runcmdAndGetData(exe, args=[], verbose=False, outputStdErr=False, outputStdOut=False, stdin=None, input=None):
     all_args = [str(exe)]
@@ -134,11 +138,11 @@ def get_new_commits(ref_updates):
 
 def handle_trac(commits, use_sudo=False):
     if not (os.path.exists(TRAC_ENV) and os.path.isdir(TRAC_ENV)):
-        print "Trac path (%s) is not a directory." % TRAC_ENV
+        error("Trac path (%s) is not a directory." % TRAC_ENV)
         return 2
 
     if len(commits) == 0:
-        print "No commits"
+        error("No commits")
         return 3
 
     args = ['changeset', 'added', REPO_NAME] + commits 
