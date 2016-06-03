@@ -38,6 +38,10 @@ class SFUSettings(object):
     def __init__(self, cxn=None):
         self._max_gid_number = None
         self._max_uid_number = None
+        self.order_number = None
+        self.master_server_name = None
+        self.domains = None
+
         self._cxn = cxn
 
     @staticmethod
@@ -284,13 +288,17 @@ class ActiveDirectoryDomain(object):
         ret = SFUSettings.defaults(self)
         searchBase = 'CN=%s,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,' % self._samba_domain + self._base
         searchFilter = None
-        attrsFilter = ['msSFU30MaxGidNumber', 'msSFU30MaxUidNumber']
+        attrsFilter = ['msSFU30MaxGidNumber', 'msSFU30MaxUidNumber', 'msSFU30Domains', 'msSFU30MasterServerName', 'msSFU30OrderNumber']
         result = self._cxn.search(searchBase, searchFilter, attrsFilter, scope=BASE)
         if result is not None:
-            if 'msSFU30MaxGidNumber' in result[0]:
-                ret.max_gid_number = int(result[0]['msSFU30MaxGidNumber'])
-            if 'msSFU30MaxUidNumber' in result[0]:
-                ret.max_uid_number = int(result[0]['msSFU30MaxUidNumber'])
+            for entry in result:
+                entry_attrs = entry.entry_get_attribute_names()
+                # use property names with underscore to avoid triggering to apply the SFU changes to AD again
+                ret._max_gid_number = int(entry['msSFU30MaxGidNumber'].value) if 'msSFU30MaxGidNumber' in entry_attrs else 0
+                ret._max_uid_number = int(entry['msSFU30MaxUidNumber'].value) if 'msSFU30MaxUidNumber' in entry_attrs else 0
+                ret.order_number = int(entry['msSFU30OrderNumber'].value) if 'msSFU30OrderNumber' in entry_attrs else 0
+                ret.master_server_name = str(entry['msSFU30MasterServerName'].value) if 'msSFU30MasterServerName' in entry_attrs else 0
+                ret.domains = str(entry['msSFU30Domains'].value) if 'msSFU30Domains' in entry_attrs else 0
         return ret
 
     def update_sfu_settings(self, sfu):

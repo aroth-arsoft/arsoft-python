@@ -53,12 +53,14 @@ class ad_rfc2307:
             self._backend.close()
 
     def setup_idmap(self):
-        if self._backend.sfu_settings is None:
+        sfu_settings = self._backend.sfu_settings
+        if sfu_settings is None:
             return
 
         idmap = self._backend.idmap
-        max_uid_number = self._backend.sfu_settings.max_uid_number
-        max_gid_number = self._backend.sfu_settings.max_gid_number
+        max_uid_number = sfu_settings.max_uid_number
+        max_gid_number = sfu_settings.max_gid_number
+        self.verbose('Next available uid %i, gid %i' % (max_uid_number, max_gid_number))
 
         # create a set of all groups required for all users to map their primary group
         all_primary_groups = set()
@@ -82,11 +84,13 @@ class ad_rfc2307:
                     idmap.modify(group)
                     max_gid_number += 1
 
-                    self._backend.sfu_settings.max_gid_number = max_gid_number
+                    sfu_settings.max_gid_number = max_gid_number
                     print('Map group %s for unix with GID %i (%s)' % (group.name, group.gid_number, nis_domain) )
                 else:
                     self.verbose('Skip group %s for unix' % (group.name))
             else:
+                if group.gid_number >= max_gid_number:
+                    max_gid_number = group.gid_number + 1
                 self.verbose('Skip already mapped group %s (%i)' % (group.name, group.gid_number))
 
         for user in idmap.users:
@@ -105,10 +109,17 @@ class ad_rfc2307:
                 user.unix_home = '/home/%s' % user.name
                 idmap.modify(user)
                 max_uid_number += 1
-                self._backend.sfu_settings.max_uid_number = max_uid_number
+                sfu_settings.max_uid_number = max_uid_number
                 print('Map user %s for unix with UID %i, GID %i (%s)' % (user.name, user.uid_number, user.gid_number, user.nis_domain))
             else:
+                if user.uid_number >= max_uid_number:
+                    max_uid_number = user.uid_number + 1
                 self.verbose('Skip already mapped user %s (%i)' % (user.name, user.uid_number))
+        # if we found higher gid/uid numbers update the SFU settings to avoid trouble on next add of a user/group
+        if max_gid_number > sfu_settings.max_gid_number:
+            sfu_settings.max_gid_number = max_gid_number
+        if max_uid_number > sfu_settings.max_uid_number:
+            sfu_settings.max_uid_number = max_uid_number
         return 0
 
     def run(self):
