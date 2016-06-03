@@ -1,3 +1,10 @@
+arsoft-python (1.250) xenial; urgency=medium
+
+  * trac-git-post-receive-hook: add option to use sudo
+  * ad-rfc2307: fixed issues messing with max uid/gid of the SFU settings
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 03 Jun 2016 07:45:07 +0200
+
 arsoft-python (1.249) xenial; urgency=medium
 
   * openvpn-admin: fixed password file
