@@ -46,6 +46,8 @@ class dns_update_app(object):
             (key, value) = arg.split('=', 1)
             if '/' in key:
                 (key, rrtype) = key.split('/', 1)
+            elif '/' in value:
+                (value, rrtype) = value.split('/', 1)
             else:
                 rrtype = None
             return (key, value, rrtype)
