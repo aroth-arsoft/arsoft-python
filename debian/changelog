@@ -1,3 +1,9 @@
+arsoft-python (1.252) xenial; urgency=medium
+
+  * install ad-rfc2307 and ad-password-expire scripts
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 13 Jul 2016 07:41:22 +0200
+
 arsoft-python (1.251) xenial; urgency=medium
 
   * dns-update: improve update syntax

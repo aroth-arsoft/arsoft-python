@@ -24,6 +24,8 @@ usr/lib/python3*/dist-packages/arsoft/trac/*.py
 usr/lib/python3*/dist-packages/arsoft/trac/plugins/*.py
 usr/lib/python3*/dist-packages/arsoft/xdg/*.py
 usr/lib/python3*/dist-packages/arsoft/xmpp/*.py
+usr/bin/ad-rfc2307
+usr/bin/ad-password-expire
 usr/bin/alog
 usr/bin/arsoft-backup
 usr/bin/arsoft-mailer
