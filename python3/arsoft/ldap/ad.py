@@ -79,7 +79,8 @@ class RIDSet(object):
         self.used_ool = None
 
 class ADSamAccount(object):
-    def __init__(self, dn, name, object_sid):
+    def __init__(self, cxn, dn, name, object_sid):
+        self._cxn = cxn
         self.dn = dn
         self.name = name
         self.object_sid = object_sid
@@ -97,13 +98,14 @@ class ADSamAccount(object):
         return True if self.rid < 1000 else False
 
 class ADUser(ADSamAccount):
-    def __init__(self, dn, name, object_sid):
-        ADSamAccount.__init__(self, dn, name, object_sid)
+    def __init__(self, cxn, dn, name, object_sid):
+        ADSamAccount.__init__(self, cxn, dn, name, object_sid)
         self.uid_number = 0
         self.gid_number = 0
         self.nis_domain = None
         self.unix_home = None
         self.login_shell = None
+        self.display_name = None
         self.primary_gid = None
         self.account_control = 0
         self.account_expires = None
@@ -143,11 +145,18 @@ class ADUser(ADSamAccount):
         return 'ADUser(%s/%i - %s/%i)' % (self.name, self.uid_number, self.object_sid_as_string, self.rid)
 
 class ADGroup(ADSamAccount):
-    def __init__(self, dn, name, object_sid):
-        ADSamAccount.__init__(self, dn, name, object_sid)
+    def __init__(self, cxn, dn, name, object_sid):
+        ADSamAccount.__init__(self, cxn, dn, name, object_sid)
         self.gid_number = 0
         self.nis_domain = None
-        self.members = []
+        self._members = []
+
+    @property
+    def members(self):
+        ret = []
+        for m in self._members:
+            ret.append(self._cxn.get_user_by_dn(m))
+        return ret
 
     def __str__(self):
         return 'ADGroup(%s/%i - %s/%i)' % (self.name, self.gid_number, self.object_sid_as_string, self.rid)
@@ -304,7 +313,7 @@ class ActiveDirectoryDomain(object):
     def update_sfu_settings(self, sfu):
         if self._cxn is None:
             raise NoConnection
-        print('update_sfu_settings')
+        #print('update_sfu_settings')
         dn = 'CN=%s,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,' % self._samba_domain + self._base
         changes = {
             'msSFU30MaxGidNumber': [ (ldap3.MODIFY_REPLACE, [ sfu.max_gid_number ] ) ],
@@ -365,14 +374,13 @@ class ActiveDirectoryDomain(object):
             ret.used_ool = int(res[0]["rIDUsedPool"][0])
         return ret
 
-    @property
-    def users(self):
+    def _get_users_by_dn(self, dn=None):
         if self._cxn is None:
             raise NoConnection
 
         ret = []
 
-        searchBase = self._base
+        searchBase = self._base if dn is None else dn
         searchFilter = '(objectClass=user)'
         attrsFilter = ['name', 'sAMAccountName', 'pwdLastSet', 'accountExpires', 'userAccountControl',
                        'objectSid',
@@ -390,7 +398,7 @@ class ActiveDirectoryDomain(object):
                 accountexpires = ad_timestamp_to_datetime( int(entry.get('accountExpires', 0)) )
                 mailaddr = None
 
-                user = ADUser(entry.entry_get_dn(), entry['sAMAccountName'].value, entry['objectSid'].value)
+                user = ADUser(self, entry.entry_get_dn(), entry['sAMAccountName'].value, entry['objectSid'].value)
                 user.account_control = useraccountcontrol
                 user.account_expires = accountexpires
                 user.password_last_set = pwdlastset
@@ -402,9 +410,21 @@ class ActiveDirectoryDomain(object):
                 user.nis_domain = str(entry['msSFU30NisDomain'].value) if 'msSFU30NisDomain' in entry_attrs else None
                 user.unix_home = str(entry['unixHomeDirectory'].value) if 'unixHomeDirectory' in entry_attrs else None
                 user.login_shell = str(entry['loginShell'].value) if 'loginShell' in entry_attrs else None
+                user.display_name = str(entry['displayName'].value) if 'displayName' in entry_attrs else None
 
                 ret.append(user)
         return ret
+
+    def get_user_by_dn(self, dn):
+        ret = self._get_users_by_dn(dn)
+        if ret:
+            return ret[0]
+        else:
+            return None
+
+    @property
+    def users(self):
+        return self._get_users_by_dn()
 
     @property
     def groups(self):
@@ -429,9 +449,9 @@ class ActiveDirectoryDomain(object):
                 accountexpires = ad_timestamp_to_datetime( int(entry.get('accountExpires', 0)) )
                 mailaddr = None
 
-                group = ADGroup(entry.entry_get_dn(), entry['sAMAccountName'].value, entry['objectSid'].value)
+                group = ADGroup(self, entry.entry_get_dn(), entry['sAMAccountName'].value, entry['objectSid'].value)
                 if 'member' in entry_attrs:
-                    group.members = entry['member']
+                    group._members = entry['member']
                 group.nis_domain = str(entry['msSFU30NisDomain'].value) if 'msSFU30NisDomain' in entry_attrs else None
                 group.gid_number = int(entry['gidNumber'].value) if 'gidNumber' in entry_attrs else 0
 

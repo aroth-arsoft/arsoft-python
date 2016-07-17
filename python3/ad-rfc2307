@@ -21,29 +21,48 @@ class ad_rfc2307:
     def __init__(self):
         self._verbose = False
         self._uri = None
-        self._ldapbase = None
         self._username = None
         self._password = None
         self._saslmech = None
         self._cxn = None
-        self._actually_sendmail = True
         (self._fqdn, self._hostname, self._domain) = gethostname_tuple()
         self._samba_domain = self._domain
         if '.' in self._samba_domain:
             self._samba_domain = self._samba_domain[0:self._samba_domain.find('.')]
+        self._realm = self._domain.upper()
 
-    def connect(self):
+    def _check_extensions(self):
+        ext_ldap3_ok = False
+        ext_gssapi_ok = False
         try:
             import ldap3
+            ext_ldap3_ok = True
         except ImportError:
-            self.error('Unable to load ldap3 extension. Please make sure that python3-ldap3 is installed.')
-            return False
-        
+            pass
+
         try:
             import gssapi
+            ext_gssapi_ok = True
         except ImportError:
+            pass
+
+        ret = True
+        if not ext_ldap3_ok:
+            ret = False
+            self.error('Unable to load ldap3 extension. Please make sure that python3-ldap3 is installed.')
+        if not ext_gssapi_ok:
+            ret = False
             self.error('Unable to load gssapi extension. Please make sure that python3-gssapi is installed.')
+        return ret
+
+    def connect(self):
+        if not self._check_extensions():
             return False
+
+        if self._username is not None:
+            if '@' not in self._username:
+                self._username += '@' + self._realm
+
         from arsoft.ldap.ad import ActiveDirectoryDomain
         self._backend = ActiveDirectoryDomain(domain_name=self._domain, username=self._username, password=self._password, saslmech=self._saslmech, logger=self)
         return self._backend.connect()
@@ -122,9 +141,40 @@ class ad_rfc2307:
             sfu_settings.max_uid_number = max_uid_number
         return 0
 
-    def run(self):
-        self.setup_idmap()
+    def list_users(self):
+        idmap = self._backend.idmap
+        for user in idmap.users:
+            if not user.normal_account:
+                self.verbose('Skip user %s for unix (no normal user account)' % (user.name))
+                continue
+            print('%s:*:%i:%i:%s:%s:%s' % (user.name, user.uid_number, user.gid_number, '' if user.display_name is None else user.display_name, user.unix_home, user.login_shell ))
+
         return 0
+
+    def list_groups(self):
+        idmap = self._backend.idmap
+        for group in idmap.groups:
+            # skip all builtin groups (with low RID)
+            if group.is_builtin:
+                continue
+            member_names = []
+            for user in group.members:
+                member_names.append(user.name)
+            print('%s:*:%i:%s' % (group.name, group.gid_number, ','.join(member_names) ))
+
+        return 0
+
+    def run(self):
+        if self._operation == 'idmap':
+            ret = self.setup_idmap()
+        elif self._operation == 'passwd':
+            ret = self.list_users()
+        elif self._operation == 'group':
+            ret = self.list_groups()
+        else:
+            sys.stderr.write('Unknown operation %s\n' % (self._operation))
+            ret = 2
+        return ret
 
     def main(self):
         #=============================================================================================
@@ -135,6 +185,7 @@ class ad_rfc2307:
         parser.add_argument('--username', dest='username', type=str, help='specify the user to access the ldap directory.')
         parser.add_argument('--password', dest='password', type=str, help='password for the ldap user.')
         parser.add_argument('-Y', '--saslmech', dest='saslmech', type=str, default='gssapi', help='specify mechanism used to SASL authentication.')
+        parser.add_argument('operation', choices=['passwd', 'group', 'idmap'], nargs='?', help='operation to preform')
 
         args = parser.parse_args()
 
@@ -142,6 +193,7 @@ class ad_rfc2307:
         self._saslmech = args.saslmech
         self._username = args.username
         self._password = args.password
+        self._operation = 'passwd' if args.operation is None else args.operation
 
         if self.connect():
             ret = self.run()

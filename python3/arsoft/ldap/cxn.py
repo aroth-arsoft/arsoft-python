@@ -84,7 +84,7 @@ class LdapConnection(object):
         else:
             return s
 
-    def connect(self, uri=None, username=None, password=None, saslmech=None, use_tls=False):
+    def connect(self, uri=None, username=None, password=None, saslmech=None, use_tls=False, validate=False):
         if uri is None:
             uri = self._uri
         if username is None:
@@ -94,11 +94,12 @@ class LdapConnection(object):
         if saslmech is None:
             saslmech = self._saslmech
         uri = get_full_ldap_uri(uri)
-        use_ssl = False
+        use_ssl = True if uri.startswith('ldaps://') else False
         tls_configuration = None
-        if use_tls:
+        if use_tls or use_ssl:
             import ssl
-            tls_configuration = ldap3.Tls(validate=ssl.CERT_REQUIRED, version=ssl.PROTOCOL_TLSv1)
+
+            tls_configuration = ldap3.Tls(validate=ssl.CERT_REQUIRED if validate else ssl.CERT_NONE, version=ssl.PROTOCOL_TLSv1)
             use_ssl = True
 
         try:
@@ -108,13 +109,25 @@ class LdapConnection(object):
             self._error("Failed to initialize ldap server for %s: %s" % (uri, str(e)))
 
         if self._server is not None:
+            #auto_bind = ldap3.AUTO_BIND_NONE if username is not None else ldap3.AUTO_BIND_TLS_BEFORE_BIND
+            auto_bind = ldap3.AUTO_BIND_TLS_BEFORE_BIND
+            sasl_mechanism = LdapConnection._get_saslmech(saslmech)
+            authentication = LdapConnection._get_auth_from_saslmech(saslmech)
+            if sasl_mechanism == ldap3.GSSAPI:
+                import gssapi
             try:
                 self._cxn = ldap3.Connection(self._server, user=username, password=password, 
-                                             authentication=LdapConnection._get_auth_from_saslmech(saslmech), 
-                                             sasl_mechanism=LdapConnection._get_saslmech(saslmech), 
-                                             auto_bind=True, version=3, )
+                                             authentication=authentication,
+                                             sasl_mechanism=sasl_mechanism,
+                                             auto_bind=auto_bind, version=3, )
             except ldap3.LDAPException as e:
                 self._error("Failed to connect to ldap server %s: %s" % (uri, str(e)))
+                self._cxn = None
+            except gssapi.raw.misc.GSSError as e:
+                self._error("Failed to connect to ldap server %s: %s" % (uri, str(e)))
+                self._cxn = None
+            if self._cxn is not None and self._cxn.closed:
+                self._error("Failed to connect to ldap server %s: Connection closed" % (uri))
                 self._cxn = None
         ret = True if self._cxn is not None else False
         return ret
