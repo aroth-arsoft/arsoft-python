@@ -9,13 +9,15 @@ import socket
 from arsoft.socket_utils import gethostname_tuple
 
 class ad_rfc2307:
-    
 
     def verbose(self, msg):
         if self._verbose:
             print(msg)
-            
+
     def error(self, msg):
+        sys.stderr.write(msg + '\n')
+
+    def warning(self, msg):
         sys.stderr.write(msg + '\n')
 
     def __init__(self):
@@ -79,6 +81,18 @@ class ad_rfc2307:
         idmap = self._backend.idmap
         max_uid_number = sfu_settings.max_uid_number
         max_gid_number = sfu_settings.max_gid_number
+        if max_uid_number < self._min_uid:
+            if self._fix_issues:
+                self.warning('Next SFU UID %i is below the limit of %i. Correcting.' % (max_uid_number, self._min_uid))
+                max_uid_number = self._min_uid
+            else:
+                self.error('Next SFU UID %i is below the limit of %i.' % (max_uid_number, self._min_uid))
+        if max_gid_number < self._min_gid:
+            if self._fix_issues:
+                self.warning('Next SFU GID %i is below the limit of %i. Correcting.' % (max_gid_number, self._min_gid))
+                max_gid_number = self._min_gid
+            else:
+                self.error('Next SFU UID %i is below the limit of %i.' % (max_gid_number, self._min_gid))
         self.verbose('Next available uid %i, gid %i' % (max_uid_number, max_gid_number))
 
         # create a set of all groups required for all users to map their primary group
@@ -89,7 +103,7 @@ class ad_rfc2307:
 
         # first map all groups so we can use them later for the users
         for group in idmap.groups:
-            if group.gid_number == 0:
+            if group.gid_number == 0 or (group.gid_number < self._min_gid and self._fix_issues):
                 add = True
                 # skip all builtin groups (with low RID) and if these group is not used as primary group by a user
                 if group.is_builtin and group.rid not in all_primary_groups:
@@ -116,7 +130,7 @@ class ad_rfc2307:
             if not user.normal_account:
                 self.verbose('Skip user %s for unix (no normal user account)' % (user.name))
                 continue
-            if user.uid_number == 0:
+            if user.uid_number == 0 or (user.uid_number < self._min_uid and self._fix_issues):
                 primary_group = idmap.get_group_by_rid(user.primary_gid)
                 if primary_group is None:
                     self.verbose('Skip user %s because primary group %i is unknown' % (user.name, user.primary_gid))
@@ -135,9 +149,9 @@ class ad_rfc2307:
                     max_uid_number = user.uid_number + 1
                 self.verbose('Skip already mapped user %s (%i)' % (user.name, user.uid_number))
         # if we found higher gid/uid numbers update the SFU settings to avoid trouble on next add of a user/group
-        if max_gid_number > sfu_settings.max_gid_number:
+        if max_gid_number != sfu_settings.max_gid_number:
             sfu_settings.max_gid_number = max_gid_number
-        if max_uid_number > sfu_settings.max_uid_number:
+        if max_uid_number != sfu_settings.max_uid_number:
             sfu_settings.max_uid_number = max_uid_number
         return 0
 
@@ -185,6 +199,9 @@ class ad_rfc2307:
         parser.add_argument('--username', dest='username', type=str, help='specify the user to access the ldap directory.')
         parser.add_argument('--password', dest='password', type=str, help='password for the ldap user.')
         parser.add_argument('-Y', '--saslmech', dest='saslmech', type=str, default='gssapi', help='specify mechanism used to SASL authentication.')
+        parser.add_argument('-F', dest='fix_issues', action='store_true', help='fix any encountered issue.')
+        parser.add_argument('--min-gid', dest='min_gid', type=int, default=10000, help='Minimum id of a group')
+        parser.add_argument('--min-uid', dest='min_uid', type=int, default=10000, help='Minimum id of a user')
         parser.add_argument('operation', choices=['passwd', 'group', 'idmap'], nargs='?', help='operation to preform')
 
         args = parser.parse_args()
@@ -194,6 +211,9 @@ class ad_rfc2307:
         self._username = args.username
         self._password = args.password
         self._operation = 'passwd' if args.operation is None else args.operation
+        self._min_gid = args.min_gid
+        self._min_uid = args.min_uid
+        self._fix_issues = args.fix_issues
 
         if self.connect():
             ret = self.run()
