@@ -169,12 +169,13 @@ class ad_rfc2307:
         idmap = self._backend.idmap
         for group in idmap.groups:
             # skip all builtin groups (with low RID)
-            if group.is_builtin:
+            if group.is_builtin and group.gid_number == 0:
+                self.verbose('Skip built-in group %s (%i, %i)' % (group.name, group.gid_number, group.rid))
                 continue
             member_names = []
             for user in group.members:
                 member_names.append(user.name)
-            print('%s:*:%i:%s' % (group.name, group.gid_number, ','.join(member_names) ))
+            print('%s:*:%i:%s' % (group.name if self._ad_names else group.nis_domain, group.gid_number, ','.join(member_names) ))
 
         return 0
 
@@ -196,12 +197,13 @@ class ad_rfc2307:
         #=============================================================================================
         parser = argparse.ArgumentParser(description='show and modify RFC2307 information in Active Directory.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
-        parser.add_argument('--username', dest='username', type=str, help='specify the user to access the ldap directory.')
-        parser.add_argument('--password', dest='password', type=str, help='password for the ldap user.')
+        parser.add_argument('-U', '--user', dest='username', type=str, help='specify the user to access the ldap directory.')
+        parser.add_argument('-p', '--password', dest='password', type=str, help='password for the ldap user.')
         parser.add_argument('-Y', '--saslmech', dest='saslmech', type=str, default='gssapi', help='specify mechanism used to SASL authentication.')
         parser.add_argument('-F', dest='fix_issues', action='store_true', help='fix any encountered issue.')
         parser.add_argument('--min-gid', dest='min_gid', type=int, default=10000, help='Minimum id of a group')
         parser.add_argument('--min-uid', dest='min_uid', type=int, default=10000, help='Minimum id of a user')
+        parser.add_argument('--ad-names', dest='ad_names', action='store_true', help='Show the AD account names instead of RFC2307 names')
         parser.add_argument('operation', choices=['passwd', 'group', 'idmap'], nargs='?', help='operation to preform')
 
         args = parser.parse_args()
@@ -214,6 +216,7 @@ class ad_rfc2307:
         self._min_gid = args.min_gid
         self._min_uid = args.min_uid
         self._fix_issues = args.fix_issues
+        self._ad_names = args.ad_names
 
         if self.connect():
             ret = self.run()
