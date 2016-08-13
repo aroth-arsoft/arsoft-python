@@ -7,6 +7,7 @@ def inventory_systemd(checkname, info):
     if len(info) > 1:
         ret.append( ('daemon', {}) )
         ret.append( ('timedate', {}) )
+        ret.append( ('failed_services', {}) )
     return ret
 
 def check_systemd(item, params, info):
@@ -31,7 +32,6 @@ def check_systemd(item, params, info):
         if len(details) == 0:
             details.append('Version %s' % (data['version']))
     elif item == 'timedate':
-
         #timedatectl_status = data.get('timedatectl_status')
         timedatectl_ntp_synchronized = data.get('timedatectl_ntp_synchronized')
         timedatectl_ntp_enabled = data.get('timedatectl_ntp_enabled')
@@ -68,6 +68,13 @@ def check_systemd(item, params, info):
                 details.append('%s (%s) from %s' % (time_utc, timedatectl_time_zone, timedatectl_time_server))
             else:
                 details.append('%s (%s)' % (time_utc, timedatectl_time_zone))
+    elif item == 'failed_services':
+        failed_services = data.get('failed_services', None)
+        if failed_services:
+            failed_services = failed_services.split(',')
+            if level < 2:
+                level = 2
+            details.append('Failed services %s' % (','.join(failed_services)))
 
     # Construct a the status message.
     if level == 0:

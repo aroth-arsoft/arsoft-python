@@ -21,9 +21,11 @@ class systemd_check_mk_plugin(object):
         self._features_enabled = []
         self._features_disabled = []
         self._timedate_info = {}
+        self._failed_services = []
 
         self._get_version()
         self._get_timedate_status()
+        self._get_failed()
 
     def _get_version(self):
         if not os.path.isfile(self.SYSTEMCTL):
@@ -121,6 +123,14 @@ class systemd_check_mk_plugin(object):
                     if key == 'status':
                         self._extract_time_server_from_status(value)
                     self._timedate_info[key] = value
+    def _get_failed(self):
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.SYSTEMCTL, '--failed', '--no-pager', '--no-legend'], env={'LANG':'C'})
+        if sts == 0:
+            got_header = False
+            for line in stdoutdata.splitlines():
+                elems = line.split(' ')
+                if elems:
+                    self._failed_services.append(elems[0])
 
     def status(self):
         if self._version:
@@ -128,6 +138,7 @@ class systemd_check_mk_plugin(object):
             print('version;%s' % self._version)
             print('features_enabled;%s' % ','.join(self._features_enabled))
             print('features_disabled;%s' % ','.join(self._features_disabled))
+            print('failed_services;%s' % ','.join(self._failed_services))
             for k,v in self._timedate_info.items():
                 if isinstance(v, list):
                     print('timedatectl_%s;%s' % (k,';'.join(v)))

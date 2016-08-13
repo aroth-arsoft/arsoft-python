@@ -1,3 +1,9 @@
+arsoft-python (1.254) xenial; urgency=medium
+
+  * check_mk: detect and report failed service from systemd
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 13 Aug 2016 11:17:01 +0200
+
 arsoft-python (1.253) xenial; urgency=medium
 
   * ad-rfc2307: list users and groups
