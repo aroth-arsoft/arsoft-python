@@ -6,6 +6,22 @@ import os.path
 from arsoft.crypto.utils import check_mk_cert_file_info
 import re
 import urllib2
+import httplib
+import socket
+
+class UnixHTTPConnection(httplib.HTTPConnection):
+
+    def __init__(self, path, host='localhost', port=None, strict=None,
+                 timeout=None):
+        httplib.HTTPConnection.__init__(self, host, port=port, strict=strict,
+                                        timeout=timeout)
+        self.path = path
+
+    def connect(self):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(self.path)
+        self.sock = sock
+
 class cups_check_mk_plugin(object):
 
     def __init__(self):
@@ -13,6 +29,7 @@ class cups_check_mk_plugin(object):
         self.certificate_files = []
         self._version_info = { 'IPP':'', 'CUPS':''}
         self._installed = False
+        self._got_info = False
         self.listen = []
         cups_config_dir = '/etc/cups'
         if os.path.isdir(cups_config_dir):
@@ -26,13 +43,28 @@ class cups_check_mk_plugin(object):
                 self._get_info()
 
     def _get_info(self):
-        response = urllib2.urlopen('http://localhost:631')
-        if response:
-            for (key, value) in response.info().items():
-                if key == 'server':
-                    for e in value.split(' '):
-                        (item, version) = e.split('/', 1)
-                        self._version_info[item] = version
+        for addr in self.listen:
+            try:
+                if os.path.isabs(addr):
+                    cxn = UnixHTTPConnection(addr)
+                    cxn.request('GET', '/')
+                    response = cxn.getresponse()
+                    headers = response.getheaders()
+                else:
+                    response = urllib2.urlopen('http://' + addr)
+                    headers = response.info().items()
+
+                if headers:
+                    for (key, value) in headers:
+                        if key == 'server':
+                            self._got_info = True
+                            for e in value.split(' '):
+                                (item, version) = e.split('/', 1)
+                                self._version_info[item] = version
+            except urllib2.URLError:
+                pass
+            if self._got_info:
+                break
 
     def _parse_config_file(self, filename):
         with open(filename, 'r') as f:
@@ -45,15 +77,19 @@ class cups_check_mk_plugin(object):
                     if key == 'ServerCertificate':
                         fullname = os.path.join(dir, value)
                         self.certificate_files.append(fullname)
+                    elif key == 'Listen':
+                        self.listen.append(value)
             f.close()
 
     def status(self):
         if self._installed:
             print("<<<cups:sep(59)>>>")
+            print('running;%i' % (self._got_info))
             for cert_file in self.certificate_files:
                 check_mk_cert_file_info(cert_file)
-            for (item, version) in self._version_info.items():
-                print('version_%s;%s' % (item, version))
+            if self._got_info:
+                for (item, version) in self._version_info.items():
+                    print('version_%s;%s' % (item, version))
 
 if __name__ == "__main__":
     pl = cups_check_mk_plugin()

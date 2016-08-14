@@ -23,7 +23,7 @@ def check_cups(item, params, info):
     msg = None
     details = []
     perfdata = []
-    data = { 'version_IPP':'', 'version_CUPS':'' }
+    data = { 'version_IPP':'', 'version_CUPS':'', 'running':'0' }
 
     for line in info:
         if len(line) < 2:
@@ -33,18 +33,23 @@ def check_cups(item, params, info):
 
     if item == 'status':
         (expected_cups_version, expected_ipp_version) = params
+        running = saveint(data['running'])
+        if not running:
+            if level < 2:
+                level = 2
+            details.append('Not running'))
+        else:
+            if data['version_CUPS'] != expected_cups_version:
+                if level < 1:
+                    level = 1
+                details.append('CUPS version %s != %s' % (data['version_CUPS'], expected_cups_version))
 
-        if data['version_CUPS'] != expected_cups_version:
-            if level < 1:
-                level = 1
-            details.append('CUPS version %s != %s' % (data['version_CUPS'], expected_cups_version))
-
-        if data['version_IPP'] != expected_ipp_version:
-            if level < 1:
-                level = 1
-            details.append('IPP version %s != %s' % (data['version_IPP'], expected_ipp_version))
-        if level == 0:
-            details.append('CUPS %s, IPP %s' % (data['version_CUPS'], data['version_IPP']))
+            if data['version_IPP'] != expected_ipp_version:
+                if level < 1:
+                    level = 1
+                details.append('IPP version %s != %s' % (data['version_IPP'], expected_ipp_version))
+            if level == 0:
+                details.append('CUPS %s, IPP %s' % (data['version_CUPS'], data['version_IPP']))
     else:
         return check_mk_cert_check(item, params, info, prefix=False)
 
