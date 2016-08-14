@@ -37,8 +37,7 @@ Description: module for django web applications
 
 Package: arsoft-python-nagios
 Architecture: all
-Depends: python-arsoft, arsoft-python-fritzbox, python-yaml,
- ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-yaml, ${python:Depends}, ${misc:Depends}
 Description: nagios plugin module
  This module includes a wrapper to create nagios plugins and also
  includes ready to use plugins for nagios to monitor an AVM FritzBox
