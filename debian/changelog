@@ -1,3 +1,10 @@
+arsoft-python (1.255) xenial; urgency=medium
+
+  * check_mk: added cups plugin/check
+  * check_mk: added DMI bios and baseboard info
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 14 Aug 2016 14:20:33 +0200
+
 arsoft-python (1.254) xenial; urgency=medium
 
   * check_mk: detect and report failed service from systemd
