@@ -356,6 +356,7 @@ class dns_update_app(object):
         parser.add_argument('--rrtype', dest='rrtype', default=self.DEFAULT_RRTYPE, help='specify the RR type for the next operation')
         parser.add_argument('--ttl', dest='ttl', default=self.DEFAULT_TTL, help='specify the TTL for the records')
         parser.add_argument('-k', '--key', dest='keyfile', default=self.DEFAULT_KEYFILE, help='key to use for the update')
+        parser.add_argument('-g', '--gssapi', dest='gssapi', action='store_true', help='use GSSAPI for authentication')
         parser.add_argument('-t', '--timeout', dest='timeout', default=self.DEFAULT_TIMEOUT, help='set the timeout for DNS queries and updates')
 
         parser.add_argument('-l', '--lookup', dest='lookup', nargs='+', help='look up the given DNS record')
@@ -376,6 +377,7 @@ class dns_update_app(object):
         self.server = args.server
         self.keyfile = args.keyfile
         self.timeout = args.timeout
+        self.gssapi = args.gssapi
 
         perform_update = True
 
