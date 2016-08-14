@@ -37,7 +37,7 @@ def check_cups(item, params, info):
         if not running:
             if level < 2:
                 level = 2
-            details.append('Not running'))
+            details.append('Not running')
         else:
             if data['version_CUPS'] != expected_cups_version:
                 if level < 1:
