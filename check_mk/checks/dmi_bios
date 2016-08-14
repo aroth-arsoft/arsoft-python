@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+#
+
+def inventory_dmi_bios(checkname, info):
+    if len(info) > 0 and info[0] == ['BIOS', 'Information']:
+        return [(None, None)]
+
+def check_dmi_bios(item, param, info):
+    if len(info) == 0 or info[0] != ['BIOS', 'Information']:
+        return (3, "Invalid information")
+    data = {}
+    for line in info:
+        line = " ".join(line)
+        if ":" in line:
+            key, value = line.split(":", 1)
+            data[key.strip()] = value.strip()
+
+    release_date = data.get("Release Date", "")
+    if '-' in release_date:
+        elems = release_date.split('-', 2)
+    elif '/' in release_date:
+        elems = release_date.split('/', 2)
+    else:
+        elems = []
+    if len(elems) == 3:
+        first_digit = saveint(elems[0])
+        middle_digit = saveint(elems[1])
+        last_digit = saveint(elems[2])
+        if first_digit > 1900:
+            year = first_digit
+            month = middle_digit
+            day = last_digit
+        elif last_digit > 1900:
+            year = last_digit
+            if middle_digit > 12:
+                day = middle_digit
+                month = first_digit
+            else:
+                day = first_digit
+                month = middle_digit
+        release_date = '%04i-%02i-%02i' % (year, month, day)
+
+    return (0, "Vendor: %s, Version: %s, Revision %s, Release date: %s" % (
+                 data.get("Vendor", "Unknown"),
+                 data.get("Version", "Unknown"),
+                 data.get("BIOS Revision", "Unknown"),
+                 release_date,
+            ))
+
+
+
+check_info["dmi_bios"] = {
+    'check_function':          check_dmi_bios,
+    'inventory_function':      inventory_dmi_bios,
+    'service_description':     'DMI BIOS info',
+}

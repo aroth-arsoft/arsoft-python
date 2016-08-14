@@ -2,5 +2,9 @@
 
 if which dmidecode >/dev/null 2>&1; then
     echo "<<<dmi_sysinfo>>>"
-    dmidecode -t 1 -q
+    dmidecode -t system -q
+    echo "<<<dmi_bios>>>"
+    dmidecode -t bios -q
+    echo "<<<dmi_baseboard>>>"
+    dmidecode -t baseboard -q
 fi
