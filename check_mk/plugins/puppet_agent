@@ -62,15 +62,16 @@ class puppet_agent_check_mk_plugin(object):
         self._start = True
 
         self._get_config()
-        self._pid, self._running = check_running(self.PIDFILE)
+        if os.path.isfile(self.SYSTEMCTL):
+            self._pid, self._running = systemd_status('puppet')
+        else:
+            self._pid, self._running = check_running(self.PIDFILE)
         self._load_last_run_summary()
         self._load_lock_file()
 
     def _get_config(self):
         if os.path.isfile(self.SYSTEMCTL):
-            (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.SYSTEMCTL, 'is-enabled', 'puppet'])
-            if sts == 0:
-                self._start = True if stdoutdata.find('enabled') != -1 else False
+            self._start = systemd_is_enabled('puppet')
         else:
             self._start = is_debian_service_enabled('puppet')
 

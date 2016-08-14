@@ -12,7 +12,8 @@ from arsoft.check_mk import *
 class puppetdb_check_mk_plugin(object):
 
     JETTY_INI = '/etc/puppetlabs/puppetdb/conf.d/jetty.ini'
-    PIDFILE = '/var/run/puppetlabs/puppetdb/puppetdb.pid'
+    SERVICE_NAME = 'puppetdb'
+    SYSTEMCTL = '/bin/systemctl'
 
     def __init__(self):
         self._hostname = 'localhost'
@@ -27,7 +28,7 @@ class puppetdb_check_mk_plugin(object):
         self._get_config()
 
         if self._port:
-            self._pid, self._running = check_running(self.PIDFILE)
+            self._pid, self._running = systemd_status(self.SERVICE_NAME)
             self._beans['memory'] = '/metrics/v1/mbeans/java.lang:type=Memory'
             self._beans['threading'] = '/metrics/v1/mbeans/java.lang:type=Threading'
             
