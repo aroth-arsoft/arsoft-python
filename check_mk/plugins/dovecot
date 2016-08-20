@@ -1,0 +1,103 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+from arsoft.utils import runcmdAndGetData
+from arsoft.timestamp import strptime_as_timestamp
+from arsoft.check_mk import *
+import re
+import os
+import errno
+import time
+import socket
+
+class dovecot_check_mk_plugin(object):
+
+    DOVECOT_BIN = '/usr/bin/dovecot'
+    DOVECOT_SBIN = '/usr/sbin/dovecot'
+    VERSION_RE = re.compile(r'^(?P<version>[0-9]+\.[0-9]+\.[0-9]+)\s*\(?(?P<gitrev>[0-9a-fA-F]+)?\)?')
+    TIMEDATECTL = '/usr/bin/timedatectl'
+    STATS_SECTIONS = ['command', 'session', 'user', 'domain', 'ip', 'global']
+    STATS_SOCKET = '/var/run/dovecot/stats'
+    PIDFILE = '/var/run/dovecot/master.pid'
+
+    def __init__(self):
+        self._version = ''
+        self._gitrev = ''
+        self._stats_data = {}
+        self._got_statistics = False
+        self._is_enabled = False
+        self._pid = 0
+        self._running = False
+
+        self._get_version()
+        self._get_daemon_status()
+        self._get_statistics()
+
+    def _get_version(self):
+        if os.path.isfile(self.DOVECOT_SBIN):
+            (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.DOVECOT_SBIN, '--version'])
+        elif os.path.isfile(self.DOVECOT_BIN):
+            (sts, stdoutdata, stderrdata) = runcmdAndGetData([self.DOVECOT_BIN, '--version'])
+        else:
+            sts = 2
+        if sts == 0:
+            lines = stdoutdata.splitlines()
+            if lines:
+                mo = self.VERSION_RE.match(lines[0])
+                if mo:
+                    mogrp = mo.groupdict()
+                    self._version = mo.group('version') if 'version' in mogrp else ''
+                    self._gitrev = mo.group('gitrev') if 'gitrev' in mogrp else ''
+
+    def _get_daemon_status(self):
+        if not self._version:
+            return
+        if has_systemd():
+            self._is_enabled = systemd_is_enabled('puppet')
+            self._pid, self._running = systemd_status('dovecot')
+        else:
+            self._is_enabled = is_debian_service_enabled('puppet')
+            self._pid, self._running = check_running(self.PIDFILE)
+
+    def _get_statistics(self):
+        if not self._version:
+            return
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(self.STATS_SOCKET)
+            for section in self.STATS_SECTIONS:
+                sock.send('EXPORT\t%s\n' % section)
+                data = sock.recv(4096)
+                lines = data.splitlines()
+                section_data = {}
+                if len(lines) >= 2:
+                    header_line = lines[0]
+                    data_line = lines[1]
+                    fields = header_line.split('\t')
+                    values = data_line.split('\t')
+                    for idx, f in enumerate(fields):
+                        section_data[f] = values[idx]
+                self._stats_data[section] = section_data
+            sock.close()
+        except socket.error:
+            pass
+
+    def status(self):
+        if self._version:
+            print("<<<dovecot:sep(59)>>>")
+            print('version;%s' % self._version)
+            print('gitrev;%s' % self._gitrev)
+            print('pid;%i' % self._pid)
+            print('enabled;%i' % self._is_enabled)
+            print('running;%i' % self._running)
+            for k, v in self._stats_data.items():
+                kv_pairs = []
+                for kv, vv in v.items():
+                    kv_pairs.append('%s=%s' % (kv, vv))
+                print('stats_%s;%s' % (k, ','.join(kv_pairs)))
+
+if __name__ == "__main__":
+    pl = dovecot_check_mk_plugin()
+    pl.status()
+ 

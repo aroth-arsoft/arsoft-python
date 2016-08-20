@@ -44,6 +44,9 @@ def check_running(pidfile):
         running = check_pid(pid)
     return (pid, running)
 
+def has_systemd():
+    return os.path.isfile('/bin/systemctl')
+
 def systemd_is_enabled(service_name):
     ret = False
     (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/bin/systemctl', '--no-pager', 'is-enabled', service_name])
@@ -94,6 +97,28 @@ def systemd_status(service_name):
         else:
             pid = saveint(main_pid)
     return (pid, running)
+
+# taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
+def _debian_start_link_count(service_name):
+    return len(glob.glob('/etc/rc*.d/S??' + service_name))
+
+# taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
+def is_debian_service_enabled(service_name):
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(["/usr/sbin/invoke-rc.d", "--quiet", "--query", service_name, "start"])
+    # 104 is the exit status when you query start an enabled service.
+    # 106 is the exit status when the policy layer supplies a fallback action
+    # See x-man-page://invoke-rc.d
+    if sts in [104, 106]:
+        return True
+    elif sts in [101, 105]:
+        # 101 is action not allowed, which means we have to do the check manually.
+        # 105 is unknown, which generally means the iniscript does not support query
+        # The debian policy states that the initscript should support methods of query
+        # For those that do not, peform the checks manually
+        # http://www.debian.org/doc/debian-policy/ch-opersys.html
+        return True if _debian_start_link_count(service_name) >= 4 else False
+    else:
+        return False
 
 def saveint(v):
     if v is None:

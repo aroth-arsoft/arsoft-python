@@ -11,31 +11,8 @@ from arsoft.inifile import IniFile
 from arsoft.check_mk import *
 from arsoft.utils import runcmdAndGetData
 
-# taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
-def _debian_start_link_count(service_name):
-    return len(glob.glob('/etc/rc*.d/S??' + service_name))
-
-# taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
-def is_debian_service_enabled(service_name):
-    (sts, stdoutdata, stderrdata) = runcmdAndGetData(["/usr/sbin/invoke-rc.d", "--quiet", "--query", service_name, "start"])
-    # 104 is the exit status when you query start an enabled service.
-    # 106 is the exit status when the policy layer supplies a fallback action
-    # See x-man-page://invoke-rc.d
-    if sts in [104, 106]:
-        return True
-    elif sts in [101, 105]:
-        # 101 is action not allowed, which means we have to do the check manually.
-        # 105 is unknown, which generally means the iniscript does not support query
-        # The debian policy states that the initscript should support methods of query
-        # For those that do not, peform the checks manually
-        # http://www.debian.org/doc/debian-policy/ch-opersys.html
-        return True if _debian_start_link_count(service_name) >= 4 else False
-    else:
-        return False
-
 class puppet_agent_check_mk_plugin(object):
 
-    SYSTEMCTL = '/bin/systemctl'
     DEFAULTS = '/etc/default/puppet'
     STATE_DIR = '/var/lib/puppet/state'
     LOCKFILE = STATE_DIR + '/agent_disabled.lock'
@@ -62,7 +39,7 @@ class puppet_agent_check_mk_plugin(object):
         self._start = True
 
         self._get_config()
-        if os.path.isfile(self.SYSTEMCTL):
+        if has_systemd():
             self._pid, self._running = systemd_status('puppet')
         else:
             self._pid, self._running = check_running(self.PIDFILE)
@@ -70,7 +47,7 @@ class puppet_agent_check_mk_plugin(object):
         self._load_lock_file()
 
     def _get_config(self):
-        if os.path.isfile(self.SYSTEMCTL):
+        if has_systemd():
             self._start = systemd_is_enabled('puppet')
         else:
             self._start = is_debian_service_enabled('puppet')
