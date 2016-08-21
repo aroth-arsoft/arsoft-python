@@ -10,8 +10,14 @@ def inventory_dovecot(checkname, info):
 
     ret = []
     data = {}
-    if len(info) > 1:
-        ret.append( ('daemon', (True, True) ) )
+    for line in info:
+        if len(line) > 1:
+            continue
+        if line[0] == 'daemon':
+            # check for daemon; must be enabled and running
+            ret.append( ('daemon', (True, True) ) )
+        elif line[0] == 'global':
+            ret.append( ('statistics', () ) )
     return ret
 
 def check_dovecot(item, params, info):
@@ -20,42 +26,46 @@ def check_dovecot(item, params, info):
     msg = None
     details = []
     perfdata = []
-    data = {
-        'running':0,
-        'enabled':1,
-        'pid':0,
-        'version':'',
-        'gitrev':'',
-        }
+    data = {}
+    current_section = None
+    current_fields = None
 
     for line in info:
-        # if we don't have any upgrades listed, the line list
-        # will only contain one element, eg. "upgrades\n"
-        if len(line) < 2:
+        if not line:
             continue
-
-        key = line[0]
-        value = line[1]
-        if key.startswith('stats_'):
-            value_dict = {}
-            for e in value.split(','):
-                if '=' in e:
-                    k,v = split('=', 1)
-                    value_dict[k] = v
-            value = value_dict
-        elif key != 'version' and key != 'girev':
-            value = saveint(value)
-        data[key] = value
+        if len(line) == 1:
+            current_section = line[0]
+            data[current_section] = []
+            current_fields = None
+            continue
+        if current_fields is None:
+            current_fields = line
+        else:
+            vals = {}
+            for idx, f in enumerate(current_fields):
+                try:
+                    if '.' in line[idx]:
+                        vals[f] = float(line[idx])
+                    else:
+                        vals[f] = int(line[idx])
+                except ValueError:
+                    vals[f] = line[idx]
+            if current_section == 'daemon' or current_section == 'global':
+                data[current_section] = vals
+            else:
+                data[current_section].append(vals)
 
     if item == 'daemon':
         if params:
             (must_be_running, enabled) = params
         else:
             (must_be_running, enabled) = (True, True)
-            
-        actually_running = False if data['running'] == 0 or data['pid'] == 0 else True
-        actually_enabled = True if data['enabled'] else False
-            
+
+        daemon_info = data['daemon']
+
+        actually_running = False if daemon_info['running'] == 0 or daemon_info['pid'] == 0 else True
+        actually_enabled = True if daemon_info['enabled'] else False
+
         if must_be_running:
             if not actually_running:
                 if level < 2:
@@ -68,7 +78,35 @@ def check_dovecot(item, params, info):
                 details.append('Daemon is running, but it should be stopped')
 
         if len(details) == 0:
-            details.append('Version %s-%s' % (data['version'], data['gitrev']))
+            details.append('Version %s-%s' % (daemon_info['version'], daemon_info['gitrev']))
+    elif item == 'statistics':
+        stats = data['global']
+        auth_db_tempfails = stats.get('auth_db_tempfails', 0)
+        if auth_db_tempfails != 0:
+            if level < 1:
+                level = 1
+            details.append('%i auth DB temp failures' % auth_db_tempfails)
+        num_connected_sessions = stats.get('num_connected_sessions', 0)
+        num_logins = stats.get('num_logins', 0)
+        user_cpu = stats.get('user_cpu', 0.0)
+        sys_cpu = stats.get('sys_cpu', 0.0)
+        total_cpu = user_cpu + sys_cpu
+
+        perfdata.append( ('auth_failures', stats.get('auth_failures', 0), '', '') )
+        perfdata.append( ('auth_successes', stats.get('auth_successes', 0), '', '') )
+        perfdata.append( ('auth_master_successes', stats.get('auth_master_successes', 0), '', '') )
+        perfdata.append( ('auth_cache_misses', stats.get('auth_cache_misses', 0), '', '') )
+        perfdata.append( ('num_logins', num_logins, '', '') )
+        perfdata.append( ('num_cmds', stats.get('num_cmds', 0), '', '') )
+        perfdata.append( ('num_connected_sessions', num_connected_sessions, '', '') )
+        perfdata.append( ('mail_cache_hits', stats.get('mail_cache_hits', 0), '', '') )
+        perfdata.append( ('auth_db_tempfails', auth_db_tempfails, '', '') )
+        perfdata.append( ('user_cpu', stats.get('user_cpu', 0.0), '', '') )
+        perfdata.append( ('sys_cpu', stats.get('sys_cpu', 0.0), '', '') )
+        perfdata.append( ('total_cpu', stats.get('total_cpu', 0.0), '', '') )
+
+        if len(details) == 0:
+            details.append('%i logins, %i connected sessions' % (num_logins, num_connected_sessions))
 
     # Construct a the status message.
     if level == 0:
