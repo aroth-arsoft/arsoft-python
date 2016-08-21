@@ -1,3 +1,9 @@
+arsoft-python (1.258) xenial; urgency=medium
+
+  * check_mk: add dovecot checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 21 Aug 2016 11:35:59 +0200
+
 arsoft-python (1.257) xenial; urgency=medium
 
   * check_mk: use systemd for puppet service checks
