@@ -17,7 +17,15 @@ class dovecot_check_mk_plugin(object):
     DOVECOT_SBIN = '/usr/sbin/dovecot'
     VERSION_RE = re.compile(r'^(?P<version>[0-9]+\.[0-9]+\.[0-9]+)\s*\(?(?P<gitrev>[0-9a-fA-F]+)?\)?')
     TIMEDATECTL = '/usr/bin/timedatectl'
-    STATS_SECTIONS = ['command', 'session', 'user', 'domain', 'ip', 'global']
+    # the following statistics are available:
+    #STATS_SECTIONS = ['command', 'user', 'domain', 'ip', 'global']
+    # But these include too much data:
+    #   command: contains stats for each IMAP command
+    #   user: contains stats for each user
+    #   domain: contains stats for each hosted domain
+    #   ip: contains stats for each network interface used by dovecot
+    # For the time being we stick to the global stats
+    STATS_SECTIONS = ['global']
     STATS_SOCKET = '/var/run/dovecot/stats'
     PIDFILE = '/var/run/dovecot/master.pid'
 
@@ -32,7 +40,6 @@ class dovecot_check_mk_plugin(object):
 
         self._get_version()
         self._get_daemon_status()
-        self._get_statistics()
 
     def _get_version(self):
         if os.path.isfile(self.DOVECOT_SBIN):
@@ -60,42 +67,26 @@ class dovecot_check_mk_plugin(object):
             self._is_enabled = is_debian_service_enabled('puppet')
             self._pid, self._running = check_running(self.PIDFILE)
 
-    def _get_statistics(self):
-        if not self._version:
-            return
+    def _print_statistics(self):
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect(self.STATS_SOCKET)
             for section in self.STATS_SECTIONS:
                 sock.send('EXPORT\t%s\n' % section)
                 data = sock.recv(4096)
-                lines = data.splitlines()
-                section_data = {}
-                if len(lines) >= 2:
-                    header_line = lines[0]
-                    data_line = lines[1]
-                    fields = header_line.split('\t')
-                    values = data_line.split('\t')
-                    for idx, f in enumerate(fields):
-                        section_data[f] = values[idx]
-                self._stats_data[section] = section_data
+                print(section)
+                print(data)
             sock.close()
         except socket.error:
             pass
 
     def status(self):
         if self._version:
-            print("<<<dovecot:sep(59)>>>")
-            print('version;%s' % self._version)
-            print('gitrev;%s' % self._gitrev)
-            print('pid;%i' % self._pid)
-            print('enabled;%i' % self._is_enabled)
-            print('running;%i' % self._running)
-            for k, v in self._stats_data.items():
-                kv_pairs = []
-                for kv, vv in v.items():
-                    kv_pairs.append('%s=%s' % (kv, vv))
-                print('stats_%s;%s' % (k, ','.join(kv_pairs)))
+            print("<<<dovecot:sep(9)>>>")
+            print('daemon')
+            print('version\tgitrev\tpid\tenabled\trunning')
+            print('%s\t%s\t%i\t%i\t%i' % (self._version, self._gitrev, self._pid, self._is_enabled, self._running) )
+            self._print_statistics()
 
 if __name__ == "__main__":
     pl = dovecot_check_mk_plugin()
