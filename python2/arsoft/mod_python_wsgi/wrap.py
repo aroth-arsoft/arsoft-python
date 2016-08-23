@@ -20,21 +20,21 @@ class ModPythonWSGIApp(object):
 
     def excecute_callable(self, request):
         try:
-            try:
-                retval = self.callable(request)
-                if retval == 1:
-                    # Request declined !?
-                    request.response.status = "502 Bad Gateway"
-                elif retval:
-                    request.response.status_code = retval
-                elif request.response.status is None:
-                    # Status not set
-                    # apache.OK
-                    request.response.status = "200 OK"
-            except mod_python.apache.SERVER_RETURN as ex:
+            retval = self.callable(request)
+            if retval == 1:
+                # Request declined !?
+                request.response.status = "502 Bad Gateway"
+            elif retval:
+                request.response.status_code = retval
+            elif request.response.status is None:
+                # Status not set
+                # apache.OK
+                request.response.status = "200 OK"
+        except Exception as ex:
+            # catch any exception if not handled and check if it has an status_code
+            if hasattr(ex, 'status_code'):
+                #print('catch ex SERVER_RETURN %i' %ex.status_code)
                 request.response.status_code = ex.status_code
-            except Exception as ex:
-                print('unknown ex %s %s' % (type(ex), str(ex)))
         finally:
             if request.cleanup is not None:
                 request.cleanup(request.cleanupData)

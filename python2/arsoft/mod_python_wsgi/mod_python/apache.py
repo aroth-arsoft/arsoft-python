@@ -60,6 +60,7 @@ HTTP_NOT_EXTENDED = 510
 
 class SERVER_RETURN(Exception):
     def __init__(self, status_code):
+        #print('SERVER_RETURN %i' % status_code)
         Exception.__init__(self)
         self.status_code = status_code
 
