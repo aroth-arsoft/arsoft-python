@@ -1,3 +1,9 @@
+arsoft-python (1.259) xenial; urgency=medium
+
+  * add wrapper for running mod_python apps using WSGI
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 23 Aug 2016 19:14:50 +0200
+
 arsoft-python (1.258) xenial; urgency=medium
 
   * check_mk: add dovecot checks

@@ -1,2 +1,4 @@
 usr/lib/python2*/dist-packages/arsoft/web/*.py
 usr/lib/python2*/dist-packages/arsoft/web/templatetags/*.py
+usr/lib/python2*/dist-packages/arsoft/mod_python_wsgi/*.py
+usr/lib/python2*/dist-packages/arsoft/mod_python_wsgi/mod_python/*.py
