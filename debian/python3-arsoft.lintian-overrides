@@ -1,3 +1,5 @@
+python3-arsoft: binary-without-manpage usr/bin/ad-password-expire
+python3-arsoft: binary-without-manpage usr/bin/ad-rfc2307
 python3-arsoft: binary-without-manpage usr/bin/alog
 python3-arsoft: binary-without-manpage usr/bin/arsoft-backup
 python3-arsoft: binary-without-manpage usr/bin/arsoft-mailer
@@ -7,6 +9,7 @@ python3-arsoft: binary-without-manpage usr/bin/cups-admin
 python3-arsoft: binary-without-manpage usr/bin/dns-query
 python3-arsoft: binary-without-manpage usr/bin/dns-update
 python3-arsoft: binary-without-manpage usr/bin/efiinfo
+python3-arsoft: binary-without-manpage usr/bin/eurosport-stream
 python3-arsoft: binary-without-manpage usr/bin/fritzbox-status
 python3-arsoft: binary-without-manpage usr/bin/ini-util
 python3-arsoft: binary-without-manpage usr/bin/managehosts
