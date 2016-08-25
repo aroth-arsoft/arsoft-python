@@ -1,3 +1,9 @@
+arsoft-python (1.260) xenial; urgency=medium
+
+  * fixed python3 trouble
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 25 Aug 2016 07:54:36 +0200
+
 arsoft-python (1.259) xenial; urgency=medium
 
   * add wrapper for running mod_python apps using WSGI
