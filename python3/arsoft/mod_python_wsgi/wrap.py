@@ -1,10 +1,14 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
 """WSGI Application to wrap a mod_python callable.
 
 This is usually the `handler` function that would have been configured for
 mod_python.
 """
 
-from . import mod_python.apache
+import mod_python.apache
 from .request import ModPythonRequest
 
 
