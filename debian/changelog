@@ -1,3 +1,9 @@
+arsoft-python (1.262) xenial; urgency=medium
+
+  * mod_python_wsgi: add missing mpm_query function
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 27 Aug 2016 18:30:45 +0200
+
 arsoft-python (1.261) xenial; urgency=medium
 
   * mod_python_wsgi: add Cookie from mod_python
