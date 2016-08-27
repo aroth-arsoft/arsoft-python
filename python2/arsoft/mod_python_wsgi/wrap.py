@@ -39,6 +39,8 @@ class ModPythonWSGIApp(object):
             if hasattr(ex, 'status_code'):
                 #print('catch ex SERVER_RETURN %i' %ex.status_code)
                 request.response.status_code = ex.status_code
+            else:
+                raise ex
         finally:
             if request.cleanup is not None:
                 request.cleanup(request.cleanupData)
