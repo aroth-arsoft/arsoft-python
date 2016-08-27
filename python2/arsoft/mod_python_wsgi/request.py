@@ -142,3 +142,7 @@ class ModPythonRequest(object):
 
     def set_content_length(self, len_):
         self.response.content_length = len_
+
+    @property
+    def method(self):
+        return self.request.method
