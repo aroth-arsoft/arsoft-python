@@ -1,3 +1,9 @@
+arsoft-python (1.261) xenial; urgency=medium
+
+  * mod_python_wsgi: add Cookie from mod_python
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 27 Aug 2016 13:45:25 +0200
+
 arsoft-python (1.260) xenial; urgency=medium
 
   * fixed python3 trouble
