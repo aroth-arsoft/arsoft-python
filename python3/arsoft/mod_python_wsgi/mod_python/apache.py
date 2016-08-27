@@ -3,6 +3,9 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import sys
+import imp
+import time
+import os
 
 # Apache return codes
 
@@ -93,3 +96,200 @@ except ImportError:
 
 def log_error(msg, level=0):
     sys.stderr.write(msg + '\n')
+
+# for mpm_query
+AP_MPMQ_NOT_SUPPORTED      = 0  # This value specifies whether
+                                # an MPM is capable of
+                                # threading or forking.
+AP_MPMQ_STATIC             = 1  # This value specifies whether
+                                # an MPM is using a static # of
+                                # threads or daemons.
+AP_MPMQ_DYNAMIC            = 2  # This value specifies whether
+                                # an MPM is using a dynamic # of
+                                # threads or daemons.
+
+AP_MPMQ_MAX_DAEMON_USED    = 1  # Max # of daemons used so far
+AP_MPMQ_IS_THREADED        = 2  # MPM can do threading
+AP_MPMQ_IS_FORKED          = 3  # MPM can do forking
+AP_MPMQ_HARD_LIMIT_DAEMONS = 4  # The compiled max # daemons
+AP_MPMQ_HARD_LIMIT_THREADS = 5  # The compiled max # threads
+AP_MPMQ_MAX_THREADS        = 6  # # of threads/child by config
+AP_MPMQ_MIN_SPARE_DAEMONS  = 7  # Min # of spare daemons
+AP_MPMQ_MIN_SPARE_THREADS  = 8  # Min # of spare threads
+AP_MPMQ_MAX_SPARE_DAEMONS  = 9  # Max # of spare daemons
+AP_MPMQ_MAX_SPARE_THREADS  = 10 # Max # of spare threads
+AP_MPMQ_MAX_REQUESTS_DAEMON= 11 # Max # of requests per daemon
+AP_MPMQ_MAX_DAEMONS        = 12 # Max # of daemons by config
+
+def mpm_query(code):
+    if code == AP_MPMQ_MAX_DAEMON_USED:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_IS_THREADED:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_IS_FORKED:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_HARD_LIMIT_DAEMONS:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_HARD_LIMIT_THREADS:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_MAX_THREADS:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_MIN_SPARE_DAEMONS:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_MIN_SPARE_THREADS:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_MAX_SPARE_DAEMONS:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_MAX_SPARE_THREADS:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_MAX_REQUESTS_DAEMON:
+        return AP_MPMQ_NOT_SUPPORTED
+    elif code == AP_MPMQ_MAX_DAEMONS:
+        return AP_MPMQ_NOT_SUPPORTED
+    else:
+        return AP_MPMQ_NOT_SUPPORTED
+
+def import_module(module_name, autoreload=1, log=0, path=None):
+    """
+    Get the module to handle the request. If
+    autoreload is on, then the module will be reloaded
+    if it has changed since the last import.
+    """
+
+    # nlehuen: this is a big lock, we'll have to refine it later to get better performance.
+    # For now, we'll concentrate on thread-safety.
+    imp.acquire_lock()
+    try:
+        # (Re)import
+        if module_name in sys.modules:
+
+            # The module has been imported already
+            module = sys.modules[module_name]
+            oldmtime, mtime  = 0, 0
+
+            if autoreload:
+
+                # but is it in the path?
+                try:
+                    file = module.__dict__["__file__"]
+                except KeyError:
+                    file = None
+
+                # the "and not" part of this condition is to prevent execution
+                # of arbitrary already imported modules, such as os. The
+                # reason we use startswith as opposed to exact match is that
+                # modules inside packages are actually in subdirectories.
+
+                if not file or (path and not list(filter(file.startswith, path))):
+                    # there is a script by this name already imported, but it's in
+                    # a different directory, therefore it's a different script
+                    mtime, oldmtime = 0, -1 # trigger import
+                else:
+                    try:
+                        last_check = module.__dict__["__mtime_check__"]
+                    except KeyError:
+                        last_check = 0
+
+                    if (time.time() - last_check) > 1:
+                        oldmtime = module.__dict__.get("__mtime__", 0)
+                        mtime = module_mtime(module)
+            else:
+                pass
+        else:
+            mtime, oldmtime = 0, -1
+
+        if mtime != oldmtime:
+
+            # Import the module
+            if log:
+                if path:
+                    s = "mod_python: (Re)importing module '%s' with path set to '%s'" % (module_name, path)
+                else:
+                    s = "mod_python: (Re)importing module '%s'" % module_name
+                _apache.log_error(s, APLOG_NOTICE)
+
+            parent = None
+            parts = module_name.split('.')
+            for i in range(len(parts)):
+                f, p, d = imp.find_module(parts[i], path)
+                try:
+                    mname = ".".join(parts[:i+1])
+                    module = imp.load_module(mname, f, p, d)
+                    if parent:
+                        setattr(parent,parts[i],module)
+                    parent = module
+                finally:
+                    if f: f.close()
+                if hasattr(module, "__path__"):
+                    path = module.__path__
+
+            if mtime == 0:
+                mtime = module_mtime(module)
+
+            module.__mtime__ = mtime
+
+        return module
+    finally:
+        imp.release_lock()
+
+def module_mtime(module):
+    """Get modification time of module"""
+    mtime = 0
+    if "__file__" in module.__dict__:
+
+        filepath = module.__file__
+
+        try:
+            # this try/except block is a workaround for a Python bug in
+            # 2.0, 2.1 and 2.1.1. See
+            # http://sourceforge.net/tracker/?group_id=5470&atid=105470&func=detail&aid=422004
+
+            if os.path.exists(filepath):
+                mtime = os.path.getmtime(filepath)
+
+            if os.path.exists(filepath[:-1]) :
+                mtime = max(mtime, os.path.getmtime(filepath[:-1]))
+
+            module.__dict__["__mtime_check__"] = time.time()
+        except OSError: pass
+
+    return mtime
+
+def resolve_object(module, obj_str, arg=None, silent=0):
+    """
+    This function traverses the objects separated by .
+    (period) to find the last one we're looking for:
+
+       From left to right, find objects, if it is
+       an unbound method of a class, instantiate the
+       class passing the request as single argument
+
+    'arg' is sometimes req, sometimes filter,
+    sometimes connection
+    """
+
+    obj = module
+
+    for obj_str in obj_str.split('.'):
+
+        parent = obj
+
+        # don't throw attribute errors when silent
+        if silent and not hasattr(obj, obj_str):
+            return None
+
+        # this adds a little clarity if we have an attriute error
+        if obj == module and not hasattr(module, obj_str):
+            if hasattr(module, "__file__"):
+                s = "module '%s' contains no '%s'" % (module.__file__, obj_str)
+                raise AttributeError(s)
+
+        obj = getattr(obj, obj_str)
+
+        if hasattr(obj, "im_self") and not obj.__self__:
+            # this is an unbound method, its class
+            # needs to be instantiated
+            instance = parent(arg)
+            obj = getattr(instance, obj_str)
+
+    return obj
