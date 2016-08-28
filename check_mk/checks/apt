@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from arsoft.timestamp import format_timedelta
+from arsoft.timestamp import format_timedelta, format_time, format_time_and_delta
 
 cache_age_warn_level = 2 * (24 * (60 * 60))
 cache_age_critical_level = 4 * (24 * (60 * 60))
@@ -39,7 +39,7 @@ def check_apt(item, params, info):
     level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
     perfdata = []
     details = []
-    data = {'check_time':0, 'cache_time':0, 'upgrades':[], 'secupgrades':[]}
+    data = {'check_time':0, 'up_time':0, 'boot_time':0, 'cache_time':0, 'upgrades':[], 'secupgrades':[]}
 
     for line in info:
         # if we don't have any upgrades listed, the line list
@@ -55,20 +55,30 @@ def check_apt(item, params, info):
             data[key] = saveint(line[1])
 
     if item == 'cache':
-        if 'cache_age' in data:
-            check_age = 0
-            cache_age = data['cache_age']
+        now = time.time()
+        cache_time = data.get('cache_time', 0)
+        check_time = data.get('check_time', 0)
+        boot_time = data.get('boot_time', 0)
+        up_time = data.get('up_time', 0)
+        #print(check_time, boot_time, up_time)
+        check_age = now - check_time
+        cache_age = now - cache_time
+        if check_time > boot_time:
+            if cache_age > cache_age_critical_level or check_age > check_age_critical_level:
+                level = 2
+            elif cache_age > cache_age_warn_level or check_age > check_age_warn_level:
+                level = 1
+            details.append("Cache has been updated %s, last check %s" % (format_time_and_delta(cache_time, -cache_age), format_time_and_delta(check_time, -check_age)) )
         else:
-            check_age = time.time() - data['check_time']
-            cache_age = time.time() - data['cache_time']
+            if up_time > check_age_critical_level:
+                level = 2
+            elif up_time > check_age_warn_level:
+                level = 1
+            details.append("Cache has been updated %s, boot %s" % (format_time_and_delta(cache_time, -cache_age), format_time_and_delta(boot_time, -up_time)) )
+
         perfdata.append( ('check_age', check_age, check_age_warn_level, check_age_critical_level ) )
         perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
-        if cache_age > cache_age_critical_level or check_age > check_age_critical_level:
-            level = 2
-        elif cache_age > cache_age_warn_level or check_age > check_age_warn_level:
-            level = 1
 
-        details.append("Cache has been updated %s, last check %s" % (format_timedelta(cache_age), format_timedelta(check_age)) )
     elif item == 'upgrades':
         num_secupgrades = len(data['secupgrades'])
         num_upgrades = len(data['upgrades'])
