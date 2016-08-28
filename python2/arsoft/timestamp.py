@@ -196,6 +196,26 @@ def format_timedelta(delta):
         ret += ' ago'
     return ret
 
+def format_time(t, format=None):
+    if isinstance(t, float) or isinstance(t, int):
+        t = time.localtime(t)
+    elif isinstance(t, time.struct_time):
+        pass
+    if format is None:
+        if isinstance(t, time.struct_time):
+            format = '%Y-%m-%d %H:%M:%S'
+        elif isinstance(t, datetime):
+            format = '%Y-%m-%d %H:%M:%S'
+        elif isinstance(t, time.date):
+            format = '%Y-%m-%d'
+    if isinstance(t, time.struct_time):
+        return time.strftime(format, t)
+    else:
+        return t.strftime(format)
+
+def format_time_and_delta(t, delta):
+    return format_time(t) + '(' + format_timedelta(delta) + ')'
+
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 def timestamp_from_datetime(datetime_obj):
