@@ -104,7 +104,10 @@ def get_upgradeable():
 if __name__ == "__main__":
     age, upgrades, secupgrades = get_upgradeable()
 
-    stats_file = os.path.join(AptCache.cache_dir, 'check_mk_stats')
+    if len(sys.argv) > 1:
+        stats_file = sys.argv[1]
+    else:
+        stats_file = os.path.join(AptCache.cache_dir, 'check_mk_stats')
     now = time.time()
     try:
         f = open(stats_file, 'w')
