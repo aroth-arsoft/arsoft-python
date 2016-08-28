@@ -1,3 +1,9 @@
+arsoft-python (1.263) xenial; urgency=medium
+
+  * check_mk: take boot time into account when checking apt cache
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 28 Aug 2016 11:30:39 +0200
+
 arsoft-python (1.262) xenial; urgency=medium
 
   * mod_python_wsgi: add missing mpm_query function
