@@ -114,5 +114,6 @@ check_info['apt'] = {
     'check_function':            check_apt,
     'inventory_function':        inventory_apt,
     'service_description':       'APT',
+    'group':                     'apt',
     'has_perfdata':              True,
 }
