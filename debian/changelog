@@ -1,3 +1,9 @@
+arsoft-python (1.267) xenial; urgency=medium
+
+  * check_mk: fixed missing puppet_agent plugin
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 30 Aug 2016 14:58:13 +0200
+
 arsoft-python (1.266) xenial; urgency=medium
 
   * check_mk: fixed exit codes of check_mk agent plugins
