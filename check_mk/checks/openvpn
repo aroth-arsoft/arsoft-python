@@ -78,39 +78,38 @@ def check_openvpn(item, params, info):
             perfdata.append( (stat_key, value) )
 
         if 'connected_clients' in cfgdata:
-            connected_clients = cfgdata['connected_clients'].split(',')
+            connected_clients = cfgdata.get('connected_clients', '').split(',')
             perfdata.append( ('numclients', len(connected_clients) ) )
         if 'configured_clients' in cfgdata:
-            configured_clients = cfgdata['configured_clients'].split(',')
+            configured_clients = cfgdata.get('configured_clients', '').split(',')
             perfdata.append( ('confclients', len(configured_clients) ) )
 
-        autostart = saveint(cfgdata['autostart'])
-        running = saveint(cfgdata['running'])
+        autostart = saveint(cfgdata.get('autostart', False))
+        running = saveint(cfgdata.get('running', False))
         if autostart != 0:
             expected_state = 'CONNECTED'
         else:
             expected_state = 'DOWN'
-        if cfgdata['state'] != expected_state:
+        actual_state = cfgdata.get('state', 'UNKNOWN')
+        if actual_state != expected_state:
             if level < 1:
                 level = 1
-            details.append('%s != %s' % (cfgdata['state'], expected_state))
+            details.append('%s != %s' % (actual_state, expected_state))
         else:
             state_age = saveint(cfgdata['state_age']) if 'state_age' in cfgdata else 0
             if state_age:
-                details.append('%s for %s' % (cfgdata['state'], format_timedelta(state_age)))
+                details.append('%s for %s' % (actual_state, format_timedelta(state_age)))
             else:
-                details.append('%s' % (cfgdata['state']))
+                details.append('%s' % (actual_state))
         if autostart != running:
             if level < 2:
                 level = 2
             details.append('VPN running' if running != 0 else 'VPN not running')
 
         if running != 0:
-            if 'localip' in cfgdata and cfgdata['localip']:
-                details.append('local %s' % (cfgdata['localip']))
-            if 'remoteip' in cfgdata and cfgdata['remoteip']:
-                details.append('remote %s' % (cfgdata['remoteip']))
-            last_updated_age = saveint(cfgdata['last_updated_age'])
+            details.append('local %s' % (cfgdata.get('localip', 'UNKNOWN')))
+            details.append('remote %s' % (cfgdata.get('remoteip', 'UNKNOWN')))
+            last_updated_age = saveint(cfgdata.get('last_updated_age', 0))
             if last_updated_age > 600:
                 if level < 1:
                     level = 1
