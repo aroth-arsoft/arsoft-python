@@ -1,3 +1,9 @@
+arsoft-python (1.268) xenial; urgency=medium
+
+  * fix minor python script errors
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 30 Aug 2016 18:00:34 +0200
+
 arsoft-python (1.267) xenial; urgency=medium
 
   * check_mk: fixed missing puppet_agent plugin
