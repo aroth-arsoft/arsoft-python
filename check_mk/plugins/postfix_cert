@@ -6,6 +6,7 @@ from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
 import os.path
 from arsoft.utils import runcmdAndGetData
 import time
+import sys
 
 class postfix_cert_mk_check_plugin(object):
 
@@ -21,11 +22,9 @@ class postfix_cert_mk_check_plugin(object):
                 key = key.rstrip()
                 if 'cert_file' in key:
                     check_mk_cert_file_info(value)
+        return 0
 
 if __name__ == "__main__":
     print("<<<postfix_cert:sep(59)>>>")
     pl = postfix_cert_mk_check_plugin()
-    pl.status()
-
-
-
+    sys.exit(pl.status())

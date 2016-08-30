@@ -8,6 +8,7 @@ import os
 import errno
 import urllib2
 import json
+import sys
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -137,8 +138,8 @@ class jenkins_check_mk_plugin(object):
                         print('job;%s;%s;%i' % (job_name, k, v))
                     else:
                         print('job;%s;%s;%s' % (job_name, k, v))
+        return 0
 
 if __name__ == "__main__":
     pl = jenkins_check_mk_plugin()
-    pl.status()
-
+    sys.exit(pl.status())

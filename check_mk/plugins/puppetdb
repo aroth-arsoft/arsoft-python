@@ -6,6 +6,7 @@ import urllib2
 import json
 import os
 import errno
+import sys
 from arsoft.inifile import IniFile
 from arsoft.check_mk import *
 
@@ -87,11 +88,9 @@ class puppetdb_check_mk_plugin(object):
                                         print('%s_%s_%s;%s' % (bean, key.lower(), value_key.lower(), value_value))
                                 else:
                                     print('%s_%s;%s' % (bean, key.lower(), value))
+        return 0
 
 if __name__ == "__main__":
     print("<<<puppetdb:sep(59)>>>")
     pl = puppetdb_check_mk_plugin()
-    pl.status()
-
-
-
+    sys.exit(pl.status())

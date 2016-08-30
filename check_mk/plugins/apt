@@ -2,3 +2,4 @@
 [ -r '/var/cache/apt/check_mk_stats' ] && cat '/var/cache/apt/check_mk_stats'
 echo "up_time;$(awk '{ printf "%i", $1 }' /proc/uptime)"
 echo "boot_time;$(awk '/btime/ { print $2 }' /proc/stat)"
+exit 0

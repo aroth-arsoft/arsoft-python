@@ -5,6 +5,7 @@
 from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
 import os.path
 from arsoft.inifile import IniFile
+import sys
 
 def check_pid(pid):
     """ Check For the existence of a unix pid. """
@@ -90,11 +91,9 @@ class cyrus_imapd_mk_check_plugin(object):
                 check_mk_cert_file_info(f, prefix=name)
             for (name, f) in self._ca_files:
                 check_mk_cert_file_info(f, prefix=name, ca=True)
+        return 0
 
 if __name__ == "__main__":
     print("<<<cyrus_imapd:sep(59)>>>")
     pl = cyrus_imapd_mk_check_plugin()
-    pl.status()
-
-
-
+    sys.exit(pl.status())

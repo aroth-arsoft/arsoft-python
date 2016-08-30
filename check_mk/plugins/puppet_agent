@@ -7,6 +7,7 @@ import errno
 import time
 import yaml
 import glob
+import sys
 from arsoft.inifile import IniFile
 from arsoft.check_mk import *
 from arsoft.utils import runcmdAndGetData
@@ -106,11 +107,9 @@ class puppet_agent_check_mk_plugin(object):
         print('pid;%i' % self._pid)
         print('start;%i' % self._start)
         print('running;%i' % self._running)
+        return 0
 
 if __name__ == "__main__":
     print("<<<puppet_agent:sep(59)>>>")
     pl = puppet_agent_check_mk_plugin()
-    pl.status()
-
-
-
+    sys.exit(pl.status())

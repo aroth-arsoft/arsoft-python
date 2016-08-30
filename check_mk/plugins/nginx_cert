@@ -5,6 +5,7 @@
 from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
 import os
 import re
+import sys
 
 class nginx_cert_mk_check_plugin(object):
 
@@ -61,11 +62,9 @@ class nginx_cert_mk_check_plugin(object):
         for server_name, cert_files in self.certificate_files.iteritems():
             for cert_file in cert_files:
                 check_mk_cert_file_info(cert_file, prefix=server_name)
+        return 0
 
 if __name__ == "__main__":
     print("<<<nginx_cert:sep(59)>>>")
     pl = nginx_cert_mk_check_plugin()
-    pl.status()
-
-
-
+    sys.exit(pl.status())

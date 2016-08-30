@@ -4,6 +4,7 @@
 
 from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
 import os.path
+import sys
 from arsoft.ldap import *
 
 # ldapsearch -b cn=config -D cn=admin,cn=config -w PW -x
@@ -65,11 +66,9 @@ class slapd_cert_mk_check_plugin(object):
             check_mk_cert_file_info(cert_file, ca=True)
         for crl_file in self._crl_files:
             check_mk_crl_file_info(crl_file)
+        return 0
 
 if __name__ == "__main__":
     print("<<<slapd_cert:sep(59)>>>")
     pl = slapd_cert_mk_check_plugin()
-    pl.status()
-
-
-
+    sys.exit(pl.status())

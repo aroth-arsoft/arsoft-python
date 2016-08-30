@@ -10,6 +10,7 @@ import os
 import errno
 import time
 import socket
+import sys
 
 class dovecot_check_mk_plugin(object):
 
@@ -86,8 +87,8 @@ class dovecot_check_mk_plugin(object):
             print('version\tgitrev\tpid\tenabled\trunning')
             print('%s\t%s\t%i\t%i\t%i' % (self._version, self._gitrev, self._pid, self._is_enabled, self._running) )
             self._print_statistics()
+        return 0
 
 if __name__ == "__main__":
     pl = dovecot_check_mk_plugin()
-    pl.status()
- 
+    sys.exit(pl.status())

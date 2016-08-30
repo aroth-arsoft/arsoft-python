@@ -9,6 +9,7 @@ import re
 import os
 import errno
 import time
+import sys
 
 class systemd_check_mk_plugin(object):
 
@@ -144,8 +145,8 @@ class systemd_check_mk_plugin(object):
                     print('timedatectl_%s;%s' % (k,';'.join(v)))
                 else:
                     print('timedatectl_%s;%s' % (k,v))
+        return 0
 
 if __name__ == "__main__":
     pl = systemd_check_mk_plugin()
-    pl.status()
- 
+    sys.exit(pl.status())

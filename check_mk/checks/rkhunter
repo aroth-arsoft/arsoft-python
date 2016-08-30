@@ -45,7 +45,9 @@ def check_rkhunter(item, params, info):
         'num_users_changed':0,
         'num_groups_changed':0,
         'num_downloads_failed':0,
+        'num_missing_files':0,
         'changed_file_properties':[],
+        'missing_files':[],
         'changed_services':[],
         'changed_users':[],
         'changed_groups':[],
@@ -106,6 +108,11 @@ def check_rkhunter(item, params, info):
                 level = 1
             details.append('%i changed files %s' % (data['num_file_properties_changed'], ','.join(data['changed_file_properties']) ) )
 
+        if data['num_missing_files'] > 0:
+            if level < 1:
+                level = 1
+            details.append('%i missing files %s' % (data['num_missing_files'], ','.join(data['missing_files']) ) )
+
         if data['num_services_changed'] > 0:
             if level < 1:
                 level = 1
@@ -135,6 +142,7 @@ def check_rkhunter(item, params, info):
         perfdata.append( ('num_warnings', data['num_warnings'], 1, 0) )
         perfdata.append( ('num_infos', data['num_infos']) )
         perfdata.append( ('num_file_properties_changed', data['num_file_properties_changed'], 1, 0) )
+        perfdata.append( ('num_missing_files', data['num_missing_files'], 1, 0) )
         perfdata.append( ('num_services_changed', data['num_services_changed'], 1, 0) )
         perfdata.append( ('num_users_changed', data['num_users_changed'], 1, 0) )
         perfdata.append( ('num_groups_changed', data['num_groups_changed'], 1, 0) )

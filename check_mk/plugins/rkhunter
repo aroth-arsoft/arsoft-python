@@ -38,6 +38,8 @@ class rkhunter_mk_check_plugin(object):
         self.num_infos = 0
         self.num_file_properties_changed = 0
         self.changed_file_properties = []
+        self.num_missing_files = 0
+        self.missing_files = []
         self.num_services_changed = 0
         self.changed_services = []
         self.num_users_changed = 0
@@ -74,6 +76,14 @@ class rkhunter_mk_check_plugin(object):
                     f_end = msgobj.message.find('\n', f_start)
                     f_name = msgobj.message[f_start:f_end] if f_end > 0 else msgobj.message[f_start:]
                     self.changed_services.append(f_name)
+            elif 'does not exist on the system' in msgobj.message:
+                self.num_missing_files += 1
+                f_start = msgobj.message.find('The file \'')
+                if f_start >= 0:
+                    f_start += 10
+                    f_end = msgobj.message.find('\'', f_start)
+                    f_name = msgobj.message[f_start:f_end] if f_end > 0 else msgobj.message[f_start:]
+                    self.missing_files.append(f_name)
             elif msgobj.message.startswith('User '):
                 self.num_users_changed += 1
                 f_start = msgobj.message.find('\'')
@@ -100,7 +110,7 @@ class rkhunter_mk_check_plugin(object):
                     self.downloads_failed.append(f_name)
             else:
                 self.num_warnings += 1
-                self.warnigns.append(msgobj.message)
+                self.warnings.append(msgobj.message)
         elif msgobj.loglevel == 'ERROR':
             self.num_errors += 1
             self.errors.append(msgobj.message)
@@ -164,6 +174,8 @@ class rkhunter_mk_check_plugin(object):
         print('num_infos;%i' % self.num_infos)
         print('num_file_properties_changed;%i' % self.num_file_properties_changed)
         print('changed_file_properties;%s' % ','.join(self.changed_file_properties))
+        print('num_missing_files;%i' % self.num_missing_files)
+        print('missing_files;%s' % ','.join(self.missing_files))
         print('num_services_changed;%i' % self.num_services_changed)
         print('changed_services;%s' % ','.join(self.changed_services))
         print('num_users_changed;%i' % self.num_users_changed)
@@ -172,11 +184,9 @@ class rkhunter_mk_check_plugin(object):
         print('changed_groups;%s' % ','.join(self.changed_groups))
         print('num_downloads_failed;%i' % self.num_downloads_failed)
         print('downloads_failed;%s' % ','.join(self.downloads_failed))
+        return 0
 
 if __name__ == "__main__":
     print("<<<rkhunter:sep(59)>>>")
     pl = rkhunter_mk_check_plugin()
-    pl.output()
-
-
-
+    sys.exit(pl.output())

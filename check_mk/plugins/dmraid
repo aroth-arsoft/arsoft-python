@@ -17,3 +17,4 @@ for disk in $DISKS ; do
     status=$(echo "$STATUS" | grep ^${disk})
     echo "$status Model: $device"
 done
+exit 0

@@ -7,6 +7,7 @@ from arsoft.check_mk import *
 import re
 import os
 import errno
+import sys
 
 class samba_status_check_mk_plugin(object):
 
@@ -94,10 +95,8 @@ class samba_status_check_mk_plugin(object):
             for p in self._processes:
                 p_stat = self._processes[p]
                 print('process_%s;%i' % (p, p_stat['pid'] if p_stat['running'] else 0))
+        return 0
 
 if __name__ == "__main__":
     pl = samba_status_check_mk_plugin()
-    pl.status()
-
-
-
+    sys.exit(pl.status())

@@ -1,3 +1,9 @@
+arsoft-python (1.266) xenial; urgency=medium
+
+  * check_mk: fixed exit codes of check_mk agent plugins
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 30 Aug 2016 14:33:14 +0200
+
 arsoft-python (1.265) xenial; urgency=medium
 
   * check_mk: add script to automatically enable plugins for agent

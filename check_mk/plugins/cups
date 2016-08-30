@@ -8,6 +8,7 @@ import re
 import urllib2
 import httplib
 import socket
+import sys
 
 class UnixHTTPConnection(httplib.HTTPConnection):
 
@@ -90,7 +91,8 @@ class cups_check_mk_plugin(object):
             if self._got_info:
                 for (item, version) in self._version_info.items():
                     print('version_%s;%s' % (item, version))
+        return 0
 
 if __name__ == "__main__":
     pl = cups_check_mk_plugin()
-    pl.status()
+    sys.exit(pl.status())
