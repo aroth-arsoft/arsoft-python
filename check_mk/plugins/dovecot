@@ -16,7 +16,6 @@ class dovecot_check_mk_plugin(object):
     DOVECOT_BIN = '/usr/bin/dovecot'
     DOVECOT_SBIN = '/usr/sbin/dovecot'
     VERSION_RE = re.compile(r'^(?P<version>[0-9]+\.[0-9]+\.[0-9]+)\s*\(?(?P<gitrev>[0-9a-fA-F]+)?\)?')
-    TIMEDATECTL = '/usr/bin/timedatectl'
     # the following statistics are available:
     #STATS_SECTIONS = ['command', 'user', 'domain', 'ip', 'global']
     # But these include too much data:

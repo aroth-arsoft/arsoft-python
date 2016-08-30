@@ -1,0 +1,173 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import os.path
+import copy
+import platform
+import arsoft.utils
+
+def check_rkhunter():
+    return os.path.isfile('/etc/rkhunter2.conf')
+
+class check_mk_agent_plugins(object):
+
+    available_plugin_dir='/usr/share/check_mk/agents/plugins'
+    active_plugin_dir='/etc/check_mk/agent-plugins.d'
+
+    def __init__(self):
+        self.plugins_per_interval = {}
+        self.lsbdistcodename = None
+
+    def _add_plugin(self, name, interval=0, enable=True, config=None, check_function=None):
+        if not interval in self.plugins_per_interval:
+            self.plugins_per_interval.update( {interval: {} } )
+        plugin_config = copy.deepcopy(config) if config else {}
+        plugin_config['enable'] = enable
+        plugin_config['check_function'] = check_function
+        self.plugins_per_interval[interval][name] = plugin_config
+
+    def _default_linux(self):
+        # enable default plugins
+        self._add_plugin('smart', check_function=lambda: os.path.isfile('/usr/sbin/smartctl'))
+        self._add_plugin('dmi_sysinfo', interval=60, check_function=lambda: os.path.isfile('/usr/sbin/dmidecode'))
+
+    def _default_windows(self):
+        self._add_plugin('wmi_sysinfo', interval=60)
+
+    def _default_ubuntu(self):
+        # enable default plugins
+        self._add_plugin('apt')
+        self._add_plugin('cups')
+        self._add_plugin('lvm', check_function=lambda: os.path.isfile('/sbin/vgs'))
+        self._add_plugin('dmraid', check_function=lambda: os.path.isfile('/sbin/dmraid'))
+        self._add_plugin('nfsexports', interval=10, check_function=lambda: os.path.isfile('/etc/exports'))
+        self._add_plugin('postfix_cert', interval=60, check_function=lambda: os.path.isfile('/etc/postfix/master.cf'))
+        self._add_plugin('nginx_status', check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf'))
+        self._add_plugin('nginx_cert', interval=60, check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf'))
+        self._add_plugin('puppet_agent', check_function=lambda: os.path.isfile('/etc/default/puppet'))
+        self._add_plugin('rkhunter', interval=20, check_function=lambda: os.path.isfile('/etc/rkhunter.conf'))
+        self._add_plugin('systemd', check_function=lambda: os.path.isfile('/bin/systemctl'))
+        self._add_plugin('jenkins', interval=20, check_function=lambda: os.path.isfile('/etc/default/jenkins'))
+        self._add_plugin('mk_mysql', check_function=lambda: os.path.isfile('/etc/mysql/my.cnf'))
+        self._add_plugin('mk_postgres', check_function=lambda: os.path.isdir('/etc/postgresql-common'))
+        self._add_plugin('openvpn', check_function=lambda: os.path.isfile('/etc/default/openvpn'))
+        self._add_plugin('puppetdb', check_function=lambda: os.path.isfile('/etc/default/puppetdb'))
+        self._add_plugin('openvz_ubc', check_function=lambda: os.path.isfile('/proc/user_beancounters'))
+        self._add_plugin('samba_status', check_function=lambda: os.path.isfile('/usr/bin/smbstatus'))
+        self._add_plugin('dovecot', check_function=lambda: os.path.isfile('/usr/bin/dovecot') or os.path.isfile('/usr/sbin/dovecot'))
+
+    def _check_check_mk_install(self):
+        ret = os.path.isdir(self.active_plugin_dir)
+        if not ret:
+            sys.stderr.write("check_mk agent plugin directory $active_plugin_dir does not exist.\n")
+        return ret
+
+    def _manage_plugin_dir(self, interval, plugins):
+        dest_dir = self.active_plugin_dir
+        if interval != 0:
+            dest_dir = os.path.join(dest_dir, str(interval))
+        #print('_manage_plugin_dir %i, %s=%s' % (interval, dest_dir, plugins))
+        missing_plugins = plugins
+        if os.path.isdir(dest_dir):
+            for f in os.listdir(dest_dir):
+                fullname = os.path.join(dest_dir, f)
+                if os.path.isdir(fullname):
+                    remove_dir = True
+                    try:
+                        dir_interval = int(f)
+                    except ValueError:
+                        pass
+                    if dir_interval is not None and interval == 0:
+                        if dir_interval in self.plugins_per_interval:
+                            # check if any plugin is actually enabled
+                            remove_dir = False
+                    if remove_dir:
+                        arsoft.utils.rmtree(fullname)
+                elif os.path.islink(fullname):
+                    enable = plugins[f].get('enable', False) if f in plugins else False
+                    available = plugins[f].get('available', True) if f in plugins else False
+                    #print('found symlink %s, %s=%i' % (fullname, f, enable))
+                    if enable and available:
+                        del missing_plugins[f]
+                    else:
+                        os.unlink(fullname)
+                elif os.path.isfile(fullname):
+                    os.unlink(fullname)
+        for plugin_name, config in missing_plugins.items():
+            enable = config.get('enable', False) if plugin_name in plugins else False
+            available = config.get('available', False) if plugin_name in plugins else False
+            if enable and available:
+                #print('missing %s=%i (interval=%i)' %(plugin_name, enable, interval))
+                src = os.path.join(self.available_plugin_dir, plugin_name)
+                dest = os.path.join(dest_dir, plugin_name)
+                if not os.path.isdir(dest_dir):
+                    os.makedirs(dest_dir)
+                os.symlink(src, dest)
+
+    def _apply(self):
+        for interval, plugins in self.plugins_per_interval.items():
+            #print(plugins)
+            self._manage_plugin_dir(interval, plugins)
+
+    def _check_availability(self):
+        for interval, plugins in self.plugins_per_interval.items():
+            for plugin_name, config in plugins.items():
+                available = config.get('enable', True)
+                if available and 'check_function' in config:
+                    func = config['check_function']
+                    #print(func)
+                    if func is not None:
+                        available = func()
+                        #print('call func for %s => %i' % (plugin_name, available))
+                config['available'] = available
+
+    def list_plugins(self):
+        plugin_list = []
+        for f in os.listdir(self.available_plugin_dir):
+            fullname = os.path.join(self.available_plugin_dir, f)
+            if os.access(fullname, os.X_OK):
+                plugin_list.append(f)
+        for f in sorted(plugin_list):
+            print(f)
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='enables plugins for the check_mk agent')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-L', '--list', dest='list_plugins', action='store_true', help='list all available plugins')
+
+        args = parser.parse_args()
+        self.verbose = args.verbose
+
+        if args.list_plugins:
+            self.list_plugins()
+            return 0
+
+        if not self._check_check_mk_install():
+            return 2
+
+        self._sysinfo = {}
+        self._sysinfo['name'] = platform.system().lower()
+        if self._sysinfo['name'] == 'linux':
+            (distname,version,id) = platform.linux_distribution()
+            self._sysinfo['lsbdistid'] = distname
+            self._sysinfo['lsbdistcodename'] = id
+            self._sysinfo['lsbrelease'] = version
+            self._default_linux()
+            if distname == 'Ubuntu':
+                self._default_ubuntu()
+        elif self._sysinfo['name'] == 'windows':
+            self._default_windows()
+        self._check_availability()
+        self._apply()
+
+        return 0
+
+if __name__ == "__main__":
+    app =  check_mk_agent_plugins()
+    sys.exit(app.main())

@@ -34,7 +34,7 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.264',
+		version='1.265',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -108,6 +108,7 @@ setup(name='arsoft-python',
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
 			('/etc/cron.d', ['cron/check_mk_agent_apt'] ),
+			('/etc/cron.hourly', ['check_mk/cmk_agent_plugins'] ),
 			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
                            'config/default_pattern.conf', 'config/default_shortcuts.conf']),
             ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),

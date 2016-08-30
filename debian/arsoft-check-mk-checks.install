@@ -1,2 +1,3 @@
+etc/cron.hourly/cmk_agent_plugins
 usr/share/check_mk/checks
 usr/share/check_mk/special
