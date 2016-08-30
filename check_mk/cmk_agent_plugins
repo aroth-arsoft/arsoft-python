@@ -45,7 +45,7 @@ class check_mk_agent_plugins(object):
         self._add_plugin('dovecot', check_function=lambda: os.path.isfile('/usr/bin/dovecot') or os.path.isfile('/usr/sbin/dovecot'))
         self._add_plugin('jenkins', interval=20, check_function=lambda: os.path.isfile('/etc/default/jenkins'))
         self._add_plugin('lvm', check_function=lambda: os.path.isfile('/sbin/vgs'))
-        self._add_plugin('mk_mysql', check_function=lambda: os.path.isfile('/etc/mysql/my.cnf'))
+        self._add_plugin('mk_mysql', check_function=lambda: os.path.isfile('/etc/check_mk/mysql.cfg') and os.path.isfile('/etc/mysql/my.cnf'))
         self._add_plugin('mk_postgres', check_function=lambda: os.path.isdir('/etc/postgresql-common'))
         self._add_plugin('nfsexports', interval=10, check_function=lambda: os.path.isfile('/etc/exports'))
         self._add_plugin('nginx_cert', interval=60, check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf'))
