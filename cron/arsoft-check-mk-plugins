@@ -1,0 +1,5 @@
+# check for new plugin for check_mk every hour
+@hourly root /usr/lib/check_mk_agent/check_mk_agent_detect_plugins
+# run the APT update every hour and after a system reboot
+@reboot root /usr/lib/check_mk_agent/check_mk_agent_apt
+@hourly root /usr/lib/check_mk_agent/check_mk_agent_apt

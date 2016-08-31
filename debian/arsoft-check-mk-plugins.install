@@ -1,3 +1,4 @@
 usr/share/check_mk/agents/plugins
 usr/lib/check_mk_agent/check_mk_agent_apt
-etc/cron.d/check_mk_agent_apt
+usr/lib/check_mk_agent/check_mk_agent_detect_plugins
+etc/cron.d/arsoft-check-mk-plugins

@@ -1,2 +1,0 @@
-@reboot root /usr/lib/check_mk_agent/check_mk_agent_apt
-@hourly root /usr/lib/check_mk_agent/check_mk_agent_apt

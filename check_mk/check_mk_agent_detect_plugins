@@ -124,7 +124,7 @@ class check_mk_agent_plugins(object):
                         #print('call func for %s => %i' % (plugin_name, available))
                 config['available'] = available
 
-    def list_plugins(self):
+    def list_available_plugins(self):
         plugin_list = []
         for f in os.listdir(self.available_plugin_dir):
             fullname = os.path.join(self.available_plugin_dir, f)
@@ -132,6 +132,36 @@ class check_mk_agent_plugins(object):
                 plugin_list.append(f)
         for f in sorted(plugin_list):
             print(f)
+        return 0
+
+    def list_active_plugins(self):
+        plugin_list_per_interval = {}
+        plugin_list_per_interval[0] = []
+        for f in os.listdir(self.active_plugin_dir):
+            fullname = os.path.join(self.active_plugin_dir, f)
+            if os.path.isdir(fullname):
+                try:
+                    dir_interval = int(f)
+                except ValueError:
+                    pass
+                if dir_interval is not None:
+                    plugin_list_per_interval[dir_interval] = []
+                    for cf in os.listdir(fullname):
+                        cfull = os.path.join(fullname, cf)
+                        if os.path.islink(cfull):
+                            plugin_list_per_interval[dir_interval].append(cf)
+            elif os.path.islink(fullname):
+                plugin_list_per_interval[0].append(f)
+        for interval in sorted(plugin_list_per_interval):
+            if len(plugin_list_per_interval[interval]) == 0:
+                continue
+            if interval != 0:
+                print('Plugins with %i minutes interval:' % interval)
+            else:
+                print('Plugins:')
+            for pl in sorted(plugin_list_per_interval[interval]):
+                print('  %s' % pl)
+        return 0
 
     def main(self):
         #=============================================================================================
@@ -139,14 +169,16 @@ class check_mk_agent_plugins(object):
         #=============================================================================================
         parser = argparse.ArgumentParser(description='enables plugins for the check_mk agent')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
-        parser.add_argument('-L', '--list', dest='list_plugins', action='store_true', help='list all available plugins')
+        parser.add_argument('-l', '--list', dest='list_active_plugins', action='store_true', help='list all active plugins')
+        parser.add_argument('-a', '--available', dest='list_available_plugins', action='store_true', help='list all available plugins')
 
         args = parser.parse_args()
         self.verbose = args.verbose
 
-        if args.list_plugins:
-            self.list_plugins()
-            return 0
+        if args.list_active_plugins:
+            return self.list_active_plugins()
+        elif args.list_available_plugins:
+            return self.list_available_plugins()
 
         if not self._check_check_mk_install():
             return 2

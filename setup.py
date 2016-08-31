@@ -34,7 +34,7 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.268',
+		version='1.269',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -107,8 +107,7 @@ setup(name='arsoft-python',
             ]),
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
-			('/etc/cron.d', ['cron/check_mk_agent_apt'] ),
-			('/etc/cron.hourly', ['check_mk/cmk_agent_plugins'] ),
+			('/etc/cron.d', ['cron/arsoft-check-mk-plugins'] ),
 			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
                            'config/default_pattern.conf', 'config/default_shortcuts.conf']),
             ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),
@@ -163,6 +162,7 @@ setup(name='arsoft-python',
                 'check_mk/checks/systemd',
                     ] ),
             ('/usr/lib/check_mk_agent',
+                        ['check_mk/check_mk_agent_detect_plugins'] +
                          distribution_dep_scripts([
                              ('check_mk/cron/python2/check_mk_agent_apt', ['precise', 'trusty']),
                              ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'yakkety']),
