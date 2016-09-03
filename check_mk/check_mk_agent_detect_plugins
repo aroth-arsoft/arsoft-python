@@ -62,7 +62,7 @@ class check_mk_agent_plugins(object):
     def _check_check_mk_install(self):
         ret = os.path.isdir(self.active_plugin_dir)
         if not ret:
-            sys.stderr.write("check_mk agent plugin directory $active_plugin_dir does not exist.\n")
+            sys.stderr.write("check_mk agent plugin directory %s does not exist.\n" % self.active_plugin_dir)
         return ret
 
     def _manage_plugin_dir(self, interval, plugins):
