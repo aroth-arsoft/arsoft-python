@@ -179,7 +179,10 @@ class ARSoftBackupApp(BackupApp):
         if not self._check_config():
             return 1
 
-        print('Active Plugins:   %s' % (','.join(self.config.active_plugins)))
+        active_plugins = []
+        for plugin in self.plugins:
+            active_plugins.append(plugin.name)
+        print('Active Plugins:   %s' % (','.join(active_plugins) if active_plugins else 'None'))
         print('Backup directory: %s' % (self.config.backup_directory))
         print('Retention time:   %s' % (self.config.retention_time))
         print('Retention count:  %i' % (self.config.retention_count))
@@ -320,6 +323,7 @@ class ARSoftBackupApp(BackupApp):
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
         parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft-backup', help='name of the directory containing the backup configuration.')
         parser.add_argument('-S', '--state-directory', dest='state_dir', default='/var/lib/arsoft-backup', help='name of the directory containing the state of all backup jobs.')
+        parser.add_argument('-P', '--plugins', dest='plugins', nargs='*', help='shows detailed information about the selected backups.')
         parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
         parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
         parser.add_argument('--status', dest='show_status', action='store_true', help='shows the status of the backup.')
@@ -344,7 +348,7 @@ class ARSoftBackupApp(BackupApp):
             sys.stderr.write('Given root directory %s does not exist.\n' % (root_dir))
             ret = 2
         else:
-            if not self.reinitialize(args.config_dir, args.state_dir, root_dir):
+            if not self.reinitialize(args.config_dir, args.state_dir, root_dir, plugins=args.plugins):
                 sys.stderr.write('Failed to load configuration from %s.\n' % (self.config_dir))
                 ret = 1
             else:
