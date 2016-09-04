@@ -100,6 +100,7 @@ def systemd_status(service_name):
 
 # taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
 def _debian_start_link_count(service_name):
+    import glob
     return len(glob.glob('/etc/rc*.d/S??' + service_name))
 
 # taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
