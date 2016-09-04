@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -15,6 +15,8 @@ class OpenVPNDefaults(object):
     else:
         run_directory = '/run'
     config_extension = '.conf'
+
+    has_systemd = os.path.isfile('/bin/systemctl')
 
     def __init__(self):
         pass
@@ -78,21 +80,30 @@ class Config(object):
 
     def start(self, config_name):
         if config_name in self._names:
-            ret = self._invoke_rc_d_openvpn('start', [config_name])
+            if OpenVPNDefaults.has_systemd:
+                ret = self._invoke_systemctl_openvpn('start', config_name)
+            else:
+                ret = self._invoke_rc_d_openvpn('start', config_name)
         else:
             ret = False
         return ret
 
     def stop(self, config_name):
         if config_name in self._names:
-            ret = self._invoke_rc_d_openvpn('stop', [config_name])
+            if OpenVPNDefaults.has_systemd:
+                ret = self._invoke_systemctl_openvpn('stop', config_name)
+            else:
+                ret = self._invoke_rc_d_openvpn('stop', config_name)
         else:
             ret = False
         return ret
 
     def restart(self, config_name):
         if config_name in self._names:
-            ret = self._invoke_rc_d_openvpn('restart', [config_name])
+            if OpenVPNDefaults.has_systemd:
+                ret = self._invoke_systemctl_openvpn('restart', config_name)
+            else:
+                ret = self._invoke_rc_d_openvpn('restart', config_name)
         else:
             ret = False
         return ret
@@ -100,10 +111,20 @@ class Config(object):
     @property
     def names(self):
         return list(self._names.keys())
-    
-    def _invoke_rc_d_openvpn(self, action, args):
-        invoke_args = ['/usr/sbin/invoke-rc.d', 'openvpn', action]
-        invoke_args.extend(args)
+
+    def _invoke_rc_d_openvpn(self, action, name):
+        invoke_args = ['/usr/sbin/invoke-rc.d', 'openvpn', action, name]
+        (sts, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData(invoke_args)
+        if sts == 0:
+            self.last_error = None
+            ret = True
+        else:
+            self.last_error = stderrdata
+            ret = False
+        return ret
+
+    def _invoke_systemctl_openvpn(self, action, name):
+        invoke_args = ['/bin/systemctl', action, 'openvpn@%s.service' % name]
         (sts, stdoutdata, stderrdata) = arsoft.utils.runcmdAndGetData(invoke_args)
         if sts == 0:
             self.last_error = None

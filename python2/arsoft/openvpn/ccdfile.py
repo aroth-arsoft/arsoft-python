@@ -18,6 +18,7 @@ class CCDFile(object):
         self._name = None
         self._ostype = None
         self._mailnotify = None
+        self._disable_private_key_encryption = None
         self._auth_user_pass_file = None
         self._configfile = configfile
         self._certfile = None
@@ -113,6 +114,18 @@ class CCDFile(object):
                     (dummy, self._mailnotify) = comment.split(' ', 1)
                     break
             return self._mailnotify
+
+    @property
+    def disable_private_key_encryption(self):
+        if self._disable_private_key_encryption:
+            return self._disable_private_key_encryption
+        else:
+            self._disable_private_key_encryption = False
+            for comment in self._conf.comments:
+                if comment.startswith('disable-private-key-encryption'):
+                    self._disable_private_key_encryption = True
+                    break
+            return self._disable_private_key_encryption
 
     @property
     def auth_user_pass_file(self):
