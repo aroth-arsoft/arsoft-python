@@ -1,3 +1,9 @@
+arsoft-python (1.273) xenial; urgency=medium
+
+  * use systemd to control openvpn services
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 04 Sep 2016 17:37:25 +0200
+
 arsoft-python (1.272) xenial; urgency=medium
 
   * cleanup
