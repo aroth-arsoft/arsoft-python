@@ -1,3 +1,9 @@
+arsoft-python (1.271) xenial; urgency=medium
+
+  * check_mk: add more plugins
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 04 Sep 2016 13:49:39 +0200
+
 arsoft-python (1.270) xenial; urgency=medium
 
   * backup: add imap plugin

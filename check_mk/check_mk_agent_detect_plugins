@@ -9,9 +9,6 @@ import copy
 import platform
 import arsoft.utils
 
-def check_rkhunter():
-    return os.path.isfile('/etc/rkhunter2.conf')
-
 class check_mk_agent_plugins(object):
 
     available_plugin_dir='/usr/share/check_mk/agents/plugins'
@@ -40,7 +37,7 @@ class check_mk_agent_plugins(object):
     def _default_ubuntu(self):
         # enable default plugins
         self._add_plugin('apt')
-        self._add_plugin('cups')
+        self._add_plugin('cups', check_function=lambda: os.path.isdir('/etc/cups'))
         self._add_plugin('dmraid', check_function=lambda: os.path.isfile('/sbin/dmraid'))
         self._add_plugin('dovecot', check_function=lambda: os.path.isfile('/usr/bin/dovecot') or os.path.isfile('/usr/sbin/dovecot'))
         self._add_plugin('jenkins', interval=20, check_function=lambda: os.path.isfile('/etc/default/jenkins'))
@@ -50,6 +47,7 @@ class check_mk_agent_plugins(object):
         self._add_plugin('nfsexports', interval=10, check_function=lambda: os.path.isfile('/etc/exports'))
         self._add_plugin('nginx_cert', interval=60, check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf'))
         self._add_plugin('nginx_status', check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf'))
+        self._add_plugin('apache_status', check_function=lambda: os.path.isfile('/etc/apache2/apache2.conf'))
         self._add_plugin('openvpn', check_function=lambda: os.path.isfile('/etc/default/openvpn'))
         self._add_plugin('openvz_ubc', check_function=lambda: os.path.isfile('/proc/user_beancounters'))
         self._add_plugin('postfix_cert', interval=60, check_function=lambda: os.path.isfile('/etc/postfix/master.cf'))
@@ -58,6 +56,9 @@ class check_mk_agent_plugins(object):
         self._add_plugin('rkhunter', interval=20, check_function=lambda: os.path.isfile('/etc/rkhunter.conf'))
         self._add_plugin('samba_status', check_function=lambda: os.path.isfile('/usr/bin/smbstatus'))
         self._add_plugin('systemd', check_function=lambda: os.path.isfile('/bin/systemctl'))
+        self._add_plugin('slapd_cert', check_function=lambda: os.path.isdir('/etc/ldap/slapd.d') and os.path.isfile('/etc/check_mk/slapd_cert'))
+        self._add_plugin('isc_dhcpd', check_function=lambda: os.path.isfile('/etc/dhcp/dhcpd.conf'))
+        self._add_plugin('cyrus_imapd', check_function=lambda: os.path.isfile('/etc/imapd.conf'))
 
     def _check_check_mk_install(self):
         ret = os.path.isdir(self.active_plugin_dir)
