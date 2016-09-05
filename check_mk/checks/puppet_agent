@@ -62,23 +62,23 @@ def check_puppet_agent(item, params, info):
             if not actually_running:
                 if level < 2:
                     level = 2
-                details.append('Agent not running')
+                details.append('Agent not running(!!)')
         else:
             if actually_running:
                 if level < 2:
                     level = 2
-                details.append('Agent is running, but it should be stopped')
+                details.append('Agent is running, but it should be stopped(!!)')
                 
         if enabled:
             if not actually_enabled:
                 if level < 2:
                     level = 2
-                details.append('Agent is disabled (%s)' % data['disabled_message'])
+                details.append('Agent is disabled (%s)(!!)' % data['disabled_message'])
         else:
             if actually_enabled:
                 if level < 2:
                     level = 2
-                details.append('Agent is enabled, but it should be disabled')
+                details.append('Agent is enabled, but it should be disabled(!!)')
 
         if len(details) == 0:
             details.append('Running' if actually_running else 'Stopped')
@@ -112,20 +112,20 @@ def check_puppet_agent(item, params, info):
                 if time_last_run < crit_time:
                     if level < 2:
                         level = 2
-                    msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
+                    details.append('Config has not been updated for %s(!!)' % format_timedelta(time_last_run - now))
                 elif time_last_run < warn_time:
                     if level < 1:
                         level = 1
-                    msg = 'Config has not been updated for %s' % format_timedelta(time_last_run - now)
+                    details.append('Config has not been updated for %s(!)' % format_timedelta(time_last_run - now))
 
         if data['num_failed'] != 0:
             if level < 2:
                 level = 2
-            details.append('%i resources failed' % data['num_failed'])
+            details.append('%i resources failed(!!)' % data['num_failed'])
         if data['num_failed_to_restart'] != 0:
             if level < 2:
                 level = 2
-            details.append('%i services failed to restart' % data['num_failed_to_restart'])
+            details.append('%i services failed to restart(!!)' % data['num_failed_to_restart'])
         details.append('Config updated %s' % format_timedelta(time_last_run - now))
 
     # Construct a the status message.
