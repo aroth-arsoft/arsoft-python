@@ -11,7 +11,7 @@ USAGE: agent_eiscp [OPTIONS] HOST
        agent_eiscp -h
 
 ARGUMENTS:
-  HOST                          Host name or IP address of your Fritz!Box
+  HOST                          Host name or IP address of your device
 
 OPTIONS:
   -h, --help                    Show this help message and exit

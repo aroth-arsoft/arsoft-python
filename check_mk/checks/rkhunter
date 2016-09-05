@@ -89,49 +89,49 @@ def check_rkhunter(item, params, info):
         if data['num_infects'] > 0:
             if level < 2:
                 level = 2
-            details.append('%i infects %s' % (data['num_infects'], ','.join(data['infects']) ) )
+            details.append('%i infects %s(!!)' % (data['num_infects'], ','.join(data['infects']) ) )
         if data['num_criticals'] > 0:
             if level < 2:
                 level = 2
-            details.append('%i criticals %s' % (data['num_criticals'], ','.join(data['criticals']) ) )
+            details.append('%i criticals %s(!!)' % (data['num_criticals'], ','.join(data['criticals']) ) )
         if data['num_errors'] > 0:
             if level < 2:
                 level = 2
-            details.append('%i errors %s' % (data['num_errors'], ','.join(data['errors']) ) )
+            details.append('%i errors %s(!!)' % (data['num_errors'], ','.join(data['errors']) ) )
         if data['num_warnings'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i warnings %s' % (data['num_warnings'], ','.join(data['warnings']) ) )
+            details.append('%i warnings %s(!)' % (data['num_warnings'], ','.join(data['warnings']) ) )
 
         if data['num_file_properties_changed'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i changed files %s' % (data['num_file_properties_changed'], ','.join(data['changed_file_properties']) ) )
+            details.append('%i changed files %s(!)' % (data['num_file_properties_changed'], ','.join(data['changed_file_properties']) ) )
 
         if data['num_missing_files'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i missing files %s' % (data['num_missing_files'], ','.join(data['missing_files']) ) )
+            details.append('%i missing files %s(!)' % (data['num_missing_files'], ','.join(data['missing_files']) ) )
 
         if data['num_services_changed'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i changed services %s' % (data['num_services_changed'], ','.join(data['changed_services']) ) )
+            details.append('%i changed services %s(!)' % (data['num_services_changed'], ','.join(data['changed_services']) ) )
 
         if data['num_users_changed'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i changed users %s' % (data['num_users_changed'], ','.join(data['changed_users']) ) )
+            details.append('%i changed users %s(!)' % (data['num_users_changed'], ','.join(data['changed_users']) ) )
 
         if data['num_groups_changed'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i changed groups %s' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
+            details.append('%i changed groups %s(!)' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
 
         if data['num_downloads_failed'] > 0:
             if level < 1:
                 level = 1
-            details.append('%i downloads failed %s' % (data['num_downloads_failed'], ','.join(data['downloads_failed']) ) )
+            details.append('%i downloads failed %s(!)' % (data['num_downloads_failed'], ','.join(data['downloads_failed']) ) )
 
         if len(details) == 0:
             details.append('No issues detected.')

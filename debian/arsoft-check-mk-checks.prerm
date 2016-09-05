@@ -6,6 +6,8 @@ if [ "$1" = remove ] ; then
 	[ -f /usr/share/check_mk/checks/apt ] && rm /usr/share/check_mk/checks/apt
 	dpkg-divert --remove --package ${PKG} --rename \
 				--divert /usr/share/check_mk/checks.distrib/apt /usr/share/check_mk/checks/apt
+	dpkg-divert --remove --package ${PKG} --rename \
+				--divert /usr/share/check_mk/special/agent_fritzbox.distrib /usr/share/check_mk/special/agent_fritzbox
 fi
 
 #DEBHELPER#

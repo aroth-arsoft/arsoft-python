@@ -1,3 +1,9 @@
+arsoft-python (1.274) xenial; urgency=medium
+
+  * check_mk: fixed dpkg-divert rules
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 05 Sep 2016 16:56:43 +0200
+
 arsoft-python (1.273) xenial; urgency=medium
 
   * use systemd to control openvpn services

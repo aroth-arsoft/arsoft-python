@@ -63,18 +63,19 @@ def check_apt(item, params, info):
         #print(check_time, boot_time, up_time)
         check_age = now - check_time
         cache_age = now - cache_time
+        details.append("Cache has been updated %s" % (format_time_and_delta(cache_time, -cache_age)) )
         if check_time > boot_time:
             if cache_age > cache_age_critical_level or check_age > check_age_critical_level:
                 level = 2
             elif cache_age > cache_age_warn_level or check_age > check_age_warn_level:
                 level = 1
-            details.append("Cache has been updated %s, last check %s" % (format_time_and_delta(cache_time, -cache_age), format_time_and_delta(check_time, -check_age)) )
+            details.append("last check %s" % (format_time_and_delta(check_time, -check_age)) )
         else:
             if up_time > check_age_critical_level:
                 level = 2
             elif up_time > check_age_warn_level:
                 level = 1
-            details.append("Cache has been updated %s, boot %s" % (format_time_and_delta(cache_time, -cache_age), format_time_and_delta(boot_time, -up_time)) )
+            details.append("boot %s" % (format_time_and_delta(boot_time, -up_time)) )
 
         perfdata.append( ('check_age', check_age, check_age_warn_level, check_age_critical_level ) )
         perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
