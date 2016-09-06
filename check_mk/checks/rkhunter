@@ -18,6 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 from arsoft.timestamp import format_timedelta
+from arsoft.check_mk import check_state
 
 def inventory_rkhunter(checkname, info):
 
@@ -30,9 +31,7 @@ def inventory_rkhunter(checkname, info):
 
 def check_rkhunter(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    perfdata = []
-    details = []
+    state = check_state()
     data = {
         'check_age':0,
         'num_infects':0,
@@ -87,75 +86,47 @@ def check_rkhunter(item, params, info):
         details.append('last check %s ago' % format_timedelta(check_age))
     else:
         if data['num_infects'] > 0:
-            if level < 2:
-                level = 2
-            details.append('%i infects %s(!!)' % (data['num_infects'], ','.join(data['infects']) ) )
+            state.critical('%i infects %s' % (data['num_infects'], ','.join(data['infects']) ) )
         if data['num_criticals'] > 0:
-            if level < 2:
-                level = 2
-            details.append('%i criticals %s(!!)' % (data['num_criticals'], ','.join(data['criticals']) ) )
+            state.critical('%i criticals %s' % (data['num_criticals'], ','.join(data['criticals']) ) )
         if data['num_errors'] > 0:
-            if level < 2:
-                level = 2
-            details.append('%i errors %s(!!)' % (data['num_errors'], ','.join(data['errors']) ) )
+            state.critical('%i errors %s' % (data['num_errors'], ','.join(data['errors']) ) )
         if data['num_warnings'] > 0:
-            if level < 1:
-                level = 1
-            details.append('%i warnings %s(!)' % (data['num_warnings'], ','.join(data['warnings']) ) )
+            state.warning('%i warnings %s' % (data['num_warnings'], ','.join(data['warnings']) ) )
 
         if data['num_file_properties_changed'] > 0:
-            if level < 1:
-                level = 1
-            details.append('%i changed files %s(!)' % (data['num_file_properties_changed'], ','.join(data['changed_file_properties']) ) )
+            state.warning('%i changed files %s' % (data['num_file_properties_changed'], ','.join(data['changed_file_properties']) ) )
 
         if data['num_missing_files'] > 0:
-            if level < 1:
-                level = 1
-            details.append('%i missing files %s(!)' % (data['num_missing_files'], ','.join(data['missing_files']) ) )
+            state.warning('%i missing files %s(!)' % (data['num_missing_files'], ','.join(data['missing_files']) ) )
 
         if data['num_services_changed'] > 0:
-            if level < 1:
-                level = 1
-            details.append('%i changed services %s(!)' % (data['num_services_changed'], ','.join(data['changed_services']) ) )
+            state.warning('%i changed services %s(!)' % (data['num_services_changed'], ','.join(data['changed_services']) ) )
 
         if data['num_users_changed'] > 0:
-            if level < 1:
-                level = 1
-            details.append('%i changed users %s(!)' % (data['num_users_changed'], ','.join(data['changed_users']) ) )
+            state.warning('%i changed users %s(!)' % (data['num_users_changed'], ','.join(data['changed_users']) ) )
 
         if data['num_groups_changed'] > 0:
-            if level < 1:
-                level = 1
-            details.append('%i changed groups %s(!)' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
+            state.warning('%i changed groups %s(!)' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
 
         if data['num_downloads_failed'] > 0:
-            if level < 1:
-                level = 1
-            details.append('%i downloads failed %s(!)' % (data['num_downloads_failed'], ','.join(data['downloads_failed']) ) )
+            state.warning('%i downloads failed %s(!)' % (data['num_downloads_failed'], ','.join(data['downloads_failed']) ) )
 
-        if len(details) == 0:
-            details.append('No issues detected.')
+        state.ok('No issues detected.')
 
-        perfdata.append( ('num_infects', data['num_infects'], 1, 1) )
-        perfdata.append( ('num_criticals', data['num_criticals'], 1, 1) )
-        perfdata.append( ('num_errors', data['num_errors'], 1, 1) )
-        perfdata.append( ('num_warnings', data['num_warnings'], 1, 0) )
-        perfdata.append( ('num_infos', data['num_infos']) )
-        perfdata.append( ('num_file_properties_changed', data['num_file_properties_changed'], 1, 0) )
-        perfdata.append( ('num_missing_files', data['num_missing_files'], 1, 0) )
-        perfdata.append( ('num_services_changed', data['num_services_changed'], 1, 0) )
-        perfdata.append( ('num_users_changed', data['num_users_changed'], 1, 0) )
-        perfdata.append( ('num_groups_changed', data['num_groups_changed'], 1, 0) )
-        perfdata.append( ('num_downloads_failed', data['num_downloads_failed'], 1, 0) )
+        state.perfdata.append( ('num_infects', data['num_infects'], 1, 1) )
+        state.perfdata.append( ('num_criticals', data['num_criticals'], 1, 1) )
+        state.perfdata.append( ('num_errors', data['num_errors'], 1, 1) )
+        state.perfdata.append( ('num_warnings', data['num_warnings'], 1, 0) )
+        state.perfdata.append( ('num_infos', data['num_infos']) )
+        state.perfdata.append( ('num_file_properties_changed', data['num_file_properties_changed'], 1, 0) )
+        state.perfdata.append( ('num_missing_files', data['num_missing_files'], 1, 0) )
+        state.perfdata.append( ('num_services_changed', data['num_services_changed'], 1, 0) )
+        state.perfdata.append( ('num_users_changed', data['num_users_changed'], 1, 0) )
+        state.perfdata.append( ('num_groups_changed', data['num_groups_changed'], 1, 0) )
+        state.perfdata.append( ('num_downloads_failed', data['num_downloads_failed'], 1, 0) )
 
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-    return (level, msg, perfdata)
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['rkhunter'] = {

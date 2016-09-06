@@ -128,3 +128,67 @@ def saveint(v):
         return int(v)
     except ValueError:
         return 0
+
+LEVEL_OK = 0
+LEVEL_WARN = 1
+LEVEL_CRIT = 2
+LEVEL_UNKNOWN = 3
+
+class check_state(object):
+    def __init__(self):
+        self._list = []
+        self.perfdata = []
+        self.level = LEVEL_OK
+
+    def warning(self, msg):
+        if self.level < LEVEL_WARN:
+            self.level = LEVEL_WARN
+        self._list.append(msg + '(!)')
+
+    def critical(self, msg):
+        if self.level < LEVEL_CRIT:
+            self.level = LEVEL_CRIT
+        self._list.append(msg + '(!!)')
+
+    def ok(self, msg):
+        if self.level == LEVEL_OK:
+            self._list.append(msg)
+
+    def __str__(self):
+        return self.message
+
+    @property
+    def is_ok(self):
+        return True if self.level == LEVEL_OK else False
+
+    @property
+    def is_warning(self):
+        return True if self.level == LEVEL_WARN else False
+
+    @property
+    def is_critical(self):
+        return True if self.level == LEVEL_CRIT else False
+
+    @property
+    def is_unknown(self):
+        return True if self.level == LEVEL_UNKNOWN else False
+
+    @property
+    def message(self):
+        str_details = ','.join(self._list)
+
+        # Construct a the status message.
+        if level == LEVEL_OK:
+            return "OK - " + str_details
+        elif level == LEVEL_WARN:
+            return "WARN - " + str_details
+        elif level == LEVEL_CRIT:
+            return "CRIT - " + str_details
+        elif level == LEVEL_UNKNOWN:
+            return "UNKOWN - " + str_details
+        else:
+            return "UNKOWN(%i) - " % self.level + str_details
+
+    @property
+    def return_value(self):
+        return (self.level, self.message, self.perfdata)
