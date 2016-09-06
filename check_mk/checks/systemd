@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from arsoft.timestamp import format_timedelta, utc_timestamp_to_datetime
+from arsoft.check_mk import check_state
 
 def inventory_systemd(checkname, info):
 
@@ -12,10 +13,7 @@ def inventory_systemd(checkname, info):
 
 def check_systemd(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    details = []
-    perfdata = []
+    state = check_state()
     data = {}
 
     for line in info:
@@ -26,64 +24,55 @@ def check_systemd(item, params, info):
             continue
 
         key = line[0]
-        data[key] = line[1:] if line_len > 2 else line[1]
+        if key in ['timedatectl_ntp_synchronized', 'timedatectl_network_time_on', 'timedatectl_rtc_in_local_tz']:
+            data[key] = saveint(line[1])
+        elif key in ['timedatectl_rtc_time', 'timedatectl_universal_time', 'timedatectl_local_time']:
+            data[key] = savefloat(line[1])
+        else:
+            data[key] = line[1:] if line_len > 2 else line[1]
 
     if item == 'daemon':
-        if len(details) == 0:
-            details.append('Version %s' % (data['version']))
+        state.ok('Version %s' % (data['version']))
     elif item == 'timedate':
         #timedatectl_status = data.get('timedatectl_status')
-        timedatectl_ntp_synchronized = data.get('timedatectl_ntp_synchronized')
-        timedatectl_ntp_enabled = data.get('timedatectl_ntp_enabled')
-        timedatectl_network_time_on = data.get('timedatectl_network_time_on')
-        timedatectl_time_zone = data.get('timedatectl_time_zone')
-        timedatectl_local_time = data.get('timedatectl_local_time')
-        timedatectl_universal_time = data.get('timedatectl_universal_time')
-        timedatectl_rtc_in_local_tz = data.get('timedatectl_rtc_in_local_tz')
+        timedatectl_ntp_synchronized = data.get('timedatectl_ntp_synchronized', 0)
+        timedatectl_ntp_enabled = data.get('timedatectl_ntp_enabled', 0)
+        timedatectl_network_time_on = data.get('timedatectl_network_time_on', 0)
+        timedatectl_time_zone = data.get('timedatectl_time_zone', 'unkown')
+        timedatectl_local_time = data.get('timedatectl_local_time', 0)
+        timedatectl_universal_time = data.get('timedatectl_universal_time', 0)
+        timedatectl_rtc_in_local_tz = data.get('timedatectl_rtc_in_local_tz', 0)
         timedatectl_time_server = None
         
-        if timedatectl_ntp_enabled or timedatectl_network_time_on:
+        if timedatectl_ntp_enabled != 0 or timedatectl_network_time_on != 0:
             if timedatectl_ntp_synchronized:
                 timedatectl_time_server = data.get('timedatectl_time_server')
                 if timedatectl_time_server is not None and len(timedatectl_time_server) > 1:
                     addr, name = timedatectl_time_server
                     timedatectl_time_server = '%s (%s)' % (name, addr)
             else:
-                if level < 2:
-                    level = 2
-                details.append('Not synchronized to NTP server.')
+                state.critical('Time from synchronized with NTP server')
         else:
-            if level < 1:
-                level = 1
-            details.append('NTP synchronization disabled.')
-            
-        if not timedatectl_rtc_in_local_tz:
-            if level < 1:
-                level = 1
-            details.append('RTC is running with local time')
+            state.warning('NTP synchronization disabled.')
 
-        if len(details) == 0:
+        if timedatectl_rtc_in_local_tz != 0:
+            state.warning('RTC is running with local time')
+
+        if state.is_ok:
             time_utc = utc_timestamp_to_datetime(float(timedatectl_universal_time))
             if timedatectl_time_server:
-                details.append('%s (%s) from %s' % (time_utc, timedatectl_time_zone, timedatectl_time_server))
+                state.ok('%s (%s) from %s' % (time_utc, timedatectl_time_zone, timedatectl_time_server))
             else:
-                details.append('%s (%s)' % (time_utc, timedatectl_time_zone))
+                state.ok('%s (%s)' % (time_utc, timedatectl_time_zone))
     elif item == 'failed_services':
         failed_services = data.get('failed_services', None)
         if failed_services:
             failed_services = failed_services.split(',')
-            if level < 2:
-                level = 2
-            details.append('Failed services %s' % (','.join(failed_services)))
+            state.critical('Failed services %s' % (','.join(failed_services)))
+        if state.is_ok:
+            state.ok('No failed services')
 
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-    return (level, msg, perfdata)
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['systemd'] = {
