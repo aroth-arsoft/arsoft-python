@@ -174,17 +174,21 @@ class check_state(object):
         return True if self.level == LEVEL_UNKNOWN else False
 
     @property
+    def messages(self):
+        return self._list
+
+    @property
     def message(self):
         str_details = ','.join(self._list)
 
         # Construct a the status message.
-        if level == LEVEL_OK:
+        if self.level == LEVEL_OK:
             return "OK - " + str_details
-        elif level == LEVEL_WARN:
+        elif self.level == LEVEL_WARN:
             return "WARN - " + str_details
-        elif level == LEVEL_CRIT:
+        elif self.level == LEVEL_CRIT:
             return "CRIT - " + str_details
-        elif level == LEVEL_UNKNOWN:
+        elif self.level == LEVEL_UNKNOWN:
             return "UNKOWN - " + str_details
         else:
             return "UNKOWN(%i) - " % self.level + str_details

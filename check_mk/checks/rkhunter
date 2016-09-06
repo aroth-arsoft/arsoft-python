@@ -76,14 +76,14 @@ def check_rkhunter(item, params, info):
         warn_time = (warn_time_hours * 3600)
         crit_time = (crit_time_hours * 3600)
         check_age = data['check_age']
-        perfdata.append( ('check_age', int(check_age/3600), warn_time_hours, crit_time_hours ) )
+        state.perfdata.append( ('check_age', int(check_age/3600), warn_time_hours, crit_time_hours ) )
+        msg = 'last check %s ago' % format_timedelta(check_age)
         if check_age > crit_time:
-            level = 2
+            state.critical(msg)
         elif check_age > warn_time:
-            level = 1
+            state.warning(msg)
         else:
-            level = 0
-        details.append('last check %s ago' % format_timedelta(check_age))
+            state.ok(msg)
     else:
         if data['num_infects'] > 0:
             state.critical('%i infects %s' % (data['num_infects'], ','.join(data['infects']) ) )
