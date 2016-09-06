@@ -179,7 +179,10 @@ class check_state(object):
 
     @property
     def message(self):
-        str_details = ','.join(self._list)
+        if self._list:
+            str_details = ','.join(self._list)
+        else:
+            str_details = ''
 
         # Construct a the status message.
         if self.level == LEVEL_OK:
