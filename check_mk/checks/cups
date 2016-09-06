@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #
 from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
+from arsoft.check_mk import check_state
 
 def inventory_cups(checkname, info):
 
@@ -19,10 +20,7 @@ def inventory_cups(checkname, info):
 
 def check_cups(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    details = []
-    perfdata = []
+    state = check_state()
     data = { 'version_IPP':'', 'version_CUPS':'', 'running':'0' }
 
     for line in info:
@@ -35,32 +33,20 @@ def check_cups(item, params, info):
         (expected_cups_version, expected_ipp_version) = params
         running = saveint(data['running'])
         if not running:
-            if level < 2:
-                level = 2
-            details.append('Not running')
+            state.critical('Not running')
         else:
             if data['version_CUPS'] != expected_cups_version:
-                if level < 1:
-                    level = 1
-                details.append('CUPS version %s != %s' % (data['version_CUPS'], expected_cups_version))
+                state.warning('CUPS version %s != %s' % (data['version_CUPS'], expected_cups_version))
 
             if data['version_IPP'] != expected_ipp_version:
-                if level < 1:
-                    level = 1
-                details.append('IPP version %s != %s' % (data['version_IPP'], expected_ipp_version))
-            if level == 0:
-                details.append('CUPS %s, IPP %s' % (data['version_CUPS'], data['version_IPP']))
+                state.warning('IPP version %s != %s' % (data['version_IPP'], expected_ipp_version))
+            if state.is_ok:
+                state.ok('CUPS %s, IPP %s' % (data['version_CUPS'], data['version_IPP']))
     else:
         return check_mk_cert_check(item, params, info, prefix=False)
 
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-    return (level, msg, perfdata)
+    return state.return_value
+
 
 # declare the check to Check_MK.
 check_info['cups'] = {

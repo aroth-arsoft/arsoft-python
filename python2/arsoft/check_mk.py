@@ -154,6 +154,9 @@ class check_state(object):
         if self.level == LEVEL_OK:
             self._list.append(msg)
 
+    def append(self, msg):
+        self._list.append(msg)
+
     def __str__(self):
         return self.message
 

@@ -18,6 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 from arsoft.timestamp import format_timedelta, format_time, format_time_and_delta
+from arsoft.check_mk import check_state
 
 cache_age_warn_level = 2 * (24 * (60 * 60))
 cache_age_critical_level = 4 * (24 * (60 * 60))
@@ -36,9 +37,7 @@ def inventory_apt(checkname, info):
 
 def check_apt(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    perfdata = []
-    details = []
+    state = check_state()
     data = {'check_time':0, 'up_time':0, 'boot_time':0, 'cache_time':0, 'upgrades':[], 'secupgrades':[]}
 
     for line in info:
@@ -63,52 +62,50 @@ def check_apt(item, params, info):
         #print(check_time, boot_time, up_time)
         check_age = now - check_time
         cache_age = now - cache_time
-        details.append("Cache has been updated %s" % (format_time_and_delta(cache_time, -cache_age)) )
+        state
         if check_time > boot_time:
-            if cache_age > cache_age_critical_level or check_age > check_age_critical_level:
-                level = 2
-            elif cache_age > cache_age_warn_level or check_age > check_age_warn_level:
-                level = 1
-            details.append("last check %s" % (format_time_and_delta(check_time, -check_age)) )
-        else:
-            if up_time > check_age_critical_level:
-                level = 2
-            elif up_time > check_age_warn_level:
-                level = 1
-            details.append("boot %s" % (format_time_and_delta(boot_time, -up_time)) )
+            last_cache_update = 'Cache has been updated %s' % (format_time_and_delta(cache_time, -cache_age))
+            if cache_age > cache_age_critical_level:
+                state.critical(last_cache_update)
+            elif cache_age > cache_age_warn_level:
+                state.warning(last_cache_update)
+            else:
+                state.ok(last_cache_update)
 
-        perfdata.append( ('check_age', check_age, check_age_warn_level, check_age_critical_level ) )
-        perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
+            last_check = "last check %s" % (format_time_and_delta(check_time, -check_age))
+            if check_age > check_age_critical_level:
+                state.critical(last_check)
+            elif check_age > check_age_warn_level:
+                state.warning(last_check)
+            else:
+                state.ok(last_check)
+        else:
+            last_boot = "boot %s, cache not checked" % (format_time_and_delta(boot_time, -up_time))
+            if up_time > check_age_critical_level:
+                state.critical(last_boot)
+            elif up_time > check_age_warn_level:
+                state.warning(last_boot)
+            else:
+                state.ok(last_boot)
+
+        state.perfdata.append( ('check_age', check_age, check_age_warn_level, check_age_critical_level ) )
+        state.perfdata.append( ('cache_age', cache_age, cache_age_warn_level, cache_age_critical_level ) )
 
     elif item == 'upgrades':
         num_secupgrades = len(data['secupgrades'])
         num_upgrades = len(data['upgrades'])
-        perfdata.append( ('secupgrades', num_secupgrades) )
-        perfdata.append( ('upgrades', num_upgrades) )
+        state.perfdata.append( ('secupgrades', num_secupgrades) )
+        state.perfdata.append( ('upgrades', num_upgrades) )
 
         if num_secupgrades:
-            if level < 2:
-                level = 2
-            details.append('%i security upgrades: %s' % (num_secupgrades, ",".join(data['secupgrades'])))
+            state.critical('%i security upgrades: %s' % (num_secupgrades, ",".join(data['secupgrades'])))
         if num_upgrades:
-            if level < 1:
-                level = 1
-            details.append('%i upgrades: %s' % (num_upgrades, ",".join(data['upgrades'])))
-        if len(details) == 0:
-            details.append('All packages are up to date.')
+            state.warning('%i upgrades: %s' % (num_upgrades, ",".join(data['upgrades'])))
+        if state.is_ok:
+            state.ok('All packages are up to date.')
     else:
-        level = 3
-        msg = 'UNKNOWN - %s' % item
-
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-
-    return (level, msg, perfdata)
+        state.unknown(item)
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['apt'] = {

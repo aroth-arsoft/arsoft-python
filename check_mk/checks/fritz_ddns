@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+from arsoft.check_mk import check_state
 
 def inventory_fritz_ddns(checkname, info):
     ret = []
@@ -15,10 +16,8 @@ def inventory_fritz_ddns(checkname, info):
 
 def check_fritz_ddns(item, params, info):
     # hostname, ipaddress are defined by check_mk
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    perfdata = []
-    details = []
+
+    state = check_state()
     data = {}
 
     for line in info:
@@ -35,36 +34,21 @@ def check_fritz_ddns(item, params, info):
         (ip, wan_ip, status, error_msg) = data[item]
         #print('item %s: %s' % (item, data[item] ))
         if status == 0:
-            level = 0
-            details.append('%s matches %s' % (ip, item))
+            state.ok('%s matches %s' % (ip, item))
         elif status == 3: #unknown
             if not wan_ip:
-                level = 0 # report as ok, to avoid error during re-connecting phase
-                details.append('%s is OK (no internet connection)' % (item))
+                state.ok('%s is OK (no internet connection)' % (item))
             elif not ip:
-                level = 2
-                details.append('No address for %s (should be %s) (%s)' % (item, wan_ip, error_msg))
+                state.critical('No address for %s (should be %s) (%s)' % (item, wan_ip, error_msg))
             else:
-                level = 1
-                details.append('%s!=%s does not match %s' % (ip, wan_ip, item))
+                state.warning('%s!=%s does not match %s' % (ip, wan_ip, item))
         else:
-            level = 1
-            details.append('%s!=%s does not match %s (%s)' % (ip, wan_ip, item, error_msg))
+            state.warning('%s!=%s does not match %s (%s)' % (ip, wan_ip, item, error_msg))
 
     else:
-        level = 3
-        details.append('%s not found in agent data' % (item))
+        state.unknown('%s not found in agent data' % (item))
 
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-    elif level == 3:
-        msg = "UNKNOWN - %s" % (','.join(details))
-    return (level, msg, perfdata)
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['fritz_ddns'] = {
