@@ -1,3 +1,9 @@
+arsoft-python (1.275) xenial; urgency=medium
+
+  * check_mk: use check_state object for handling message generation
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 06 Sep 2016 18:27:18 +0200
+
 arsoft-python (1.274) xenial; urgency=medium
 
   * check_mk: fixed dpkg-divert rules
