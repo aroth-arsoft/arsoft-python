@@ -3,25 +3,19 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 from arsoft.crypto.utils import check_mk_cert_file_info, check_mk_crl_file_info
-import os.path
 from arsoft.utils import runcmdAndGetData
-import time
 import sys
 
 class postfix_cert_mk_check_plugin(object):
-
-    def __init__(self):
-        pass
-
     def status(self):
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/usr/sbin/postconf'])
+        keys = ['smtpd_tls_cert_file', 'smtp_tls_cert_file', 'lmtp_tls_cert_file']
+        args = ['/usr/sbin/postconf', '-h'] + keys
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args)
         if sts == 0:
             for line in stdoutdata.splitlines():
-                (key, value) = line.split('=',1)
-                value = value.lstrip()
-                key = key.rstrip()
-                if 'cert_file' in key:
-                    check_mk_cert_file_info(value)
+                if not line:
+                    continue
+                check_mk_cert_file_info(line)
         return 0
 
 if __name__ == "__main__":
