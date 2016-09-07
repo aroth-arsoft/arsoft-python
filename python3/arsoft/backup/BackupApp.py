@@ -244,6 +244,9 @@ class BackupApp(object):
         else:
             plugins_to_load = plugins
 
+        if self._verbose:
+            print('plugins to load: %s' % plugins_to_load)
+
         for plugin in plugins_to_load:
             try:
                 self._load_plugin(plugin)
@@ -551,7 +554,7 @@ class BackupApp(object):
             elif self.scheme == 'local':
                 self._cxn = LocalConnection(verbose=self._backup_app.verbose)
                 if self.sudo_password:
-                    self._sudo = LocalSudoSession(sudo_password=self.sudo_password)
+                    self._sudo = LocalSudoSession(self._cxn, sudo_password=self.sudo_password)
             return True if self._cxn else False
 
         def close(self):
