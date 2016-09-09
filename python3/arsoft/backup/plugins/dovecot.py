@@ -6,6 +6,7 @@ from ..plugin import *
 from arsoft.filelist import *
 from arsoft.utils import which, runcmdAndGetData
 from arsoft.sshutils import SudoSessionException
+from arsoft.rsync import Rsync
 
 import tempfile
 import sys
@@ -36,6 +37,7 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         def local_config(self, base_dir):
             items = { 'type': 'Maildir' }
             items['localfolders'] = os.path.join(base_dir, self.maildata_dir)
+            items['sep'] = '/'
             ret = ''
             for k,v in items.items():
                 ret += '%s = %s\n' % (k,v)
@@ -82,6 +84,21 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         def maildata_dir(self):
             return '%s' % self.name
 
+        @property
+        def domain(self):
+            idx = self.username.find('@')
+            if idx > 0:
+                return self.username[idx+1:]
+            else:
+                return None
+
+        @property
+        def user(self):
+            idx = self.username.find('@')
+            if idx > 0:
+                return self.username[0:idx]
+            else:
+                return self.username
 
     def __init__(self, parent):
         BackupPluginConfig.__init__(self, parent, 'dovecot')
@@ -103,6 +120,7 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
             self.master_username = None
         self.default_server = inifile.get(None, 'server', self.backup_app.fqdn)
         self.default_server_type = inifile.get(None, 'server_type', 'Dovecot')
+        self.backup_mail_location = inifile.get(None, 'backup_mail_location', 'maildir:/var/vmail-backup/%d/%n')
         for sect in inifile.sections:
             enabled = inifile.get(sect, 'enabled', True)
             username = inifile.get(sect, 'username', None)
@@ -181,6 +199,15 @@ status_backend = sqlite
 
         # take over configured account list
         self._account_list = self.config.account_list
+        self._backup_mail_location = self.config.backup_mail_location
+        if self._backup_mail_location is not None:
+            if ':' in self._backup_mail_location:
+                (scheme, self._backup_mail_location) = self._backup_mail_location.split(':', 1)
+                if scheme != 'maildir':
+                    self._backup_mail_location = None
+
+        if self.backup_app.root_dir is not None and self._backup_mail_location is not None:
+            self._backup_mail_location = self.backup_app.root_dir + self._backup_mail_location
 
         ret = False
         localhost_server_item = self.backup_app.find_remote_server_entry(hostname='localhost')
@@ -259,10 +286,56 @@ status_backend = sqlite
                             metadata_dir = os.path.join(backup_dir, item.metadata_dir)
                             dovecot_backup_filelist.append(metadata_dir)
                         else:
-                            self.writelog('Failed to backup dovecot account %s; Error %i: %s' % (item.name, sts, stderr_data))
+                            if self.backup_app._verbose:
+                                print('backup of %s failed' % str(item.name))
+                            self.writelog('Failed to backup dovecot account %s; Error %i: %s' % (item.name, sts, stderr_data.decode('utf8')))
 
                 #print(dovecot_backup_filelist)
                 self.backup_app.append_to_filelist(dovecot_backup_filelist)
                 #print(self.intermediate_filelist)
         return ret
- 
+
+    def _expand_mail_location(self, account):
+        ret = self._backup_mail_location
+        if '%d' in ret:
+            ret = ret.replace('%d', account.domain)
+        if '%n' in ret:
+            ret = ret.replace('%n', account.user)
+        if '%u' in ret:
+            ret = ret.replace('%u', account.username)
+        return ret
+
+    def rsync_complete(self, **kwargs):
+        ret = True
+        app = self.backup_app
+
+        backup_dir = app.session.backup_dir
+        if Rsync.is_rsync_url(backup_dir):
+            print('Cannot map backup to %s into dovecot namespace at %s' % (backup_dir, self._backup_mail_location))
+        else:
+            backup_name = os.path.basename(backup_dir)
+
+            if backup_dir and backup_dir[-1] != '/':
+                backup_dir += '/'
+            backup_dir = os.path.join(backup_dir, 'dovecot')
+
+            for item in self._account_list:
+                if self.backup_app._verbose:
+                    print('backup %s' % str(item))
+
+                if not item.enabled or not item.is_valid:
+                    if self.backup_app._verbose:
+                        print('skip disabled or invalid account %s' % str(item))
+                    continue
+
+                src_dir = os.path.join(backup_dir, item.maildata_dir)
+                account_dir = self._expand_mail_location(item)
+                if not os.path.isdir(account_dir):
+                    os.makedirs(account_dir)
+                account_dir = os.path.join(account_dir, backup_name)
+
+                print('backup_account dir %s <> %s' % (account_dir, src_dir))
+
+                os.symlink(src_dir, account_dir)
+
+        return ret

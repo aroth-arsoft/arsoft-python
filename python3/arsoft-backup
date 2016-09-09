@@ -92,9 +92,12 @@ class ARSoftBackupApp(BackupApp):
                          dryrun=self._dryrun, verbose=self._verbose)
             ret = inst.execute(stdout=my_stdout, stderr_to_stdout=True)
             self.session.logfile_proxy.remove_notify(lc)
-            print(str(lc))
+            if self._verbose:
+                print(str(lc))
         else:
             # everything OK since there is nothing to do
+            if self._verbose:
+                print('Nothing to backup.')
             ret = True
         return ret
     
