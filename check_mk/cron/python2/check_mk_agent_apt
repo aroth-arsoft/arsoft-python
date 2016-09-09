@@ -27,7 +27,7 @@ import time
 try:
     import apt
 except ImportError:
-    sys.exit
+    sys.exit(0)
 
 class AptCache(apt.Cache):
 
@@ -69,40 +69,43 @@ class AptCache(apt.Cache):
             except apt.cache.FetchFailedException as e:
                 pass
 
-
 def get_upgradeable():
-    pkgs_to_upgrade     = []
-    pkgs_to_sec_upgrade = []
-    cache = AptCache()
+    try:
+        pkgs_to_upgrade     = []
+        pkgs_to_sec_upgrade = []
+        cache = AptCache()
+        for pkg in cache:
+            # the comments show the way on how we could implement this with the
+            # new APT API. Since its only supported on the most current Debian
+            # platforms, we still use the older one and supress the warnings
+            # at the beginning of the script.
+            #
+            if pkg.is_upgradable:
+            #if pkg.isUpgradable:
+                name      = pkg.name
+                candidate = pkg.candidate.origins[0]
+                #candidate = pkg.candidateOrigin[0]
 
-    for pkg in cache:
-        # the comments show the way on how we could implement this with the
-        # new APT API. Since its only supported on the most current Debian
-        # platforms, we still use the older one and supress the warnings
-        # at the beginning of the script.
-        #
-        if pkg.is_upgradable:
-        #if pkg.isUpgradable:
-            name      = pkg.name
-            candidate = pkg.candidate.origins[0]
-            #candidate = pkg.candidateOrigin[0]
-
-            # Debian security archive
-            if candidate.label == "Debian-Security":
-                pkgs_to_sec_upgrade.append(name)
-            # Ubuntu security archive
-            elif candidate.archive.find("security") > -1:
-                pkgs_to_sec_upgrade.append(name)
-            else:
-                pkgs_to_upgrade.append(name)
-            #candidate = pkg.candidate
-            #print candidate.origins
-            #pkgs_to_upgrade.append(pkg.name.rstrip("\n"))
-
-    return [cache.cache_mtime, pkgs_to_upgrade, pkgs_to_sec_upgrade]
+                # Debian security archive
+                if candidate.label == "Debian-Security":
+                    pkgs_to_sec_upgrade.append(name)
+                # Ubuntu security archive
+                elif candidate.archive.find("security") > -1:
+                    pkgs_to_sec_upgrade.append(name)
+                else:
+                    pkgs_to_upgrade.append(name)
+                #candidate = pkg.candidate
+                #print candidate.origins
+                #pkgs_to_upgrade.append(pkg.name.rstrip("\n"))
+        return (cache.cache_mtime, pkgs_to_upgrade, pkgs_to_sec_upgrade)
+    except SystemError:
+        return (None, None, None)
 
 if __name__ == "__main__":
     age, upgrades, secupgrades = get_upgradeable()
+    if age is None:
+        # happens when apt update is in progress
+        sys.exit(0)
 
     if len(sys.argv) > 1:
         stats_file = sys.argv[1]
