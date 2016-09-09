@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+#
+from arsoft.check_mk import check_state
 
 def inventory_eiscp_status(checkname, info):
     ret = []
@@ -8,47 +11,45 @@ def inventory_eiscp_status(checkname, info):
 
 def check_eiscp_status(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    details = []
-    perfdata = []
+    state = check_state()
     data = {}
 
     for line in info:
         if len(line) < 2:
             continue
         key = line[0]
-        data[key] = line[1]
+        if key in ['input']:
+            data[key] = line[1]
+        else:
+            data[key] = saveint(line[1])
 
     if item == 'status':
-        if 'power' in data:
-            details.append('Power %s' % ('on' if saveint(data['power']) != 0 else 'off'))
-        if 'mute' in data:
-            details.append('Mute %s' % ('on' if saveint(data['mute']) != 0 else 'off'))
-        if 'input' in data:
-            details.append('Input %s' % (data['input']))
+        power = data.get('power', 0)
+        mute = data.get('mute', 0)
+        sleep = data.get('sleep', 0)
         if 'volume' in data:
-            details.append('Volume %i' % (saveint(data['volume'])))
-        if 'sleep' in data:
-            if saveint(data['sleep']) == 0:
-                details.append('Sleep off')
-            else:
-                details.append('Sleep %i minutes' % saveint(data['sleep']))
-        if len(details) == 0:
-            level = 1
-            details.append('Unknown status')
+            volume = data.get('volume', 0)
+        elif 'master_volume' in data:
+            volume = data.get('master_volume', 0)
 
-        # Construct a the status message.
-        if level == 0:
-            msg = "OK - %s" % (','.join(details))
-        elif level == 1:
-            msg = "WARN - %s" % (','.join(details))
-        elif level == 2:
-            msg = "CRIT - %s" % (','.join(details))
+        state.append('Power %s' % ('on' if power != 0 else 'off'))
+        state.append('Mute %s' % ('on' if mute != 0 else 'off'))
+        if 'input' in data:
+            state.append('Input %s' % (data['input']))
+        state.append('Sleep off' if sleep == 0 else 'Sleep %i minutes' % sleep)
+        state.append('Volume %i' % (volume))
+
+        state.perfdata.append( ('power', power ) )
+        state.perfdata.append( ('mute', mute ) )
+        state.perfdata.append( ('sleep', sleep ) )
+        state.perfdata.append( ('volume', volume ) )
+
+        if len(state.messages) == 0:
+            state.warning('Unknown status')
     else:
-        level = 3
-        msg = "UNKNOWN - item %s unknown" % (item)
-    return (level, msg, perfdata)
+        state.unknown('item %s unknown' % (item))
+
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['eiscp'] = {
