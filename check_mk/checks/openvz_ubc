@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from arsoft.check_mk import check_state
 
 def inventory_openvz_ubc(checkname, info):
 
@@ -10,9 +11,7 @@ def inventory_openvz_ubc(checkname, info):
 
 def check_openvz_ubc(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    perfdata = []
+    state = check_state()
     data = {}
     machine_data = {}
     current_machine = None
@@ -42,29 +41,23 @@ def check_openvz_ubc(item, params, info):
         machine_uid = None
         if len(machine_data) == 1:
             machine_uid = machine_data.keys()[0]
+            state.ok('Version %s, uid %s' % (data['version'], machine_uid))
+
             for (key, value) in machine_data[machine_uid].iteritems():
                 (held, maxheld, barrier, limit, failcnt) = value
-                perfdata.append( (key, held, barrier, limit ) )
+                state.perfdata.append( (key, held, barrier, limit ) )
                 if held >= limit:
-                    if level < 2:
-                        level = 2
-                    details.append('%s %i>=%i' % (key, held, limit))
+                    state.critical('%s %i>=%i' % (key, held, limit))
                 elif held >= barrier:
-                    if level < 1:
-                        level = 1
-                    details.append('%s %i>=%i' % (key, held, barrier))
+                    state.warning('%s %i>=%i' % (key, held, barrier))
+        else:
+            state.ok('Version %s' % (data['version']))
+            if len(machine_data) == 0:
+                state.critical('No machine data found')
+            else:
+                state.warning('Data for %i machines found' % len(machine_data))
 
-        if len(details) == 0:
-            details.append('Version %s, uid %s' % (data['version'], machine_uid))
-
-        # Construct a the status message.
-        if level == 0:
-            msg = "OK - %s" % (','.join(details))
-        elif level == 1:
-            msg = "WARN - %s" % (','.join(details))
-        elif level == 2:
-            msg = "CRIT - %s" % (','.join(details))
-    return (level, msg, perfdata)
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['openvz_ubc'] = {

@@ -51,7 +51,7 @@ def check_systemd(item, params, info):
                     addr, name = timedatectl_time_server
                     timedatectl_time_server = '%s (%s)' % (name, addr)
             else:
-                state.critical('Time from synchronized with NTP server')
+                state.critical('Time not synchronized with NTP server')
         else:
             state.warning('NTP synchronization disabled.')
 

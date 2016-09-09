@@ -19,6 +19,7 @@
 #
 from arsoft.timestamp import format_timedelta
 from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
+from arsoft.check_mk import check_state
 
 def inventory_openvpn(checkname, info):
 
@@ -37,10 +38,7 @@ def inventory_openvpn(checkname, info):
 
 def check_openvpn(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    details = []
-    perfdata = []
+    state = check_state()
 
     (cfgname, check_name) = item.split(' ', 1)
     cfgdata = {}
@@ -75,14 +73,14 @@ def check_openvpn(item, params, info):
                 value = cfgdata['statistics.%s' % stat_key]
             else:
                 value = 0
-            perfdata.append( (stat_key, value) )
+            state.perfdata.append( (stat_key, value) )
 
         if 'connected_clients' in cfgdata:
             connected_clients = cfgdata.get('connected_clients', '').split(',')
-            perfdata.append( ('numclients', len(connected_clients) ) )
+            state.perfdata.append( ('numclients', len(connected_clients) ) )
         if 'configured_clients' in cfgdata:
             configured_clients = cfgdata.get('configured_clients', '').split(',')
-            perfdata.append( ('confclients', len(configured_clients) ) )
+            state.perfdata.append( ('confclients', len(configured_clients) ) )
 
         autostart = saveint(cfgdata.get('autostart', False))
         running = saveint(cfgdata.get('running', False))
@@ -92,39 +90,26 @@ def check_openvpn(item, params, info):
             expected_state = 'DOWN'
         actual_state = cfgdata.get('state', 'UNKNOWN')
         if actual_state != expected_state:
-            if level < 1:
-                level = 1
-            details.append('%s != %s' % (actual_state, expected_state))
+            state.warning('%s != %s' % (actual_state, expected_state))
         else:
             state_age = saveint(cfgdata['state_age']) if 'state_age' in cfgdata else 0
             if state_age:
-                details.append('%s for %s' % (actual_state, format_timedelta(state_age)))
+                state.append('%s for %s' % (actual_state, format_timedelta(state_age)))
             else:
-                details.append('%s' % (actual_state))
+                state.append('%s' % (actual_state))
         if autostart != running:
-            if level < 2:
-                level = 2
-            details.append('VPN running' if running != 0 else 'VPN not running')
+            state.critical('VPN running' if running != 0 else 'VPN not running')
 
         if running != 0:
-            details.append('local %s' % (cfgdata.get('localip', 'UNKNOWN')))
-            details.append('remote %s' % (cfgdata.get('remoteip', 'UNKNOWN')))
+            state.append('local %s' % (cfgdata.get('localip', 'UNKNOWN')))
+            state.append('remote %s' % (cfgdata.get('remoteip', 'UNKNOWN')))
             last_updated_age = saveint(cfgdata.get('last_updated_age', 0))
             if last_updated_age > 600:
-                if level < 1:
-                    level = 1
-                details.append('Status has not been updated for %s' % format_timedelta(last_updated_age))
+                state.warning('Status has not been updated for %s' % format_timedelta(last_updated_age))
     else:
         return check_mk_cert_check(item, params, info, prefix=True)
 
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-    return (level, msg, perfdata)
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['openvpn'] = {
