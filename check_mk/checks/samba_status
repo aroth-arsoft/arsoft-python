@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+#
+
+from arsoft.check_mk import check_state
 
 def inventory_samba_status(checkname, info):
 
@@ -42,10 +46,7 @@ def role_to_pretty_string(role):
 
 def check_samba_status(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    perfdata = []
-    details = []
+    state = check_state()
     data = { 'server_role':'',
             'shares':[],
             'version':'',
@@ -79,50 +80,34 @@ def check_samba_status(item, params, info):
         if params is not None:
             (expected_server_role, expected_workgroup) = params
             if expected_server_role != data['server_role']:
-                if level < 1:
-                    level = 1
-                details.append('Server role %s!=%s' % (role_to_pretty_string(data['server_role']), role_to_pretty_string(expected_server_role)))
+                state.warning('Server role %s!=%s' % (role_to_pretty_string(data['server_role']), role_to_pretty_string(expected_server_role)))
             if expected_workgroup != data['workgroup']:
-                if level < 1:
-                    level = 1
-                details.append('Workgroup %s!=%s' % (data['workgroup'], expected_workgroup))
+                state.warning('Workgroup %s!=%s' % (data['workgroup'], expected_workgroup))
         else:
             expected_server_role = None
             expected_workgroup = None
 
         if data['process_smbd'] == 0:
-            if level < 2:
-                level = 2
-            details.append('smbd process not running')
+            state.critical('smbd process not running')
 
         expect_nmbd_running = False if expected_server_role == 'ROLE_ACTIVE_DIRECTORY_DC' else True
         if expect_nmbd_running:
+
             if data['process_nmbd'] == 0:
-                if level < 2:
-                    level = 2
-                details.append('nmbd process not running')
+                state.critical('nmbd process not running')
         else:
             if data['process_nmbd'] != 0:
-                if level < 2:
-                    level = 2
-                details.append('nmbd process is running')
-        if len(details) == 0:
-            details.append('Version %s, Workgroup %s, %s' % (data['version'], data['workgroup'], role_to_pretty_string(data['server_role']) ) )
+                state.critical('nmbd process is running')
+        if state.is_ok:
+            state.append('Version %s, Workgroup %s, %s' % (data['version'], data['workgroup'], role_to_pretty_string(data['server_role']) ) )
 
     elif item_class == 'share':
         if item_name in data['shares']:
-            details.append('%s ok' % (item_name))
+            state.ok('%s ok' % (item_name))
         else:
-            details.append('%s is missing' % (item_name))
-            level = 2
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-    return (level, msg, perfdata)
+            state.critical('%s is missing' % (item_name))
+
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['samba_status'] = {

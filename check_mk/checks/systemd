@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+#
 from arsoft.timestamp import format_timedelta, utc_timestamp_to_datetime
 from arsoft.check_mk import check_state
 

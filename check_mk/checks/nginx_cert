@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
 #
 from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
 #
 # Check_MK APT Plugin - Check for upgradeable packages.
 #
@@ -98,19 +99,19 @@ def check_rkhunter(item, params, info):
             state.warning('%i changed files %s' % (data['num_file_properties_changed'], ','.join(data['changed_file_properties']) ) )
 
         if data['num_missing_files'] > 0:
-            state.warning('%i missing files %s(!)' % (data['num_missing_files'], ','.join(data['missing_files']) ) )
+            state.warning('%i missing files %s' % (data['num_missing_files'], ','.join(data['missing_files']) ) )
 
         if data['num_services_changed'] > 0:
-            state.warning('%i changed services %s(!)' % (data['num_services_changed'], ','.join(data['changed_services']) ) )
+            state.warning('%i changed services %s' % (data['num_services_changed'], ','.join(data['changed_services']) ) )
 
         if data['num_users_changed'] > 0:
-            state.warning('%i changed users %s(!)' % (data['num_users_changed'], ','.join(data['changed_users']) ) )
+            state.warning('%i changed users %s' % (data['num_users_changed'], ','.join(data['changed_users']) ) )
 
         if data['num_groups_changed'] > 0:
-            state.warning('%i changed groups %s(!)' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
+            state.warning('%i changed groups %s' % (data['num_groups_changed'], ','.join(data['changed_groups']) ) )
 
         if data['num_downloads_failed'] > 0:
-            state.warning('%i downloads failed %s(!)' % (data['num_downloads_failed'], ','.join(data['downloads_failed']) ) )
+            state.warning('%i downloads failed %s' % (data['num_downloads_failed'], ','.join(data['downloads_failed']) ) )
 
         state.ok('No issues detected.')
 
