@@ -59,7 +59,7 @@ def check_apt(item, params, info):
         check_time = data.get('check_time', 0)
         boot_time = data.get('boot_time', 0)
         up_time = now - boot_time
-        print(format_time(check_time), format_time(cache_time), format_time(boot_time))
+        #print(format_time(check_time), format_time(cache_time), format_time(boot_time))
         check_age = now - check_time
         cache_age = now - cache_time
 

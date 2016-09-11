@@ -19,12 +19,13 @@ class check_mk_agent_plugins(object):
         self.lsbdistcodename = None
 
     def _add_plugin(self, name, interval=0, interval_unit=60, enable=True, config=None, check_function=None):
-        if not interval in self.plugins_per_interval:
-            self.plugins_per_interval.update( {interval * interval_unit: {} } )
+        actual_interval = interval * interval_unit
+        if not actual_interval in self.plugins_per_interval:
+            self.plugins_per_interval.update( {actual_interval: {} } )
         plugin_config = copy.deepcopy(config) if config else {}
         plugin_config['enable'] = enable
         plugin_config['check_function'] = check_function
-        self.plugins_per_interval[interval * interval_unit][name] = plugin_config
+        self.plugins_per_interval[actual_interval][name] = plugin_config
 
     def _default_linux(self):
         # enable default plugins
@@ -122,7 +123,7 @@ class check_mk_agent_plugins(object):
                     #print(func)
                     if func is not None:
                         available = func()
-                        #print('call func for %s => %i' % (plugin_name, available))
+                #print('call func for %s => %i' % (plugin_name, available))
                 config['available'] = available
 
     def list_available_plugins(self):
