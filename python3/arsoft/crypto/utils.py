@@ -111,13 +111,13 @@ def check_mk_cert_check_impl(itemname, params, subject, issuer, expire_date, ca=
     perfdata = [ (itemname, int(expire_date - now)/86400 if expire_date else 0, warn_time_days, crit_time_days) ]
     if expire_date <= now:
         level = 2
-        msg = 'CRIT - %sCertificate %s expired %s' % ('CA ' if ca else '', subject, format_timedelta(expire_date - now))
+        msg = 'CRIT - %sCertificate %s expired %s(!!)' % ('CA ' if ca else '', subject, format_timedelta(expire_date - now))
     elif expire_date <= warn_time:
         level = 1
-        msg = 'WARN - %sCertificate %s expires in %s' % ('CA ' if ca else '', subject, format_timedelta(expire_date - now))
+        msg = 'WARN - %sCertificate %s expires in %s(!)' % ('CA ' if ca else '', subject, format_timedelta(expire_date - now))
     elif expire_date <= crit_time:
         level = 2
-        msg = 'CRIT - %sCertificate %s expires in %s' % ('CA ' if ca else '', subject, format_timedelta(expire_date - now))
+        msg = 'CRIT - %sCertificate %s expires in %s(!!)' % ('CA ' if ca else '', subject, format_timedelta(expire_date - now))
     else:
         msg = 'OK - %sCertificate %s expires in %s' % ('CA ' if ca else '', subject, format_timedelta(expire_date - now))
 
