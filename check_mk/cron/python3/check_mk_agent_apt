@@ -25,6 +25,9 @@ import os
 import time
 
 check_mk_spool_dir = '/var/lib/check_mk_agent/spool'
+update_cache_if_not_up_to_date = True
+# apt-cache update interval in seconds
+update_cache_interval = 3600
 
 try:
     import apt
@@ -41,9 +44,6 @@ def get_boot_time():
     return 0.0
 
 class AptCache(apt.Cache):
-
-    # apt-cache update interval in seconds
-    update_interval = 3600
 
     # path to the apt cache directory
     cache_dir = '/var/cache/apt'
@@ -65,20 +65,23 @@ class AptCache(apt.Cache):
 
         return self.cache_age
 
-    def __init__(self, update_if_not_up_to_date=False):
+    def __init__(self):
         apt.Cache.__init__(self)
         self._get_mtime()
-        if update_if_not_up_to_date:
+        if update_cache_if_not_up_to_date:
             self.update_cache()
         self.open(None)
 
     # automatically update the apt cache once a hour
     def update_cache(self):
-        if not self.cache_age or self.cache_age > self.update_interval:
+        if not self.cache_age or self.cache_age > update_cache_interval:
             try:
                 self.update()
             except apt.cache.FetchFailedException as e:
                 pass
+            except apt.cache.LockFailedException as e:
+                pass
+            self._get_mtime()
 
 def get_upgradeable():
     try:
