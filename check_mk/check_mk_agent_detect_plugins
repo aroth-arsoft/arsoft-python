@@ -18,13 +18,13 @@ class check_mk_agent_plugins(object):
         self.plugins_per_interval = {}
         self.lsbdistcodename = None
 
-    def _add_plugin(self, name, interval=0, enable=True, config=None, check_function=None):
+    def _add_plugin(self, name, interval=0, interval_unit=60, enable=True, config=None, check_function=None):
         if not interval in self.plugins_per_interval:
-            self.plugins_per_interval.update( {interval: {} } )
+            self.plugins_per_interval.update( {interval * interval_unit: {} } )
         plugin_config = copy.deepcopy(config) if config else {}
         plugin_config['enable'] = enable
         plugin_config['check_function'] = check_function
-        self.plugins_per_interval[interval][name] = plugin_config
+        self.plugins_per_interval[interval * interval_unit][name] = plugin_config
 
     def _default_linux(self):
         # enable default plugins

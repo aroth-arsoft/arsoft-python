@@ -24,10 +24,21 @@ import sys
 import os
 import time
 
+check_mk_spool_dir = '/var/lib/check_mk_agent/spool'
+
 try:
     import apt
 except ImportError:
     sys.exit(0)
+
+def get_boot_time():
+    """Return the system boot time expressed in seconds since the epoch."""
+    with open('/proc/stat', 'rb') as f:
+        for line in f:
+            if line.startswith(b'btime'):
+                ret = float(line.strip().split()[1])
+                return ret
+    return 0.0
 
 class AptCache(apt.Cache):
 
@@ -102,25 +113,34 @@ def get_upgradeable():
         return (None, None, None)
 
 if __name__ == "__main__":
-    age, upgrades, secupgrades = get_upgradeable()
-    if age is None:
+    cache_mtime, upgrades, secupgrades = get_upgradeable()
+    if cache_mtime is None:
         # happens when apt update is in progress
         sys.exit(0)
 
+    boot_time = get_boot_time()
+
     if len(sys.argv) > 1:
         stats_file = sys.argv[1]
+        use_stdout = True if sys.argv[1] == '-' else False
     else:
-        stats_file = os.path.join(AptCache.cache_dir, 'check_mk_stats')
+        use_stdout = False
+        stats_file = os.path.join(check_mk_spool_dir, 'check_mk_stats')
     now = time.time()
     try:
-        f = open(stats_file, 'w')
+        if use_stdout:
+            f = sys.stdout
+        else:
+            f = open(stats_file, 'w')
         f.write("<<<apt:sep(59)>>>\n")
         f.write("check_time;%i\n" % now)
-        f.write("cache_time;%i\n" % age)
+        f.write("cache_time;%i\n" % cache_mtime)
+        f.write("boot_time;%i\n" % boot_time)
         f.write("upgrades;%s\n" % ",".join(upgrades))
         f.write("secupgrades;%s\n" % ",".join(secupgrades))
-        f.close()
-    except:
+        if not use_stdout:
+            f.close()
+    except IOError:
         try:
             os.remove(stats_file)
         except:

@@ -168,7 +168,6 @@ setup(name='arsoft-python',
                              ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'yakkety']),
                              ] )  ),
             ('/usr/share/check_mk/agents/plugins', [
-                    'check_mk/plugins/apt',
                     'check_mk/plugins/cups',
                     'check_mk/plugins/cyrus_imapd',
                     'check_mk/plugins/dmi_sysinfo',

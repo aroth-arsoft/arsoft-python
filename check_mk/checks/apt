@@ -58,11 +58,11 @@ def check_apt(item, params, info):
         cache_time = data.get('cache_time', 0)
         check_time = data.get('check_time', 0)
         boot_time = data.get('boot_time', 0)
-        up_time = data.get('up_time', 0)
-        #print(check_time, boot_time, up_time)
+        up_time = now - boot_time
+        print(format_time(check_time), format_time(cache_time), format_time(boot_time))
         check_age = now - check_time
         cache_age = now - cache_time
-        state
+
         if check_time > boot_time:
             last_cache_update = 'Cache has been updated %s' % (format_time_and_delta(cache_time, -cache_age))
             if cache_age > cache_age_critical_level:
