@@ -78,6 +78,7 @@ class check_mk_agent_plugins(object):
                 fullname = os.path.join(dest_dir, f)
                 if os.path.isdir(fullname):
                     remove_dir = True
+                    dir_interval = None
                     try:
                         dir_interval = int(f)
                     except ValueError:

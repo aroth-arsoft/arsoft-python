@@ -1,3 +1,9 @@
+arsoft-python (1.280) xenial; urgency=medium
+
+  * check_mk: add missing variable init
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 12 Sep 2016 07:09:59 +0200
+
 arsoft-python (1.279) xenial; urgency=medium
 
   * check_mk: fixed interval and plugin detection
