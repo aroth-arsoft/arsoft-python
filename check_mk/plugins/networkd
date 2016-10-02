@@ -1,0 +1,6 @@
+#!/bin/sh
+test ! -x /bin/networkctl && exit 0
+echo "<<<networkd:sep(20)>>>"
+/bin/networkctl --no-pager --no-legend list
+echo "<<<networkd.links>>>"
+/bin/networkctl --no-pager --no-legend --all status

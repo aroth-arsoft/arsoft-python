@@ -1,3 +1,9 @@
+arsoft-python (1.282) xenial; urgency=medium
+
+  * check_mk: add networkd plugin and check
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 02 Oct 2016 17:02:28 +0200
+
 arsoft-python (1.281) xenial; urgency=medium
 
   * check_mk: remove one more obsolete/conflicting cron job

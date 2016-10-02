@@ -8,6 +8,7 @@ import os.path
 import copy
 import platform
 import arsoft.utils
+from arsoft.inifile import IniFile
 
 class check_mk_agent_plugins(object):
 
@@ -16,6 +17,7 @@ class check_mk_agent_plugins(object):
 
     def __init__(self):
         self.plugins_per_interval = {}
+        self.disabled_plugins = []
         self.lsbdistcodename = None
 
     def _add_plugin(self, name, interval=0, interval_unit=60, enable=True, config=None, check_function=None):
@@ -57,6 +59,7 @@ class check_mk_agent_plugins(object):
         self._add_plugin('rkhunter', interval=20, check_function=lambda: os.path.isfile('/etc/rkhunter.conf'))
         self._add_plugin('samba_status', check_function=lambda: os.path.isfile('/usr/bin/smbstatus'))
         self._add_plugin('systemd', check_function=lambda: os.path.isfile('/bin/systemctl'))
+        self._add_plugin('networkd', check_function=lambda: os.path.isfile('/bin/networkctl'))
         self._add_plugin('slapd_cert', check_function=lambda: os.path.isdir('/etc/ldap/slapd.d') and os.path.isfile('/etc/check_mk/slapd_cert'))
         self._add_plugin('isc_dhcpd', check_function=lambda: os.path.isfile('/etc/dhcp/dhcpd.conf'))
         self._add_plugin('cyrus_imapd', check_function=lambda: os.path.isfile('/etc/imapd.conf'))
@@ -68,6 +71,7 @@ class check_mk_agent_plugins(object):
         return ret
 
     def _manage_plugin_dir(self, interval, plugins):
+        ret = True
         dest_dir = self.active_plugin_dir
         if interval != 0:
             dest_dir = os.path.join(dest_dir, str(interval))
@@ -105,10 +109,19 @@ class check_mk_agent_plugins(object):
             if enable and available:
                 #print('missing %s=%i (interval=%i)' %(plugin_name, enable, interval))
                 src = os.path.join(self.available_plugin_dir, plugin_name)
-                dest = os.path.join(dest_dir, plugin_name)
-                if not os.path.isdir(dest_dir):
-                    os.makedirs(dest_dir)
-                os.symlink(src, dest)
+                if not os.path.exists(src):
+                    sys.stderr.write("Failed to enable plugin %s because %s is missing.\n" % (plugin_name, src))
+                    ret = False
+                else:
+                    dest = os.path.join(dest_dir, plugin_name)
+                    try:
+                        if not os.path.isdir(dest_dir):
+                            os.makedirs(dest_dir)
+                        os.symlink(src, dest)
+                    except IOError as e:
+                        sys.stderr.write("Failed to enable plugin %s: %s\n" % (plugin_name, str(e)))
+                        ret = False
+        return ret
 
     def _apply(self):
         for interval, plugins in self.plugins_per_interval.items():
@@ -119,6 +132,8 @@ class check_mk_agent_plugins(object):
         for interval, plugins in self.plugins_per_interval.items():
             for plugin_name, config in plugins.items():
                 available = config.get('enable', True)
+                if plugin_name in self.disabled_plugins:
+                    available = False
                 if available and 'check_function' in config:
                     func = config['check_function']
                     #print(func)
@@ -174,9 +189,17 @@ class check_mk_agent_plugins(object):
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-l', '--list', dest='list_active_plugins', action='store_true', help='list all active plugins')
         parser.add_argument('-a', '--available', dest='list_available_plugins', action='store_true', help='list all available plugins')
+        parser.add_argument('--config-file', dest='config_file', default='/etc/default/check_mk_agent', help='list all available plugins')
 
         args = parser.parse_args()
+
         self.verbose = args.verbose
+
+        if os.path.isfile(args.config_file):
+            cfgfile = IniFile(filename=args.config_file, commentPrefix='#', keyValueSeperator='=', autoQuoteStrings=True)
+            disabled_plugins_str = cfgfile.get(section=None, key='DISABLED_PLUGINS')
+            if disabled_plugins_str:
+                self.disabled_plugins = disabled_plugins_str.split(',')
 
         if args.list_active_plugins:
             return self.list_active_plugins()
