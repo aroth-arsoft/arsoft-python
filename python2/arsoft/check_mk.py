@@ -5,6 +5,7 @@
 import os.path
 import errno
 from arsoft.utils import runcmdAndGetData
+from arsoft.timestamp import strptime_as_datetime
 
 def check_pid(pid):
     """ Check For the existence of a unix pid. """
@@ -62,21 +63,14 @@ def systemd_is_active(service_name):
         running = True
     return (pid, running)
 
-def systemd_status(service_name):
-    pid = 0
-    running = False
-    data = {}
-    (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/bin/systemctl', '--no-pager', 'status', service_name], env={'LANG':'C'})
+def systemd_parse_status(lines, skip_header_line=True):
+    ret = {}
     got_header = False
-    for line in stdoutdata.splitlines():
-        if not line:
+    for line in lines:
+        if not got_header:
             got_header = True
-            continue
-        if got_header:
-            pass
-        else:
-            if not ':' in line:
-                continue
+        elif ':' in line:
+
             key, value = line.split(':', 1)
             key = key.strip().replace(' ', '_').lower()
             if key.startswith('next_') or key.startswith('last_'):
@@ -86,17 +80,86 @@ def systemd_status(service_name):
                 value = 1
             elif value == 'no':
                 value = 0
-            data[key] = value
+            elif len(value) > 2 and value[0] == '"' and value[-1] == '"':
+                value = value[1:-1]
+            if key == 'main_pid':
+                (main_pid, procname) = value.split(' ', 1)
+                if ' ' in main_pid:
+                    pid, dummy = main_pid.split(' ', 1)
+                    value = saveint(pid)
+                else:
+                    value = saveint(main_pid)
+            elif key == 'active':
+                start = value.find('since ')
+                if start >= 0:
+                    end = value.find(';', start+6)
+                    if end >= 0:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                        ret['active_since'] = strptime_as_datetime(value[start+6:end], fmt)
+                    value = value[0:start].strip()
+            elif key == 'loaded':
+                start = value.find('(')
+                if start >= 0:
+                    end = value.find(')', start+1)
+                    unit_file, enable_state, vendor_preset = value[start+1:end-1].split(';', 2)
+                    ret['unit_file'] = unit_file
+                    ret['enabled'] = True if enable_state.strip() == 'enabled' else False
+                    if ':' in vendor_preset:
+                        txt, st = vendor_preset.split(':', 1)
+                        ret['vendor_preset_enabled'] = True if st.strip() == 'enable' else False
+                    else:
+                        ret['vendor_preset_enabled'] = None
+                    if value[0:start-1].strip() == 'loaded':
+                        value = True
+                    else:
+                        value = False
+            ret[key] = value
+    return ret
+
+def systemd_status_raw(service_name):
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/bin/systemctl', '--no-pager', '--lines=0', 'status', service_name], env={'LANG':'C'})
+    return systemd_parse_status(lines=stdoutdata.splitlines())
+
+def systemd_status(service_name):
+    pid = 0
+    running = False
+    data = systemd_status_raw(service_name)
     running = data.get('active')
     running = True if running is not None and running.startswith('active') else False
-    main_pid = data.get('main_pid')
-    if main_pid:
-        if ' ' in main_pid:
-            pid, dummy = main_pid.split(' ', 1)
-            pid = saveint(pid)
-        else:
-            pid = saveint(main_pid)
+    pid = data.get('main_pid')
     return (pid, running)
+
+def timedatectl_parse_status(lines):
+    ret = {}
+    for line in lines:
+        if ':' in line:
+            key, value = line.split(':', 1)
+            key = key.strip().replace(' ', '_').lower()
+            if key.startswith('next_') or key.startswith('last_'):
+                break
+            value = value.strip()
+            if value == 'yes':
+                value = 1
+            elif value == 'no':
+                value = 0
+            elif len(value) > 2 and value[0] == '"' and value[-1] == '"':
+                value = value[1:-1]
+            if key.endswith('time'):
+                if key == 'rtc_time':
+                    fmt = '%a %Y-%m-%d %H:%M:%S'
+                else:
+                    fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                value = strptime_as_datetime(value, fmt)
+            ret[key] = value
+    return ret
+
+def timedatectl_status():
+    pid = 0
+    running = False
+    data = {}
+    (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/usr/bin/timedatectl', '--no-pager', 'status'], env={'LANG':'C'})
+    data = systemd_parse_status(lines=stdoutdata.splitlines())
+    return data
 
 # taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
 def _debian_start_link_count(service_name):
@@ -129,11 +192,6 @@ def saveint(v):
     except ValueError:
         return 0
 
-LEVEL_OK = 0
-LEVEL_WARN = 1
-LEVEL_CRIT = 2
-LEVEL_UNKNOWN = 3
-
 class check_state(object):
     def __init__(self):
         self._list = []
@@ -153,6 +211,11 @@ class check_state(object):
     def ok(self, msg):
         if self.level == LEVEL_OK:
             self._list.append(msg)
+
+    def unknown(self, msg):
+        if self.level < LEVEL_UNKNOWN:
+            self.level = LEVEL_UNKNOWN
+        self._list.append(msg + '(!!!)')
 
     def append(self, msg):
         self._list.append(msg)
@@ -202,3 +265,10 @@ class check_state(object):
     @property
     def return_value(self):
         return (self.level, self.message, self.perfdata)
+
+
+if __name__ == "__main__":
+    print(systemd_status('systemd-timesyncd'))
+    print(systemd_status('unknown-service'))
+    print(systemd_status_raw('systemd-timesyncd'))
+    print(timedatectl_status())
