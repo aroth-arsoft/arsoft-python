@@ -1,0 +1,4 @@
+#!/bin/sh
+echo '<<<clamav>>>'
+[ -x /usr/bin/clamconf ] && /usr/bin/clamconf
+exit 0
