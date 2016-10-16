@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+#
+from arsoft.check_mk import check_state
+
+def inventory_systemd_failed(checkname, info):
+    return [(None, None)]
+
+def check_systemd_failed(item, params, info):
+    state = check_state()
+    failed_services = []
+    for line in info:
+        service_name = line[0]
+        failed_services.append(service_name)
+
+    if failed_services:
+        state.critical('%s' % ','.join(failed_services) )
+    else:
+        state.ok('All services OK')
+
+    state.perfdata.append( ('num', len(failed_services) ) )
+
+    return state.return_value
+
+
+# declare the check to Check_MK.
+check_info['systemd_failed'] = {
+    'check_function':            check_systemd_failed,
+    'inventory_function':        inventory_systemd_failed,
+    'service_description':       'systemd failed services',
+    'has_perfdata':              True,
+}

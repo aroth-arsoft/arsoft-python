@@ -1,0 +1,179 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+#
+from arsoft.check_mk import check_state
+from arsoft.timestamp import strptime_as_datetime
+#from arsoft.check_mk import check_state, systemd_parse_status, timedatectl_parse_status
+
+def systemd_parse_status(lines, skip_header_line=True):
+    ret = {}
+    got_header = False
+    for line in lines:
+        if not got_header:
+            got_header = True
+        elif ':' in line:
+
+            key, value = line.split(':', 1)
+            key = key.strip().replace(' ', '_').lower()
+            if key.startswith('next_') or key.startswith('last_'):
+                break
+            value = value.strip()
+            if value == 'yes':
+                value = 1
+            elif value == 'no':
+                value = 0
+            elif len(value) > 2 and value[0] == '"' and value[-1] == '"':
+                value = value[1:-1]
+            if key == 'main_pid':
+                (main_pid, procname) = value.split(' ', 1)
+                if ' ' in main_pid:
+                    pid, dummy = main_pid.split(' ', 1)
+                    value = saveint(pid)
+                else:
+                    value = saveint(main_pid)
+            elif key == 'active':
+                start = value.find('since ')
+                if start >= 0:
+                    end = value.find(';', start+6)
+                    if end >= 0:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                        ret['active_since'] = strptime_as_datetime(value[start+6:end], fmt)
+                    value = value[0:start].strip()
+            elif key == 'loaded':
+                start = value.find('(')
+                if start >= 0:
+                    end = value.find(')', start+1)
+                    unit_file, enable_state, vendor_preset = value[start+1:end-1].split(';', 2)
+                    ret['unit_file'] = unit_file
+                    ret['enabled'] = True if enable_state.strip() == 'enabled' else False
+                    if ':' in vendor_preset:
+                        txt, st = vendor_preset.split(':', 1)
+                        ret['vendor_preset_enabled'] = True if st.strip() == 'enable' else False
+                    else:
+                        ret['vendor_preset_enabled'] = None
+                    if value[0:start-1].strip() == 'loaded':
+                        value = True
+                    else:
+                        value = False
+            ret[key] = value
+    return ret
+
+def timedatectl_parse_status(lines):
+    ret = {}
+    for line in lines:
+        if ':' in line:
+            key, value = line.split(':', 1)
+            key = key.strip().replace(' ', '_').lower()
+            if key.startswith('next_') or key.startswith('last_'):
+                break
+            value = value.strip()
+            if value == 'yes':
+                value = 1
+            elif value == 'no':
+                value = 0
+            elif len(value) > 2 and value[0] == '"' and value[-1] == '"':
+                value = value[1:-1]
+            if key.endswith('time'):
+                if key == 'rtc_time':
+                    fmt = '%a %Y-%m-%d %H:%M:%S'
+                else:
+                    fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                value = strptime_as_datetime(value, fmt)
+            ret[key] = value
+    return ret
+
+def extract_time_server_from_status(status_line):
+    addr = None
+    name = None
+    idx = status_line.find('time server')
+    if idx >= 0:
+        server_info = status_line[idx + 12:]
+        if ' ' in server_info:
+            addr, name = server_info.split(' ', 1)
+            if name[0] == '(':
+                if name[-1] == ')':
+                    name = name[1:-1]
+                elif name[-2] == ')' and name[-1] == '.':
+                    name = name[1:-2]
+        else:
+            addr = server_info
+            name = server_info
+    return (addr, name)
+
+def inventory_systemd_timedate(checkname, info):
+    return [('timedate', None), ('timesync', None) ]
+
+def check_systemd_timedate(item, params, info):
+    state = check_state()
+    timedate_data = {}
+    timesync_data = {}
+
+    got_header = False
+    timedate_done = False
+    idx = -1
+    lines = []
+    for i_idx, i in enumerate(info):
+        lines.append(i[0])
+        if i[0] == '--------':
+            idx = i_idx
+    if idx < 0:
+        item = None
+
+    if item == 'timedate':
+        #print(lines[0:idx])
+        data = timedatectl_parse_status(lines[0:idx])
+        #print(data)
+        timedatectl_ntp_synchronized = data.get('ntp_synchronized', 0)
+        timedatectl_network_time_on = data.get('network_time_on', 0)
+        timedatectl_time_zone = data.get('time_zone', 'unkown')
+        timedatectl_local_time = data.get('local_time', 0)
+        timedatectl_universal_time = data.get('universal_time', 0)
+        timedatectl_rtc_in_local_tz = data.get('rtc_in_local_tz', 0)
+
+        if timedatectl_rtc_in_local_tz != 0:
+            state.warning('RTC is running with local time')
+
+        if state.is_ok:
+            state.ok('%s (%s)' % (timedatectl_universal_time, timedatectl_time_zone))
+    elif item == 'timesync':
+        #print(lines[idx+1:])
+        timedatectl_data = timedatectl_parse_status(lines[0:idx])
+        data = systemd_parse_status(lines[idx+1:])
+        #print(data)
+
+        ntp_enabled = data.get('enabled', False)
+        ntp_synchronized = timedatectl_data.get('ntp_synchronized', 0)
+        network_time_on = timedatectl_data.get('network_time_on', 0)
+        time_server = None
+
+        addr, name = extract_time_server_from_status(data.get('status'))
+        if not 'time_server' in data:
+            data['time_server'] = [ addr, name ]
+
+        if ntp_enabled != 0 or network_time_on != 0:
+            if ntp_synchronized:
+                time_server = data.get('time_server')
+                if time_server is not None and len(time_server) > 1:
+                    addr, name = time_server
+                    time_server = '%s (%s)' % (name, addr)
+            else:
+                state.critical('Time not synchronized with NTP server')
+        else:
+            state.warning('NTP synchronization disabled.')
+
+        if state.is_ok:
+            state.ok('Synced on %s' % (time_server))
+    else:
+        print('unknown item %s' % item)
+        #state.unknown('item %s' % item)
+
+    return state.return_value
+
+
+# declare the check to Check_MK.
+check_info['systemd_timedate'] = {
+    'check_function':            check_systemd_timedate,
+    'inventory_function':        inventory_systemd_timedate,
+    'service_description':       'systemd timedate',
+    'has_perfdata':              False,
+}
