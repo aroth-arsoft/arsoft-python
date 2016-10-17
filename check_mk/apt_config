@@ -1,0 +1,4 @@
+// Refresh the check_mk spool file after each source index update
+APT::Update::Post-Invoke-Success "/usr/lib/check_mk_agent/check_mk_agent_apt";
+// Refresh the check_mk spool file after each package installation
+DPkg::Post-Invoke "/usr/lib/check_mk_agent/check_mk_agent_apt";
