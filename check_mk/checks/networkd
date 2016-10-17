@@ -4,39 +4,37 @@
 from arsoft.timestamp import format_timedelta, utc_timestamp_to_datetime
 from arsoft.check_mk import check_state
 
-def inventory_networkd(checkname, info):
-
-    ret = []
+def parse_networkd(info):
+    ret = {}
     for line in info:
         #print(line)
         fields = filter(bool, line[0].split(' '))
         #print(fields)
         (num, lnk_name, lnk_type, lnk_op, lnk_setup) = fields
         if lnk_name != 'lo':
-            ret.append( (str(lnk_name), {'type':str(lnk_type), 'setup':str(lnk_setup) } ) )
+            ret[str(lnk_name)] = {'num': saveint(num), 'type':str(lnk_type), 'op': str(lnk_op), 'setup':str(lnk_setup) }
+    return ret
+
+def inventory_networkd(checkname, info):
+
+    ret = []
+    for lnk_name, lnk_data in info.items():
+        ret.append( (lnk_name, lnk_data ) )
     return ret
 
 def check_networkd(item, params, info):
 
     state = check_state()
-    data = {}
 
-    for line in info:
-        #print(line)
-        fields = filter(bool, line[0].split(' '))
-        #print(fields)
-        (num, lnk_name, lnk_type, lnk_op, lnk_setup) = fields
-        if lnk_name != 'lo':
-            data[lnk_name] = { 'type':str(lnk_type), 'op': str(lnk_op), 'setup':str(lnk_setup) }
-    if item in data:
-        if data[item]['type'] != params['type']:
-            state.critical('Type mismatch %s!=%s' % (data[item]['type'], params['type']) )
-        if data[item]['setup'] != params['setup']:
-            state.critical('Setup mismatch %s!=%s' % (data[item]['setup'], params['setup']) )
+    if item in info:
+        if info[item]['type'] != params['type']:
+            state.critical('Type mismatch %s!=%s' % (info[item]['type'], params['type']) )
+        if info[item]['setup'] != params['setup']:
+            state.critical('Setup mismatch %s!=%s' % (info[item]['setup'], params['setup']) )
         if state.is_ok:
-            state.ok('Type %s' % data[item]['type'])
-            state.ok('Operational %s' % data[item]['op'])
-            state.ok('Setup %s' % data[item]['setup'])
+            state.ok('Type %s' % info[item]['type'])
+            state.ok('Operational %s' % info[item]['op'])
+            state.ok('Setup %s' % info[item]['setup'])
     else:
         state.critical('Network link %s missing' % item)
 
@@ -44,6 +42,7 @@ def check_networkd(item, params, info):
 
 # declare the check to Check_MK.
 check_info['networkd'] = {
+    'parse_function':            parse_networkd,
     'check_function':            check_networkd,
     'inventory_function':        inventory_networkd,
     'service_description':       'networkd',
