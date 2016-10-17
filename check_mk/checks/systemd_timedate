@@ -100,29 +100,38 @@ def extract_time_server_from_status(status_line):
             name = server_info
     return (addr, name)
 
+def parse_systemd_timedate(info):
+
+    timedatectl_lines = []
+    timesync_lines = []
+    got_separator = False
+    for i in info:
+        if i[0] == '--------':
+            got_separator = True
+            continue
+        if got_separator:
+            timesync_lines.append(i[0])
+        else:
+            timedatectl_lines.append(i[0])
+
+    timedatectl_data = timedatectl_parse_status(timedatectl_lines)
+    timesync_data = systemd_parse_status(timesync_lines)
+
+    if not 'time_server' in timesync_data:
+        timesync_data['time_server'] = extract_time_server_from_status(timesync_data.get('status'))
+
+    parsed = { 'timedate': timedatectl_data, 'timesync': timesync_data }
+    return parsed
+
+
 def inventory_systemd_timedate(checkname, info):
     return [('timedate', None), ('timesync', None) ]
 
 def check_systemd_timedate(item, params, info):
     state = check_state()
-    timedate_data = {}
-    timesync_data = {}
-
-    got_header = False
-    timedate_done = False
-    idx = -1
-    lines = []
-    for i_idx, i in enumerate(info):
-        lines.append(i[0])
-        if i[0] == '--------':
-            idx = i_idx
-    if idx < 0:
-        item = None
 
     if item == 'timedate':
-        #print(lines[0:idx])
-        data = timedatectl_parse_status(lines[0:idx])
-        #print(data)
+        data = info['timedate']
         timedatectl_ntp_synchronized = data.get('ntp_synchronized', 0)
         timedatectl_network_time_on = data.get('network_time_on', 0)
         timedatectl_time_zone = data.get('time_zone', 'unkown')
@@ -136,19 +145,13 @@ def check_systemd_timedate(item, params, info):
         if state.is_ok:
             state.ok('%s (%s)' % (timedatectl_universal_time, timedatectl_time_zone))
     elif item == 'timesync':
-        #print(lines[idx+1:])
-        timedatectl_data = timedatectl_parse_status(lines[0:idx])
-        data = systemd_parse_status(lines[idx+1:])
-        #print(data)
+        timedatectl_data = info['timedate']
+        data = info['timesync']
 
         ntp_enabled = data.get('enabled', False)
         ntp_synchronized = timedatectl_data.get('ntp_synchronized', 0)
         network_time_on = timedatectl_data.get('network_time_on', 0)
         time_server = None
-
-        addr, name = extract_time_server_from_status(data.get('status'))
-        if not 'time_server' in data:
-            data['time_server'] = [ addr, name ]
 
         if ntp_enabled != 0 or network_time_on != 0:
             if ntp_synchronized:
@@ -164,14 +167,13 @@ def check_systemd_timedate(item, params, info):
         if state.is_ok:
             state.ok('Synced on %s' % (time_server))
     else:
-        print('unknown item %s' % item)
-        #state.unknown('item %s' % item)
+        state.unknown('item %s' % item)
 
     return state.return_value
 
-
 # declare the check to Check_MK.
 check_info['systemd_timedate'] = {
+    'parse_function':            parse_systemd_timedate,
     'check_function':            check_systemd_timedate,
     'inventory_function':        inventory_systemd_timedate,
     'service_description':       'systemd timedate',
