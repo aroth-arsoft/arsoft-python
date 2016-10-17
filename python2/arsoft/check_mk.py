@@ -192,6 +192,11 @@ def saveint(v):
     except ValueError:
         return 0
 
+LEVEL_OK = 0
+LEVEL_WARN = 1
+LEVEL_CRIT = 2
+LEVEL_UNKNOWN = 3
+
 class check_state(object):
     def __init__(self):
         self._list = []

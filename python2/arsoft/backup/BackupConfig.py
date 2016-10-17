@@ -31,7 +31,7 @@ class BackupConfigDefaults(object):
     SSH_IDENTITY_FILE = None
     USE_TIMESTAMP_FOR_BACKUP_DIR = True
     TIMESTAMP_FORMAT_FOR_BACKUP_DIR = '%Y%m%d%H%M%S'
-    ACTIVE_PLUGINS = ['git', 'dir', 'mysql', 'trac']
+    ACTIVE_PLUGINS = ['git', 'dir', 'mysql', 'trac', 'imap', 'dovecot']
     DISK_TAG = None
     DISK_TIMEOUT = 60.0
 

@@ -14,6 +14,7 @@ from .state import *
 from .diskmgr import *
 import sys, stat
 import shlex
+import traceback
     
 class BackupList(object):
 
@@ -173,12 +174,16 @@ class BackupApp(object):
                 return None
 
     class PluginLoadException(Exception):
-        def __init__(self, plugin_name, original_exception):
+        def __init__(self, plugin_name, exc_info):
             self.name = plugin_name
-            self.original_exception = original_exception
+            self.exc_type, self.exc_value, self.exc_traceback = exc_info
+
+        @property
+        def exc_info(self):
+            return (self.exc_type, self.exc_value, self.exc_traceback)
 
         def __str__(self):
-            return 'PluginLoadException(%s, %s)' % (self.name, str(self.original_exception))
+            return 'PluginLoadException(%s, %s(%s) )' % (self.name, self.exc_type, self.exc_value)
 
     def __init__(self, name=None):
         self.name = name
@@ -212,7 +217,7 @@ class BackupApp(object):
         if self._diskmgr:
             self._diskmgr.cleanup()
 
-    def reinitialize(self, config_dir=None, state_dir=None, root_dir=None):
+    def reinitialize(self, config_dir=None, state_dir=None, root_dir=None, plugins=None):
         self.root_dir = root_dir
         self.config.open(config_dir, root_dir=root_dir)
         self.job_state.open(state_dir, root_dir=root_dir)
@@ -234,12 +239,21 @@ class BackupApp(object):
         # in any case continue with the config we got
         self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag, root_dir=root_dir)
 
-        plugins_to_load = self.config.active_plugins
+        if plugins is None:
+            plugins_to_load = self.config.active_plugins
+        else:
+            plugins_to_load = plugins
+
+        if self._verbose:
+            print('plugins to load: %s' % plugins_to_load)
+
         for plugin in plugins_to_load:
             try:
                 self._load_plugin(plugin)
             except BackupApp.PluginLoadException as e:
                 sys.stderr.write('Failed to load plugin %s: error %s\n' % (plugin, str(e)))
+                (ex_type, ex_value, ex_traceback) = e.exc_info
+                traceback.print_exception(ex_type, ex_value, ex_traceback)
         return True
 
     def _load_plugin(self, plugin_name):
@@ -247,7 +261,8 @@ class BackupApp(object):
         try:
             mod = __import__(plugin_module_name)
         except Exception as e:
-            raise BackupApp.PluginLoadException(plugin_module_name, e)
+            (ex_type, ex_value, ex_traceback) = sys.exc_info()
+            raise BackupApp.PluginLoadException(plugin_module_name, (ex_type, ex_value, ex_traceback) )
 
         subclasses=[]
         if mod:
@@ -539,7 +554,7 @@ class BackupApp(object):
             elif self.scheme == 'local':
                 self._cxn = LocalConnection(verbose=self._backup_app.verbose)
                 if self.sudo_password:
-                    self._sudo = LocalSudoSession(sudo_password=self.sudo_password)
+                    self._sudo = LocalSudoSession(self._cxn, sudo_password=self.sudo_password)
             return True if self._cxn else False
 
         def close(self):
