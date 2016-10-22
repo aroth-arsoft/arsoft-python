@@ -140,8 +140,7 @@ def systemd_status(service_name):
     pid = 0
     running = False
     data = systemd_status_raw(service_name)
-    running = data.get('active')
-    running = True if running is not None and running.startswith('active') else False
+    running = True if data.get('state') == 'running' else False
     pid = data.get('main_pid')
     return (pid, running)
 
