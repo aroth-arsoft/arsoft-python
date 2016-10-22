@@ -108,7 +108,7 @@ def check_puppet_agent(item, params, info):
             state.warning('%i resources failed' % data['num_failed'])
         if data['num_failed_to_restart'] != 0:
             state.warning('%i services failed to restart(!!)' % data['num_failed_to_restart'])
-        append.append('Config updated %s' % format_timedelta(time_last_run - now))
+        state.append('Config updated %s' % format_timedelta(time_last_run - now))
 
     return state.return_value
 

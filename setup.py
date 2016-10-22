@@ -161,6 +161,8 @@ setup(name='arsoft-python',
                 'check_mk/checks/samba_status',
                 'check_mk/checks/slapd_cert',
                 'check_mk/checks/systemd',
+                'check_mk/checks/systemd_failed'
+                'check_mk/checks/systemd_timedate',
                     ] ),
             ('/usr/lib/check_mk_agent',
                         ['check_mk/check_mk_agent_detect_plugins'] +
