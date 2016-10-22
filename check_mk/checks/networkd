@@ -4,39 +4,154 @@
 from arsoft.timestamp import format_timedelta, utc_timestamp_to_datetime
 from arsoft.check_mk import check_state
 
-def parse_networkd(info):
+
+def systemd_parse_status(lines, skip_header_line=True):
     ret = {}
-    for line in info:
-        #print(line)
-        fields = filter(bool, line[0].split(' '))
-        #print(fields)
-        (num, lnk_name, lnk_type, lnk_op, lnk_setup) = fields
-        if lnk_name != 'lo':
-            ret[str(lnk_name)] = {'num': saveint(num), 'type':str(lnk_type), 'op': str(lnk_op), 'setup':str(lnk_setup) }
+    got_header = False
+    for line in lines:
+        if not got_header:
+            got_header = True
+        elif ':' in line:
+
+            key, value = line.split(':', 1)
+            key = key.strip().replace(' ', '_').lower()
+            if key.startswith('next_') or key.startswith('last_'):
+                break
+            value = value.strip()
+            if value == 'yes':
+                value = 1
+            elif value == 'no':
+                value = 0
+            elif len(value) > 2 and value[0] == '"' and value[-1] == '"':
+                value = value[1:-1]
+            if key == 'main_pid':
+                (main_pid, procname) = value.split(' ', 1)
+                if ' ' in main_pid:
+                    pid, dummy = main_pid.split(' ', 1)
+                    value = saveint(pid)
+                else:
+                    value = saveint(main_pid)
+            elif key == 'active':
+                start = value.find('(')
+                if start >= 0:
+                    end = value.find(')', start+1)
+                    ret['state'] = value[start+1:end]
+                    active = True if value[0:start].strip() == 'active' else False
+                else:
+                    active = False
+
+                start = value.find('since ')
+                if start >= 0:
+                    end = value.find(';', start+6)
+                    if end >= 0:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                        ret['active_since'] = strptime_as_datetime(value[start+6:end], fmt)
+                value = active
+            elif key == 'condition':
+                start = value.find('at ')
+                if start >= 0:
+                    end = value.find(';', start+3)
+                    if end >= 0:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                        ret['condition_since'] = strptime_as_datetime(value[start+3:end], fmt)
+                    value = value[0:start].strip()
+            elif key == 'loaded':
+                start = value.find('(')
+                if start >= 0:
+                    end = value.find(')', start+1)
+                    unit_file, enable_state, vendor_preset = value[start+1:end-1].split(';', 2)
+                    ret['unit_file'] = unit_file
+                    ret['enabled'] = True if enable_state.strip() == 'enabled' else False
+                    if ':' in vendor_preset:
+                        txt, st = vendor_preset.split(':', 1)
+                        ret['vendor_preset_enabled'] = True if st.strip() == 'enable' else False
+                    else:
+                        ret['vendor_preset_enabled'] = None
+                    if value[0:start-1].strip() == 'loaded':
+                        value = True
+                    else:
+                        value = False
+            ret[key] = value
     return ret
 
-def inventory_networkd(checkname, info):
+def networkctl_parse_status(lines):
+    ret = {}
+    for line in lines:
+        fields = filter(bool, line.split(' '))
+        (num, lnk_name, lnk_type, lnk_op, lnk_setup) = fields
+        if lnk_name != 'lo':
+            iface = {'num': saveint(num), 'type':str(lnk_type), 'op': str(lnk_op), 'setup':str(lnk_setup) }
+            if iface['setup'] == 'unmanaged':
+                iface['managed'] = False
+            else:
+                iface['managed'] = True
+                iface['configured'] = True if iface['setup'] == 'configured' else False
+            ret[str(lnk_name)] = iface
+    return ret
 
+def parse_networkd(info):
+    networkd_lines = []
+    interfaces_lines = []
+    got_separator = False
+    for i in info:
+        if i[0] == '--------':
+            got_separator = True
+            continue
+        if got_separator:
+            interfaces_lines.append(i[0])
+        else:
+            networkd_lines.append(i[0])
+
+    networkctl_data = networkctl_parse_status(interfaces_lines)
+    networkd_data = systemd_parse_status(networkd_lines)
+    parsed = { 'networkctl': networkctl_data, 'networkd': networkd_data }
+    return parsed
+
+def inventory_networkd(checkname, info):
     ret = []
-    for lnk_name, lnk_data in info.items():
-        ret.append( (lnk_name, lnk_data ) )
+    networkd_data = info['networkd']
+    networkd_enabled = networkd_data.get('enabled',0)
+    ret.append( ('daemon', { 'enabled':networkd_enabled } ) )
+    if networkd_enabled:
+        networkctl_data = info['networkctl']
+        for lnk_name, lnk_data in networkctl_data.items():
+            ret.append( (lnk_name, lnk_data ) )
     return ret
 
 def check_networkd(item, params, info):
 
     state = check_state()
 
-    if item in info:
-        if info[item]['type'] != params['type']:
-            state.critical('Type mismatch %s!=%s' % (info[item]['type'], params['type']) )
-        if info[item]['setup'] != params['setup']:
-            state.critical('Setup mismatch %s!=%s' % (info[item]['setup'], params['setup']) )
+    if item == 'daemon':
+        networkd_data = info['networkd']
+        should_enabled = params.get('enabled', True)
+        actual_enabled = networkd_data.get('enabled', True)
+        #print(networkd_data)
+        #print(params)
+        if should_enabled != actual_enabled:
+            if should_enabled:
+                state.critical('daemon is disabled, should be enabled')
+            else:
+                state.critical('daemon is enabled, should be disabled')
+        if actual_enabled:
+            actual_state = networkd_data.get('state', 'unknown')
+            if actual_state != 'running':
+                state.critical('state %s!=running' % actual_state)
         if state.is_ok:
-            state.ok('Type %s' % info[item]['type'])
-            state.ok('Operational %s' % info[item]['op'])
-            state.ok('Setup %s' % info[item]['setup'])
+            state.ok('daemon is %s' % ('running' if actual_enabled else 'stopped'))
     else:
-        state.critical('Network link %s missing' % item)
+        networkctl_data = info['networkctl']
+        if item in networkctl_data:
+            if networkctl_data[item]['type'] != params['type']:
+                state.critical('Type mismatch %s!=%s' % (networkctl_data[item]['type'], params['type']) )
+            if networkctl_data[item]['setup'] != params['setup']:
+                state.critical('Setup mismatch %s!=%s' % (networkctl_data[item]['setup'], params['setup']) )
+            if state.is_ok:
+                state.ok('Type %s' % networkctl_data[item]['type'])
+                state.ok('Operational %s' % networkctl_data[item]['op'])
+                state.ok('Setup %s' % networkctl_data[item]['setup'])
+        else:
+            state.critical('Network link %s missing' % item)
 
     return state.return_value
 

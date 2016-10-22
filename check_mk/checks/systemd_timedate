@@ -32,12 +32,28 @@ def systemd_parse_status(lines, skip_header_line=True):
                 else:
                     value = saveint(main_pid)
             elif key == 'active':
+                start = value.find('(')
+                if start >= 0:
+                    end = value.find(')', start+1)
+                    ret['state'] = value[start+1:end]
+                    active = True if value[0:start].strip() == 'active' else False
+                else:
+                    active = False
+
                 start = value.find('since ')
                 if start >= 0:
                     end = value.find(';', start+6)
                     if end >= 0:
                         fmt = '%a %Y-%m-%d %H:%M:%S %Z'
                         ret['active_since'] = strptime_as_datetime(value[start+6:end], fmt)
+                value = active
+            elif key == 'condition':
+                start = value.find('at ')
+                if start >= 0:
+                    end = value.find(';', start+3)
+                    if end >= 0:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                        ret['condition_since'] = strptime_as_datetime(value[start+3:end], fmt)
                     value = value[0:start].strip()
             elif key == 'loaded':
                 start = value.find('(')
@@ -85,7 +101,7 @@ def timedatectl_parse_status(lines):
 def extract_time_server_from_status(status_line):
     addr = None
     name = None
-    idx = status_line.find('time server')
+    idx = status_line.find('time server') if status_line else -1
     if idx >= 0:
         server_info = status_line[idx + 12:]
         if ' ' in server_info:
@@ -101,7 +117,6 @@ def extract_time_server_from_status(status_line):
     return (addr, name)
 
 def parse_systemd_timedate(info):
-
     timedatectl_lines = []
     timesync_lines = []
     got_separator = False
@@ -155,10 +170,11 @@ def check_systemd_timedate(item, params, info):
 
         if ntp_enabled != 0 or network_time_on != 0:
             if ntp_synchronized:
-                time_server = data.get('time_server')
-                if time_server is not None and len(time_server) > 1:
-                    addr, name = time_server
-                    time_server = '%s (%s)' % (name, addr)
+                time_server_addr, time_server_name = data.get('time_server')
+                if time_server_addr is not None and time_server_name is not None:
+                    time_server = '%s (%s)' % (time_server_addr, time_server_name)
+                else:
+                    time_server = 'Unknown'
             else:
                 state.critical('Time not synchronized with NTP server')
         else:
@@ -176,6 +192,6 @@ check_info['systemd_timedate'] = {
     'parse_function':            parse_systemd_timedate,
     'check_function':            check_systemd_timedate,
     'inventory_function':        inventory_systemd_timedate,
-    'service_description':       'systemd timedate',
+    'service_description':       'systemd',
     'has_perfdata':              False,
 }

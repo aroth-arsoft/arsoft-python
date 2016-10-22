@@ -90,12 +90,28 @@ def systemd_parse_status(lines, skip_header_line=True):
                 else:
                     value = saveint(main_pid)
             elif key == 'active':
+                start = value.find('(')
+                if start >= 0:
+                    end = value.find(')', start+1)
+                    ret['state'] = value[start+1:end]
+                    active = True if value[0:start].strip() == 'active' else False
+                else:
+                    active = False
+
                 start = value.find('since ')
                 if start >= 0:
                     end = value.find(';', start+6)
                     if end >= 0:
                         fmt = '%a %Y-%m-%d %H:%M:%S %Z'
                         ret['active_since'] = strptime_as_datetime(value[start+6:end], fmt)
+                value = active
+            elif key == 'condition':
+                start = value.find('at ')
+                if start >= 0:
+                    end = value.find(';', start+3)
+                    if end >= 0:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                        ret['condition_since'] = strptime_as_datetime(value[start+3:end], fmt)
                     value = value[0:start].strip()
             elif key == 'loaded':
                 start = value.find('(')
@@ -160,6 +176,21 @@ def timedatectl_status():
     (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/usr/bin/timedatectl', '--no-pager', 'status'], env={'LANG':'C'})
     data = systemd_parse_status(lines=stdoutdata.splitlines())
     return data
+
+def networkctl_parse_status(lines):
+    ret = {}
+    for line in lines:
+        fields = filter(bool, line.split(' '))
+        (num, lnk_name, lnk_type, lnk_op, lnk_setup) = fields
+        if lnk_name != 'lo':
+            iface = {'num': saveint(num), 'type':str(lnk_type), 'op': str(lnk_op), 'setup':str(lnk_setup) }
+            if iface['setup'] == 'unmanaged':
+                iface['managed'] = False
+            else:
+                iface['managed'] = True
+                iface['configured'] = True if iface['setup'] == 'configured' else False
+            ret[str(lnk_name)] = iface
+    return ret
 
 # taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
 def _debian_start_link_count(service_name):

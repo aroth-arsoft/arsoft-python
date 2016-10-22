@@ -7,4 +7,4 @@ echo "<<<systemd_failed>>>"
 echo "<<<systemd_timedate:sep(0)>>>"
 /usr/bin/timedatectl --no-pager status
 echo "--------"
-/bin/systemctl --no-pager status systemd-timesyncd
+/bin/systemctl --no-pager --lines=0 status systemd-timesyncd
