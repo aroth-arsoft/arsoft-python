@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+from arsoft.check_mk import check_state
 
 def inventory_jenkins(checkname, info):
 
@@ -29,10 +31,7 @@ def inventory_jenkins(checkname, info):
 
 def check_jenkins(item, params, info):
 
-    level   = 0 # 0:OK, 1:WARNING 2:CRITICAL, 3: UNKNOWN
-    msg = None
-    perfdata = []
-    details = []
+    state = check_state()
     data = { 'slaves': {}, 'jobs': {} }
 
     if '.' in item:
@@ -71,38 +70,26 @@ def check_jenkins(item, params, info):
             data[key] = value
 
     if item_class == 'daemon':
-        details = []
         if data['pid'] == 0:
-            if level < 2:
-                level = 2
-            details.append('Jenkins process not running')
-        if len(details) == 0:
-            details.append('Version %s' % (data['version']))
+            state.critical('Jenkins process not running')
+        if state.is_ok:
+            state.ok('Version %s' % (data['version']))
     elif item_class == 'slave':
         if item_name in data['slaves']:
-            slave_data = data['slaves'][item_name]
-            details.append('%s ok' % (item_name))
+            #slave_data = data['slaves'][item_name]
+            state.ok('%s ok' % (item_name))
         else:
-            details.append('%s not available' % (item_name))
-            level = 2
+            state.critical('%s not available' % (item_name))
     elif item_class == 'job':
         if item_name in data['jobs']:
+            state.ok('%s ok' % (item_name))
             job_data = data['jobs'][item_name]
-            details.append('%s ok' % (item_name))
-            perfdata.append( ('buildnumber', job_data['last_build_number']) )
-            perfdata.append( ('duration', job_data['last_build_duration']) )
+            state.perfdata.append( ('buildnumber', job_data['last_build_number']) )
+            state.perfdata.append( ('duration', job_data['last_build_duration']) )
         else:
-            details.append('%s not available' % (item_name))
-            level = 2
+            state.critical('%s not available' % (item_name))
 
-    # Construct a the status message.
-    if level == 0:
-        msg = "OK - %s" % (','.join(details))
-    elif level == 1:
-        msg = "WARN - %s" % (','.join(details))
-    elif level == 2:
-        msg = "CRIT - %s" % (','.join(details))
-    return (level, msg, perfdata)
+    return state.return_value
 
 # declare the check to Check_MK.
 check_info['jenkins'] = {

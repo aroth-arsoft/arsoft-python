@@ -2,77 +2,7 @@
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 #
 from arsoft.timestamp import format_timedelta, utc_timestamp_to_datetime
-from arsoft.check_mk import check_state
-
-
-def systemd_parse_status(lines, skip_header_line=True):
-    ret = {}
-    got_header = False
-    for line in lines:
-        if not got_header:
-            got_header = True
-        elif ':' in line:
-
-            key, value = line.split(':', 1)
-            key = key.strip().replace(' ', '_').lower()
-            if key.startswith('next_') or key.startswith('last_'):
-                break
-            value = value.strip()
-            if value == 'yes':
-                value = 1
-            elif value == 'no':
-                value = 0
-            elif len(value) > 2 and value[0] == '"' and value[-1] == '"':
-                value = value[1:-1]
-            if key == 'main_pid':
-                (main_pid, procname) = value.split(' ', 1)
-                if ' ' in main_pid:
-                    pid, dummy = main_pid.split(' ', 1)
-                    value = saveint(pid)
-                else:
-                    value = saveint(main_pid)
-            elif key == 'active':
-                start = value.find('(')
-                if start >= 0:
-                    end = value.find(')', start+1)
-                    ret['state'] = value[start+1:end]
-                    active = True if value[0:start].strip() == 'active' else False
-                else:
-                    active = False
-
-                start = value.find('since ')
-                if start >= 0:
-                    end = value.find(';', start+6)
-                    if end >= 0:
-                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
-                        ret['active_since'] = strptime_as_datetime(value[start+6:end], fmt)
-                value = active
-            elif key == 'condition':
-                start = value.find('at ')
-                if start >= 0:
-                    end = value.find(';', start+3)
-                    if end >= 0:
-                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
-                        ret['condition_since'] = strptime_as_datetime(value[start+3:end], fmt)
-                    value = value[0:start].strip()
-            elif key == 'loaded':
-                start = value.find('(')
-                if start >= 0:
-                    end = value.find(')', start+1)
-                    unit_file, enable_state, vendor_preset = value[start+1:end-1].split(';', 2)
-                    ret['unit_file'] = unit_file
-                    ret['enabled'] = True if enable_state.strip() == 'enabled' else False
-                    if ':' in vendor_preset:
-                        txt, st = vendor_preset.split(':', 1)
-                        ret['vendor_preset_enabled'] = True if st.strip() == 'enable' else False
-                    else:
-                        ret['vendor_preset_enabled'] = None
-                    if value[0:start-1].strip() == 'loaded':
-                        value = True
-                    else:
-                        value = False
-            ret[key] = value
-    return ret
+from arsoft.check_mk import check_state, systemd_parse_status
 
 def networkctl_parse_status(lines):
     ret = {}
