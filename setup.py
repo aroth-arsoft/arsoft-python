@@ -34,7 +34,7 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.286',
+		version='1.287',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -161,7 +161,7 @@ setup(name='arsoft-python',
                 'check_mk/checks/samba_status',
                 'check_mk/checks/slapd_cert',
                 'check_mk/checks/systemd',
-                'check_mk/checks/systemd_failed'
+                'check_mk/checks/systemd_failed',
                 'check_mk/checks/systemd_timedate',
                     ] ),
             ('/usr/lib/check_mk_agent',
