@@ -1,3 +1,9 @@
+arsoft-python (1.285) yakkety; urgency=medium
+
+  * check_mk: simplify networkd and systemd checks
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 22 Oct 2016 16:17:21 +0200
+
 arsoft-python (1.284) yakkety; urgency=medium
 
   * fixed syntax errors
