@@ -46,7 +46,8 @@ def parse_systemd_timedate(info):
 
 
 def inventory_systemd_timedate(checkname, info):
-    return [('timedate', None), ('timesync', None) ]
+    timesync_enabled = info['timesync'].get('enabled',0)
+    return [('timedate', None), ('timesync', { 'enabled':timesync_enabled }) ]
 
 def check_systemd_timedate(item, params, info):
     state = check_state()
@@ -69,12 +70,28 @@ def check_systemd_timedate(item, params, info):
         timedatectl_data = info['timedate']
         data = info['timesync']
 
-        ntp_enabled = data.get('enabled', False)
+        should_enabled = params.get('enabled', True) if params else True
+        actual_enabled = data.get('enabled', True)
+
+        if should_enabled != actual_enabled:
+            if should_enabled:
+                state.critical('daemon is disabled, should be enabled')
+            else:
+                state.critical('daemon is enabled, should be disabled')
+
         ntp_synchronized = timedatectl_data.get('ntp_synchronized', 0)
         network_time_on = timedatectl_data.get('network_time_on', 0)
         time_server = None
 
-        if ntp_enabled != 0 or network_time_on != 0:
+        if actual_enabled:
+            actual_state = data.get('state', 'unknown')
+            if actual_state != 'running':
+                state.critical('state %s!=running' % actual_state)
+                if data.get('condition'):
+                    if 'condition_desc' in data:
+                        state.critical('%s: %s' % (data.get('condition'), data.get('condition_desc')))
+                    else:
+                        state.critical(data.get('condition'))
             if ntp_synchronized:
                 time_server_addr, time_server_name = data.get('time_server')
                 if time_server_addr is not None and time_server_name is not None:
@@ -83,8 +100,6 @@ def check_systemd_timedate(item, params, info):
                     time_server = 'Unknown'
             else:
                 state.critical('Time not synchronized with NTP server')
-        else:
-            state.warning('NTP synchronization disabled.')
 
         if state.is_ok:
             state.ok('Synced on %s' % (time_server))

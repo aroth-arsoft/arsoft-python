@@ -66,6 +66,7 @@ def systemd_is_active(service_name):
 def systemd_parse_status(lines, skip_header_line=True):
     ret = {}
     got_header = False
+    last_key = None
     for line in lines:
         if not got_header:
             got_header = True
@@ -130,6 +131,14 @@ def systemd_parse_status(lines, skip_header_line=True):
                     else:
                         value = False
             ret[key] = value
+            last_key = key
+        elif last_key is not None:
+            if last_key == 'condition':
+                ret['condition_desc'] = line.strip()
+            elif last_key == 'drop-in':
+                if 'drop_in_depends' not in ret:
+                    ret['drop_in_depends'] = []
+                ret['drop_in_depends'].append(line.strip())
     return ret
 
 def systemd_status_raw(service_name):
