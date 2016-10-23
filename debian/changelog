@@ -1,3 +1,9 @@
+arsoft-python (1.288) yakkety; urgency=medium
+
+  * check_mk: handle timesyncd disable
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 23 Oct 2016 14:07:28 +0200
+
 arsoft-python (1.287) yakkety; urgency=medium
 
   * fixed typo
