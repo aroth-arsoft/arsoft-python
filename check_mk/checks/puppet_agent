@@ -6,6 +6,20 @@ from arsoft.check_mk import check_state
 default_warn_time = 24
 default_crit_time = 48
 
+def parse_puppet_agent(info):
+    data = {}
+    for line in info:
+        # if we don't have any upgrades listed, the line list
+        # will only contain one element, eg. "upgrades\n"
+        if len(line) < 2:
+            continue
+
+        key = line[0]
+        value = line[1]
+        if key != 'version' and key != 'disabled_message':
+            value = saveint(value)
+        data[key] = value
+    return data
 
 def inventory_puppet_agent(checkname, info):
 
@@ -19,43 +33,16 @@ def inventory_puppet_agent(checkname, info):
 def check_puppet_agent(item, params, info):
 
     state = check_state()
-    data = {
-        'running':0,
-        'enabled':1,
-        'start':1,
-        'pid':0,
-        'disabled_message':'',
-        'time_last_run':0,
-        'num_failed':0,
-        'num_failed_to_restart':0,
-        'num_changed':0,
-        'num_skipped':0,
-        'num_restarted':0,
-        'num_out_of_sync':0,
-        'num_total':0,
-        }
-
-    for line in info:
-        # if we don't have any upgrades listed, the line list
-        # will only contain one element, eg. "upgrades\n"
-        if len(line) < 2:
-            continue
-
-        key = line[0]
-        value = line[1]
-        if key != 'version' and key != 'disabled_message':
-            value = saveint(value)
-        data[key] = value
 
     if item == 'daemon':
         if params:
             (must_be_running, enabled) = params
         else:
             (must_be_running, enabled) = (True, True)
-            
-        actually_running = False if data['running'] == 0 or data['pid'] == 0 else True
-        actually_enabled = True if data['enabled'] else False
-            
+
+        actually_running = False if info.get('running', False) == 0 or info.get('pid',0) == 0 else True
+        actually_enabled = True if info.get('enabled', True) else False
+
         if must_be_running:
             if not actually_running:
                 state.critical('Agent not running')
@@ -65,7 +52,7 @@ def check_puppet_agent(item, params, info):
 
         if enabled:
             if not actually_enabled:
-                state.critical('Agent is disabled (%s)' % data['disabled_message'])
+                state.critical('Agent is disabled (%s)' % info.get('disabled_message', ''))
         else:
             if actually_enabled:
                 state.critical('Agent is enabled, but it should be disabled')
@@ -73,7 +60,7 @@ def check_puppet_agent(item, params, info):
         if state.is_ok:
             state.ok('Running' if actually_running else 'Stopped')
             state.ok('Enabled' if actually_enabled else 'Disabled')
-            state.ok('Version %s' % (data.get('version','unknown')))
+            state.ok('Version %s' % (info.get('version','unknown')))
     elif item == 'config':
         if params:
             (warn_time_hours, crit_time_hours) = params
@@ -83,37 +70,38 @@ def check_puppet_agent(item, params, info):
         now = saveint(time.time())
         warn_time = now - (warn_time_hours * 3600)
         crit_time = now - (crit_time_hours * 3600)
-        time_last_run = saveint(data['time_last_run'])
+        time_last_run = saveint(info.get('time_last_run',0))
 
-        actually_running = False if data['running'] == 0 or data['pid'] == 0 else True
-        actually_enabled = True if data['enabled'] else False
+        actually_running = False if info.get('running', False) == 0 or info.get('pid',0) == 0 else True
+        actually_enabled = True if info.get('enabled', True) else False
 
         state.perfdata.append( ('config_age', (time_last_run - now)/3600 if time_last_run else 0, warn_time_hours, crit_time_hours) )
-        state.perfdata.append( ('num_failed', data['num_failed']) )
-        state.perfdata.append( ('num_failed_to_restart', data['num_failed_to_restart']) )
-        state.perfdata.append( ('num_changed', data['num_changed']) )
-        state.perfdata.append( ('num_skipped', data['num_skipped']) )
-        state.perfdata.append( ('num_restarted', data['num_restarted']) )
-        state.perfdata.append( ('num_out_of_sync', data['num_out_of_sync']) )
-        state.perfdata.append( ('num_total', data['num_total']) )
+        state.perfdata.append( ('num_failed', info.get('num_failed',0)) )
+        state.perfdata.append( ('num_failed_to_restart', info.get('num_failed_to_restart',0)) )
+        state.perfdata.append( ('num_changed', info.get('num_changed',0)) )
+        state.perfdata.append( ('num_skipped', info.get('num_skipped',0)) )
+        state.perfdata.append( ('num_restarted', info.get('num_restarted',0)) )
+        state.perfdata.append( ('num_out_of_sync', info.get('num_out_of_sync',0)) )
+        state.perfdata.append( ('num_total', info.get('num_total',0)) )
 
         if actually_running and actually_enabled:
-            if level == 0 and time_last_run != 0 and data['start']:
+            if time_last_run != 0 and info.get('start', True):
                 if time_last_run < crit_time:
-                    state.critical('Config has not been updated for %s' % format_timedelta(time_last_run - now))
+                    state.critical('No update for %s' % format_timedelta(time_last_run - now))
                 elif time_last_run < warn_time:
-                    state.waring('Config has not been updated for %s' % format_timedelta(time_last_run - now))
+                    state.waring('No update for %s' % format_timedelta(time_last_run - now))
 
-        if data['num_failed'] != 0:
-            state.warning('%i resources failed' % data['num_failed'])
-        if data['num_failed_to_restart'] != 0:
-            state.warning('%i services failed to restart(!!)' % data['num_failed_to_restart'])
-        state.append('Config updated %s' % format_timedelta(time_last_run - now))
+        if info.get('num_failed',0) != 0:
+            state.warning('%i resources failed' % info.get('num_failed',0))
+        if info.get('num_failed_to_restart',0) != 0:
+            state.warning('%i services failed to restart' % info.get('num_failed_to_restart',0))
+        state.append('Last update %s' % format_timedelta(time_last_run - now))
 
     return state.return_value
 
 # declare the check to Check_MK.
 check_info['puppet_agent'] = {
+    'parse_function':            parse_puppet_agent,
     'check_function':            check_puppet_agent,
     'inventory_function':        inventory_puppet_agent,
     'service_description':       'Puppet agent',
