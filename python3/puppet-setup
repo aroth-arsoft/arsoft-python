@@ -366,7 +366,11 @@ echo "Use puppet executable: $puppet_bin" | tee --append "$logfile"
 
         if is_valid_ipv4(self.target_hostname) or is_valid_ipv6(self.target_hostname):
             self.target_hostname_full = self.target_hostname
-            target_ptr_record = get_dns_ptr_record(self.target_hostname)
+            target_ptr_record = None
+            try:
+                target_ptr_record = get_dns_ptr_record(self.target_hostname)
+            except dns.exception.DNSException:
+                pass
             if target_ptr_record:
                 target_ptr_record_str = str(target_ptr_record[0])
                 if '.' in target_ptr_record_str:
