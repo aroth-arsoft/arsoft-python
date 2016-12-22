@@ -265,7 +265,7 @@ def initialize_settings(settings_module, setttings_file, options={}):
             'handlers': {
                 'null': {
                     'level': 'DEBUG',
-                    'class': 'django.utils.log.NullHandler',
+                    'class': 'logging.NullHandler',
                 },
                 'console':{
                     'level': 'DEBUG',

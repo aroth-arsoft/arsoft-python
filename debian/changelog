@@ -1,3 +1,10 @@
+arsoft-python (1.289) yakkety; urgency=medium
+
+  * web: use logging.NullHandler for django to avoid errors with version 
+    1.9 or later
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 22 Dec 2016 07:49:58 +0100
+
 arsoft-python (1.288) yakkety; urgency=medium
 
   * check_mk: handle timesyncd disable
