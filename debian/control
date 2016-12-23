@@ -31,7 +31,7 @@ Description: common files for the AR Soft python scripts
 Package: python3-arsoft-web
 Section: python
 Architecture: all
-Depends: ${python3:Depends}, ${misc:Depends}, python3-arsoft, python3-django (>= 1.8), python3-webob
+Depends: ${python3:Depends}, ${misc:Depends}, python3-arsoft, python3-django (>= 1.10), python3-webob
 Description: module for django web applications
  This package includes all common files for the django web applications.
 
@@ -60,7 +60,7 @@ Description: python module to access and control a Kerberos environment
 
 Package: arsoft-python-web
 Architecture: all
-Depends: python-arsoft, python-django (>= 1.8), python-webob, python-flup, ${python:Depends}, ${misc:Depends}
+Depends: python-arsoft, python-django (>= 1.10), python-webob, python-flup, ${python:Depends}, ${misc:Depends}
 Description: base package for Django based web applications
  This package installs all required packages for Django based web applications.
 

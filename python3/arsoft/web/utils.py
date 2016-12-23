@@ -118,7 +118,6 @@ def initialize_settings(settings_module, setttings_file, options={}):
         settings_obj.DEBUG = options['debug']
     else:
         settings_obj.DEBUG = in_devserver
-    settings_obj.TEMPLATE_DEBUG = settings_obj.DEBUG
 
     # If DISABLE_DEBUG_INFO_PAGE is set the 
     settings_obj.DISABLE_DEBUG_INFO_PAGE = False
@@ -199,17 +198,36 @@ def initialize_settings(settings_module, setttings_file, options={}):
     settings_obj.STATICFILES_FINDERS = [ 'django.contrib.staticfiles.finders.FileSystemFinder', 'django.contrib.staticfiles.finders.AppDirectoriesFinder' ]
 
     # set up the template directories and loaders
+    template_dirs = []
     if in_devserver:
         app_template_dir = os.path.join(appdir, 'templates')
         if os.path.exists(app_template_dir):
-            settings_obj.TEMPLATE_DIRS = [ app_template_dir ]
+            template_dirs = [ app_template_dir ]
         else:
-            settings_obj.TEMPLATE_DIRS = []
+            template_dirs = []
     else:
-        settings_obj.TEMPLATE_DIRS = [ os.path.join(app_etc_dir, 'templates') ]
-    # always include the app_directories loader to get templates from various applications
-    # working (e.g. admin)
-    settings_obj.TEMPLATE_LOADERS = [ 'django.template.loaders.filesystem.Loader', 'django.template.loaders.app_directories.Loader' ]
+        template_dirs = [ os.path.join(app_etc_dir, 'templates') ]
+
+    settings_obj.TEMPLATES = [
+        {
+            'BACKEND': 'django.template.backends.django.DjangoTemplates',
+            'DIRS': template_dirs,
+            'APP_DIRS': True,
+            'OPTIONS': {
+                'context_processors': [
+                    # Insert your TEMPLATE_CONTEXT_PROCESSORS here or use this
+                    # list if you haven't customized them:
+                    'django.contrib.auth.context_processors.auth',
+                    'django.template.context_processors.debug',
+                    'django.template.context_processors.i18n',
+                    'django.template.context_processors.media',
+                    'django.template.context_processors.static',
+                    'django.template.context_processors.tz',
+                    'django.contrib.messages.context_processors.messages',
+                ],
+            },
+        },
+    ]
 
     # set config directory
     if in_devserver:
@@ -484,16 +502,16 @@ def django_debug_info(request):
     return HttpResponse(t.render(c), content_type='text/html')
 
 def django_debug_urls(options={}):
-    from django.conf.urls import patterns, url
+    from django.conf.urls import url
 
     # add debug handler here
-    urlpatterns = patterns('',
-        url(r'^$', 'arsoft.web.utils.django_debug_info', name='debug_django_info'),
-        url(r'^request$', 'arsoft.web.utils.django_request_info_view', name='debug_django_request'),
-        url(r'^env$', 'arsoft.web.utils.django_env_info_view', name='debug_django_env'),
-        url(r'^settings$', 'arsoft.web.utils.django_settings_view', name='debug_django_settings'),
-        url(r'^urls$', 'arsoft.web.utils.django_urls_view', name='debug_django_urls'),
-        )
+    urlpatterns = [
+        url(r'^$', django_debug_info, name='debug_django_info'),
+        url(r'^request$', django_request_info_view, name='debug_django_request'),
+        url(r'^env$', django_env_info_view, name='debug_django_env'),
+        url(r'^settings$', django_settings_view, name='debug_django_settings'),
+        url(r'^urls$', django_urls_view, name='debug_django_urls'),
+        ]
     return urlpatterns
 
 DEBUG_INFO_VIEW_TEMPLATE = """

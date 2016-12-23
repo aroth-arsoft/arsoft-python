@@ -1,3 +1,9 @@
+arsoft-python (1.290) yakkety; urgency=medium
+
+  * web: more upgrade stuff for django 1.10
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 23 Dec 2016 07:19:18 +0100
+
 arsoft-python (1.289) yakkety; urgency=medium
 
   * web: use logging.NullHandler for django to avoid errors with version 
