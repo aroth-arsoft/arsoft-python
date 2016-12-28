@@ -86,7 +86,6 @@ class eurosport_stream_app(object):
             #print('save config')
             self._config.save(filename=args.config_file)
 
-
         options = {}
         options['debug'] = self._debug
         if self._config.geo is not None:
@@ -109,11 +108,17 @@ class eurosport_stream_app(object):
         except Login.IsNotConfigured:
             sys.stderr.write('Missing login credentials.\n')
             ret = 1
+        except Login.InvalidLoginData as e:
+            sys.stderr.write('Invalid login credentials: %s.\n' % e)
+            ret = 1
         except Login.NetworkError:
             sys.stderr.write('Network error. Unable to login to Eurosport.\n')
             ret = 2
+        except Login.InvalidContext:
+            sys.stderr.write('Invalid context.\n')
+            ret = 4
         except Login.LoginIncorrect:
-            sys.stderr.write('Invalid login credentials.\n')
+            sys.stderr.write('Incorrect login credentials.\n')
             ret = 5
 
         if channels:
@@ -153,7 +158,8 @@ class eurosport_stream_app(object):
                 except ValueError:
                     channel_no = -1
                 try:
-                    quality = int(quality)
+                    if quality is not None:
+                        quality = int(quality)
                 except ValueError:
                     pass
 

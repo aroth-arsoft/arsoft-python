@@ -52,7 +52,9 @@ class Constants(object):
         if language_code is None:
             return 'GB'
         code = language_code.lower()
-        if code in Constants.l2g:
+        if len(code) == 0:
+            return 'GB'
+        elif code in Constants.l2g:
             return Constants.l2g[code]
         else:
             return language_code.upper()

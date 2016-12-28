@@ -57,10 +57,14 @@ class Login:
 
 
     def _get_all_query_parameters(self):
-        return urllib.parse.urlencode({
+        url = {
             "data": self._prepare_login_data(),
             "context": self.prepare_application_context()
-        })
+        }
+        if self.__options.get('debug', False):
+            print('Login data: %s' % url['data']) 
+            print('Login context: %s' % url['context'])
+        return urllib.parse.urlencode(url)
 
     def do_login(self):
         login_url = BASE_LOGIN_PATH
@@ -89,6 +93,18 @@ class Login:
     class LoginIncorrect(Exception):
         pass
 
+    class NotYetProcessed(Exception):
+        pass
+
+    class InvalidLoginData(Exception):
+        pass
+
+    class IncorrectJson(Exception):
+        pass
+
+    class InvalidContext(Exception):
+        pass
+
 
 class LoginResponse:
 
@@ -100,13 +116,17 @@ class LoginResponse:
 
     def process_response(self):
         if not self.__response_body:
-            raise LoginResponse.IncorrectJson
+            raise Login.IncorrectJson
         if self.__response_body["Response"]["Success"] != 1:
-            raise LoginResponse.InvalidLoginData(self.__response_body["Response"]["Message"])
+            if self.__response_body["Response"]["Message"] == 'Invalid Context':
+                raise Login.InvalidContext
+            else:
+                print(json.dumps(self.__response_body, indent='  '))
+                raise Login.InvalidLoginData(self.__response_body["Response"]["Message"])
 
     def get_confirmation(self):
         if not self.__response_body:
-            raise LoginResponse.NotYetProcessed
+            raise Login.NotYetProcessed
         return {
             "userid": self.__response_body["Id"],
             "hkey": self.__response_body["Hkey"],
@@ -115,13 +135,4 @@ class LoginResponse:
             "isbroadcasted": 0,
             "epglight": False
         }
-
-    class NotYetProcessed(Exception):
-        pass
-
-    class InvalidLoginData(Exception):
-        pass
-
-    class IncorrectJson(Exception):
-        pass
 
