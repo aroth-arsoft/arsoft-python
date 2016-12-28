@@ -179,6 +179,8 @@ def initialize_settings(settings_module, setttings_file, options={}):
 
     settings_obj.AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
 
+    settings_obj.LOGIN_URL = settings_obj.BASE_PATH + '/accounts/login/'
+
     # use sendmail as email backend by default
     settings_obj.EMAIL_BACKEND = 'arsoft.web.backends.SendmailBackend'
 
@@ -427,6 +429,130 @@ def django_settings_view(request):
     })
     return HttpResponse(t.render(c), content_type='text/html')
 
+class _url_pattern_wrapper(object):
+    def __init__(self, url, parent, level):
+        self.url = url
+        self.parent = parent
+        self.level = level
+
+    def __getattr__(self, attr, default_value=None):
+        if attr not in ['full_url', 'full_name', 'url', 'level', 'parent', 'typename', 'full_qualified_name']:
+            return getattr(self.url, attr, default_value)
+        else:
+            return object.__getattribute__(self, attr)
+
+    @property
+    def typename(self):
+        return str(type(self.url))
+
+    @property
+    def full_qualified_name(self):
+        namespace = getattr(self.url, 'namespace', None)
+        if namespace is None and self.parent is not None:
+            namespace = getattr(self.parent, 'namespace', None)
+        if namespace is not None:
+            ret = namespace + ':' + self.url.name
+        else:
+            ret = self.url.name
+        return ret
+
+    @property
+    def reverse_url(self):
+        from django.core.urlresolvers import reverse, NoReverseMatch
+        url = None
+        try:
+            url = reverse(self.full_qualified_name)
+        except NoReverseMatch:
+            pass
+        return url
+
+    @property
+    def full_url(self):
+        from django.core.urlresolvers import LocaleRegexProvider
+        if isinstance(self.url, LocaleRegexProvider):
+            ret = [ self.url.regex.pattern ]
+        else:
+            ret = [ self.url.name ]
+        if self.parent is not None:
+            ret.insert(0, self.parent.full_url)
+        return ','.join(ret)
+
+    @property
+    def full_name(self):
+        from django.core.urlresolvers import RegexURLResolver, RegexURLPattern
+        if isinstance(self.url, RegexURLResolver):
+            if isinstance(self.url.urlconf_name, list) and len(self.url.urlconf_name):
+                # Don't bother to output the whole list, it can be huge
+                urlconf_repr = '<%s list>' % self.url.urlconf_name[0].__class__.__name__
+            else:
+                urlconf_repr = repr(self.url.urlconf_name)
+            ret = [ urlconf_repr ]
+        elif isinstance(self.url, RegexURLPattern):
+            ret = [ self.url.name ]
+        else:
+            ret = [ str(self.url) ]
+        if self.parent is not None:
+            ret.insert(0, self.parent.full_name)
+        return '/'.join(ret)
+
+
+def _flatten_url_list(obj, parent_obj=None, level=0):
+    from django.core.urlresolvers import RegexURLResolver, RegexURLPattern
+    ret = []
+    wrapped_obj = _url_pattern_wrapper(obj, parent_obj, level)
+    if isinstance(obj, RegexURLResolver):
+        for p in obj.url_patterns:
+            if hasattr(p, 'url_patterns'):
+                r = _flatten_url_list(p, wrapped_obj, level=level+1)
+                ret.extend(r)
+            else:
+                ret.append(_url_pattern_wrapper(p, wrapped_obj, level))
+    elif isinstance(obj, list):
+        for p in obj:
+            if hasattr(p, 'url_patterns'):
+                r = _flatten_url_list(p, wrapped_obj, level=level+1)
+                ret.extend(r)
+            else:
+                ret.append(_url_pattern_wrapper(p, wrapped_obj, level))
+    else:
+        ret.append(wrapped_obj)
+    return ret
+
+def _flatten_url_dict(obj, parent_obj=None, level=0):
+    from django.core.urlresolvers import RegexURLResolver, RegexURLPattern
+    ret = {}
+    wrapped_obj = _url_pattern_wrapper(obj, parent_obj, level)
+    if isinstance(obj, RegexURLResolver):
+        for p in obj.url_patterns:
+            if hasattr(p, 'url_patterns'):
+                r = _flatten_url_dict(p, wrapped_obj, level=level+1)
+                ret.update(r)
+            else:
+                pobj = _url_pattern_wrapper(p, wrapped_obj, level)
+                if pobj.full_qualified_name is not None:
+                    ret[pobj.full_qualified_name] = pobj
+    elif isinstance(obj, list):
+        for p in obj:
+            if hasattr(p, 'url_patterns'):
+                r = _flatten_url_dict(p, wrapped_obj, level=level+1)
+                ret.update(r)
+            else:
+                pobj = _url_pattern_wrapper(p, wrapped_obj, level)
+                if pobj.full_qualified_name is not None:
+                    ret[pobj.full_qualified_name] = pobj
+    else:
+        if wrapped_obj.full_qualified_name is not None:
+            ret[wrapped_obj.full_qualified_name] = wrapped_obj
+    return ret
+
+def _sort_dict_by_key(d):
+    def _sort_key(a):
+        return a[0]
+    ret = []
+    for k,v in d.items():
+        ret.append( (k, v) )
+    return sorted(ret, key=_sort_key)
+
 def django_urls_view(request):
     import datetime
     from django.conf import settings
@@ -445,16 +571,15 @@ def django_urls_view(request):
     urlconf = getattr(request, 'urlconf', settings.ROOT_URLCONF)
     if isinstance(urlconf, types.ModuleType):
         urlconf = urlconf.__name__
-    #urlpatterns = get_resolver(None)
-    urlpatterns = get_resolver(None).url_patterns
-    #urlpatterns = resolver_data.items()
+    resolver = get_resolver(None)
 
     t = Template(DEBUG_URLS_VIEW_TEMPLATE, name='Debug URL handlers template')
     c = Context({
         'urlconf': urlconf,
         'root_urlconf': settings.ROOT_URLCONF,
         'request_path': request.path_info,
-        'urlpatterns': urlpatterns,
+        'urlpatterns': _flatten_url_list(resolver),
+        'urlnames': _sort_dict_by_key(_flatten_url_dict(resolver)),
         'reason': 'N/A',
         'request': request,
         'settings': get_safe_settings(),
@@ -1234,6 +1359,10 @@ DEBUG_URLS_VIEW_TEMPLATE = """
       <th>Media URL:</th>
       <td><pre>{% media_url %}</pre></td>
     </tr>
+    <tr>
+      <th>URLconf:</th>
+      <td><pre>{{ urlconf }}</pre></td>
+    </tr>
       <tr>
         <th>Django Version:</th>
         <td>{{ django_version_info }}</td>
@@ -1281,36 +1410,34 @@ DEBUG_URLS_VIEW_TEMPLATE = """
     </table>
   </div>
   <div id="info">
-    {% if urlpatterns %}
-      <p>
-      Using the URLconf defined in <code>{{ urlconf }}</code>,
-      Django tried these URL patterns, in this order:
-      </p>
-      <ol>
-        {% for pattern in urlpatterns %}
-          <li>
-            {{ pattern.regex.pattern }}&nbsp;({{pattern|type}})
-            {% if pattern.name.strip %}&nbsp;[{% url pattern.name as the_url %}{% if the_url %}<a href="{{the_url}}">{% endif %}name='{{pattern.name}}'{% if the_url %}</a>{% endif %}]{% endif %}
-            {% if pattern.callback %}&nbsp;[callback='{{pattern.callback}}']{% endif %}
-            {% if pattern.name.default_args %}&nbsp;[args='{{pattern.default_args|join:", "}}']{% endif %}
-            {% if pattern.url_patterns %}
-              <ol>
-                {% for child_pattern in pattern.url_patterns %}
-                    <li>
-                        {{ child_pattern.regex.pattern }}&nbsp;({{child_pattern|type}})
-                        {% if child_pattern.name.strip %}&nbsp;[{% url child_pattern.name as the_url %}{% if the_url %}<a href="{{the_url}}">{% endif %}name='{{child_pattern.name}}'{% if the_url %}</a>{% endif %}]{% endif %}
-
-                        {% if child_pattern.name.default_args %}&nbsp;[args='{{child_pattern.default_args|join:", "}}']{% endif %}
-                    </li>
-                {% endfor %}
-              </ol>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ol>
-    {% else %}
-      <p>{{ reason }}</p>
-    {% endif %}
+    <p>
+    Available URL patterns:
+    </p>
+    <ul>
+    {% for pattern in urlpatterns %}
+        <li style="margin-left:{% widthratio pattern.level 1 16 %}px;">
+        {{ pattern.full_url}}
+        {% if pattern.full_name.strip %}&nbsp;[{% url pattern.name as the_url %}{% if the_url %}<a href="{{the_url}}">{% endif %}name='{{pattern.name}}'{% if the_url %}</a>{% endif %}]
+        {% endif %}
+        {% if pattern.namespace %}&nbsp;[namespace='{{pattern.namespace}}']{% endif %}
+        {% if pattern.name.default_args %}&nbsp;[args='{{pattern.default_args|join:", "}}']{% endif %}
+        &nbsp;({{pattern.url|type}})
+        </li>
+    {% endfor %}
+    </ul>
+    <p>
+    Available URL names:
+    </p>
+    <ul>
+    {% for full_qualified_name, pattern in urlnames %}
+        <li>
+        {{full_qualified_name}}
+        {% if pattern.reverse_url %}&nbsp;<a href="{{ pattern.reverse_url }}">{{ pattern.reverse_url }}</a>{% endif %}
+        {% if pattern.name.default_args %}&nbsp;[args='{{pattern.default_args|join:", "}}']{% endif %}
+        &nbsp;({{pattern.url|type}})
+        </li>
+    {% endfor %}
+    </ul>
   </div>
 
   <div id="explanation">
