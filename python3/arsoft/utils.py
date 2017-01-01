@@ -172,6 +172,19 @@ def rmtree(directory):
 
     shutil.rmtree(directory, onerror=remove_readonly)
 
+def walk_filetree(directory, operation=None, recursive=True):
+    ret = True
+    for f in os.listdir(directory):
+        full = os.path.join(directory, f)
+        st = os.stat(full)
+        if operation is not None:
+            if not operation(full, st):
+                ret = False
+        if stat.S_ISDIR(st.st_mode) and recursive:
+            if not walk_filetree(full, operation, recursive):
+                ret = False
+    return ret
+
 def isProcessRunning(pid, use_kill=False):
     '''Check For the existence of a unix pid.
     '''
@@ -227,6 +240,26 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
     # Ensure a very conservative umask
     old_umask = os.umask(0o77)
     return True
+
+def get_uid(user_name_or_id):
+    ret = None
+    try:
+        ret = int(user_name_or_id)
+    except ValueError:
+        u = pwd.getpwnam(user_name_or_id)
+        if u:
+            ret = u.pw_uid
+    return ret
+
+def get_gid(group_name_or_id):
+    ret = None
+    try:
+        ret = int(group_name_or_id)
+    except ValueError:
+        g = grp.getgrnam(group_name_or_id)
+        if g:
+            ret = g.gr_gid
+    return ret
 
 def isMountDirectory(path):
     return os.path.ismount(path)

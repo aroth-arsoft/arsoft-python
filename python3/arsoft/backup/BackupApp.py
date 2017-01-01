@@ -312,9 +312,12 @@ class BackupApp(object):
                 ret = False
         return ret
 
-    def sync_directories(self, source_dir, target_dir, recursive=True, relative=False, exclude=None, delete=True, deleteExcluded=True):
-        return Rsync.sync_directories(source_dir, target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete,
-                               deleteExcluded=deleteExcluded, stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._verbose)
+    def sync_directories(self, source_dir, target_dir, recursive=True, relative=False, exclude=None, delete=True, deleteExcluded=True, perserveACL=True, preserveXAttrs=True):
+        return Rsync.sync_directories(source_dir, target_dir,
+                                      recursive=recursive, relative=relative,
+                                      exclude=exclude, delete=delete, deleteExcluded=deleteExcluded,
+                                      perserveACL=perserveACL, preserveXAttrs=preserveXAttrs,
+                                      stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._verbose)
 
     def is_localhost(self, hostname):
         if hostname == 'localhost' or hostname == 'loopback':

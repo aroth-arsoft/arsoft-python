@@ -4,12 +4,13 @@
 
 from ..plugin import *
 from arsoft.filelist import *
-from arsoft.utils import which, runcmdAndGetData
+from arsoft.utils import which, runcmdAndGetData, get_gid, get_uid, walk_filetree
 from arsoft.sshutils import SudoSessionException
 from arsoft.rsync import Rsync
 
 import tempfile
 import sys
+import stat
 
 class DovecotBackupPluginConfig(BackupPluginConfig):
 
@@ -32,7 +33,7 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
             self.readonly = readonly
 
         def __str__(self):
-            return '%s (%s@%s)' % (self.name, self.username, self.server)
+            return '%s (%s on %s)' % (self.name, self.username, self.server)
 
         def local_config(self, base_dir):
             items = { 'type': 'Maildir' }
@@ -120,7 +121,9 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
             self.master_username = None
         self.default_server = inifile.get(None, 'server', self.backup_app.fqdn)
         self.default_server_type = inifile.get(None, 'server_type', 'Dovecot')
-        self.backup_mail_location = inifile.get(None, 'backup_mail_location', 'maildir:/var/vmail-backup/%d/%n')
+        self.mail_uid = inifile.get(None, 'mail_uid', 'vmail')
+        self.mail_gid = inifile.get(None, 'mail_gid', 'vmail')
+        self.backup_mail_location = inifile.get(None, 'backup_mail_location', 'maildir:/var/vmail/backup/%d/%n')
         for sect in inifile.sections:
             enabled = inifile.get(sect, 'enabled', True)
             username = inifile.get(sect, 'username', None)
@@ -192,6 +195,89 @@ status_backend = sqlite
             pass
         return ret
 
+    def _grant_dovecot_backup_access(self, backup_dir):
+        ret = False
+
+        mail_uid = get_uid(self.config.mail_uid)
+        mail_gid = get_gid(self.config.mail_gid)
+
+        try:
+            import posix1e
+            dir_acl = posix1e.ACL(file=backup_dir)
+            file_acl = posix1e.ACL(acl=dir_acl)
+            for entry in file_acl:
+                entry.permset.delete(posix1e.ACL_EXECUTE)
+
+            if mail_gid:
+                found = False
+                for entry in dir_acl:
+                    if entry.tag_type == posix1e.ACL_GROUP and entry.qualifier == mail_gid:
+                        found = True
+                        break;
+                if not found:
+                    dir_acl_gid = dir_acl.append()
+                    dir_acl_gid.tag_type = posix1e.ACL_GROUP
+                    dir_acl_gid.qualifier = mail_gid
+                    dir_acl_gid.permset.add(posix1e.ACL_READ | posix1e.ACL_EXECUTE)
+                    file_acl_gid = file_acl.append()
+                    file_acl_gid.tag_type = posix1e.ACL_GROUP
+                    file_acl_gid.qualifier = mail_gid
+                    file_acl_gid.permset.add(posix1e.ACL_READ)
+            if mail_uid:
+                found = False
+                for entry in dir_acl:
+                    if entry.tag_type == posix1e.ACL_USER and entry.qualifier == mail_uid:
+                        found = True
+                        break;
+                if not found:
+                    dir_acl_uid = dir_acl.append()
+                    dir_acl_uid.tag_type = posix1e.ACL_USER
+                    dir_acl_uid.qualifier = mail_uid
+                    dir_acl_uid.permset.add(posix1e.ACL_READ | posix1e.ACL_EXECUTE)
+                    file_acl_uid = file_acl.append()
+                    file_acl_uid.tag_type = posix1e.ACL_USER
+                    file_acl_uid.qualifier = mail_uid
+                    file_acl_uid.permset.add(posix1e.ACL_READ)
+
+            # need to calculate the mask for the ACLs otherwise a ACL_MISS_ERROR would arise.
+            dir_acl.calc_mask()
+            file_acl.calc_mask()
+
+            if dir_acl.valid() and file_acl.valid():
+                class _apply_acls(object):
+                    def __init__(self, dir_acl, file_acl):
+                        self._dir_acl = dir_acl
+                        self._file_acl = file_acl
+                    def __call__(self, path, stats):
+                        try:
+                            if stat.S_ISDIR(stats.st_mode):
+                                #print('set dir acl=%s' % path)
+                                self._dir_acl.applyto(path)
+                            else:
+                                #print('set file acl=%s' % path)
+                                self._file_acl.applyto(path)
+                            return True
+                        except OSError as e:
+                            #print('failed to set acl to %s: %s' % (path, e))
+                            return False
+
+                #print(dir_acl)
+                #print(file_acl)
+
+                dir_acl.applyto(backup_dir)
+                walk_filetree(backup_dir, operation=_apply_acls(dir_acl, file_acl))
+            else:
+                acl_err = dir_acl.check()
+                self.writelog('Invalid directory ACL %s: %s.\n' % (dir_acl, acl_err))
+
+                acl_err = file_acl.check()
+                self.writelog('Invalid file ACL %s: %s.\n' % (file_acl, acl_err))
+
+        except ImportError:
+            self.writelog('Unable to load posix1e extension, so unable to setup ACLs for dovecot to access the backup at %s.\n' % (backup_dir))
+            pass
+        return ret
+
     def start_backup(self, **kwargs):
         if self.doveadm_exe is None:
             self.writelog('doveadm not found')
@@ -220,6 +306,8 @@ status_backend = sqlite
             if sts == 0:
                 for line in stdout_data.splitlines():
                     name = line.decode('utf8').strip()
+                    if not name:
+                        continue
                     account = DovecotBackupPluginConfig.AccountItem(
                         enabled=True,
                         name=name,
@@ -231,6 +319,8 @@ status_backend = sqlite
                         server_type=self.config.default_server_type,
                         )
                     if account.is_valid:
+                        if self.backup_app._verbose:
+                            print('add account %s' % (account))
                         self._account_list.append(account)
                     else:
                         self.writelog('Got invalid account %s' % (account) )
@@ -286,9 +376,10 @@ status_backend = sqlite
                             metadata_dir = os.path.join(backup_dir, item.metadata_dir)
                             dovecot_backup_filelist.append(metadata_dir)
                         else:
-                            if self.backup_app._verbose:
-                                print('backup of %s failed' % str(item.name))
                             self.writelog('Failed to backup dovecot account %s; Error %i: %s' % (item.name, sts, stderr_data.decode('utf8')))
+
+                if not self._grant_dovecot_backup_access(backup_dir):
+                    ret = False
 
                 #print(dovecot_backup_filelist)
                 self.backup_app.append_to_filelist(dovecot_backup_filelist)
@@ -298,10 +389,16 @@ status_backend = sqlite
     def _expand_mail_location(self, account):
         ret = self._backup_mail_location
         if '%d' in ret:
+            if account.domain is None:
+                return None
             ret = ret.replace('%d', account.domain)
         if '%n' in ret:
+            if account.user is None:
+                return None
             ret = ret.replace('%n', account.user)
         if '%u' in ret:
+            if account.username is None:
+                return None
             ret = ret.replace('%u', account.username)
         return ret
 
@@ -330,12 +427,15 @@ status_backend = sqlite
 
                 src_dir = os.path.join(backup_dir, item.maildata_dir)
                 account_dir = self._expand_mail_location(item)
-                if not os.path.isdir(account_dir):
-                    os.makedirs(account_dir)
-                account_dir = os.path.join(account_dir, backup_name)
+                if account_dir is None:
+                    self.writelog('Unable to get backup directory for dovecot account %s from %s' % (item, item.maildata_dir))
+                else:
+                    if not os.path.isdir(account_dir):
+                        os.makedirs(account_dir)
+                    account_dir = os.path.join(account_dir, backup_name)
 
-                print('backup_account dir %s <> %s' % (account_dir, src_dir))
+                    print('backup_account dir %s ->%s' % (src_dir, account_dir))
 
-                os.symlink(src_dir, account_dir)
+                    os.symlink(src_dir, account_dir)
 
         return ret

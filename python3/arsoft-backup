@@ -88,6 +88,7 @@ class ARSoftBackupApp(BackupApp):
             my_stdout = self.session.logfile_proxy
             inst = Rsync(source=source_filelist_include, dest=backup_dir, linkDest=previous_backup_dir, exclude=source_filelist_exclude,
                          delete=True, deleteExcluded=True, 
+                         perserveACL=True, preserveXAttrs=True,
                          use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
                          dryrun=self._dryrun, verbose=self._verbose)
             ret = inst.execute(stdout=my_stdout, stderr_to_stdout=True)
