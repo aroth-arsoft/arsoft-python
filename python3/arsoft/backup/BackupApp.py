@@ -136,6 +136,7 @@ class BackupList(object):
         return self._items[index]
 
     def __delitem__(self, index):
+        error_msg = None
         item = self._items[index]
         if Rsync.is_rsync_url(item.fullpath):
             url = Rsync.parse_url(item.fullpath)
@@ -143,11 +144,15 @@ class BackupList(object):
                                  use_ssh=True, ssh_key=self.config.ssh_identity_file,
                                  verbose=self.app.verbose)
         else:
-            rmtree(item.fullpath)
-            result = True
+            result = False
+            try:
+                rmtree(item.fullpath)
+                result = True
+            except IOError as e:
+                error_msg = str(e)
+
         if not result:
-            sys.stderr.write('Failed to remove backup %s\n' % (item.fullpath) )
-            self.app.session.writelog('Failed to remove backup %s\n' % (item.fullpath) )
+            self.app.session.writelog('Failed to remove backup %s (Error %s)\n' % (item.fullpath, error_msg if not None else 'unknown'))
         del self._items[index]
 
     @property
@@ -220,7 +225,7 @@ class BackupApp(object):
     def reinitialize(self, config_dir=None, state_dir=None, root_dir=None, plugins=None):
         self.root_dir = root_dir
         self.config.open(config_dir, root_dir=root_dir)
-        self.job_state.open(state_dir, root_dir=root_dir)
+        self.job_state.open(state_dir, root_dir=root_dir, verbose=self._verbose)
 
         (fqdn, hostname, domain) = gethostname_tuple()
         self.fqdn = fqdn

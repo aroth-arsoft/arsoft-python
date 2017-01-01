@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
+import sys
 import os.path
 import datetime
 from arsoft.inifile import IniFile
@@ -17,7 +18,7 @@ class BackupStateDefaults(object):
     TIMESTAMP_FORMAT = '%Y%m%d%H%M%S'
 
 class BackupJobHistoryItem(object):
-    def __init__(self, parent, filename, temporary=False):
+    def __init__(self, parent, filename, temporary=False, verbose=False):
         self.parent = parent
         self.filename = filename
         (self.state_dir, basename) = os.path.split(self.filename)
@@ -37,13 +38,14 @@ class BackupJobHistoryItem(object):
         self._require_read = True
         self._backup_dir = None
         self._backup_disk = None
+        self._verbose = verbose
 
     @staticmethod
-    def create(parent, state_dir, temporary=False):
+    def create(parent, state_dir, temporary=False, verbose=False):
         now = datetime.datetime.utcnow()
         itemname = BackupStateDefaults.HISTORY_FILE_PREFIX + now.strftime(BackupStateDefaults.TIMESTAMP_FORMAT) + BackupStateDefaults.HISTORY_FILE_EXTENSION
         fullpath = os.path.join(state_dir, itemname)
-        item = BackupJobHistoryItem(parent, fullpath, temporary)
+        item = BackupJobHistoryItem(parent, fullpath, temporary, verbose)
         item._startdate = now
         item._write_state()
         return item
@@ -162,6 +164,8 @@ class BackupJobHistoryItem(object):
         proxy = self.openlog()
         if proxy:
             proxy.write(*args)
+        if self._verbose:
+            sys.stdout.write(' '.join(args) + '\n')
 
     @property
     def logfile_proxy(self):
@@ -200,14 +204,14 @@ class BackupJobHistory(object):
         for item in self._items:
             item.save()
 
-    def create_new_item(self):
+    def create_new_item(self, verbose=False):
         self.load()
-        item = BackupJobHistoryItem.create(self, self.state_dir)
+        item = BackupJobHistoryItem.create(self, self.state_dir, verbose=verbose)
         self._items.append(item)
         return item
 
-    def create_temporary_item(self):
-        item = BackupJobHistoryItem.create(self, '/tmp', True)
+    def create_temporary_item(self, verbose=False):
+        item = BackupJobHistoryItem.create(self, '/tmp', True, verbose=verbose)
         return item
     
     @property
@@ -240,7 +244,7 @@ class BackupJobHistory(object):
         return '[' + ','.join([str(item) for item in self._items]) + ']'
 
 class BackupJobState(object):
-    def __init__(self, state_dir=None, root_dir=None):
+    def __init__(self, state_dir=None, root_dir=None, verbose=False):
         self.root_dir = root_dir
         self.state_dir = state_dir
         if state_dir:
@@ -250,14 +254,16 @@ class BackupJobState(object):
         self.history = BackupJobHistory(self, state_dir)
         self.clear()
         self._dirty = False
+        self._verbose = verbose
 
     def clear(self):
         self.oldest_entry = None
         self.last_success = None
         self.last_failure = None
 
-    def open(self, state_dir=None, root_dir=None):
+    def open(self, state_dir=None, root_dir=None, verbose=False):
         self.root_dir = root_dir
+        self._verbose = verbose
         if state_dir is None:
             state_dir = self.state_dir
         else:
@@ -336,13 +342,13 @@ class BackupJobState(object):
         return ret
     
     def start_new_session(self):
-        ret = self.history.create_new_item()
+        ret = self.history.create_new_item(verbose=self._verbose)
         if ret:
             self._dirty = True
         return ret
 
     def start_temporary_session(self):
-        return self.history.create_temporary_item()
+        return self.history.create_temporary_item(verbose=self._verbose)
 
     def remove_old_items(self, max_age, min_count=0, max_count=50):
         
