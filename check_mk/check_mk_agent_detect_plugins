@@ -49,9 +49,9 @@ class check_mk_agent_plugins(object):
         self._add_plugin('mk_postgres', check_function=lambda: os.path.isdir('/etc/postgresql-common'))
         self._add_plugin('nfsexports', interval=10, check_function=lambda: os.path.isfile('/etc/exports'))
         self._add_plugin('nginx_cert', interval=60, check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf'))
-        self._add_plugin('nginx_status', check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf'))
-        self._add_plugin('apache_status', check_function=lambda: os.path.isfile('/etc/apache2/apache2.conf'))
-        self._add_plugin('openvpn', check_function=lambda: os.path.isfile('/etc/default/openvpn'))
+        self._add_plugin('nginx_status', check_function=lambda: os.path.isfile('/etc/nginx/nginx.conf') and os.path.isfile('/usr/sbin/nginx'))
+        self._add_plugin('apache_status', check_function=lambda: os.path.isfile('/etc/apache2/apache2.conf') and os.path.isfile('/usr/sbin/apache2'))
+        self._add_plugin('openvpn', check_function=lambda: os.path.isfile('/etc/default/openvpn') and os.path.isfile('/usr/sbin/openvpn'))
         self._add_plugin('openvz_ubc', check_function=lambda: os.path.isfile('/proc/user_beancounters'))
         self._add_plugin('postfix_cert', interval=60, check_function=lambda: os.path.isfile('/etc/postfix/master.cf'))
         self._add_plugin('puppet_agent', check_function=lambda: os.path.isfile('/etc/puppetlabs/puppet/puppet.conf'))
@@ -61,8 +61,8 @@ class check_mk_agent_plugins(object):
         self._add_plugin('systemd', check_function=lambda: os.path.isfile('/bin/systemctl'))
         self._add_plugin('networkd', check_function=lambda: os.path.isfile('/bin/networkctl'))
         self._add_plugin('slapd_cert', check_function=lambda: os.path.isdir('/etc/ldap/slapd.d') and os.path.isfile('/etc/check_mk/slapd_cert'))
-        self._add_plugin('isc_dhcpd', check_function=lambda: os.path.isfile('/etc/dhcp/dhcpd.conf'))
-        self._add_plugin('cyrus_imapd', check_function=lambda: os.path.isfile('/etc/imapd.conf'))
+        self._add_plugin('isc_dhcpd', check_function=lambda: os.path.isfile('/etc/dhcp/dhcpd.conf') and os.path.isfile('/usr/sbin/dhcpd'))
+        self._add_plugin('cyrus_imapd', check_function=lambda: os.path.isfile('/etc/imapd.conf') and os.path.isfile('/usr/lib/cyrus/bin/master'))
 
     def _check_check_mk_install(self):
         ret = os.path.isdir(self.active_plugin_dir)
