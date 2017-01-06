@@ -84,6 +84,10 @@ class BackupJobHistoryItem(object):
         return self._enddate
 
     @property
+    def backup_name(self):
+        return self.unique_name
+
+    @property
     def backup_dir(self):
         if self._require_read:
             self._read_state()

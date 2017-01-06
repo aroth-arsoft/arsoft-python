@@ -386,6 +386,13 @@ status_backend = sqlite
                 #print(self.intermediate_filelist)
         return ret
 
+    def _get_mail_location_without_account(self):
+        base_path=[]
+        for e in self._backup_mail_location.split('/'):
+            if not '%' in e:
+                base_path.append(e)
+        return '/'.join(base_path)
+
     def _expand_mail_location(self, account):
         ret = self._backup_mail_location
         if '%d' in ret:
@@ -404,9 +411,8 @@ status_backend = sqlite
 
     def rsync_complete(self, **kwargs):
         ret = True
-        app = self.backup_app
 
-        backup_dir = app.session.backup_dir
+        backup_dir = self.backup_app.session.backup_dir
         if Rsync.is_rsync_url(backup_dir):
             print('Cannot map backup to %s into dovecot namespace at %s' % (backup_dir, self._backup_mail_location))
         else:
@@ -415,6 +421,21 @@ status_backend = sqlite
             if backup_dir and backup_dir[-1] != '/':
                 backup_dir += '/'
             backup_dir = os.path.join(backup_dir, 'dovecot')
+
+            symlink_relative_to = None
+
+            if self._backup_mail_location:
+                dovecot_backup_dir = os.path.join(self._get_mail_location_without_account(), '_dovecot_backup')
+                if not os.path.isdir(dovecot_backup_dir):
+                    os.mkdir(dovecot_backup_dir)
+
+                real_dir = os.path.join(dovecot_backup_dir, self.backup_app.session.backup_name)
+
+                if self.backup_app._verbose:
+                    print('dovecot create link to backups from %s -> %s' % (backup_dir, real_dir))
+
+                if self.backup_app.create_link(backup_dir, real_dir, hardlink=self.backup_app.config.use_filesystem_hardlinks):
+                    symlink_relative_to = real_dir
 
             for item in self._account_list:
                 if self.backup_app._verbose:
@@ -434,8 +455,9 @@ status_backend = sqlite
                         os.makedirs(account_dir)
                     account_dir = os.path.join(account_dir, backup_name)
 
-                    print('backup_account dir %s ->%s' % (src_dir, account_dir))
+                    if self.backup_app._verbose:
+                        print('backup_account dir %s ->%s' % (src_dir, account_dir))
 
-                    os.symlink(src_dir, account_dir)
+                    self.backup_app.create_link(src_dir, account_dir, symlink=True, relative_to=symlink_relative_to)
 
         return ret

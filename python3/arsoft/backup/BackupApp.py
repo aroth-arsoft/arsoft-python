@@ -5,7 +5,7 @@
 from arsoft.filelist import *
 from arsoft.rsync import Rsync
 from arsoft.sshutils import *
-from arsoft.utils import rmtree
+from arsoft.utils import rmtree, isRoot
 from arsoft.socket_utils import gethostname_tuple
 from arsoft.sshutils import *
 from .BackupConfig import *
@@ -491,6 +491,44 @@ class BackupApp(object):
             self.filelist_exclude.append(filelist_item)
         else:
             self.filelist_include.append(filelist_item)
+
+    def create_link(self, source, link, hardlink=False, symlink=False, overwrite=True, relative_to=None):
+        if not hardlink and not symlink:
+            symlink = True
+        if relative_to is not None:
+            actual_source = os.path.relpath(source, start=relative_to)
+        else:
+            actual_source = source
+        if hardlink:
+            if not isRoot():
+                hardlink = False
+                symlink = True
+        remove_old_link = False
+        old_link_exists = False
+        try:
+            link_st = os.stat(link, follow_symlinks=False)
+            old_link_exists = True
+            if stat.S_ISLNK(link_st.st_mode):
+                target = os.readlink(link)
+                if not os.path.samefile(source, target):
+                    remove_old_link = True if overwrite else False
+            else:
+                if not os.path.samefile(source, link):
+                    remove_old_link = True if overwrite else False
+        except IOError:
+            # ignore if it does not exist
+            pass
+        if old_link_exists:
+            if remove_old_link:
+                # remove old link
+                os.unlink(link)
+            else:
+                raise IOError('%s already exists' % link)
+        if symlink:
+            os.symlink(actual_source, link)
+        else:
+            os.link(actual_source, link)
+        return True
 
     def plugin_notify_start_session(self):
         self._call_plugins('start_session')
