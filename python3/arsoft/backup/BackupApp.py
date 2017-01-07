@@ -204,6 +204,7 @@ class BackupApp(object):
         self._disk_obj = None
         self._real_backup_dir = None
         self._verbose = False
+        self._rsync_verbose = False
         self.root_dir = None
         self.fqdn = None
         self.hostname = None
@@ -317,7 +318,7 @@ class BackupApp(object):
                                       recursive=recursive, relative=relative,
                                       exclude=exclude, delete=delete, deleteExcluded=deleteExcluded,
                                       perserveACL=perserveACL, preserveXAttrs=preserveXAttrs,
-                                      stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._verbose)
+                                      stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._rsync_verbose)
 
     def is_localhost(self, hostname):
         if hostname == 'localhost' or hostname == 'loopback':

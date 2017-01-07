@@ -90,7 +90,7 @@ class ARSoftBackupApp(BackupApp):
                          delete=True, deleteExcluded=True, 
                          perserveACL=True, preserveXAttrs=True,
                          use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
-                         dryrun=self._dryrun, verbose=self._verbose)
+                         dryrun=self._dryrun, verbose=self._rsync_verbose)
             ret = inst.execute(stdout=my_stdout, stderr_to_stdout=True)
             self.session.logfile_proxy.remove_notify(lc)
             if self._verbose:
@@ -156,7 +156,7 @@ class ARSoftBackupApp(BackupApp):
         if Rsync.is_rsync_url(item.fullpath):
             files, stats = Rsync.listdir(item.fullpath,
                                             use_ssh=self.config.use_ssh_for_rsync, ssh_key=self.config.ssh_identity_file,
-                                            stats=True, recursive=True, verbose=self._verbose)
+                                            stats=True, recursive=True, verbose=self._rsync_verbose)
             ret = {}
             ret['num_files'] = stats.get('num_total_files', 0)
             ret['num_dirs'] = stats.get('num_dirs', 0)
@@ -322,6 +322,7 @@ class ARSoftBackupApp(BackupApp):
         #=============================================================================================
         parser = argparse.ArgumentParser(description='frontend for the AR Soft backup functionality.')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('--verbose-rsync', dest='rsync_verbose', action='store_true', help='enable verbose output of rsync.')
         parser.add_argument('-n', '--dry-run', dest='dryrun', action='store_true', help='Don\'t actually run any commands; just print them.')
 
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
@@ -338,6 +339,7 @@ class ARSoftBackupApp(BackupApp):
         args = parser.parse_args()
 
         self._verbose = args.verbose
+        self._rsync_verbose = args.rsync_verbose
         self._dryrun = args.dryrun
         self._show_details = True if args.details is not None else False
         self._show_details_all = True if args.details is not None and 'all' in args.details else False
