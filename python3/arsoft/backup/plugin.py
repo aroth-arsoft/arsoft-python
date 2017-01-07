@@ -22,4 +22,4 @@ class BackupPlugin(object):
         return self.backup_app.session.logfile_proxy
 
     def writelog(self, msg):
-        return self.backup_app.session.writelog(msg)
+        return self.backup_app.session.writelog(msg, plugin=self.name)

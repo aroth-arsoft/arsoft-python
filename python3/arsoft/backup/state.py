@@ -164,12 +164,15 @@ class BackupJobHistoryItem(object):
                 self._logfile_proxy = logfile_writer_proxy(self._logfile_fobj)
         return self._logfile_proxy
 
-    def writelog(self, *args):
+    def writelog(self, *args, plugin=None):
         proxy = self.openlog()
         if proxy:
             proxy.write(*args)
         if self._verbose:
-            sys.stdout.write(' '.join(args) + '\n')
+            if plugin is not None:
+                sys.stdout.write(('[%s]' % plugin) + ' '.join(args) + '\n')
+            else:
+                sys.stdout.write(' '.join(args) + '\n')
 
     @property
     def logfile_proxy(self):
@@ -271,7 +274,7 @@ class BackupJobState(object):
         if state_dir is None:
             state_dir = self.state_dir
         else:
-            if self.root_dir is not None:
+            if self.root_dir is not None and self.root_dir != '/':
                 state_dir = self.root_dir + state_dir
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
             self.history = BackupJobHistory(self, state_dir)
@@ -346,6 +349,8 @@ class BackupJobState(object):
         return ret
     
     def start_new_session(self):
+        if not os.path.isdir(self.state_dir):
+            self._mkdir(self.state_dir)
         ret = self.history.create_new_item(verbose=self._verbose)
         if ret:
             self._dirty = True

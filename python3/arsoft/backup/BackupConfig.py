@@ -244,7 +244,7 @@ class BackupConfig(object):
             config_dir = self.config_dir
         else:
             if self.root_dir is not None:
-                config_dir = self.root_dir + config_dir
+                config_dir = os.path.normpath(self.root_dir + config_dir)
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
             self.secret_conf = os.path.join(config_dir, BackupConfigDefaults.SECRET_CONF)
             self.config_dir = config_dir
@@ -294,7 +294,7 @@ class BackupConfig(object):
         else:
             self.root_dir = root_dir
             if self.root_dir is not None:
-                config_dir = self.root_dir + config_dir
+                config_dir = os.path.normpath(self.root_dir + config_dir)
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
             self.config_dir = config_dir
 
@@ -339,7 +339,10 @@ class BackupConfig(object):
             if idx > 0:
                 return path
             else:
-                return self.root_dir + path
+                if self.root_dir and self.root_dir != '/':
+                    return os.path.normpath(self.root_dir + path)
+                else:
+                    return path
         return path
 
     def _unchroot_dir(self, path):

@@ -217,6 +217,10 @@ class BackupApp(object):
     def config_dir(self):
         return self.config.config_dir
 
+    @property
+    def backup_dir(self):
+        return self._real_backup_dir
+
     def cleanup(self):
         self.job_state.save()
 
@@ -493,17 +497,19 @@ class BackupApp(object):
         else:
             self.filelist_include.append(filelist_item)
 
-    def create_link(self, source, link, hardlink=False, symlink=False, overwrite=True, relative_to=None):
+    def create_link(self, source, link, hardlink=False, symlink=False, overwrite=True, relative_to=None, use_relative_path=True):
         if not hardlink and not symlink:
             symlink = True
-        if relative_to is not None:
-            actual_source = os.path.relpath(source, start=relative_to)
-        else:
-            actual_source = source
         if hardlink:
             if not isRoot():
                 hardlink = False
                 symlink = True
+        if relative_to is not None:
+            actual_source = os.path.relpath(source, start=relative_to)
+        elif use_relative_path and symlink:
+            actual_source = os.path.relpath(source, start=os.path.dirname(link))
+        else:
+            actual_source = source
         remove_old_link = False
         old_link_exists = False
         try:

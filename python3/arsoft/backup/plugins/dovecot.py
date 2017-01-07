@@ -4,7 +4,7 @@
 
 from ..plugin import *
 from arsoft.filelist import *
-from arsoft.utils import which, runcmdAndGetData, get_gid, get_uid, walk_filetree
+from arsoft.utils import which, runcmdAndGetData, get_gid, get_uid, walk_filetree, create_posix_acl, apply_access_to_parent_directories
 from arsoft.sshutils import SudoSessionException
 from arsoft.rsync import Rsync
 
@@ -67,6 +67,8 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
                     items['auth_mechanisms'] = ','.join(self.mechanisms)
             items['ssl'] = 'yes' if self.ssl else 'no'
             items['readonly'] = 'True' if self.readonly else 'False'
+            # DO NOT backup the backups
+            items['folderfilter'] = 'lambda folder: not folder.startswith(\'backup\')'
 
             ret = ''
             for k,v in items.items():
@@ -195,87 +197,52 @@ status_backend = sqlite
             pass
         return ret
 
-    def _grant_dovecot_backup_access(self, backup_dir):
-        ret = False
+    def _prepare_dovecot_acls(self, backup_dir):
 
+        ret = True
         mail_uid = get_uid(self.config.mail_uid)
         mail_gid = get_gid(self.config.mail_gid)
 
-        try:
-            import posix1e
-            dir_acl = posix1e.ACL(file=backup_dir)
-            file_acl = posix1e.ACL(acl=dir_acl)
-            for entry in file_acl:
-                entry.permset.delete(posix1e.ACL_EXECUTE)
+        if mail_uid != 0 or mail_gid != 0:
+            self._dir_acl, self._file_acl = create_posix_acl(file=backup_dir, uid=mail_uid, gid=mail_gid)
+            if self._dir_acl is None:
+                self.writelog('Unable to create directory ACL for dovecot to access the backup at %s.\n' % (backup_dir))
+                ret = False
+            if self._file_acl is None:
+                self.writelog('Unable to create file ACL for dovecot to access the backup at %s.\n' % (backup_dir))
+                ret = False
 
-            if mail_gid:
-                found = False
-                for entry in dir_acl:
-                    if entry.tag_type == posix1e.ACL_GROUP and entry.qualifier == mail_gid:
-                        found = True
-                        break;
-                if not found:
-                    dir_acl_gid = dir_acl.append()
-                    dir_acl_gid.tag_type = posix1e.ACL_GROUP
-                    dir_acl_gid.qualifier = mail_gid
-                    dir_acl_gid.permset.add(posix1e.ACL_READ | posix1e.ACL_EXECUTE)
-                    file_acl_gid = file_acl.append()
-                    file_acl_gid.tag_type = posix1e.ACL_GROUP
-                    file_acl_gid.qualifier = mail_gid
-                    file_acl_gid.permset.add(posix1e.ACL_READ)
-            if mail_uid:
-                found = False
-                for entry in dir_acl:
-                    if entry.tag_type == posix1e.ACL_USER and entry.qualifier == mail_uid:
-                        found = True
-                        break;
-                if not found:
-                    dir_acl_uid = dir_acl.append()
-                    dir_acl_uid.tag_type = posix1e.ACL_USER
-                    dir_acl_uid.qualifier = mail_uid
-                    dir_acl_uid.permset.add(posix1e.ACL_READ | posix1e.ACL_EXECUTE)
-                    file_acl_uid = file_acl.append()
-                    file_acl_uid.tag_type = posix1e.ACL_USER
-                    file_acl_uid.qualifier = mail_uid
-                    file_acl_uid.permset.add(posix1e.ACL_READ)
+        return ret
 
-            # need to calculate the mask for the ACLs otherwise a ACL_MISS_ERROR would arise.
-            dir_acl.calc_mask()
-            file_acl.calc_mask()
+    def _grant_dovecot_backup_access(self, backup_dir, recursive=True):
+        if self._dir_acl is None or self._file_acl is None:
+            return False
 
-            if dir_acl.valid() and file_acl.valid():
-                class _apply_acls(object):
-                    def __init__(self, dir_acl, file_acl):
-                        self._dir_acl = dir_acl
-                        self._file_acl = file_acl
-                    def __call__(self, path, stats):
-                        try:
-                            if stat.S_ISDIR(stats.st_mode):
-                                #print('set dir acl=%s' % path)
-                                self._dir_acl.applyto(path)
-                            else:
-                                #print('set file acl=%s' % path)
-                                self._file_acl.applyto(path)
-                            return True
-                        except OSError as e:
-                            #print('failed to set acl to %s: %s' % (path, e))
-                            return False
+        ret = False
+        class _apply_acls(object):
+            def __init__(self, dir_acl, file_acl):
+                self._dir_acl = dir_acl
+                self._file_acl = file_acl
+            def __call__(self, path, stats):
+                try:
+                    if stat.S_ISDIR(stats.st_mode):
+                        #print('set dir acl=%s' % path)
+                        self._dir_acl.applyto(path)
+                    else:
+                        #print('set file acl=%s' % path)
+                        self._file_acl.applyto(path)
+                    return True
+                except OSError as e:
+                    #print('failed to set acl to %s: %s' % (path, e))
+                    return False
 
-                #print(dir_acl)
-                #print(file_acl)
+        #print(dir_acl)
+        #print(file_acl)
 
-                dir_acl.applyto(backup_dir)
-                walk_filetree(backup_dir, operation=_apply_acls(dir_acl, file_acl))
-            else:
-                acl_err = dir_acl.check()
-                self.writelog('Invalid directory ACL %s: %s.\n' % (dir_acl, acl_err))
+        self._dir_acl.applyto(backup_dir)
+        if recursive:
+            walk_filetree(backup_dir, operation=_apply_acls(self._dir_acl, self._file_acl))
 
-                acl_err = file_acl.check()
-                self.writelog('Invalid file ACL %s: %s.\n' % (file_acl, acl_err))
-
-        except ImportError:
-            self.writelog('Unable to load posix1e extension, so unable to setup ACLs for dovecot to access the backup at %s.\n' % (backup_dir))
-            pass
         return ret
 
     def start_backup(self, **kwargs):
@@ -293,7 +260,10 @@ status_backend = sqlite
                     self._backup_mail_location = None
 
         if self.backup_app.root_dir is not None and self._backup_mail_location is not None:
-            self._backup_mail_location = self.backup_app.root_dir + self._backup_mail_location
+            if self.backup_app.root_dir != '/':
+                self._backup_mail_location = self.backup_app.root_dir + self._backup_mail_location
+
+        self._prepare_dovecot_acls(self.backup_app.backup_dir)
 
         ret = False
         localhost_server_item = self.backup_app.find_remote_server_entry(hostname='localhost')
@@ -410,32 +380,28 @@ status_backend = sqlite
         return ret
 
     def rsync_complete(self, **kwargs):
+        backup_dir = self.backup_app.session.backup_dir
+        if backup_dir is None or not backup_dir:
+            self.writelog('No backup directory.')
+            return False
         ret = True
 
-        backup_dir = self.backup_app.session.backup_dir
         if Rsync.is_rsync_url(backup_dir):
             print('Cannot map backup to %s into dovecot namespace at %s' % (backup_dir, self._backup_mail_location))
         else:
-            backup_name = os.path.basename(backup_dir)
+            backup_name = self.backup_app.session.backup_name
 
             if backup_dir and backup_dir[-1] != '/':
                 backup_dir += '/'
             backup_dir = os.path.join(backup_dir, 'dovecot')
 
-            symlink_relative_to = None
+            # grant dovecot access to the base backup directory (for this session)
+            # and access to directories above
+            mail_uid = get_uid(self.config.mail_uid)
+            mail_gid = get_gid(self.config.mail_gid)
 
-            if self._backup_mail_location:
-                dovecot_backup_dir = os.path.join(self._get_mail_location_without_account(), '_dovecot_backup')
-                if not os.path.isdir(dovecot_backup_dir):
-                    os.mkdir(dovecot_backup_dir)
-
-                real_dir = os.path.join(dovecot_backup_dir, self.backup_app.session.backup_name)
-
-                if self.backup_app._verbose:
-                    print('dovecot create link to backups from %s -> %s' % (backup_dir, real_dir))
-
-                if self.backup_app.create_link(backup_dir, real_dir, hardlink=self.backup_app.config.use_filesystem_hardlinks):
-                    symlink_relative_to = real_dir
+            if mail_uid != 0 or mail_gid != 0:
+                apply_access_to_parent_directories(backup_dir, uid=mail_uid, gid=mail_gid)
 
             for item in self._account_list:
                 if self.backup_app._verbose:
@@ -458,6 +424,6 @@ status_backend = sqlite
                     if self.backup_app._verbose:
                         print('backup_account dir %s ->%s' % (src_dir, account_dir))
 
-                    self.backup_app.create_link(src_dir, account_dir, symlink=True, relative_to=symlink_relative_to)
+                    self.backup_app.create_link(src_dir, account_dir, symlink=True)
 
         return ret
