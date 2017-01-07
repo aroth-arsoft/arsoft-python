@@ -1,3 +1,11 @@
+arsoft-python (1.291) yakkety; urgency=medium
+
+  * check_mk: improve plugin detection
+  * backup: get dovecot backup running and integrate backup into dovecot
+    as well
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 07 Jan 2017 17:52:17 +0100
+
 arsoft-python (1.290) yakkety; urgency=medium
 
   * web: more upgrade stuff for django 1.10
