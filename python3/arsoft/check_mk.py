@@ -66,6 +66,7 @@ def systemd_is_active(service_name):
 def systemd_parse_status(lines, skip_header_line=True):
     ret = {}
     got_header = False
+    last_key = None
     for line in lines:
         if not got_header:
             got_header = True
@@ -90,12 +91,28 @@ def systemd_parse_status(lines, skip_header_line=True):
                 else:
                     value = saveint(main_pid)
             elif key == 'active':
+                start = value.find('(')
+                if start >= 0:
+                    end = value.find(')', start+1)
+                    ret['state'] = value[start+1:end]
+                    active = True if value[0:start].strip() == 'active' else False
+                else:
+                    active = False
+
                 start = value.find('since ')
                 if start >= 0:
                     end = value.find(';', start+6)
                     if end >= 0:
                         fmt = '%a %Y-%m-%d %H:%M:%S %Z'
                         ret['active_since'] = strptime_as_datetime(value[start+6:end], fmt)
+                value = active
+            elif key == 'condition':
+                start = value.find('at ')
+                if start >= 0:
+                    end = value.find(';', start+3)
+                    if end >= 0:
+                        fmt = '%a %Y-%m-%d %H:%M:%S %Z'
+                        ret['condition_since'] = strptime_as_datetime(value[start+3:end], fmt)
                     value = value[0:start].strip()
             elif key == 'loaded':
                 start = value.find('(')
@@ -114,6 +131,14 @@ def systemd_parse_status(lines, skip_header_line=True):
                     else:
                         value = False
             ret[key] = value
+            last_key = key
+        elif last_key is not None:
+            if last_key == 'condition':
+                ret['condition_desc'] = line.strip()
+            elif last_key == 'drop-in':
+                if 'drop_in_depends' not in ret:
+                    ret['drop_in_depends'] = []
+                ret['drop_in_depends'].append(line.strip())
     return ret
 
 def systemd_status_raw(service_name):
@@ -124,8 +149,7 @@ def systemd_status(service_name):
     pid = 0
     running = False
     data = systemd_status_raw(service_name)
-    running = data.get('active')
-    running = True if running is not None and running.startswith('active') else False
+    running = True if data.get('state') == 'running' else False
     pid = data.get('main_pid')
     return (pid, running)
 
@@ -160,6 +184,21 @@ def timedatectl_status():
     (sts, stdoutdata, stderrdata) = runcmdAndGetData(['/usr/bin/timedatectl', '--no-pager', 'status'], env={'LANG':'C'})
     data = systemd_parse_status(lines=stdoutdata.splitlines())
     return data
+
+def networkctl_parse_status(lines):
+    ret = {}
+    for line in lines:
+        fields = filter(bool, line.split(' '))
+        (num, lnk_name, lnk_type, lnk_op, lnk_setup) = fields
+        if lnk_name != 'lo':
+            iface = {'num': saveint(num), 'type':str(lnk_type), 'op': str(lnk_op), 'setup':str(lnk_setup) }
+            if iface['setup'] == 'unmanaged':
+                iface['managed'] = False
+            else:
+                iface['managed'] = True
+                iface['configured'] = True if iface['setup'] == 'configured' else False
+            ret[str(lnk_name)] = iface
+    return ret
 
 # taken from file:///opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/provider/service/debian.rb
 def _debian_start_link_count(service_name):

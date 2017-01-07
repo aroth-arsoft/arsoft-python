@@ -5,7 +5,7 @@
 from arsoft.filelist import *
 from arsoft.rsync import Rsync
 from arsoft.sshutils import *
-from arsoft.utils import rmtree
+from arsoft.utils import rmtree, isRoot
 from arsoft.socket_utils import gethostname_tuple
 from arsoft.sshutils import *
 from .BackupConfig import *
@@ -136,6 +136,7 @@ class BackupList(object):
         return self._items[index]
 
     def __delitem__(self, index):
+        error_msg = None
         item = self._items[index]
         if Rsync.is_rsync_url(item.fullpath):
             url = Rsync.parse_url(item.fullpath)
@@ -143,11 +144,15 @@ class BackupList(object):
                                  use_ssh=True, ssh_key=self.config.ssh_identity_file,
                                  verbose=self.app.verbose)
         else:
-            rmtree(item.fullpath)
-            result = True
+            result = False
+            try:
+                rmtree(item.fullpath)
+                result = True
+            except IOError as e:
+                error_msg = str(e)
+
         if not result:
-            sys.stderr.write('Failed to remove backup %s\n' % (item.fullpath) )
-            self.app.session.writelog('Failed to remove backup %s\n' % (item.fullpath) )
+            self.app.session.writelog('Failed to remove backup %s (Error %s)\n' % (item.fullpath, error_msg if not None else 'unknown'))
         del self._items[index]
 
     @property
@@ -199,6 +204,7 @@ class BackupApp(object):
         self._disk_obj = None
         self._real_backup_dir = None
         self._verbose = False
+        self._rsync_verbose = False
         self.root_dir = None
         self.fqdn = None
         self.hostname = None
@@ -211,6 +217,10 @@ class BackupApp(object):
     def config_dir(self):
         return self.config.config_dir
 
+    @property
+    def backup_dir(self):
+        return self._real_backup_dir
+
     def cleanup(self):
         self.job_state.save()
 
@@ -220,7 +230,7 @@ class BackupApp(object):
     def reinitialize(self, config_dir=None, state_dir=None, root_dir=None, plugins=None):
         self.root_dir = root_dir
         self.config.open(config_dir, root_dir=root_dir)
-        self.job_state.open(state_dir, root_dir=root_dir)
+        self.job_state.open(state_dir, root_dir=root_dir, verbose=self._verbose)
 
         (fqdn, hostname, domain) = gethostname_tuple()
         self.fqdn = fqdn
@@ -307,9 +317,12 @@ class BackupApp(object):
                 ret = False
         return ret
 
-    def sync_directories(self, source_dir, target_dir, recursive=True, relative=False, exclude=None, delete=True, deleteExcluded=True):
-        return Rsync.sync_directories(source_dir, target_dir, recursive=recursive, relative=relative, exclude=exclude, delete=delete,
-                               deleteExcluded=deleteExcluded, stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._verbose)
+    def sync_directories(self, source_dir, target_dir, recursive=True, relative=False, exclude=None, delete=True, deleteExcluded=True, perserveACL=True, preserveXAttrs=True):
+        return Rsync.sync_directories(source_dir, target_dir,
+                                      recursive=recursive, relative=relative,
+                                      exclude=exclude, delete=delete, deleteExcluded=deleteExcluded,
+                                      perserveACL=perserveACL, preserveXAttrs=preserveXAttrs,
+                                      stdout=None, stderr=None, stderr_to_stdout=False, verbose=self._rsync_verbose)
 
     def is_localhost(self, hostname):
         if hostname == 'localhost' or hostname == 'loopback':
@@ -483,6 +496,46 @@ class BackupApp(object):
             self.filelist_exclude.append(filelist_item)
         else:
             self.filelist_include.append(filelist_item)
+
+    def create_link(self, source, link, hardlink=False, symlink=False, overwrite=True, relative_to=None, use_relative_path=True):
+        if not hardlink and not symlink:
+            symlink = True
+        if hardlink:
+            if not isRoot():
+                hardlink = False
+                symlink = True
+        if relative_to is not None:
+            actual_source = os.path.relpath(source, start=relative_to)
+        elif use_relative_path and symlink:
+            actual_source = os.path.relpath(source, start=os.path.dirname(link))
+        else:
+            actual_source = source
+        remove_old_link = False
+        old_link_exists = False
+        try:
+            link_st = os.stat(link, follow_symlinks=False)
+            old_link_exists = True
+            if stat.S_ISLNK(link_st.st_mode):
+                target = os.readlink(link)
+                if not os.path.samefile(source, target):
+                    remove_old_link = True if overwrite else False
+            else:
+                if not os.path.samefile(source, link):
+                    remove_old_link = True if overwrite else False
+        except IOError:
+            # ignore if it does not exist
+            pass
+        if old_link_exists:
+            if remove_old_link:
+                # remove old link
+                os.unlink(link)
+            else:
+                raise IOError('%s already exists' % link)
+        if symlink:
+            os.symlink(actual_source, link)
+        else:
+            os.link(actual_source, link)
+        return True
 
     def plugin_notify_start_session(self):
         self._call_plugins('start_session')
