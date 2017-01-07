@@ -491,3 +491,107 @@ def hexstring(buf):
 def hexstring_with_length(buf):
     return ' '.join(x.encode('hex') for x in buf) + ' - %i' % len(buf)
 
+def _get_or_create_acl_entry(acl, uid=None, gid=None):
+    import posix1e
+    if uid is not None:
+        for entry in acl:
+            if entry.tag_type == posix1e.ACL_USER and entry.qualifier == uid:
+                return entry
+        ret = acl.append()
+        ret.tag_type = posix1e.ACL_USER
+        ret.qualifier = uid
+        return ret
+    elif gid is not None:
+        for entry in acl:
+            if entry.tag_type == posix1e.ACL_GROUP and entry.qualifier == gid:
+                return entry
+        ret = acl.append()
+        ret.tag_type = posix1e.ACL_GROUP
+        ret.qualifier = gid
+        return ret
+    return None
+
+def create_posix_acl(file=None, uid=0, gid=0, dirmask=0o770, filemask=0o660):
+    ret_dir_acl = None
+    ret_file_acl = None
+
+    try:
+        import posix1e
+        if file is not None:
+            dir_acl = posix1e.ACL(file=file)
+        else:
+            dir_acl = posix1e.ACL()
+        file_acl = posix1e.ACL(acl=dir_acl)
+        for entry in file_acl:
+            entry.permset.delete(posix1e.ACL_EXECUTE)
+
+        if gid:
+            dir_acl_gid = _get_or_create_acl_entry(dir_acl, gid=gid)
+            dir_acl_gid.permset.clear()
+            dir_acl_gid.permset.add((dirmask & 0o070) >> 3)
+
+            file_acl_gid = _get_or_create_acl_entry(file_acl, gid=gid)
+            file_acl_gid.permset.clear()
+            file_acl_gid.permset.add((filemask & 0o070) >> 3)
+        if uid:
+            dir_acl_uid = _get_or_create_acl_entry(dir_acl, uid=uid)
+            dir_acl_uid.permset.clear()
+            dir_acl_uid.permset.add((dirmask & 0o700) >> 6)
+
+            file_acl_uid = _get_or_create_acl_entry(file_acl, uid=uid)
+            file_acl_uid.permset.clear()
+            file_acl_uid.permset.add((filemask & 0o700) >> 6)
+
+        # need to calculate the mask for the ACLs otherwise a ACL_MISS_ERROR would arise.
+        dir_acl.calc_mask()
+        file_acl.calc_mask()
+
+        #print(dir_acl)
+        #print(file_acl)
+
+        if dir_acl.valid() and file_acl.valid():
+            ret_dir_acl = dir_acl
+            ret_file_acl = file_acl
+    except ImportError:
+        pass
+    return ret_dir_acl, ret_file_acl
+
+def _can_access_file(path, uid, gid, mode=os.R_OK):
+    ret = False
+    st = os.stat(path)
+    #print('mode of %s: %o, need %o' % (path, st.st_mode, mode))
+    if not ret and st.st_uid == uid:
+        m = (st.st_mode & stat.S_IRWXU) >> 8
+        ret = (m & mode) == mode
+    if not ret and st.st_gid == gid:
+        m = (st.st_mode & stat.S_IRWXG) >> 4
+        ret = (m & mode) == mode
+    if not ret:
+        m = (st.st_mode & stat.S_IRWXO) >> 0
+        ret = (m & mode) == mode
+    return ret
+
+def apply_access_to_parent_directories(dir, uid, gid, root_dir=None):
+    ret = True
+    path = dir
+    while path:
+        if not _can_access_file(path, uid, gid, os.R_OK|os.X_OK):
+            #print('cannot access %s' % path)
+            dir_acl, file_acl = create_posix_acl(path, uid=uid, gid=gid, dirmask=0o0750)
+            if dir_acl:
+                dir_acl.applyto(path)
+            else:
+                ret = False
+                break
+        if root_dir is None:
+            if path == '/':
+                break
+        elif path == root_dir:
+            break
+        head, tail = os.path.split(path)
+        path = head
+    return ret
+
+if __name__ == "__main__":
+    import sys
+    apply_access_to_parent_directories(sys.argv[1], 100, 100)
