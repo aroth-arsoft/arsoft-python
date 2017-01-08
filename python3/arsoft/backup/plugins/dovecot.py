@@ -126,6 +126,7 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         self.mail_uid = inifile.get(None, 'mail_uid', 'vmail')
         self.mail_gid = inifile.get(None, 'mail_gid', 'vmail')
         self.backup_mail_location = inifile.get(None, 'backup_mail_location', 'maildir:/var/vmail/backup/%d/%n')
+        self.load_accounts_automatically = inifile.get(None, 'load_accounts_automatically', True)
         for sect in inifile.sections:
             enabled = inifile.get(sect, 'enabled', True)
             username = inifile.get(sect, 'username', None)
@@ -271,34 +272,35 @@ status_backend = sqlite
             print('use server %s' % str(localhost_server_item))
         if localhost_server_item:
             cxn = localhost_server_item.connection
-        try:
-            (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(args=[self.doveadm_exe, 'user', '*'], sudo=True, outputStdErr=False, outputStdOut=False)
-            if sts == 0:
-                for line in stdout_data.splitlines():
-                    name = line.decode('utf8').strip()
-                    if not name:
-                        continue
-                    account = DovecotBackupPluginConfig.AccountItem(
-                        enabled=True,
-                        name=name,
-                        username=name,
-                        password=None,
-                        master_username=self.config.master_username,
-                        master_password=self.config.master_password,
-                        server=self.config.default_server,
-                        server_type=self.config.default_server_type,
-                        )
-                    if account.is_valid:
-                        if self.backup_app._verbose:
-                            print('add account %s' % (account))
-                        self._account_list.append(account)
-                    else:
-                        self.writelog('Got invalid account %s' % (account) )
-                ret = True
-            else:
-                self.writelog('Unable to get account list from doveadm (Exit code %i, %s)' % (sts, stderr_data.strip()) )
-        except SudoSessionException as e:
-            self.writelog('Unable to get account list from doveadm because sudo failed: %s.\n' % str(e))
+        if self.config.load_accounts_automatically:
+            try:
+                (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(args=[self.doveadm_exe, 'user', '*'], sudo=True, outputStdErr=False, outputStdOut=False)
+                if sts == 0:
+                    for line in stdout_data.splitlines():
+                        name = line.decode('utf8').strip()
+                        if not name:
+                            continue
+                        account = DovecotBackupPluginConfig.AccountItem(
+                            enabled=True,
+                            name=name,
+                            username=name,
+                            password=None,
+                            master_username=self.config.master_username,
+                            master_password=self.config.master_password,
+                            server=self.config.default_server,
+                            server_type=self.config.default_server_type,
+                            )
+                        if account.is_valid:
+                            if self.backup_app._verbose:
+                                print('add account %s' % (account))
+                            self._account_list.append(account)
+                        else:
+                            self.writelog('Got invalid account %s' % (account) )
+                    ret = True
+                else:
+                    self.writelog('Unable to get account list from doveadm (Exit code %i, %s)' % (sts, stderr_data.strip()) )
+            except SudoSessionException as e:
+                self.writelog('Unable to get account list from doveadm because sudo failed: %s.\n' % str(e))
         return ret
 
     def perform_backup(self, **kwargs):
@@ -400,30 +402,58 @@ status_backend = sqlite
             mail_uid = get_uid(self.config.mail_uid)
             mail_gid = get_gid(self.config.mail_gid)
 
-            if mail_uid != 0 or mail_gid != 0:
+            if (mail_uid != 0 or mail_gid != 0) and os.path.isdir(backup_dir):
                 apply_access_to_parent_directories(backup_dir, uid=mail_uid, gid=mail_gid)
 
             for item in self._account_list:
                 if self.backup_app._verbose:
-                    print('backup %s' % str(item))
+                    print('backup %s' % (item.name))
 
                 if not item.enabled or not item.is_valid:
                     if self.backup_app._verbose:
-                        print('skip disabled or invalid account %s' % str(item))
+                        print('skip disabled or invalid account %s' % (item.name))
                     continue
 
                 src_dir = os.path.join(backup_dir, item.maildata_dir)
                 account_dir = self._expand_mail_location(item)
                 if account_dir is None:
-                    self.writelog('Unable to get backup directory for dovecot account %s from %s' % (item, item.maildata_dir))
+                    self.writelog('Unable to get backup directory for dovecot account %s from %s' % (item.name, item.maildata_dir))
                 else:
                     if not os.path.isdir(account_dir):
                         os.makedirs(account_dir)
                     account_dir = os.path.join(account_dir, backup_name)
 
-                    if self.backup_app._verbose:
-                        print('backup_account dir %s ->%s' % (src_dir, account_dir))
-
+                    self.writelog('create link from %s -> %s' % (src_dir, account_dir))
                     self.backup_app.create_link(src_dir, account_dir, symlink=True)
 
         return ret
+
+    def manage_retention_complete(self, **kwargs):
+        backup_dir = self.backup_app.session.backup_dir
+        if backup_dir is None or not backup_dir:
+            self.writelog('No backup directory.')
+            return False
+
+        if Rsync.is_rsync_url(backup_dir):
+            print('Cannot map backup to %s into dovecot namespace at %s' % (backup_dir, self._backup_mail_location))
+        else:
+            for item in self._account_list:
+                if self.backup_app._verbose:
+                    print('manage_retention for account %s' % str(item))
+                src_dir = os.path.join(backup_dir, item.maildata_dir)
+                account_dir = self._expand_mail_location(item)
+                if account_dir is None:
+                    self.writelog('Unable to get backup directory for dovecot account %s from %s' % (item.name, item.maildata_dir))
+                else:
+                    if not os.path.isdir(account_dir):
+                        continue
+                    for f in os.listdir(account_dir):
+                        full = os.path.join(account_dir, f)
+                        if os.path.islink(full):
+                            target = os.readlink(full)
+                            target_full = os.path.normpath(os.path.join(account_dir, target))
+                            if not os.path.isdir(target_full):
+                                self.writelog('Remove link to %s for dovecot account %s' % (target_full, item.name))
+                                os.unlink(full)
+        return True
+

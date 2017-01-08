@@ -164,7 +164,8 @@ class BackupJobHistoryItem(object):
                 self._logfile_proxy = logfile_writer_proxy(self._logfile_fobj)
         return self._logfile_proxy
 
-    def writelog(self, *args, plugin=None):
+    def writelog(self, *args, **kwargs):
+        plugin = kwargs['plugin'] if 'plugin' in kwargs else None
         proxy = self.openlog()
         if proxy:
             proxy.write(*args)

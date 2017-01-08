@@ -136,7 +136,9 @@ class ARSoftBackupApp(BackupApp):
             self.plugin_notify_rsync_complete()
 
             # remove old data and state
+            self.plugin_notify_start_manage_retention()
             self.manage_retention()
+            self.plugin_notify_manage_retention_complete()
 
         if not BackupApp.shutdown_destination(self):
             if success:

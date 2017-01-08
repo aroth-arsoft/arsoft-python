@@ -567,6 +567,11 @@ class BackupApp(object):
     def plugin_notify_backup_complete(self):
         self._call_plugins('backup_complete')
 
+    def plugin_notify_start_manage_retention(self):
+        self._call_plugins('start_manage_retention')
+    def plugin_notify_manage_retention_complete(self):
+        self._call_plugins('manage_retention_complete')
+
     class RemoteServerConnection(BackupConfig.RemoteServerInstance):
         def __init__(self, backup_app, server_item):
             BackupConfig.RemoteServerInstance.__init__(self,
