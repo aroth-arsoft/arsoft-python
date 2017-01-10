@@ -171,7 +171,7 @@ def initialize_settings(settings_module, setttings_file, options={}):
 
     settings_obj.SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 
-    settings_obj.MIDDLEWARE_CLASSES = [
+    settings_obj.MIDDLEWARE = [
             'django.middleware.common.CommonMiddleware',
             'django.contrib.sessions.middleware.SessionMiddleware',
             'django.middleware.csrf.CsrfViewMiddleware',
