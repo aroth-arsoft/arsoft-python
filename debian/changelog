@@ -1,3 +1,9 @@
+arsoft-python (1.293) yakkety; urgency=medium
+
+  * kerberos: add support for MIT kpasswd and improve error handling
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 11 Jan 2017 07:49:50 +0100
+
 arsoft-python (1.292) yakkety; urgency=medium
 
   * backup: manage rentention for dovecot backups; remove dead symlinks
