@@ -134,7 +134,7 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
             server = inifile.get(sect, 'server', self.default_server)
             server_type = inifile.get(sect, 'server_type', self.default_server_type)
 
-            if username and (password or master_password) and server:
+            if username and (password or self.master_password) and server:
                 account = DovecotBackupPluginConfig.AccountItem(
                     enabled=enabled,
                     name=sect,
