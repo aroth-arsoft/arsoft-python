@@ -7,6 +7,7 @@ from arsoft.filelist import *
 from arsoft.utils import which, runcmdAndGetData, get_gid, get_uid, walk_filetree, create_posix_acl, apply_access_to_parent_directories
 from arsoft.sshutils import SudoSessionException
 from arsoft.rsync import Rsync
+from arsoft.offlineimap import OfflineImap
 
 import tempfile
 import sys
@@ -14,98 +15,9 @@ import stat
 
 class DovecotBackupPluginConfig(BackupPluginConfig):
 
-    class AccountItem(object):
-        def __init__(self, enabled, name, username, password,
-                     master_username=None,
-                     master_password=None,
-                     server=None, server_type=None, ssl=False, mechanisms=None,
-                     readonly=True):
-            self.enabled = enabled
-            self.name = name
-            self.username = username
-            self.password = password
-            self.master_username = master_username
-            self.master_password = master_password
-            self.server = server
-            self.server_type = server_type
-            self.ssl = ssl
-            self.mechanisms = mechanisms
-            self.readonly = readonly
-
-        def __str__(self):
-            return '%s (%s on %s)' % (self.name, self.username, self.server)
-
-        def local_config(self, base_dir):
-            items = { 'type': 'Maildir' }
-            items['localfolders'] = os.path.join(base_dir, self.maildata_dir)
-            items['sep'] = '/'
-            ret = ''
-            for k,v in items.items():
-                ret += '%s = %s\n' % (k,v)
-            return ret
-
-        @property
-        def is_valid(self):
-            return self.name is not None and self.username is not None and self.server is not None
-
-        def remote_config(self):
-            items = { 'type': 'IMAP' }
-            items['remotehost'] = self.server
-            if self.master_username is not None:
-                if self.server_type == 'Dovecot':
-                    items['remoteuser'] = '%s*%s' % (self.username, self.master_username)
-                elif self.server_type == 'Cyrus':
-                    items['remoteuser'] = self.username
-                    items['remote_identity'] = self.master_username
-                items['remotepass'] = self.master_password
-            else:
-                items['remotepass'] = self.password
-            if self.mechanisms is not None:
-                if isinstance(self.mechanisms, str):
-                    items['auth_mechanisms'] = self.mechanisms
-                else:
-                    items['auth_mechanisms'] = ','.join(self.mechanisms)
-            items['ssl'] = 'yes' if self.ssl else 'no'
-            items['readonly'] = 'True' if self.readonly else 'False'
-            # DO NOT backup the backups
-            items['folderfilter'] = 'lambda folder: not folder.startswith(\'backup\')'
-
-            ret = ''
-            for k,v in items.items():
-                ret += '%s = %s\n' % (k,v)
-            return ret
-
-        @property
-        def config_file(self):
-            return '%s.conf' % self.name
-
-        @property
-        def metadata_dir(self):
-            return 'meta-%s' % self.name
-
-        @property
-        def maildata_dir(self):
-            return '%s' % self.name
-
-        @property
-        def domain(self):
-            idx = self.username.find('@')
-            if idx > 0:
-                return self.username[idx+1:]
-            else:
-                return None
-
-        @property
-        def user(self):
-            idx = self.username.find('@')
-            if idx > 0:
-                return self.username[0:idx]
-            else:
-                return self.username
-
-    def __init__(self, parent):
+    def __init__(self, plugin, parent):
         BackupPluginConfig.__init__(self, parent, 'dovecot')
-        self._account_list = []
+        self._plugin = plugin
 
     @property
     def account_list(self):
@@ -116,37 +28,11 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         self._account_list = value
 
     def _read_conf(self, inifile):
-        self.master_password = inifile.get(None, 'master_password', None)
-        if self.master_password is not None:
-            self.master_username = inifile.get(None, 'master_username', 'doveadm')
-        else:
-            self.master_username = None
-        self.default_server = inifile.get(None, 'server', self.backup_app.fqdn)
-        self.default_server_type = inifile.get(None, 'server_type', 'Dovecot')
         self.mail_uid = inifile.get(None, 'mail_uid', 'vmail')
         self.mail_gid = inifile.get(None, 'mail_gid', 'vmail')
         self.backup_mail_location = inifile.get(None, 'backup_mail_location', 'maildir:/var/vmail/backup/%d/%n')
         self.load_accounts_automatically = inifile.get(None, 'load_accounts_automatically', True)
-        for sect in inifile.sections:
-            enabled = inifile.get(sect, 'enabled', True)
-            username = inifile.get(sect, 'username', None)
-            password = inifile.get(sect, 'password', None)
-            server = inifile.get(sect, 'server', self.default_server)
-            server_type = inifile.get(sect, 'server_type', self.default_server_type)
-
-            if username and (password or self.master_password) and server:
-                account = DovecotBackupPluginConfig.AccountItem(
-                    enabled=enabled,
-                    name=sect,
-                    username=username,
-                    password=password,
-                    master_username=self.master_username,
-                    master_password=self.master_password,
-                    server=server,
-                    server_type=server_type,
-                    )
-                self._account_list.append(account)
-        return True
+        return self._plugin._offlineimap.readConfig(inifile)
     
     def _write_conf(self, inifile):
         return True
@@ -154,49 +40,17 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
     def __str__(self):
         ret = BackupPluginConfig.__str__(self)
         ret = ret + 'accounts:\n'
-        if self._account_list:
-            for item in self._account_list:
+        if self._plugin._offlineimap.account_list:
+            for item in self._plugin._offlineimap.account_list:
                 ret = ret + '  %s\n' % (item)
         return ret
 
 class DovecotBackupPlugin(BackupPlugin):
     def __init__(self, backup_app):
-        self.config = DovecotBackupPluginConfig(backup_app)
+        self._offlineimap = OfflineImap()
+        self.config = DovecotBackupPluginConfig(self, backup_app)
         BackupPlugin.__init__(self, backup_app, 'dovecot')
-        self.offlineimap_exe = which('offlineimap', only_first=True)
         self.doveadm_exe = which('doveadm', only_first=True)
-        self._account_list = None
-
-    def _write_offlineimap_config(self, backup_dir, account):
-        ret = None
-        filename = os.path.join(backup_dir, account.config_file)
-        metadata_dir = os.path.join(backup_dir, account.metadata_dir)
-        try:
-            f = open(filename, 'w')
-            f.write("""[general]
-accounts = %(accountname)s
-metadata = %(metadata_dir)s
-sslcacertfile = /etc/ssl/certs/ca-certificates.crt
-
-[Account %(accountname)s]
-localrepository = %(accountname)s-local
-remoterepository = %(accountname)s-remote
-status_backend = sqlite
-
-[Repository %(accountname)s-local]
-%(local_config)s
-[Repository %(accountname)s-remote]
-%(remote_config)s
-""" % { 'accountname': account.name,
-                       'metadata_dir': metadata_dir,
-                        'remote_config': account.remote_config(),
-                        'local_config': account.local_config(backup_dir),
-                        } )
-            f.close()
-            ret = filename
-        except IOError as e:
-            pass
-        return ret
 
     def _prepare_dovecot_acls(self, backup_dir):
 
@@ -252,7 +106,7 @@ status_backend = sqlite
             return False
 
         # take over configured account list
-        self._account_list = self.config.account_list
+        self._account_list = self._offlineimap.account_list
         self._backup_mail_location = self.config.backup_mail_location
         if self._backup_mail_location is not None:
             if ':' in self._backup_mail_location:
@@ -280,20 +134,17 @@ status_backend = sqlite
                         name = line.decode('utf8').strip()
                         if not name:
                             continue
-                        account = DovecotBackupPluginConfig.AccountItem(
+                        local = { 'server_type': 'Maildir', 'maildir': None}
+                        remote = { 'server_type': 'Dovecot', 'server': self._offlineimap.fqdn }
+                        account = OfflineImap.AccountItem(
                             enabled=True,
                             name=name,
-                            username=name,
-                            password=None,
-                            master_username=self.config.master_username,
-                            master_password=self.config.master_password,
-                            server=self.config.default_server,
-                            server_type=self.config.default_server_type,
+                            local=local,
+                            remote=remote
                             )
-                        if account.is_valid:
+                        if self._offlineimap.add_account(account):
                             if self.backup_app._verbose:
                                 print('add account %s' % (account))
-                            self._account_list.append(account)
                         else:
                             self.writelog('Got invalid account %s' % (account) )
                     ret = True
@@ -314,12 +165,12 @@ status_backend = sqlite
         if not self._mkdir(backup_dir):
             ret = False
         if ret:
-            if self.offlineimap_exe is None:
-                self.writelog('offlineimap not found')
+            if not self._offlineimap.is_installed:
+                self.writelog('offlineimap not installed')
                 ret = False
             else:
                 dovecot_backup_filelist = FileListItem(base_directory=self.config.base_directory)
-                for item in self._account_list:
+                for item in self._offlineimap.account_list:
                     if self.backup_app._verbose:
                         print('backup %s' % str(item))
 
@@ -333,22 +184,16 @@ status_backend = sqlite
                             print('skip invalid account %s' % str(item))
                         continue
 
-                    conf_file = self._write_offlineimap_config(backup_dir, item)
-                    if not conf_file:
-                        self.writelog('Failed to generate config file for %s' % (item.name))
-                    else:
-                        args=[self.offlineimap_exe, '-c', conf_file]
-                        (sts, stdout_data, stderr_data) = runcmdAndGetData(args, outputStdErr=False, outputStdOut=False, verbose=self.backup_app._verbose)
-                        if sts == 0:
-                            if self.backup_app._verbose:
-                                print('backup %s complete' % str(item.name))
-                            maildata_dir = os.path.join(backup_dir, item.maildata_dir)
-                            dovecot_backup_filelist.append(maildata_dir)
+                    if self._offlineimap.run(account=item, base_dir=backup_dir):
+                        if self.backup_app._verbose:
+                            print('backup %s complete' % str(item.name))
+                        maildata_dir = os.path.join(backup_dir, item.maildata_dir)
+                        dovecot_backup_filelist.append(maildata_dir)
 
-                            metadata_dir = os.path.join(backup_dir, item.metadata_dir)
-                            dovecot_backup_filelist.append(metadata_dir)
-                        else:
-                            self.writelog('Failed to backup dovecot account %s; Error %i: %s' % (item.name, sts, stderr_data.decode('utf8')))
+                        metadata_dir = os.path.join(backup_dir, item.metadata_dir)
+                        dovecot_backup_filelist.append(metadata_dir)
+                    else:
+                        self.writelog('Failed to backup dovecot account %s' % (item.name))
 
                 if not self._grant_dovecot_backup_access(backup_dir):
                     ret = False
