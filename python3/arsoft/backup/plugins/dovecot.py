@@ -51,6 +51,10 @@ class DovecotBackupPlugin(BackupPlugin):
         self.config = DovecotBackupPluginConfig(self, backup_app)
         BackupPlugin.__init__(self, backup_app, 'dovecot')
         self.doveadm_exe = which('doveadm', only_first=True)
+        self._account_list = []
+        self._backup_mail_location = None
+        self._dir_acl = None 
+        self._file_acl = None
 
     def _prepare_dovecot_acls(self, backup_dir):
 
@@ -234,7 +238,10 @@ class DovecotBackupPlugin(BackupPlugin):
         ret = True
 
         if Rsync.is_rsync_url(backup_dir):
-            print('Cannot map backup to %s into dovecot namespace at %s' % (backup_dir, self._backup_mail_location))
+            if self._backup_mail_location:
+                self.writelog('Cannot map rsync backup to %s into dovecot namespace at %s' % (backup_dir, self._backup_mail_location))
+            else:
+                self.writelog('Cannot map rsync backup to %s into dovecot' % (backup_dir))
         else:
             backup_name = self.backup_app.session.backup_name
 
