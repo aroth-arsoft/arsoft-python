@@ -227,10 +227,10 @@ class BackupApp(object):
         if self._diskmgr:
             self._diskmgr.cleanup()
 
-    def reinitialize(self, config_dir=None, state_dir=None, root_dir=None, plugins=None):
+    def reinitialize(self, config_dir=None, state_dir=None, root_dir=None, instance=None, plugins=None):
         self.root_dir = root_dir
-        self.config.open(config_dir, root_dir=root_dir)
-        self.job_state.open(state_dir, root_dir=root_dir, verbose=self._verbose)
+        self.config.open(config_dir, root_dir=root_dir, instance=instance)
+        self.job_state.open(state_dir, root_dir=root_dir, instance=instance, verbose=self._verbose)
 
         (fqdn, hostname, domain) = gethostname_tuple()
         self.fqdn = fqdn

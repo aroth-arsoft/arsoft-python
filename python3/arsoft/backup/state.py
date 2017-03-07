@@ -268,7 +268,7 @@ class BackupJobState(object):
         self.last_success = None
         self.last_failure = None
 
-    def open(self, state_dir=None, root_dir=None, verbose=False):
+    def open(self, state_dir=None, root_dir=None, instance=None, verbose=False):
         self.root_dir = root_dir
         self._verbose = verbose
         if state_dir is None:
@@ -276,6 +276,8 @@ class BackupJobState(object):
         else:
             if self.root_dir is not None and self.root_dir != '/':
                 state_dir = self.root_dir + state_dir
+            if instance is not None:
+                state_dir = os.path.join(state_dir, str(instance))
             self.job_state_conf = os.path.join(state_dir, BackupStateDefaults.JOB_STATE_CONF)
             self.history = BackupJobHistory(self, state_dir)
             self.state_dir = state_dir

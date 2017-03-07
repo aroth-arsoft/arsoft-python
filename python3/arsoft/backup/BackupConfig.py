@@ -11,7 +11,7 @@ from arsoft.timestamp import parse_timedelta
 
 class BackupConfigDefaults(object):
     ROOT_DIR = None
-    CONFIG_DIR = '/etc/arsoft-backup'
+    CONFIG_DIR = '/etc/arsoft-backup.d'
     MAIN_CONF = 'main.conf'
     SECRET_CONF = 'secret.conf'
     PRIVATE_DIR = 'private'
@@ -238,13 +238,15 @@ class BackupConfig(object):
     def remote_servers(self):
         return self._remote_servers
 
-    def open(self, config_dir=None, root_dir=None):
+    def open(self, config_dir=None, instance=None, root_dir=None):
         self.root_dir = root_dir
         if config_dir is None:
             config_dir = self.config_dir
         else:
             if self.root_dir is not None:
                 config_dir = os.path.normpath(self.root_dir + config_dir)
+            if instance is not None:
+                config_dir = os.path.join(config_dir, str(instance))
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
             self.secret_conf = os.path.join(config_dir, BackupConfigDefaults.SECRET_CONF)
             self.config_dir = config_dir
@@ -288,13 +290,15 @@ class BackupConfig(object):
 
         return ret
 
-    def save(self, config_dir=None, root_dir=None):
+    def save(self, config_dir=None, instance=None, root_dir=None):
         if config_dir is None:
             config_dir = self.config_dir
         else:
             self.root_dir = root_dir
             if self.root_dir is not None:
                 config_dir = os.path.normpath(self.root_dir + config_dir)
+            if instance is not None:
+                config_dir = os.path.join(config_dir, str(instance))
             self.main_conf = os.path.join(config_dir, BackupConfigDefaults.MAIN_CONF)
             self.config_dir = config_dir
 

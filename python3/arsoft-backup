@@ -328,10 +328,11 @@ class ARSoftBackupApp(BackupApp):
         parser.add_argument('-n', '--dry-run', dest='dryrun', action='store_true', help='Don\'t actually run any commands; just print them.')
 
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
-        parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft-backup', help='name of the directory containing the backup configuration.')
+        parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft-backup.d', help='name of the directory containing the backup configuration.')
         parser.add_argument('-S', '--state-directory', dest='state_dir', default='/var/lib/arsoft-backup', help='name of the directory containing the state of all backup jobs.')
         parser.add_argument('-P', '--plugins', dest='plugins', nargs='*', help='shows detailed information about the selected backups.')
         parser.add_argument('--system-startup', dest='system_startup', action='store_true', help='prepare the backup discs after the system has been started.')
+        parser.add_argument('--instance', dest='instance', help='select the backup instance.')
         parser.add_argument('--backup', dest='perform_backup', action='store_true', help='starts a new backup.')
         parser.add_argument('--status', dest='show_status', action='store_true', help='shows the status of the backup.')
         parser.add_argument('--details', dest='details', nargs='*', help='shows detailed information about the selected backups.')
@@ -356,7 +357,7 @@ class ARSoftBackupApp(BackupApp):
             sys.stderr.write('Given root directory %s does not exist.\n' % (root_dir))
             ret = 2
         else:
-            if not self.reinitialize(args.config_dir, args.state_dir, root_dir, plugins=args.plugins):
+            if not self.reinitialize(args.config_dir, args.state_dir, root_dir, instance=args.instance, plugins=args.plugins):
                 sys.stderr.write('Failed to load configuration from %s.\n' % (self.config_dir))
                 ret = 1
             else:
