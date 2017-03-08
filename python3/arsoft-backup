@@ -188,6 +188,7 @@ class ARSoftBackupApp(BackupApp):
         active_plugins = []
         for plugin in self.plugins:
             active_plugins.append(plugin.name)
+        print('Config directory: %s' % (self.config.config_dir))
         print('Active Plugins:   %s' % (','.join(active_plugins) if active_plugins else 'None'))
         print('Backup directory: %s' % (self.config.backup_directory))
         print('Retention time:   %s' % (self.config.retention_time))
