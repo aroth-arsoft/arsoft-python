@@ -38,7 +38,10 @@ class OfflineImap(object):
 
         @property
         def is_valid(self):
-            return self.username is not None and self.server is not None
+            if self.server_type == 'Maildir':
+                return True if self.maildir is not None or self.username is not None else False
+            else:
+                return self.username is not None and self.server is not None
 
         @property
         def domain(self):
@@ -62,7 +65,7 @@ class OfflineImap(object):
                 if self.maildir is not None:
                     items['localfolders'] = os.path.join(base_dir, self.maildir)
                 else:
-                    items['localfolders'] = os.path.join(base_dir, self.name)
+                    items['localfolders'] = os.path.join(base_dir, self.username)
                 items['sep'] = '/'
             else:
                 if self.server_type == 'Gmail':

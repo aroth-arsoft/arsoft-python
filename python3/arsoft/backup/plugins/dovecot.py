@@ -139,7 +139,8 @@ class DovecotBackupPlugin(BackupPlugin):
                         if not name:
                             continue
                         local = { 'server_type': 'Maildir', 'maildir': None}
-                        remote = { 'server_type': 'Dovecot', 'server': self._offlineimap.fqdn }
+                        remote = { 'server_type': 'Dovecot', 'server': self._offlineimap.fqdn, 'username': name }
+                        print(name)
                         account = OfflineImap.AccountItem(
                             enabled=True,
                             name=name,
@@ -151,6 +152,10 @@ class DovecotBackupPlugin(BackupPlugin):
                                 print('add account %s' % (account))
                         else:
                             self.writelog('Got invalid account %s' % (account) )
+                            if not account.local.is_valid:
+                                self.writelog('Got invalid local account config %s' % (account.local) )
+                            if not account.remote.is_valid:
+                                self.writelog('Got invalid remote account config %s' % (account.remote) )
                     ret = True
                 else:
                     self.writelog('Unable to get account list from doveadm (Exit code %i, %s)' % (sts, stderr_data.strip()) )
