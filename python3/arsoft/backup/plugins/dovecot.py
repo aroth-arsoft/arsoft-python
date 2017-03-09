@@ -32,6 +32,10 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         self.mail_gid = inifile.get(None, 'mail_gid', 'vmail')
         self.backup_mail_location = inifile.get(None, 'backup_mail_location', 'maildir:/var/vmail/backup/%d/%n')
         self.load_accounts_automatically = inifile.get(None, 'load_accounts_automatically', True)
+        self.server = inifile.get(None, 'server', self.backup_app.fqdn)
+        self.port = inifile.get(None, 'port', 143)
+        self.master_username = inifile.get(None, 'master_username', 'doveadm')
+        self.master_password = inifile.get(None, 'master_password', None)
         return self._plugin._offlineimap.readConfig(inifile)
     
     def _write_conf(self, inifile):
@@ -124,8 +128,6 @@ class DovecotBackupPlugin(BackupPlugin):
 
         self._prepare_dovecot_acls(self.backup_app.backup_dir)
 
-        inter_backup_dir = self.config.intermediate_backup_directory
-
         ret = False
         localhost_server_item = self.backup_app.find_remote_server_entry(hostname='localhost')
         if self.backup_app._verbose:
@@ -140,9 +142,12 @@ class DovecotBackupPlugin(BackupPlugin):
                         name = line.decode('utf8').strip()
                         if not name:
                             continue
-                        maildir = os.path.join(inter_backup_dir, name)
-                        local = { 'server_type': 'Maildir', 'maildir': maildir }
-                        remote = { 'server_type': 'Dovecot', 'server': self._offlineimap.fqdn, 'username': name }
+                        local = { 'server_type': 'Maildir', 'maildir': name }
+                        remote = { 'server_type': 'Dovecot', 'server': self.config.server, 'port':self.config.port, 'username': name }
+                        if self.config.master_username and self.config.master_password:
+                            remote['master_username'] = self.config.master_username
+                            remote['master_password'] = self.config.master_password
+
                         account = OfflineImap.AccountItem(
                             enabled=True,
                             name=name,
@@ -195,16 +200,16 @@ class DovecotBackupPlugin(BackupPlugin):
                             print('skip invalid account %s' % str(item))
                         continue
 
-                    if self._offlineimap.run(account=item, base_dir=backup_dir):
+                    if self._offlineimap.run(account=item, base_dir=backup_dir, log=self.logfile_proxy):
                         if self.backup_app._verbose:
                             print('backup %s complete' % str(item.name))
-                        maildata_dir = os.path.join(backup_dir, item.maildata_dir)
+                        maildata_dir = os.path.join(backup_dir, item.local.maildir)
                         dovecot_backup_filelist.append(maildata_dir)
 
                         metadata_dir = os.path.join(backup_dir, item.metadata_dir)
                         dovecot_backup_filelist.append(metadata_dir)
                     else:
-                        self.writelog('Failed to backup dovecot account %s' % (item.name))
+                        self.writelog('Failed to backup dovecot account %s; using config %s' % (item.name, self._offlineimap.config_file))
 
                 if not self._grant_dovecot_backup_access(backup_dir):
                     ret = False
@@ -281,9 +286,9 @@ class DovecotBackupPlugin(BackupPlugin):
                     if not os.path.isdir(account_dir):
                         os.makedirs(account_dir)
                     account_dir = os.path.join(account_dir, backup_name)
-
-                    self.writelog('create link from %s -> %s' % (src_dir, account_dir))
-                    self.backup_app.create_link(src_dir, account_dir, symlink=True)
+                    if os.path.isdir(src_dir):
+                        self.writelog('create link from %s -> %s' % (src_dir, account_dir))
+                        self.backup_app.create_link(src_dir, account_dir, symlink=True)
 
         return ret
 

@@ -196,6 +196,7 @@ status_backend = sqlite
         (fqdn, hostname, domain) = gethostname_tuple()
         self.fqdn = fqdn
         self.hostname = hostname
+        self.config_file = None
 
     @property
     def is_installed(self):
@@ -301,27 +302,30 @@ status_backend = sqlite
     def account_list(self, value):
         self._account_list = value
 
-    def _sync_account(self, account=None, base_dir=None):
+    def _sync_account(self, account=None, base_dir=None, log=None):
         if base_dir is None:
             base_dir = self._private_dir
-        conf_file = account.write_config(directory=base_dir)
-        if not conf_file:
+        self.config_file = account.write_config(directory=base_dir)
+        if not self.config_file:
             return False
         args=[self.offlineimap_exe]
         if self._dryrun:
             args.append('--dry-run')
-        args.extend(['-c', conf_file])
-        (sts, stdout_data, stderr_data) = runcmdAndGetData(args, outputStdErr=False, outputStdOut=False, verbose=self._verbose)
+        args.extend(['-c', self.config_file])
+        (sts, stdout_data, stderr_data) = runcmdAndGetData(args, stdout=log if log is not None else None, stderr=None,
+                                                           outputStdErr=False, outputStdOut=False,
+                                                           stderr_to_stdout=True if log is not None else False,
+                                                           verbose=self._verbose)
         return True if sts == 0 else False
 
-    def run(self, account=None, base_dir=None):
+    def run(self, account=None, base_dir=None, log=None):
         ret = True
         if account is None:
             for account in self._account_list:
-                if not self._sync_account(account=account, base_dir=base_dir):
+                if not self._sync_account(account=account, base_dir=base_dir, log=log):
                     ret = False
         else:
-            if not self._sync_account(account=account, base_dir=base_dir):
+            if not self._sync_account(account=account, base_dir=base_dir, log=log):
                 ret = False
         return ret
 
