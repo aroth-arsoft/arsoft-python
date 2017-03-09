@@ -124,6 +124,8 @@ class DovecotBackupPlugin(BackupPlugin):
 
         self._prepare_dovecot_acls(self.backup_app.backup_dir)
 
+        inter_backup_dir = self.config.intermediate_backup_directory
+
         ret = False
         localhost_server_item = self.backup_app.find_remote_server_entry(hostname='localhost')
         if self.backup_app._verbose:
@@ -138,9 +140,9 @@ class DovecotBackupPlugin(BackupPlugin):
                         name = line.decode('utf8').strip()
                         if not name:
                             continue
-                        local = { 'server_type': 'Maildir', 'maildir': None}
+                        maildir = os.path.join(inter_backup_dir, name)
+                        local = { 'server_type': 'Maildir', 'maildir': maildir }
                         remote = { 'server_type': 'Dovecot', 'server': self._offlineimap.fqdn, 'username': name }
-                        print(name)
                         account = OfflineImap.AccountItem(
                             enabled=True,
                             name=name,
@@ -222,17 +224,17 @@ class DovecotBackupPlugin(BackupPlugin):
     def _expand_mail_location(self, account):
         ret = self._backup_mail_location
         if '%d' in ret:
-            if account.domain is None:
+            if account.remote.domain is None:
                 return None
-            ret = ret.replace('%d', account.domain)
+            ret = ret.replace('%d', account.remote.domain)
         if '%n' in ret:
-            if account.user is None:
+            if account.remote.user is None:
                 return None
-            ret = ret.replace('%n', account.user)
+            ret = ret.replace('%n', account.remote.user)
         if '%u' in ret:
-            if account.username is None:
+            if account.remote.username is None:
                 return None
-            ret = ret.replace('%u', account.username)
+            ret = ret.replace('%u', account.remote.username)
         return ret
 
     def rsync_complete(self, **kwargs):
@@ -271,10 +273,10 @@ class DovecotBackupPlugin(BackupPlugin):
                         print('skip disabled or invalid account %s' % (item.name))
                     continue
 
-                src_dir = os.path.join(backup_dir, item.maildata_dir)
+                src_dir = os.path.join(backup_dir, item.name)
                 account_dir = self._expand_mail_location(item)
                 if account_dir is None:
-                    self.writelog('Unable to get backup directory for dovecot account %s from %s' % (item.name, item.maildata_dir))
+                    self.writelog('Unable to get backup directory for dovecot account %s' % (item.name))
                 else:
                     if not os.path.isdir(account_dir):
                         os.makedirs(account_dir)
@@ -297,10 +299,10 @@ class DovecotBackupPlugin(BackupPlugin):
             for item in self._account_list:
                 if self.backup_app._verbose:
                     print('manage_retention for account %s' % str(item))
-                src_dir = os.path.join(backup_dir, item.maildata_dir)
+                src_dir = os.path.join(backup_dir, item.name)
                 account_dir = self._expand_mail_location(item)
                 if account_dir is None:
-                    self.writelog('Unable to get backup directory for dovecot account %s from %s' % (item.name, item.maildata_dir))
+                    self.writelog('Unable to get backup directory for dovecot account %s' % (item.name))
                 else:
                     if not os.path.isdir(account_dir):
                         continue
