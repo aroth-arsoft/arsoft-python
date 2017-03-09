@@ -1,3 +1,10 @@
+arsoft-python (1.294) yakkety; urgency=medium
+
+  * backup: use offlineimap for dovecot backup
+  * backup: allow multiple instances
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Thu, 09 Mar 2017 19:42:03 +0100
+
 arsoft-python (1.293) yakkety; urgency=medium
 
   * kerberos: add support for MIT kpasswd and improve error handling
