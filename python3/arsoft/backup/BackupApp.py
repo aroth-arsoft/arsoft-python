@@ -318,6 +318,8 @@ class BackupApp(object):
         return ret
 
     def sync_directories(self, source_dir, target_dir, recursive=True, relative=False, exclude=None, delete=True, deleteExcluded=True, perserveACL=True, preserveXAttrs=True):
+        if not self.config.use_extended_attributes:
+            preserveXAttrs = False
         return Rsync.sync_directories(source_dir, target_dir,
                                       recursive=recursive, relative=relative,
                                       exclude=exclude, delete=delete, deleteExcluded=deleteExcluded,

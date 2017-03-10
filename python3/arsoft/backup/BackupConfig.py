@@ -29,6 +29,7 @@ class BackupConfigDefaults(object):
     USE_FILESYSTEM_HARDLINKS = True
     USE_SSH_FOR_RSYNC = True
     SSH_IDENTITY_FILE = None
+    USE_EXTENDED_ATTRIBUTES = True
     USE_TIMESTAMP_FOR_BACKUP_DIR = True
     TIMESTAMP_FORMAT_FOR_BACKUP_DIR = '%Y%m%d%H%M%S'
     ACTIVE_PLUGINS = ['git', 'dir', 'mysql', 'trac', 'imap', 'dovecot']
@@ -119,6 +120,7 @@ class BackupConfig(object):
                  use_filesystem_hardlinks=BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS,
                  use_ssh_for_rsync=BackupConfigDefaults.USE_SSH_FOR_RSYNC,
                  ssh_identity_file=BackupConfigDefaults.SSH_IDENTITY_FILE,
+                 use_extended_attributes=BackupConfigDefaults.USE_EXTENDED_ATTRIBUTES,
                  use_timestamp_for_backup_dir=BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR,
                  timestamp_format_for_backup_dir=BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR,
                  active_plugins=BackupConfigDefaults.ACTIVE_PLUGINS,
@@ -146,6 +148,7 @@ class BackupConfig(object):
         self.use_filesystem_hardlinks = use_filesystem_hardlinks
         self.use_ssh_for_rsync = use_ssh_for_rsync
         self.ssh_identity_file = ssh_identity_file
+        self.use_extended_attributes = use_extended_attributes
         self.use_timestamp_for_backup_dir = use_timestamp_for_backup_dir
         self.timestamp_format_for_backup_dir = timestamp_format_for_backup_dir
         self.active_plugins = active_plugins
@@ -174,6 +177,7 @@ class BackupConfig(object):
         self.use_filesystem_hardlinks = BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS
         self.use_ssh_for_rsync = BackupConfigDefaults.USE_SSH_FOR_RSYNC
         self.ssh_identity_file = BackupConfigDefaults.SSH_IDENTITY_FILE
+        self.use_extended_attributes = BackupConfigDefaults.USE_EXTENDED_ATTRIBUTES
         self.use_timestamp_for_backup_dir = BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR
         self.timestamp_format_for_backup_dir = BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR
         self.active_plugins = BackupConfigDefaults.ACTIVE_PLUGINS
@@ -386,6 +390,7 @@ class BackupConfig(object):
         self.use_filesystem_hardlinks = inifile.getAsBoolean(None, 'UseFilesystemHardlinks', BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS)
         self.use_ssh_for_rsync = inifile.getAsBoolean(None, 'UseSSHForRsync', BackupConfigDefaults.USE_SSH_FOR_RSYNC)
         self.ssh_identity_file = self._chroot_dir(inifile.get(None, 'SSHIdentityFile', BackupConfigDefaults.SSH_IDENTITY_FILE))
+        self.use_extended_attributes = inifile.getAsBoolean(None, 'UseExtendedAttributes', BackupConfigDefaults.USE_EXTENDED_ATTRIBUTES)
         self.use_timestamp_for_backup_dir = inifile.getAsBoolean(None, 'UseTimestampForBackupDir', BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR)
         self.timestamp_format_for_backup_dir = inifile.get(None, 'TimestampFormatForBackupDir', BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR)
         self.filelist_include_dir = self._chroot_dir(inifile.get(None, 'FileListIncludeDirectory', BackupConfigDefaults.INCLUDE_DIR))
@@ -411,6 +416,7 @@ class BackupConfig(object):
         inifile.setAsBoolean(None, 'UseFilesystemHardlinks', self.use_filesystem_hardlinks)
         inifile.setAsBoolean(None, 'UseSSHForRsync', self.use_ssh_for_rsync)
         inifile.set(None, 'SSHIdentityFile', self._unchroot_dir(self.ssh_identity_file))
+        inifile.setAsBoolean(None, 'UseExtendedAttributes', self.use_extended_attributes)
         inifile.setAsBoolean(None, 'UseTimestampForBackupDir', self.use_timestamp_for_backup_dir)
         inifile.set(None, 'TimestampFormatForBackupDir', self.timestamp_format_for_backup_dir)
         inifile.set(None, 'FileListIncludeDirectory', self._unchroot_dir(self.filelist_include_dir))
@@ -460,6 +466,7 @@ class BackupConfig(object):
         ret = ret + 'use filesystem hardlinks: ' + str(self.use_filesystem_hardlinks) + '\n'
         ret = ret + 'use ssh for rsync: ' + str(self.use_ssh_for_rsync) + '\n'
         ret = ret + 'ssh identity file: ' + str(self.ssh_identity_file) + '\n'
+        ret = ret + 'use extended attributes: ' + str(self.use_extended_attributes) + '\n'
         ret = ret + 'use timestamp for backup dirs: ' + str(self.use_timestamp_for_backup_dir) + '\n'
         ret = ret + 'timestamp format for backup dirs: ' + str(self.timestamp_format_for_backup_dir) + '\n'
         ret = ret + 'active plugins: ' + str(self.active_plugins) + '\n'
