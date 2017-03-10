@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
@@ -140,6 +140,18 @@ class Rsync(object):
             (isinstance(self._dest, FileList) and self._dest.empty()):
             raise ValueError('invalid destination file or directory %s'%(str(self._dest)))
 
+        if self._include is not None and not \
+            (   isinstance(self._include, str) or \
+                isinstance(self._include, list) or \
+                isinstance(self._include, FileList) ):
+            raise ValueError('invalid include filelist %s'%(str(self._include)))
+
+        if self._exclude is not None and not \
+            (   isinstance(self._exclude, str) or \
+                isinstance(self._exclude, list) or \
+                isinstance(self._exclude, FileList) ):
+            raise ValueError('invalid exclude filelist %s'%(str(self._exclude)))
+
         if self._rsync_bin is None or len(self._rsync_bin) == 0:
             raise ValueError('Invalid rsync executeable %s specified'%(str(self._rsync_bin)))
 
@@ -204,24 +216,36 @@ class Rsync(object):
         tmp_exclude = None
         tmp_source = None
         if self._include:
-            tmp_fd, tmp_include = tempfile.mkstemp()
-            tmp_fobj = os.fdopen(tmp_fd, 'w')
-            if not self._include.save(tmp_fobj):
-                raise IOError
-            tmp_fobj.close()
-            args.append('--include-from=' + tmp_include)
-            if self.verbose:
-                print('Include=[%s]' % self._include)
+            if isinstance(self._include, FileList):
+                tmp_fd, tmp_include = tempfile.mkstemp()
+                tmp_fobj = os.fdopen(tmp_fd, 'w')
+                if not self._include.save(tmp_fobj):
+                    raise IOError
+                tmp_fobj.close()
+                args.append('--include-from=' + tmp_include)
+                if self.verbose:
+                    print('Include=[%s]' % self._include)
+            elif isinstance(self._include, list):
+                for arg in self._include:
+                    args.append('--include=' + str(arg))
+            elif isinstance(self._include, str):
+                args.append('--include=' + str(self._include))
 
         if self._exclude:
-            tmp_fd, tmp_exclude = tempfile.mkstemp()
-            tmp_fobj = os.fdopen(tmp_fd, 'w')
-            if not self._exclude.save(tmp_fobj):
-                raise IOError
-            tmp_fobj.close()
-            args.append('--exclude-from=' + tmp_exclude)
-            if self.verbose:
-                print('Exclude=[%s]' % self._exclude)
+            if isinstance(self._exclude, FileList):
+                tmp_fd, tmp_exclude = tempfile.mkstemp()
+                tmp_fobj = os.fdopen(tmp_fd, 'w')
+                if not self._exclude.save(tmp_fobj):
+                    raise IOError
+                tmp_fobj.close()
+                args.append('--exclude-from=' + tmp_exclude)
+                if self.verbose:
+                    print('Exclude=[%s]' % self._exclude)
+            elif isinstance(self._exclude, list):
+                for arg in self._exclude:
+                    args.append('--exclude=' + str(arg))
+            elif isinstance(self._exclude, str):
+                args.append('--exclude=' + str(self._exclude))
 
         if self.linkDest:
             linkDest_url = Rsync.parse_url(self.linkDest)
@@ -465,29 +489,39 @@ class Rsync(object):
         else:
             return ret
 
+    # See https://frickenate.com/2015/09/rsync-deleting-a-remote-directory/
     @staticmethod
     def rmdir(target_dir, recursive=True, force=True, stdout=None, stderr=None, stderr_to_stdout=False,
                   use_ssh=False, ssh_key=None,
-                  verbose=False):
-        if target_dir[-1] != '/':
-            target_dir += '/'
+                  verbose=False, dryrun=False):
         empty_dir = tempfile.mkdtemp()
         if empty_dir[-1] != '/':
             empty_dir += '/'
-        rdir = Rsync(source=empty_dir, dest=target_dir, recursive=recursive, relative=False, use_ssh=use_ssh, ssh_key=ssh_key,
-                     delete=True, deleteExcluded=True, pruneEmptyDirs=True, force=force, verbose=verbose)
+        # rsync -vr --delete --include '/dir/***' --exclude='*' $(mktemp -d)/ user@example.com::/module/path/to/
+        parent_dir, basename = os.path.split(target_dir)
+        if parent_dir[-1] != '/':
+            parent_dir += '/'
+        rdir = Rsync(source=empty_dir, dest=parent_dir, recursive=recursive, relative=False, use_ssh=use_ssh, ssh_key=ssh_key,
+                     delete=True, deleteExcluded=False, pruneEmptyDirs=False,
+                     include='%s/***' % basename, exclude='*',
+                     preservePermissions=False, preserveOwner=False, preserveGroup=False, preserveTimes=False,
+                     preserveDevices=False, preserveSpecials=False, perserveACL=False, preserveXAttrs=False,
+                     numericIds=False,
+                     force=force, verbose=verbose, dryrun=dryrun)
         ret = rdir.execute(stdout=stdout, stderr=stderr, stderr_to_stdout=stderr_to_stdout)
         os.rmdir(empty_dir)
         return ret
 
 if __name__ == "__main__":
-    files = Rsync.listdir(sys.argv[1], use_ssh=True, ssh_key=sys.argv[2], verbose=True)
-    if files is not None:
-        for f, s in files.items():
-            print(f, s)
+    #files = Rsync.listdir(sys.argv[1], use_ssh=True, ssh_key=sys.argv[2], verbose=True)
+    #if files is not None:
+        #for f, s in files.items():
+            #print(f, s)
     #app = Rsync(sys.argv[1], sys.argv[2])
 
     #if app.execute():
         #print('successful')
     #else:
         #print('failed')
+
+    Rsync.rmdir(sys.argv[1], dryrun=False, verbose=True)
