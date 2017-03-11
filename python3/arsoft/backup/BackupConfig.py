@@ -370,6 +370,7 @@ class BackupConfig(object):
     def _read_main_conf(self, filename):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         ret = inifile.open(filename)
+        config_dir = os.path.dirname(filename)
         self.filesystem = inifile.get(None, 'Filesystem', BackupConfigDefaults.FILESYSTEM)
         self.retention_time = None
         tmp = inifile.get(None, 'RetentionTime', BackupConfigDefaults.RETENTION_TIME_S)
@@ -389,7 +390,12 @@ class BackupConfig(object):
         self.use_filesystem_snapshots = inifile.getAsBoolean(None, 'UseFilesystemSnapshots', BackupConfigDefaults.USE_FILESYSTEM_SNAPSHOTS)
         self.use_filesystem_hardlinks = inifile.getAsBoolean(None, 'UseFilesystemHardlinks', BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS)
         self.use_ssh_for_rsync = inifile.getAsBoolean(None, 'UseSSHForRsync', BackupConfigDefaults.USE_SSH_FOR_RSYNC)
-        self.ssh_identity_file = self._chroot_dir(inifile.get(None, 'SSHIdentityFile', BackupConfigDefaults.SSH_IDENTITY_FILE))
+        ssh_identity_file_raw = inifile.get(None, 'SSHIdentityFile', BackupConfigDefaults.SSH_IDENTITY_FILE)
+        print('got ssh_identity_file_raw=%s' % ssh_identity_file_raw)
+        if ssh_identity_file_raw:
+            self.ssh_identity_file = os.path.join(config_dir, ssh_identity_file_raw)
+        else:
+            self.ssh_identity_file = None
         self.use_extended_attributes = inifile.getAsBoolean(None, 'UseExtendedAttributes', BackupConfigDefaults.USE_EXTENDED_ATTRIBUTES)
         self.use_timestamp_for_backup_dir = inifile.getAsBoolean(None, 'UseTimestampForBackupDir', BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR)
         self.timestamp_format_for_backup_dir = inifile.get(None, 'TimestampFormatForBackupDir', BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR)
@@ -404,6 +410,7 @@ class BackupConfig(object):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         # read existing file
         inifile.open(filename)
+        config_dir = os.path.dirname(filename)
         # and modify it according to current config
         inifile.set(None, 'Filesystem', self.filesystem)
         inifile.set(None, 'RetentionTime', self.retention_time.total_seconds())
@@ -415,7 +422,8 @@ class BackupConfig(object):
         inifile.setAsBoolean(None, 'UseFilesystemSnapshots', self.use_filesystem_snapshots)
         inifile.setAsBoolean(None, 'UseFilesystemHardlinks', self.use_filesystem_hardlinks)
         inifile.setAsBoolean(None, 'UseSSHForRsync', self.use_ssh_for_rsync)
-        inifile.set(None, 'SSHIdentityFile', self._unchroot_dir(self.ssh_identity_file))
+        ssh_identity_file_raw = os.path.relpath(self.ssh_identity_file, config_dir) if self.ssh_identity_file else None
+        inifile.set(None, 'SSHIdentityFile', ssh_identity_file_raw)
         inifile.setAsBoolean(None, 'UseExtendedAttributes', self.use_extended_attributes)
         inifile.setAsBoolean(None, 'UseTimestampForBackupDir', self.use_timestamp_for_backup_dir)
         inifile.set(None, 'TimestampFormatForBackupDir', self.timestamp_format_for_backup_dir)

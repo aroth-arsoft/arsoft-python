@@ -195,6 +195,7 @@ class BackupApp(object):
         self.filelist_include = FileList()
         self.filelist_exclude = FileList()
         self.config = BackupConfig()
+        self.instance = None
         self.job_state = BackupJobState()
         self.previous_backups = BackupList(self)
         self.plugins = []
@@ -228,7 +229,9 @@ class BackupApp(object):
             self._diskmgr.cleanup()
 
     def reinitialize(self, config_dir=None, state_dir=None, root_dir=None, instance=None, plugins=None):
+        ret = True
         self.root_dir = root_dir
+        self.instance = instance
         self.config.open(config_dir, root_dir=root_dir, instance=instance)
         self.job_state.open(state_dir, root_dir=root_dir, instance=instance, verbose=self._verbose)
 
@@ -245,6 +248,19 @@ class BackupApp(object):
 
         if not has_localhost_server:
             self.config.remote_servers.append(BackupConfig.RemoteServerInstance(name='localhost', scheme='local', hostname=self.fqdn))
+
+        if Rsync.is_rsync_url(self.config.backup_directory) and self.config.ssh_identity_file:
+            if os.path.isfile(self.config.ssh_identity_file):
+                s = os.stat(self.config.ssh_identity_file)
+                if (s.st_mode & stat.S_IRWXG) != 0:
+                    sys.stderr.write('SSH identify file %s allows group access (mode %o).\n' % (self.config.ssh_identity_file, s.st_mode))
+                    ret = False
+                if (s.st_mode & stat.S_IRWXO) != 0:
+                    sys.stderr.write('SSH identify file %s allows world access (mode %o).\n' % (self.config.ssh_identity_file, s.st_mode))
+                    ret = False
+            else:
+                sys.stderr.write('SSH identify file %s is unavailble.\n' % (self.config.ssh_identity_file))
+                ret = False
 
         # in any case continue with the config we got
         self._diskmgr = DiskManager(tag=None if not self.config.disk_tag else self.config.disk_tag, root_dir=root_dir)
@@ -264,7 +280,7 @@ class BackupApp(object):
                 sys.stderr.write('Failed to load plugin %s: error %s\n' % (plugin, str(e)))
                 (ex_type, ex_value, ex_traceback) = e.exc_info
                 traceback.print_exception(ex_type, ex_value, ex_traceback)
-        return True
+        return ret
 
     def _load_plugin(self, plugin_name):
         plugin_module_name = "arsoft.backup.plugins." + plugin_name
