@@ -204,8 +204,9 @@ class Rsync(object):
         if self.rsh:
             args.append('--rsh=' + str(self.rsh))
         elif self.use_ssh:
-            # use ssh with disable X11 forwarding
-            rsh = '/usr/bin/ssh -x'
+            # use ssh with disable X11 forwarding and enable BatchMode to avoid any prompts from
+            # ssh (e.g. password prompts)
+            rsh = '/usr/bin/ssh -x -oBatchMode=yes'
             if self.ssh_key:
                 rsh = rsh + ' -i ' + self.ssh_key
             args.append('--rsh=' + str(rsh))
