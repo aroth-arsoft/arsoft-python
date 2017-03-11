@@ -22,6 +22,24 @@ def isRoot():
     euid = os.geteuid()
     return True if euid == 0 else False
 
+def dev_null(read=False, write=False):
+    class _dev_null(object):
+        def __init__(self, mode):
+            self.handle = open(os.devnull, mode)
+
+        def __del__(self):
+            self.handle.close()
+
+    class _dev_null_singleton(object):
+        read = _dev_null('r')
+        write = _dev_null('w')
+    if read:
+        return _dev_null_singleton.read.handle
+    elif write:
+        return _dev_null_singleton.write.handle
+    else:
+        return None
+
 def runcmd(args=[], verbose=False, stdin=None, input=None, executable=None, cwd=None, env=None):
     if verbose:
         print("runcmd " + ' '.join(args) + (('< ' + stdin.name) if stdin is not None else ''))
