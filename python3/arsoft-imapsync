@@ -13,7 +13,7 @@ class ARSoftImapSync(object):
         self._script_name = os.path.basename(__file__)
         self._offline_imap = None
         self._root_dir = None
-        self._cache_dir = '/var/cache/arsoft-imap-sync'
+        self._cache_dir = '/var/cache/arsoft-imapsync'
 
 
     def main(self, argv=None):

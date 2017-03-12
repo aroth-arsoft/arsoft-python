@@ -34,7 +34,7 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.296',
+		version='1.297',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -83,6 +83,7 @@ setup(name='arsoft-python',
             ('trac-manage', 2),
             ('trac-git-post-receive-hook', 2),
             ('arsoft-backup', 3),
+            ('arsoft-imapsync', 3),
             ('arsoft-mailer', 3),
             ('edskmgr', 3),
             ('alog', 3),

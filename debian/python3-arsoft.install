@@ -28,6 +28,7 @@ usr/bin/ad-rfc2307
 usr/bin/ad-password-expire
 usr/bin/alog
 usr/bin/arsoft-backup
+usr/bin/arsoft-imapsync
 usr/bin/arsoft-mailer
 usr/bin/autofs-ldap-auth
 usr/bin/certinfo
