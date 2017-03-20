@@ -3,12 +3,16 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
 import os.path
+import collections
 
 from arsoft.utils import which, runcmdAndGetData
 from arsoft.inifile import IniFile
 from arsoft.socket_utils import gethostname_tuple
 
 class OfflineImap(object):
+
+    DEFAULT_IMAP_PORT = 143
+
     class Repository(object):
         def __init__(self, username=None, password=None,
                      master_username=None,
@@ -17,14 +21,15 @@ class OfflineImap(object):
                      maildir=None,
                      readonly=False,
                      gssapi=False,
-                     excluded_folders=['backup/', 'shared/'] ):
+                     excluded_folders=['backup/', 'shared/'],
+                     separator=None ):
             self.username = username
             self.password = password
             self.master_username = master_username
             self.master_password = master_password
             self.server = server
-            self.port = port
-            self.server_type = server_type
+            self.port = int(port) if port else None
+            self.server_type = server_type.lower() if server_type is not None else None
             self.ssl = ssl
             if mechanisms is None:
                 self.mechanisms = ['XOAUTH2', 'CRAM-MD5', 'PLAIN', 'LOGIN']
@@ -35,10 +40,11 @@ class OfflineImap(object):
             self.readonly = readonly
             self.excluded_folders = excluded_folders
             self.maildir = maildir
+            self.separator = separator
 
         @property
         def is_valid(self):
-            if self.server_type == 'Maildir':
+            if self.server_type == 'maildir':
                 return True if self.maildir is not None or self.username is not None else False
             else:
                 return self.username is not None and self.server is not None
@@ -60,28 +66,31 @@ class OfflineImap(object):
                 return self.username
 
         def config(self, base_dir):
-            if self.server_type == 'Maildir':
-                items = { 'type': 'Maildir' }
+            if self.server_type == 'maildir':
+                items = collections.OrderedDict( { 'type': 'Maildir' } )
                 if self.maildir is not None:
                     items['localfolders'] = os.path.join(base_dir, self.maildir)
                 else:
                     items['localfolders'] = os.path.join(base_dir, self.username)
                 items['sep'] = '/'
             else:
-                if self.server_type == 'Gmail':
-                    items = { 'type': 'Gmail' }
+                if self.server_type == 'gmail':
+                    items = collections.OrderedDict( { 'type': 'Gmail' } )
                 else:
-                    items = { 'type': 'IMAP' }
+                    items = collections.OrderedDict( { 'type': 'IMAP' } )
+                if self.separator is not None:
+                    items['sep'] = self.separator
                 items['remotehost'] = self.server
                 items['remoteuser'] = self.username
                 items['remotepass'] = self.password
+                port = OfflineImap.DEFAULT_IMAP_PORT if self.port is None else self.port
                 if self.port is not None:
-                    items['remoteport'] = self.port
+                    items['remoteport'] = port
                 if self.master_username is not None:
-                    if self.server_type == 'Dovecot':
+                    if self.server_type == 'dovecot':
                         items['remoteuser'] = '%s*%s' % (self.username, self.master_username)
                         items['remotepass'] = self.master_password
-                    elif self.server_type == 'Cyrus':
+                    elif self.server_type == 'cyrus':
                         items['remoteuser'] = self.master_username
                         items['remote_identity'] = self.username
                         items['remotepass'] = self.master_password
@@ -92,7 +101,7 @@ class OfflineImap(object):
                         items['auth_mechanisms'] = self.mechanisms
                     else:
                         items['auth_mechanisms'] = ','.join(self.mechanisms)
-                if self.port == 143:
+                if port == 143:
                     items['ssl'] = 'no'
                 else:
                     items['ssl'] = 'yes' if self.ssl else 'no'
@@ -100,7 +109,7 @@ class OfflineImap(object):
                     items['sslcacertfile'] = '/etc/ssl/certs/ca-certificates.crt'
                     items['tls_level'] = 'tls_no_ssl'
                     items['ssl_version'] = 'tls1_1'
-                if self.port == '143':
+                if port == 143:
                     items['starttls'] = 'yes' if self.ssl else 'no'
                 else:
                     items['starttls'] = 'no'
@@ -112,7 +121,7 @@ class OfflineImap(object):
                 for f in self.excluded_folders:
                     expr.append('not folder.startswith(\'%s\')' % f)
                 items['folderfilter'] = expr = 'lambda folder: ' + ' and '.join(expr)
-            if self.server_type == 'Cyrus':
+            if self.server_type == 'cyrus':
                 items['nametrans'] = 'lambda foldername: re.sub(\'^INBOX/\', \'\', foldername)'
 
             ret = ''
@@ -237,10 +246,10 @@ status_backend = sqlite
             self.local_master_username = None
         self.default_remote_server = inifile.get(None, 'remote_server', self.fqdn)
         self.default_remote_port = inifile.get(None, 'remote_port', 143)
-        self.default_remote_server_type = inifile.get(None, 'remote_server_type', 'Dovecot')
+        self.default_remote_server_type = inifile.get(None, 'remote_server_type', 'dovecot')
         self.default_local_server = inifile.get(None, 'local_server', self.fqdn)
         self.default_local_port = inifile.get(None, 'local_port', 143)
-        self.default_local_server_type = inifile.get(None, 'local_server_type', 'Dovecot')
+        self.default_local_server_type = inifile.get(None, 'local_server_type', 'dovecot')
         for sect in inifile.sections:
             if sect is None:
                 continue
@@ -302,16 +311,19 @@ status_backend = sqlite
     def account_list(self, value):
         self._account_list = value
 
-    def _sync_account(self, account=None, base_dir=None, log=None):
+    def _write_account_config(self, account=None, base_dir=None):
         if base_dir is None:
             base_dir = self._private_dir
-        self.config_file = account.write_config(directory=base_dir)
-        if not self.config_file:
+        return account.write_config(directory=base_dir)
+
+    def _sync_account(self, account=None, base_dir=None, log=None):
+        config_file = self._write_account_config(account=account, base_dir=base_dir)
+        if not config_file:
             return False
         args=[self.offlineimap_exe]
         if self._dryrun:
             args.append('--dry-run')
-        args.extend(['-c', self.config_file])
+        args.extend(['-c', config_file])
         (sts, stdout_data, stderr_data) = runcmdAndGetData(args, stdout=log if log is not None else None, stderr=None,
                                                            outputStdErr=False, outputStdOut=False,
                                                            stderr_to_stdout=True if log is not None else False,
@@ -329,3 +341,21 @@ status_backend = sqlite
                 ret = False
         return ret
 
+    def write_config(self, account=None, base_dir=None):
+        ok = True
+        ret = []
+        if account is None:
+            for account in self._account_list:
+                config_file = self._write_account_config(account=account, base_dir=base_dir)
+                if not config_file:
+                    ok = False
+                else:
+                    ret.append(config_file)
+        else:
+            config_file = self._write_account_config(account=account, base_dir=base_dir)
+            if not config_file:
+                ok = False
+            else:
+                ret.append(config_file)
+
+        return ret if ok else None

@@ -24,6 +24,7 @@ class ARSoftImapSync(object):
         parser = argparse.ArgumentParser(description='sync mail between imap servers')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debugging of this script.')
+        parser.add_argument('--write-config', dest='write_config', action='store_true', help='only write the configuration for offlineimap and exit.')
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
         parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft/imapsync', help='name of the directory containing the imap sync configuration.')
 
@@ -43,6 +44,11 @@ class ARSoftImapSync(object):
         account_file = os.path.join(config_dir, 'accounts')
         private_dir = os.path.join(cache_dir, 'account-data')
 
+        if self._verbose:
+            print('Config directory: %s' % config_dir)
+            print('Accounts file: %s' % account_file)
+            print('Accounts data directory: %s' % private_dir)
+
         if not os.path.isdir(cache_dir):
             os.mkdir(cache_dir)
         if not os.path.isdir(private_dir):
@@ -57,9 +63,17 @@ class ARSoftImapSync(object):
             if self._verbose:
                 for acc in self._offline_imap.account_list:
                     print(acc)
-            if not self._offline_imap.run():
-                sys.stderr.write('Failed to sync.\n')
-                ret = 1
+            if args.write_config:
+                files = self._offline_imap.write_config()
+                if files is None:
+                    sys.stderr.write('Failed to generate configuration for accounts.\n')
+                else:
+                    for f in files:
+                        print(f)
+            else:
+                if not self._offline_imap.run():
+                    sys.stderr.write('Failed to sync.\n')
+                    ret = 1
         return ret
 
 if __name__ == "__main__":
