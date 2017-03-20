@@ -49,13 +49,17 @@ class ARSoftImapSync(object):
             os.mkdir(private_dir)
 
         self._offline_imap = OfflineImap(private_dir=private_dir, verbose=self._verbose)
-        self._offline_imap.readConfig(account_file)
-        if self._verbose:
-            for acc in self._offline_imap.account_list:
-                print(acc)
-        if not self._offline_imap.run():
-            sys.stderr.write('Failed to sync.\n')
+        if not self._offline_imap.is_installed:
+            sys.stderr.write('Unable to find offlineimap executable. Please install offlineimap.\n')
             ret = 1
+        else:
+            self._offline_imap.readConfig(account_file)
+            if self._verbose:
+                for acc in self._offline_imap.account_list:
+                    print(acc)
+            if not self._offline_imap.run():
+                sys.stderr.write('Failed to sync.\n')
+                ret = 1
         return ret
 
 if __name__ == "__main__":
