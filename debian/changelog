@@ -1,3 +1,9 @@
+arsoft-python (1.298) yakkety; urgency=medium
+
+  * imapsync: fixed SSL/TLS connection issues
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 20 Mar 2017 20:12:30 +0100
+
 arsoft-python (1.297) yakkety; urgency=medium
 
   * add arsoft-imapsync script
