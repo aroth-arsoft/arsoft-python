@@ -133,13 +133,13 @@ fi
 exit $RES
 """ % { 'sudo_command': self.sudo_command,
        'proxy_url':'' if self.apt_proxy_server is None else self.apt_proxy_server }
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=self.use_sudo)
         ret = True if sts == 0 else False
         return ret
     
     def _apt_update(self):
         if self._apt_update_required:
-            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=['apt-get', '-qq', 'update'], sudo=True)
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args=['apt-get', '-qq', 'update'], sudo=self.use_sudo)
             ret = True if sts == 0 else False
             if not ret:
                 sys.stderr.write('Failed to update package sources.\n%s\n%s\n' % (stdout, stderr))
@@ -192,7 +192,7 @@ else
 fi
 exit $RES
 """ % { 'fqdn':self.target_hostname_full }
-            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
+            (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=self.use_sudo)
             ret = True if sts == 0 else False
             if not ret:
                 sys.stderr.write('Failed to enforce full qualified hostname %s.\n%s\n%s\n' % (self.target_hostname_full, stdout, stderr))
@@ -203,7 +203,7 @@ exit $RES
 managehosts add "%(hostname)s" "%(addr)s"
 """ % { 'hostname':self.puppet_server,
        'addr':self.puppet_server_ip}
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=True)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, sudo=self.use_sudo)
         ret = True if sts == 0 else False
         if not ret:
             sys.stderr.write('Failed to add puppet server %s as %s. %s\n' % (self.puppet_server, self.puppet_server_ip, stderr))
@@ -221,7 +221,7 @@ managehosts add "%(hostname)s" "%(addr)s"
             else:
                 vpnname, ext = os.path.splitext(zipcfg.config_file.suggested_filename)
                 args = ['openvpn-admin', '--start', vpnname]
-                (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args, sudo=True)
+                (sts, stdout, stderr) = self._cxn.runcmdAndGetData(args, sudo=self.use_sudo)
                 ret = True if sts == 0 else False
                 if not ret:
                     sys.stderr.write('Failed to start VPN %s. %s\n' % (vpnname, stderr))
@@ -247,7 +247,7 @@ echo "Use puppet executable: $puppet_bin" | tee --append "$logfile"
 "$puppet_bin" agent -tv --waitforcert 30 --server "%s" --vardir "$vardir" --ssldir "$ssldir" 2>&1 | tee --append "$logfile"
 """ %  self.puppet_server
 
-        (sts, stdout, stderr) = screen.runcmdAndGetData(script=script, useTerminal=True, allocateTerminal=True, sudo=True)
+        (sts, stdout, stderr) = screen.runcmdAndGetData(script=script, useTerminal=True, allocateTerminal=True, sudo=self.use_sudo)
         #(sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, useTerminal=True, allocateTerminal=True, sudo=True)
         ret = True if sts == 0 else False
         if not ret:
@@ -258,7 +258,7 @@ echo "Use puppet executable: $puppet_bin" | tee --append "$logfile"
         script_lines.append(self._cxn.to_commandline(['cat', '/tmp/puppet-setup.log']))
         script_lines.append(self._cxn.to_commandline(['rm', '-f', '/tmp/puppet-setup.log']))
         script = '\n'.join(script_lines)
-        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, useTerminal=True, sudo=True)
+        (sts, stdout, stderr) = self._cxn.runcmdAndGetData(script=script, useTerminal=True, sudo=self.use_sudo)
         return ret
 
     def _verify_sudo(self):
