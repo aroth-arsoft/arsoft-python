@@ -72,12 +72,16 @@ def runcmd(args=[], verbose=False, stdin=None, input=None, executable=None, cwd=
 
 def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, outputStdOut=False,
                      executable=None, shell='/bin/sh',
-                     stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None):
+                     stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None,
+                     runAsUser=None, su='/bin/su'):
 
     script_tmpfile = None
     if script is None:
         if args:
-            all_args = args
+            if runAsUser is None:
+                all_args = args
+            else:
+                all_args = [su, '-s', shell, '-', str(runAsUser), '-c', ' '.join(args)]
         else:
             raise ValueError('neither commandline nor script specified.')
     else:

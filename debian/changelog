@@ -1,3 +1,9 @@
+arsoft-python (1.300) yakkety; urgency=medium
+
+  * utils: add runAsUser parameter to runcmdAndGetData
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 24 Mar 2017 19:17:16 +0100
+
 arsoft-python (1.299) yakkety; urgency=medium
 
   * check_mk: disable apt plugin
