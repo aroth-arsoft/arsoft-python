@@ -41,7 +41,7 @@ class check_mk_agent_plugins(object):
 
     def _default_ubuntu(self):
         # enable default plugins
-        self._add_plugin('apt')
+        #self._add_plugin('apt')
         self._add_plugin('cups', check_function=lambda: os.path.isdir('/etc/cups'))
         self._add_plugin('dovecot', check_function=lambda: os.path.isfile('/usr/bin/dovecot') or os.path.isfile('/usr/sbin/dovecot'))
         self._add_plugin('jenkins', interval=20, check_function=lambda: os.path.isfile('/etc/default/jenkins'))
