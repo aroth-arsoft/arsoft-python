@@ -9,7 +9,7 @@ from arsoft.efi import *
 
 class efiinfo(object):
     def __init__(self):
-        self.m_verbose = False
+        self._verbose = False
  
 
     def main(self):
@@ -24,15 +24,17 @@ class efiinfo(object):
 
         args = parser.parse_args()
 
-        self.m_verbose = args.verbose
+        self._verbose = args.verbose
         
         vars = EfiVariables.get_instance()
         if vars is None:
             sys.stderr.write('Your system is not supported.\n')
             ret = 1
         else:
-            ret = 0
-            if args.vars:
+            if args.available:
+                ret = 0 if vars.available() else 1
+            elif args.vars:
+                ret = 0
                 for k in vars:
                     if args.show_values:
                         v = vars[k]
@@ -45,9 +47,8 @@ class efiinfo(object):
                         print('%s:%s' % (k,v))
                     else:
                         print(k)
-
-            if args.available:
-                ret = 0 if vars.available() else 1
+            else:
+                ret = 2
 
         return ret
 

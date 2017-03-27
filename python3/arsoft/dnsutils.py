@@ -223,7 +223,7 @@ def read_key_file(filename, format=KeyFileFormat.Zone):
             if ret is None:
                 ret = _read_key_data_tsig(keydata)
         return ret
-    if format == KeyFileFormat.Zone:
+    elif format == KeyFileFormat.Zone:
         return _read_key_file_zone(filename)
     elif format == KeyFileFormat.TSIG:
         return _read_key_file_tsig(filename)
