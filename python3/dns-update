@@ -27,7 +27,7 @@ def _is_hostaddr_equal(a, b):
         else:
             ret = False
     return ret
-    
+
 class dns_update_app(object):
 
     DEFAULT_RRTYPE = 'A'
@@ -79,15 +79,23 @@ class dns_update_app(object):
             ret = self._updates[name]
         else:
             ret = None
-            Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(name)
-            if Origin is not None:
-                for (update_name, update) in self._updates.items():
-                    if update.origin == Origin:
-                        return update
-                ret = dns.update.Update(Origin)
-                if self.keyfile:
-                    arsoft.dnsutils.use_key_file(ret, self.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic)
-                self._updates[name] = ret
+            try:
+                #print('name=%s' % name)
+                Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(name, dnsserver=self.server)
+                if Origin is not None:
+                    for (update_name, update) in self._updates.items():
+                        if update.origin == Origin:
+                            return update
+                    ret = dns.update.Update(Origin)
+                    if self.keyfile:
+                        if not arsoft.dnsutils.use_key_file(ret, self.keyfile, arsoft.dnsutils.KeyFileFormat.Automatic):
+                            sys.stderr.write("Unable to load key file %s\n" % (self.keyfile))
+                            ret = None
+                    if ret:
+                        self._updates[name] = ret
+            except dns.resolver.NoNameservers as e:
+                sys.stderr.write("No nameserver found for %s\n" % (name))
+                ret = None
         return ret
 
     def _add_record(self, args):
@@ -96,11 +104,14 @@ class dns_update_app(object):
         ret = True
         for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            try:
-                update.add(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
-            except dns.exception.SyntaxError as e:
-                sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+            if update is None:
                 ret = False
+            else:
+                try:
+                    update.add(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
+                except dns.exception.SyntaxError as e:
+                    sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                    ret = False
         return ret
 
     def _delete_record(self, args):
@@ -109,11 +120,14 @@ class dns_update_app(object):
         ret = True
         for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            try:
-                update.delete(name, self.rrtype if rrtype is None else rrtype)
-            except dns.exception.SyntaxError as e:
-                sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+            if update is None:
                 ret = False
+            else:
+                try:
+                    update.delete(name, self.rrtype if rrtype is None else rrtype)
+                except dns.exception.SyntaxError as e:
+                    sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                    ret = False
         return ret
 
     def _update_record(self, args):
@@ -122,11 +136,14 @@ class dns_update_app(object):
         ret = True
         for (name, payload, rrtype) in args:
             update = self._get_update_object(name)
-            try:
-                update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
-            except dns.exception.SyntaxError as e:
-                sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+            if update is None:
                 ret = False
+            else:
+                try:
+                    update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
+                except dns.exception.SyntaxError as e:
+                    sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                    ret = False
         return ret
 
     def _update_host(self, args):
@@ -141,19 +158,21 @@ class dns_update_app(object):
 
             name = dns.name.from_text(name)
             update = self._get_update_object(host)
-            update.delete(name, self.rrtype)
-            
-            for addr in addr_list:
-                update.add(name, self.ttl, self.rrtype, addr)
-                if (self.rrtype == 'A' or self.rrtype == 'AAAA') and not self.no_reverse:
-                    # delete reverse addr and re-add it afterwards
-                    revaddrname = dns.reversename.from_address(addr)
-                    Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(revaddrname)
-                    #print(Origin, dummy)
-                    rev_update = self._get_update_object(revaddrname)
-                    if rev_update:
-                        rev_update.delete(revaddrname, 'PTR')
-                        rev_update.add(revaddrname, self.ttl, 'PTR', addr)
+            if update is None:
+                ret = False
+            else:
+                update.delete(name, self.rrtype)
+                for addr in addr_list:
+                    update.add(name, self.ttl, self.rrtype, addr)
+                    if (self.rrtype == 'A' or self.rrtype == 'AAAA') and not self.no_reverse:
+                        # delete reverse addr and re-add it afterwards
+                        revaddrname = dns.reversename.from_address(addr)
+                        Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(revaddrname)
+                        #print(Origin, dummy)
+                        rev_update = self._get_update_object(revaddrname)
+                        if rev_update:
+                            rev_update.delete(revaddrname, 'PTR')
+                            rev_update.add(revaddrname, self.ttl, 'PTR', addr)
         return ret
 
     def _import_host(self, args):
