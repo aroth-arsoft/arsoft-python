@@ -72,7 +72,7 @@ def is_valid_ipv4(Address):
 # Is a valid IPv6 address?
 def is_valid_ipv6(Address):
     try:
-        dns.ipv6.inet_aton(Address) 
+        dns.ipv6.inet_aton(Address)
         ret = True
     except (socket.error, dns.exception.SyntaxError):
         ret = False
@@ -289,7 +289,7 @@ def _get_resolver(dnsserver=None, timeout=None):
         ret.lifetime = float(timeout)
     return ret
 
-def get_dns_zone_for_name(Name, Origin=None):
+def get_dns_zone_for_name(Name, Origin=None, resolver=None, dnsserver=None, timeout=None):
     if isinstance(Name, dns.name.Name):
         n = Name
     else:
@@ -298,8 +298,11 @@ def get_dns_zone_for_name(Name, Origin=None):
         except:
             return None, None
     if Origin is None:
-        Origin = dns.resolver.zone_for_name(n)
+        if resolver is None:
+            resolver = _get_resolver(dnsserver, timeout)
+        Origin = dns.resolver.zone_for_name(n, resolver=resolver)
         Name = n.relativize(Origin)
+        #print(Origin, Name)
         return Origin, Name
     else:
         try:
