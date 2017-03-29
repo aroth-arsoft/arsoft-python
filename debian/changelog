@@ -1,3 +1,10 @@
+arsoft-python (1.303) yakkety; urgency=medium
+
+  * dns: add syntax help and usage info
+  * dns: add option to update one specific record using replace
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 29 Mar 2017 20:11:13 +0200
+
 arsoft-python (1.302) yakkety; urgency=medium
 
   * dns: fixed error handling

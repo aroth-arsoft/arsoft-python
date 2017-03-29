@@ -32,9 +32,23 @@ class dns_update_app(object):
 
     DEFAULT_RRTYPE = 'A'
     DEFAULT_TTL = 86400
-    DEFAULT_SERVER = 'localhost'
     DEFAULT_KEYFILE = None
     DEFAULT_TIMEOUT = 5
+    SYNTAX_HELP = """
+NOTE:
+    If no DNS server is specified the default DNS server is used.
+
+Examples:
+    Add an A-record:
+    dns-update --server 127.0.0.1 -a mail.example.com.=127.0.0.2
+    Add an CNAME-record:
+    dns-update --server 127.0.0.1 -a smtp.example.com.=mail.example.com./CNAME
+    Update an A-record:
+    dns-update --server 127.0.0.1 -u mail.example.com.=127.0.0.3/A
+    Update an NS-record:
+    dns-update --server 127.0.0.1 -u example.com.=first.example.com.:second.example.com./NS
+
+    """
 
     def __init__(self):
         self.verbose = False
@@ -81,7 +95,7 @@ class dns_update_app(object):
             ret = None
             try:
                 #print('name=%s' % name)
-                Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(name, dnsserver=self.server)
+                Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(name, dnsserver=self.server, timeout=self.timeout)
                 if Origin is not None:
                     for (update_name, update) in self._updates.items():
                         if update.origin == Origin:
@@ -95,6 +109,9 @@ class dns_update_app(object):
                         self._updates[name] = ret
             except dns.resolver.NoNameservers as e:
                 sys.stderr.write("No nameserver found for %s\n" % (name))
+                ret = None
+            except dns.exception.Timeout as e:
+                sys.stderr.write("Unable to get DNS zone for %s after %s seconds\n" % (name, self.timeout))
                 ret = None
         return ret
 
@@ -124,7 +141,10 @@ class dns_update_app(object):
                 ret = False
             else:
                 try:
-                    update.delete(name, self.rrtype if rrtype is None else rrtype)
+                    if payload is None:
+                        update.delete(name, self.rrtype if rrtype is None else rrtype)
+                    else:
+                        update.delete(name, self.rrtype if rrtype is None else rrtype, payload)
                 except dns.exception.SyntaxError as e:
                     sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
                     ret = False
@@ -139,11 +159,20 @@ class dns_update_app(object):
             if update is None:
                 ret = False
             else:
-                try:
-                    update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
-                except dns.exception.SyntaxError as e:
-                    sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
-                    ret = False
+                if ':' in payload:
+                    old_payload, new_payload = payload.split(':',1)
+                    try:
+                        update.delete(name, self.rrtype if rrtype is None else rrtype, old_payload)
+                        update.add(name, self.ttl, self.rrtype if rrtype is None else rrtype, new_payload)
+                    except dns.exception.SyntaxError as e:
+                        sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                        ret = False
+                else:
+                    try:
+                        update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
+                    except dns.exception.SyntaxError as e:
+                        sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                        ret = False
         return ret
 
     def _update_host(self, args):
@@ -196,7 +225,7 @@ class dns_update_app(object):
             for (host,rrtype) in hosts_to_import:
                 target_hostaddr = None
                 try:
-                    target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server)
+                    target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server, timeout=self.timeout)
                 except dns.resolver.NoAnswer as e:
                     sys.stderr.write("Failed to retrieve host record %s from target DNS server %s - no answer.\n" % (host, self.server))
                 except dns.resolver.NXDOMAIN as e:
@@ -211,7 +240,7 @@ class dns_update_app(object):
 
                 anotherserver_hostaddr = None
                 try:
-                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver)
+                    anotherserver_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=anotherserver, timeout=self.timeout)
                 except dns.resolver.NoAnswer as e:
                     sys.stderr.write("Failed to retrieve host record %s from remote DNS server %s - no answer.\n" % (host, anotherserver))
                 except dns.resolver.NXDOMAIN as e:
@@ -366,12 +395,14 @@ class dns_update_app(object):
         #=============================================================================================
         # process command line
         #=============================================================================================
-        parser = argparse.ArgumentParser(description='update the DNS information')
+        parser = argparse.ArgumentParser(description='add/update/delete the DNS information',
+                                         formatter_class=argparse.RawDescriptionHelpFormatter,
+                                         epilog=dns_update_app.SYNTAX_HELP)
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('--noop', dest='noop', action='store_true', help='no not actual update anything, just show what would be done.')
         parser.add_argument('--no-reverse', dest='no_reverse', action='store_true', help='no not automatically update PTR records for A/AAAA record.')
         parser.add_argument('--available', dest='available', action='store_true', help='checks if EFI is available on this machine.')
-        parser.add_argument('--server', dest='server', default=self.DEFAULT_SERVER, help='name of the DNS server for updates')
+        parser.add_argument('--server', dest='server', help='name of the DNS server for updates')
         parser.add_argument('--rrtype', dest='rrtype', default=self.DEFAULT_RRTYPE, help='specify the RR type for the next operation')
         parser.add_argument('--ttl', dest='ttl', default=self.DEFAULT_TTL, help='specify the TTL for the records')
         parser.add_argument('-k', '--key', dest='keyfile', default=self.DEFAULT_KEYFILE, help='key to use for the update')
@@ -393,7 +424,10 @@ class dns_update_app(object):
         self.no_reverse = args.no_reverse
         self.ttl = args.ttl
         self.rrtype = args.rrtype
-        self.server = args.server
+        if args.server is None:
+            self.server = arsoft.dnsutils.get_default_dnsserver()
+        else:
+            self.server = args.server
         self.keyfile = args.keyfile
         self.timeout = args.timeout
         self.gssapi = args.gssapi

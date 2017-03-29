@@ -262,6 +262,10 @@ def use_key_file(update_obj, keyfile, format=KeyFileFormat.Zone):
         ret = False
     return ret
 
+def get_default_dnsserver():
+    ret = dns.resolver.get_default_resolver()
+    return ret.nameservers
+
 def _get_resolver(dnsserver=None, timeout=None):
     if dnsserver is not None:
         nameservers = []
@@ -283,7 +287,9 @@ def _get_resolver(dnsserver=None, timeout=None):
             ret = dns.resolver.Resolver()
             ret.nameservers = nameservers
     else:
-       ret = dns.resolver.Resolver()
+       ret = dns.resolver.get_default_resolver()
+       print(ret)
+       print(ret.nameservers)
     if ret is not None and timeout is not None:
         ret.timeout = float(timeout)
         ret.lifetime = float(timeout)
