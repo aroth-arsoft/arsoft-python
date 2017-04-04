@@ -135,39 +135,42 @@ class DovecotBackupPlugin(BackupPlugin):
         if localhost_server_item:
             cxn = localhost_server_item.connection
         if self.config.load_accounts_automatically:
-            try:
-                (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(args=[self.doveadm_exe, 'user', '*'], sudo=True, outputStdErr=False, outputStdOut=False)
-                if sts == 0:
-                    for line in stdout_data.splitlines():
-                        name = line.decode('utf8').strip()
-                        if not name:
-                            continue
-                        local = { 'server_type': 'Maildir', 'maildir': name }
-                        remote = { 'server_type': 'Dovecot', 'server': self.config.server, 'port':self.config.port, 'username': name }
-                        if self.config.master_username and self.config.master_password:
-                            remote['master_username'] = self.config.master_username
-                            remote['master_password'] = self.config.master_password
+            if cxn is None:
+                self.writelog('Unable to get local connection; unable to retrieve mail account information.\n')
+            else:
+                try:
+                    (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(args=[self.doveadm_exe, 'user', '*'], sudo=True, outputStdErr=False, outputStdOut=False)
+                    if sts == 0:
+                        for line in stdout_data.splitlines():
+                            name = line.decode('utf8').strip()
+                            if not name:
+                                continue
+                            local = { 'server_type': 'Maildir', 'maildir': name }
+                            remote = { 'server_type': 'Dovecot', 'server': self.config.server, 'port':self.config.port, 'username': name }
+                            if self.config.master_username and self.config.master_password:
+                                remote['master_username'] = self.config.master_username
+                                remote['master_password'] = self.config.master_password
 
-                        account = OfflineImap.AccountItem(
-                            enabled=True,
-                            name=name,
-                            local=local,
-                            remote=remote
-                            )
-                        if self._offlineimap.add_account(account):
-                            if self.backup_app._verbose:
-                                print('add account %s' % (account))
-                        else:
-                            self.writelog('Got invalid account %s' % (account) )
-                            if not account.local.is_valid:
-                                self.writelog('Got invalid local account config %s' % (account.local) )
-                            if not account.remote.is_valid:
-                                self.writelog('Got invalid remote account config %s' % (account.remote) )
-                    ret = True
-                else:
-                    self.writelog('Unable to get account list from doveadm (Exit code %i, %s)' % (sts, stderr_data.strip()) )
-            except SudoSessionException as e:
-                self.writelog('Unable to get account list from doveadm because sudo failed: %s.\n' % str(e))
+                            account = OfflineImap.AccountItem(
+                                enabled=True,
+                                name=name,
+                                local=local,
+                                remote=remote
+                                )
+                            if self._offlineimap.add_account(account):
+                                if self.backup_app._verbose:
+                                    print('add account %s' % (account))
+                            else:
+                                self.writelog('Got invalid account %s' % (account) )
+                                if not account.local.is_valid:
+                                    self.writelog('Got invalid local account config %s' % (account.local) )
+                                if not account.remote.is_valid:
+                                    self.writelog('Got invalid remote account config %s' % (account.remote) )
+                        ret = True
+                    else:
+                        self.writelog('Unable to get account list from doveadm (Exit code %i, %s)' % (sts, stderr_data.strip()) )
+                except SudoSessionException as e:
+                    self.writelog('Unable to get account list from doveadm because sudo failed: %s.\n' % str(e))
         return ret
 
     def perform_backup(self, **kwargs):

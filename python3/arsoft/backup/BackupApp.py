@@ -376,7 +376,8 @@ class BackupApp(object):
                     self.session.writelog('Failed to create backup directory %s' % backup_dir)
                     ret = False
                 else:
-                    backup_disk = self._diskmgr.get_disk_for_directory(backup_dir)
+                    if self.config.use_disk_manager:
+                        backup_disk = self._diskmgr.get_disk_for_directory(backup_dir)
             if ret:
                 self.session.backup_dir = backup_dir
                 self.session.backup_disk = backup_disk
@@ -397,22 +398,25 @@ class BackupApp(object):
                 ret = self._prepare_backup_dir()
             ret = True
         else:
-            # load all available external discs
-            disk_ready = self._diskmgr.is_disk_ready()
-            if not disk_ready:
-                if not self._diskmgr.load():
-                    self.session.writelog('Failed to load external discs')
-                    sys.stderr.write('Failed to load external discs\n')
-                    ret = 1
+            if self.config.use_disk_manager:
+                # load all available external discs
+                disk_ready = self._diskmgr.is_disk_ready()
+                if not disk_ready:
+                    if not self._diskmgr.load():
+                        self.session.writelog('Failed to load external discs')
+                        sys.stderr.write('Failed to load external discs\n')
+                        ret = 1
+                    else:
+                        self.session.writelog('Waiting for disk for %f seconds' % self.config.disk_timeout)
+                        self._disk_obj = self._diskmgr.wait_for_disk(timeout=self.config.disk_timeout)
+                        if self._disk_obj:
+                            self.disk_loaded = True
+                            disk_ready = True
                 else:
-                    self.session.writelog('Waiting for disk for %f seconds' % self.config.disk_timeout)
-                    self._disk_obj = self._diskmgr.wait_for_disk(timeout=self.config.disk_timeout)
-                    if self._disk_obj:
-                        self.disk_loaded = True
-                        disk_ready = True
+                    # just get the present disk
+                    self._disk_obj = self._diskmgr.get_disk()
             else:
-                # just get the present disk
-                self._disk_obj = self._diskmgr.get_disk()
+                disk_ready = True
 
             if disk_ready:
                 ret = True
@@ -456,30 +460,31 @@ class BackupApp(object):
 
     def shutdown_destination(self):
         ret = True
-        if self.disk_loaded:
-            self._disk_obj = self._diskmgr.update_disk(self._disk_obj)
-            self.plugin_notify_disk_eject()
-            if self._disk_obj:
-                self.session.writelog('Ejecting backup disk %s' % str(self._disk_obj))
-                if not self._diskmgr.eject(self._disk_obj):
-                    self.session.writelog('Failed to eject backup disk %s' % str(self._disk_obj))
-                    ret = False
-                self._disk_obj = None
+        if self.config.use_disk_manager:
+            if self.disk_loaded:
+                self._disk_obj = self._diskmgr.update_disk(self._disk_obj)
+                self.plugin_notify_disk_eject()
+                if self._disk_obj:
+                    self.session.writelog('Ejecting backup disk %s' % str(self._disk_obj))
+                    if not self._diskmgr.eject(self._disk_obj):
+                        self.session.writelog('Failed to eject backup disk %s' % str(self._disk_obj))
+                        ret = False
+                    self._disk_obj = None
+                else:
+                    self.session.writelog('Ejecting backup disk but no disk object available.')
+            elif self.disk_mounted:
+                self._disk_obj = self._diskmgr.update_disk(self._disk_obj)
+                self.plugin_notify_disk_unmount()
+                if self._disk_obj:
+                    self.session.writelog('Unmount backup disk %s' % str(self._disk_obj))
+                    if not self._diskmgr.disk_unmount(self._disk_obj):
+                        self.session.writelog('Failed to unmount backup disk %s' % str(self._disk_obj))
+                        ret = False
+                    self._disk_obj = None
+                else:
+                    self.session.writelog('Mounted backup disk but no disk object available.')
             else:
-                self.session.writelog('Ejecting backup disk but no disk object available.')
-        elif self.disk_mounted:
-            self._disk_obj = self._diskmgr.update_disk(self._disk_obj)
-            self.plugin_notify_disk_unmount()
-            if self._disk_obj:
-                self.session.writelog('Unmount backup disk %s' % str(self._disk_obj))
-                if not self._diskmgr.disk_unmount(self._disk_obj):
-                    self.session.writelog('Failed to unmount backup disk %s' % str(self._disk_obj))
-                    ret = False
-                self._disk_obj = None
-            else:
-                self.session.writelog('Mounted backup disk but no disk object available.')
-        else:
-            self.session.writelog('No backup disk loaded.')
+                self.session.writelog('No backup disk loaded.')
 
         return ret
     
@@ -648,5 +653,8 @@ class BackupApp(object):
                 return BackupApp.RemoteServerConnection(self,item)
             if hostname is not None and item.hostname.lower() == hostname_for_comparison:
                 return BackupApp.RemoteServerConnection(self,item)
+        if hostname_for_comparison == 'localhost':
+            item = BackupConfig.RemoteServerInstance(name='localhost', scheme='local', hostname='localhost')
+            return BackupApp.RemoteServerConnection(self, item)
         return None
 

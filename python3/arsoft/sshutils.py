@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 
-from .utils import runcmdAndGetData, to_commandline, platform_is_windows, python_is_version3, which
+from .utils import runcmdAndGetData, to_commandline, platform_is_windows, python_is_version3, which, isRoot
 from .socket_utils import gethostname
 import sys
 import tempfile
@@ -704,7 +704,7 @@ class LocalConnection(object):
             used_stdout = None
             used_stderr = None
 
-        if not sudo:
+        if not sudo or isRoot():
             return runcmdAndGetData(args, script=script, verbose=self.verbose, outputStdErr=outputStdErr, outputStdOut=outputStdOut,
                                     stdin=used_stdin, stdout=used_stdout, stderr=used_stderr, stderr_to_stdout=stderr_to_stdout,
                                     input=input, cwd=cwd, env=env)

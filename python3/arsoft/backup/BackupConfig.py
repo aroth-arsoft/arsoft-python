@@ -33,6 +33,7 @@ class BackupConfigDefaults(object):
     USE_TIMESTAMP_FOR_BACKUP_DIR = True
     TIMESTAMP_FORMAT_FOR_BACKUP_DIR = '%Y%m%d%H%M%S'
     ACTIVE_PLUGINS = ['git', 'dir', 'mysql', 'trac', 'imap', 'dovecot']
+    USE_DISK_MANAGER = False
     DISK_TAG = None
     DISK_TIMEOUT = 60.0
 
@@ -124,6 +125,7 @@ class BackupConfig(object):
                  use_timestamp_for_backup_dir=BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR,
                  timestamp_format_for_backup_dir=BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR,
                  active_plugins=BackupConfigDefaults.ACTIVE_PLUGINS,
+                 use_disk_manager=BackupConfigDefaults.USE_DISK_MANAGER,
                  disk_tag=BackupConfigDefaults.DISK_TAG,
                  disk_timeout=BackupConfigDefaults.DISK_TIMEOUT,
                  filelist_include=None, 
@@ -152,6 +154,7 @@ class BackupConfig(object):
         self.use_timestamp_for_backup_dir = use_timestamp_for_backup_dir
         self.timestamp_format_for_backup_dir = timestamp_format_for_backup_dir
         self.active_plugins = active_plugins
+        self.use_disk_manager = use_disk_manager
         self.disk_tag = disk_tag
         self.disk_timeout = disk_timeout
         self._remote_servers = []
@@ -181,6 +184,7 @@ class BackupConfig(object):
         self.use_timestamp_for_backup_dir = BackupConfigDefaults.USE_TIMESTAMP_FOR_BACKUP_DIR
         self.timestamp_format_for_backup_dir = BackupConfigDefaults.TIMESTAMP_FORMAT_FOR_BACKUP_DIR
         self.active_plugins = BackupConfigDefaults.ACTIVE_PLUGINS
+        self.use_disk_manager = BackupConfigDefaults.USE_DISK_MANAGER
         self.disk_tag = BackupConfigDefaults.DISK_TAG
         self.disk_timeout = BackupConfigDefaults.DISK_TIMEOUT
         self._remote_servers = []
@@ -402,6 +406,7 @@ class BackupConfig(object):
         self.filelist_include_dir = self._chroot_dir(inifile.get(None, 'FileListIncludeDirectory', BackupConfigDefaults.INCLUDE_DIR))
         self.filelist_exclude_dir = self._chroot_dir(inifile.get(None, 'FileListExcludeDirectory', BackupConfigDefaults.EXCLUDE_DIR))
         self.active_plugins = inifile.getAsArray(None, 'ActivePlugins', BackupConfigDefaults.ACTIVE_PLUGINS)
+        self.use_disk_manager = inifile.getAsBoolean(None, 'UseDiskManager', BackupConfigDefaults.USE_DISK_MANAGER)
         self.disk_tag = inifile.get(None, 'DiskTag', BackupConfigDefaults.DISK_TAG)
         self.disk_timeout = inifile.get(None, 'DiskTimeout', BackupConfigDefaults.DISK_TIMEOUT)
         return ret
@@ -430,6 +435,7 @@ class BackupConfig(object):
         inifile.set(None, 'FileListIncludeDirectory', self._unchroot_dir(self.filelist_include_dir))
         inifile.set(None, 'FileListExcludeDirectory', self._unchroot_dir(self.filelist_exclude_dir))
         inifile.set(None, 'ActivePlugins', self.active_plugins)
+        inifile.set(None, 'UseDiskManager', self.use_disk_manager)
         inifile.set(None, 'DiskTag', self.disk_tag)
         inifile.set(None, 'DiskTimeout', self.disk_timeout)
 
@@ -478,6 +484,7 @@ class BackupConfig(object):
         ret = ret + 'use timestamp for backup dirs: ' + str(self.use_timestamp_for_backup_dir) + '\n'
         ret = ret + 'timestamp format for backup dirs: ' + str(self.timestamp_format_for_backup_dir) + '\n'
         ret = ret + 'active plugins: ' + str(self.active_plugins) + '\n'
+        ret = ret + 'use disk manager: ' + str(self.use_disk_manager) + '\n'
         ret = ret + 'disk tag: ' + str(self.disk_tag) + '\n'
         ret = ret + 'disk timeout: ' + str(self.disk_timeout) + '\n'
         ret = ret + 'servers:\n'
