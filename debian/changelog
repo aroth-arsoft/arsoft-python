@@ -1,3 +1,9 @@
+arsoft-python (1.304) yakkety; urgency=medium
+
+  * backup: various fixes and improvements
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 05 Apr 2017 07:31:16 +0200
+
 arsoft-python (1.303) yakkety; urgency=medium
 
   * dns: add syntax help and usage info
