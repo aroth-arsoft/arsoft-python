@@ -32,6 +32,7 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         self.mail_gid = inifile.get(None, 'mail_gid', 'vmail')
         self.backup_mail_location = inifile.get(None, 'backup_mail_location', 'maildir:/var/vmail/backup/%d/%n')
         self.load_accounts_automatically = inifile.get(None, 'load_accounts_automatically', True)
+        self.use_sudo = inifile.get(None, 'use_sudo', True)
         self.server = inifile.get(None, 'server', self.backup_app.fqdn)
         self.port = inifile.get(None, 'port', 143)
         self.master_username = inifile.get(None, 'master_username', 'doveadm')
@@ -139,7 +140,7 @@ class DovecotBackupPlugin(BackupPlugin):
                 self.writelog('Unable to get local connection; unable to retrieve mail account information.\n')
             else:
                 try:
-                    (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(args=[self.doveadm_exe, 'user', '*'], sudo=True, outputStdErr=False, outputStdOut=False)
+                    (sts, stdout_data, stderr_data) = cxn.runcmdAndGetData(args=[self.doveadm_exe, 'user', '*'], sudo=self.config.use_sudo, outputStdErr=False, outputStdOut=False)
                     if sts == 0:
                         for line in stdout_data.splitlines():
                             name = line.decode('utf8').strip()
