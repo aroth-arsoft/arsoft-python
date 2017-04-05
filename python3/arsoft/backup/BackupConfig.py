@@ -249,7 +249,7 @@ class BackupConfig(object):
     def remote_servers(self):
         return self._remote_servers
 
-    def open(self, config_dir=None, instance=None, root_dir=None):
+    def open(self, config_dir=None, instance=None, root_dir=None, create_if_not_exists=False):
         self.root_dir = root_dir
         self.instance = instance
         if config_dir is None:
@@ -265,10 +265,13 @@ class BackupConfig(object):
             self.config_dir = config_dir
 
         if not os.path.isdir(config_dir):
-            try:
-                os.mkdir(config_dir)
-            except OSError:
-                pass
+            if create_if_not_exists:
+                try:
+                    os.mkdir(config_dir)
+                except OSError:
+                    pass
+            else:
+                return False
 
         if not os.path.isfile(self.main_conf):
             save_config_file = True
@@ -395,7 +398,6 @@ class BackupConfig(object):
         self.use_filesystem_hardlinks = inifile.getAsBoolean(None, 'UseFilesystemHardlinks', BackupConfigDefaults.USE_FILESYSTEM_HARDLINKS)
         self.use_ssh_for_rsync = inifile.getAsBoolean(None, 'UseSSHForRsync', BackupConfigDefaults.USE_SSH_FOR_RSYNC)
         ssh_identity_file_raw = inifile.get(None, 'SSHIdentityFile', BackupConfigDefaults.SSH_IDENTITY_FILE)
-        print('got ssh_identity_file_raw=%s' % ssh_identity_file_raw)
         if ssh_identity_file_raw:
             self.ssh_identity_file = os.path.join(config_dir, ssh_identity_file_raw)
         else:

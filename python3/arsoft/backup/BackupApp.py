@@ -232,8 +232,10 @@ class BackupApp(object):
         ret = True
         self.root_dir = root_dir
         self.instance = instance
-        self.config.open(config_dir, root_dir=root_dir, instance=instance)
-        self.job_state.open(state_dir, root_dir=root_dir, instance=instance, verbose=self._verbose)
+        if not self.config.open(config_dir, root_dir=root_dir, instance=instance):
+            ret = False
+        if not self.job_state.open(state_dir, root_dir=root_dir, instance=instance, verbose=self._verbose):
+            ret = False
 
         (fqdn, hostname, domain) = gethostname_tuple()
         self.fqdn = fqdn
