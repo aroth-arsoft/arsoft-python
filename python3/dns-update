@@ -47,12 +47,74 @@ Examples:
     dns-update --server 127.0.0.1 -u mail.example.com.=127.0.0.3/A
     Update an NS-record:
     dns-update --server 127.0.0.1 -u example.com.=first.example.com.:second.example.com./NS
-
+    Update an SOA-record:
+    dns-update --server 127.0.0.1 -u example.com.=admin=admin.example.com.,ttl=86400/SOA
     """
 
     def __init__(self):
         self.verbose = False
         self._updates = {}
+
+    class arg_data(object):
+        def __init__(self, arg, rrtype=None):
+            self._name = None
+            self._rrtype = rrtype
+
+            arg_name = None
+            arg_value = None
+            arg_rrtype = None
+            i = arg.find('=')
+            if i >= 0:
+                arg_name = arg[0:i]
+                arg_value = arg[i+1:]
+                if '/' in arg_name:
+                    (arg_name, arg_rrtype) = arg_name.split('/', 1)
+                elif '/' in arg_value:
+                    (arg_value, arg_rrtype) = arg_value.split('/', 1)
+                else:
+                    arg_rrtype = None
+
+
+                if '=' in arg_value:
+                    arg_dict = {}
+                    for v in arg_value.split(','):
+                        if '=' in v:
+                            v_name, v_val = v.split('=')
+                            arg_dict[v_name] = v_val
+                    arg_value = arg_dict
+                elif ',' in arg_value:
+                    arg_value = arg_value.split(',')
+                elif ' ' in arg_value:
+                    arg_value = arg_value.split(' ')
+            else:
+                if '/' in arg:
+                    (arg_name, arg_rrtype) = arg.split('/', 1)
+                else:
+                    arg_name = arg
+
+            self._name = arg_name
+            self._value = arg_value
+
+        @property
+        def name(self):
+            return self._name
+
+        @property
+        def value(self):
+            if isinstance(self._value, dict):
+                values = []
+                for (k, v) in self._value.items():
+                    values.append(str(v))
+            elif isinstance(self._value, list):
+                values = self._value
+            else:
+                values = [ self._value ]
+            return ' '.join(values)
+
+    @staticmethod
+    def _parse_payload(str, rrtype=None):
+        if str is None:
+            return None
 
     @staticmethod
     def _split_arg(arg):
@@ -64,7 +126,7 @@ Examples:
                 (value, rrtype) = value.split('/', 1)
             else:
                 rrtype = None
-            return (key, value, rrtype)
+            return (key, dns_update_app.payload_data(value, rrtype=rrtype), rrtype)
         else:
             if '/' in arg:
                 (key, rrtype) = arg.split('/', 1)
@@ -87,6 +149,7 @@ Examples:
             return ret
         else:
             return None
+
 
     def _get_update_object(self, name):
         if name in self._updates:
@@ -159,7 +222,8 @@ Examples:
             if update is None:
                 ret = False
             else:
-                if ':' in payload:
+                print('payload: %s' % payload)
+                if payload is not None and ':' in payload:
                     old_payload, new_payload = payload.split(':',1)
                     try:
                         update.delete(name, self.rrtype if rrtype is None else rrtype, old_payload)
@@ -169,7 +233,10 @@ Examples:
                         ret = False
                 else:
                     try:
-                        update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
+                        if payload is None:
+                            update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype)
+                        else:
+                            update.replace(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
                     except dns.exception.SyntaxError as e:
                         sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
                         ret = False
