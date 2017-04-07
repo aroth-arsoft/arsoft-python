@@ -97,6 +97,7 @@ Examples:
             else:
                 arg_name = arg
 
+            #print('>> got arg %s, %s, %s' % (arg_name, arg_rrtype, arg_value))
             if arg_name is not None:
                 try:
                     self._name = dns.name.from_text(arg_name)
@@ -148,58 +149,59 @@ Examples:
         def __str__(self):
             return self.name + ' ' + self.value
 
-        def _get_item(self, possible_keys, default_value=None):
-            if not isinstance(self._value, dict):
-                return default_value
-            target_type = type(default_value)
-            if isinstance(possible_keys, list):
-                for k in possible_keys:
-                    if k in self._value:
-                        return target_type(self._value[k])
-                return default_value
+        def _get_item(self, possible_keys, default_value=None, index=None):
+            target_type = None if default_value is None else type(default_value)
+            if isinstance(self._value, dict):
+                if isinstance(possible_keys, list):
+                    for k in possible_keys:
+                        if k in self._value:
+                            return target_type(self._value[k]) if target_type is not None else self._value[k]
+                    return default_value
+                else:
+                    if possible_keys in self._value:
+                        return target_type(self._value[possible_keys]) if target_type is not None else self._value[possible_keys]
+                    return default_value
+            elif isinstance(self._value, list):
+                if index is None:
+                    return default_value
+                else:
+                    if index < len(self._value):
+                        return target_type(self._value[index]) if target_type is not None else self._value[index]
+                    else:
+                        return default_value
             else:
-                if possible_keys in self._value:
-                    return target_type(self._value[possible_keys])
-                return default_value
+                if index is not None and index == 0:
+                    return target_type(self._value) if target_type is not None else None
+                else:
+                    return default_value
 
         def to_payload(self):
             if self._rrtype is None:
                 return None
             elif self._rrtype == dns.rdatatype.A or self._rrtype == dns.rdatatype.AAAA:
-                return str(self._value)
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
+                return '%s' % (addr) if addr is not None else None
+            elif self._rrtype == dns.rdatatype.MX:
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
+                priority = self._get_item(['priority', 'prio'], 10)
+                return '%i %s' % (priority, addr) if addr is not None else None
+            elif self._rrtype == dns.rdatatype.PTR:
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
+                return '%s' % (addr) if addr is not None else None
+            elif self._rrtype == dns.rdatatype.CNAME:
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
+                return '%s' % (addr) if addr is not None else None
             elif self._rrtype == dns.rdatatype.SOA:
-                rname = self._get_item(['admin', 'rname'], 'hostmaster.%s' % self.name)
-                mname = self._get_item(['master', 'mname'], 'master.%s' % self.name)
-                retry = self._get_item(['retry', 'ret'], 900)
-                refresh = self._get_item(['refresh', 'ref'], 86400)
-                minimum = self._get_item(['minimum', 'min'], 3600)
-                expire = self._get_item(['expire', 'ex'], 86400)
-                serial = self._get_item(['serial', 'sn'], 0)
+                mname = self._get_item(['master', 'mname'], 'master.%s' % self.name, index=0)
+                rname = self._get_item(['admin', 'rname'], 'hostmaster.%s' % self.name, index=1)
+                serial = self._get_item(['serial', 'sn'], 0, index=2)
+                refresh = self._get_item(['refresh', 'ref'], 86400, index=3)
+                retry = self._get_item(['retry', 'ret'], 900, index=4)
+                expire = self._get_item(['expire', 'ex'], 86400, index=5)
+                minimum = self._get_item(['minimum', 'min'], 3600, index=6)
                 return '%s %s (%i %i %i %i %i)' % (mname, rname, serial, refresh, retry, expire, minimum)
-            return None
-
-    @staticmethod
-    def _parse_payload(str, rrtype=None):
-        if str is None:
-            return None
-
-    @staticmethod
-    def _split_arg(arg):
-        if '=' in arg:
-            (key, value) = arg.split('=', 1)
-            if '/' in key:
-                (key, rrtype) = key.split('/', 1)
-            elif '/' in value:
-                (value, rrtype) = value.split('/', 1)
             else:
-                rrtype = None
-            return (key, dns_update_app.payload_data(value, rrtype=rrtype), rrtype)
-        else:
-            if '/' in arg:
-                (key, rrtype) = arg.split('/', 1)
-            else:
-                key, rrtype = (arg, None)
-            return (key, None, rrtype)
+                raise Exception('not implmented')
 
     @staticmethod
     def _split_args(args):
@@ -208,7 +210,7 @@ Examples:
         for arg in args:
             item = dns_update_app.arg_data(arg)
             if not item.valid:
-                sys.stderr.write("Invalid syntax for DNS name \"%s\".\n" % (item.name))
+                sys.stderr.write("Invalid syntax for DNS record \"%s\".\n" % (arg))
                 ok = False
             elif str(item.name)[-1] != '.':
                 sys.stderr.write("Missing dot at the end of \"%s\". This is most likely unintentional and cause wrongful DNS records.\n" % (item.name))
@@ -292,9 +294,9 @@ Examples:
             if update is None:
                 ret = False
             else:
-                print('arg: %s' % arg.raw)
+                #print('arg: %s' % arg.raw)
                 payload = arg.to_payload()
-                print('arg payload: %s' % payload)
+                #print('arg payload: %s' % payload)
                 if payload is not None and ':' in payload:
                     old_payload, new_payload = payload, payload
                     try:
