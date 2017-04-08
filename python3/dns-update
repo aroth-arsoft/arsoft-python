@@ -46,9 +46,12 @@ Examples:
     Update an internet (IN) class A-record:
     dns-update --server 127.0.0.1 -u mail.example.com.=127.0.0.3/A:IN
     Update an NS-record:
-    dns-update --server 127.0.0.1 -u example.com.=first.example.com.:second.example.com./NS
+    dns-update --server 127.0.0.1 -u 'example.com.=first.example.com.|second.example.com./NS'
     Update an SOA-record:
     dns-update --server 127.0.0.1 -u example.com.=admin=admin.example.com.,ttl=86400/SOA
+    dns-update --server 127.0.0.1 -u example.com.=master:ns1.example.com.,ttl:86400/SOA
+    Add SPF TXT record:
+    dns-update --server 127.0.0.1 -a "example.com.=v=spf1 include:_spf.google.com ~all/TXT"
     """
 
     def __init__(self):
@@ -58,13 +61,18 @@ Examples:
     class arg_data(object):
         def __init__(self, arg):
             self._name = None
+            self._server = None
             self._valid = False
             self._rrtype = None
             self._ttl = 0
             self._classtype = None
 
             arg_name = None
+            arg_server = None
+            arg_rrtype = None
+            arg_classtype = None
             arg_value = None
+            arg_oldvalue = None
 
             i = arg.rfind('/')
             if i >= 0:
@@ -74,28 +82,43 @@ Examples:
                     arg_rrtype, arg_classtype = arg_rrtype.split(':', 1)
                 else:
                     arg_classtype = 'IN'
-            i = arg.find('=')
-            if i >= 0:
-                arg_name = arg[0:i]
-                arg_value = arg[i+1:]
-
-                if '=' in arg_value or ':' in arg_value:
-                    arg_dict = {}
-                    for v in arg_value.split(','):
-                        if '=' in v:
-                            v_name, v_val = v.split('=')
-                            arg_dict[v_name] = v_val
-                        elif ':' in v:
-                            v_name, v_val = v.split(':')
-                            arg_dict[v_name] = v_val
-
-                    arg_value = arg_dict
-                elif ',' in arg_value:
-                    arg_value = arg_value.split(',')
-                elif ' ' in arg_value:
-                    arg_value = arg_value.split(' ')
+            if arg[0] == '@':
+                arg_server = arg[1:]
             else:
-                arg_name = arg
+                i = arg.find('=')
+                if i >= 0:
+                    arg_name = arg[0:i]
+                    arg_value = arg[i+1:]
+
+                    if ('=' in arg_value or ':' in arg_value) and arg_rrtype != 'TXT':
+                        arg_dict = {}
+                        arg_olddict = {}
+                        for v in arg_value.split(','):
+                            if '=' in v:
+                                v_name, v_val = v.split('=')
+                                arg_dict[v_name] = v_val
+                            elif ':' in v:
+                                v_name, v_val = v.split(':')
+                                arg_dict[v_name] = v_val
+
+                        arg_value = arg_dict
+                    elif (',' in arg_value or ' ' in arg_value) and arg_rrtype != 'TXT':
+                        arg_value_split = arg_value.split(',') if ',' in arg_value else arg_value.split(' ')
+                        arg_list = []
+                        arg_oldlist = []
+                        for e in arg_value_split:
+                            if '|' in e:
+                                old, new = e.split('|', 1)
+                                arg_oldlist.append(old)
+                                arg_list.append(new)
+                            else:
+                                arg_list.append(e)
+                        arg_value = arg_list if len(arg_list) else None
+                        arg_oldvalue = arg_oldlist if len(arg_oldlist) else None
+                    elif '|' in arg_value:
+                        arg_oldvalue, arg_value = arg_value.split('|', 1)
+                else:
+                    arg_name = arg
 
             #print('>> got arg %s, %s, %s' % (arg_name, arg_rrtype, arg_value))
             if arg_name is not None:
@@ -105,14 +128,26 @@ Examples:
                 except dns.exception.SyntaxError as e:
                     pass
 
+            if arg_server is not None:
+                try:
+                    self._server = dns.name.from_text(arg_server)
+                    self._valid = True
+                except dns.exception.SyntaxError as e:
+                    pass
+
             if arg_rrtype is not None:
                 try:
                     self._rrtype = dns.rdatatype.from_text(arg_rrtype)
                 except dns.exception.SyntaxError as e:
                     self._valid = False
+            else:
+                self._rrtype = dns.rdatatype.from_text('A')
+            if arg_classtype is None:
+                arg_classtype = 'IN'
 
             self._classtype = arg_classtype
             self._value = arg_value
+            self._oldvalue = arg_oldvalue
 
         @property
         def valid(self):
@@ -120,7 +155,9 @@ Examples:
 
         @property
         def rrtype(self):
-            return self._rrtype
+            if self._rrtype is None:
+                return None
+            return dns.rdatatype.to_text(self._rrtype)
 
         @property
         def ttl(self):
@@ -131,8 +168,16 @@ Examples:
             return self._name.to_text()
 
         @property
+        def has_server(self):
+            return True if self._server is not None else False
+
+        @property
+        def server(self):
+            return self._server.to_text()
+
+        @property
         def raw(self):
-            return '%s %s %s %s' % (self._name.to_text(), self._classtype, dns.rdatatype.to_text(self._rrtype), self._value)
+            return '%s %s %s %s=%s' % (self._name.to_text(), self._classtype, self.rrtype, self._oldvalue, self._value)
 
         @property
         def value(self):
@@ -146,59 +191,78 @@ Examples:
                 values = [ self._value ]
             return ' '.join(values)
 
-        def __str__(self):
-            return self.name + ' ' + self.value
+        @property
+        def has_old_value(self):
+            return True if self._oldvalue is not None else False
 
-        def _get_item(self, possible_keys, default_value=None, index=None):
+        def __str__(self):
+            if self._rrtype:
+                return self.name + ' ' + self.value + '/' + self.rrtype
+            else:
+                return self.name + ' ' + self.value
+
+        def _get_item(self, possible_keys, default_value=None, index=None, old=False):
+            if old:
+                return self._get_item_impl(self._oldvalue, possible_keys, default_value, index)
+            else:
+                return self._get_item_impl(self._value, possible_keys, default_value, index)
+
+        def _get_item_impl(self, var, possible_keys, default_value=None, index=None):
             target_type = None if default_value is None else type(default_value)
-            if isinstance(self._value, dict):
+            if isinstance(var, dict):
                 if isinstance(possible_keys, list):
                     for k in possible_keys:
-                        if k in self._value:
-                            return target_type(self._value[k]) if target_type is not None else self._value[k]
+                        if k in var:
+                            return target_type(var[k]) if target_type is not None else var[k]
                     return default_value
                 else:
-                    if possible_keys in self._value:
-                        return target_type(self._value[possible_keys]) if target_type is not None else self._value[possible_keys]
+                    if possible_keys in var:
+                        return target_type(var[possible_keys]) if target_type is not None else var[possible_keys]
                     return default_value
-            elif isinstance(self._value, list):
+            elif isinstance(var, list):
                 if index is None:
                     return default_value
                 else:
-                    if index < len(self._value):
-                        return target_type(self._value[index]) if target_type is not None else self._value[index]
+                    if index < len(var):
+                        return target_type(var[index]) if target_type is not None else var[index]
                     else:
                         return default_value
             else:
                 if index is not None and index == 0:
-                    return target_type(self._value) if target_type is not None else None
+                    return target_type(var) if target_type is not None else var
                 else:
                     return default_value
 
-        def to_payload(self):
+        def to_payload(self, old=False):
             if self._rrtype is None:
                 return None
             elif self._rrtype == dns.rdatatype.A or self._rrtype == dns.rdatatype.AAAA:
-                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0, old=old)
                 return '%s' % (addr) if addr is not None else None
             elif self._rrtype == dns.rdatatype.MX:
-                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
-                priority = self._get_item(['priority', 'prio'], 10)
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0, old=old)
+                priority = self._get_item(['priority', 'prio'], 10, old=old)
                 return '%i %s' % (priority, addr) if addr is not None else None
             elif self._rrtype == dns.rdatatype.PTR:
-                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0, old=old)
                 return '%s' % (addr) if addr is not None else None
             elif self._rrtype == dns.rdatatype.CNAME:
-                addr = self._get_item(['addr', 'host', 'address'], None, index=0)
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0, old=old)
                 return '%s' % (addr) if addr is not None else None
+            elif self._rrtype == dns.rdatatype.NS:
+                addr = self._get_item(['addr', 'host', 'address'], None, index=0, old=old)
+                return '%s' % (addr) if addr is not None else None
+            elif self._rrtype == dns.rdatatype.TXT:
+                text = self._get_item(['txt', 'text'], None, index=0, old=old)
+                return '"%s"' % (text) if text is not None else None
             elif self._rrtype == dns.rdatatype.SOA:
-                mname = self._get_item(['master', 'mname'], 'master.%s' % self.name, index=0)
-                rname = self._get_item(['admin', 'rname'], 'hostmaster.%s' % self.name, index=1)
-                serial = self._get_item(['serial', 'sn'], 0, index=2)
-                refresh = self._get_item(['refresh', 'ref'], 86400, index=3)
-                retry = self._get_item(['retry', 'ret'], 900, index=4)
-                expire = self._get_item(['expire', 'ex'], 86400, index=5)
-                minimum = self._get_item(['minimum', 'min'], 3600, index=6)
+                mname = self._get_item(['master', 'mname'], 'master.%s' % self.name, index=0, old=old)
+                rname = self._get_item(['admin', 'rname'], 'hostmaster.%s' % self.name, index=1, old=old)
+                serial = self._get_item(['serial', 'sn'], 0, index=2, old=old)
+                refresh = self._get_item(['refresh', 'ref'], 86400, index=3, old=old)
+                retry = self._get_item(['retry', 'ret'], 900, index=4, old=old)
+                expire = self._get_item(['expire', 'ex'], 86400, index=5, old=old)
+                minimum = self._get_item(['minimum', 'min'], 3600, index=6, old=old)
                 return '%s %s (%i %i %i %i %i)' % (mname, rname, serial, refresh, retry, expire, minimum)
             else:
                 raise Exception('not implmented')
@@ -211,9 +275,6 @@ Examples:
             item = dns_update_app.arg_data(arg)
             if not item.valid:
                 sys.stderr.write("Invalid syntax for DNS record \"%s\".\n" % (arg))
-                ok = False
-            elif str(item.name)[-1] != '.':
-                sys.stderr.write("Missing dot at the end of \"%s\". This is most likely unintentional and cause wrongful DNS records.\n" % (item.name))
                 ok = False
             else:
                 ret.append( item )
@@ -254,15 +315,23 @@ Examples:
         if args is None:
             return False
         ret = True
-        for (name, payload, rrtype) in args:
-            update = self._get_update_object(name)
+        for arg in args:
+            update = self._get_update_object(arg.name)
             if update is None:
                 ret = False
             else:
+                payload = arg.to_payload(old=False)
+                if payload is None:
+                    sys.stderr.write("Unable to convert %s to DNS payload\n" % (arg.raw))
+                    continue
+
+                if arg.has_old_value:
+                    sys.stderr.write("WARNING: given record has an old value. Use update instead of add operation to use the old value.\n")
+
                 try:
-                    update.add(name, self.ttl, self.rrtype if rrtype is None else rrtype, payload)
+                    update.add(arg.name, arg.ttl, arg.rrtype, payload)
                 except dns.exception.SyntaxError as e:
-                    sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                    sys.stderr.write("Syntax error for adding %s record %s: %s\n" % (arg.rrtype, arg.name, payload))
                     ret = False
         return ret
 
@@ -270,18 +339,23 @@ Examples:
         if args is None:
             return False
         ret = True
-        for (name, payload, rrtype) in args:
-            update = self._get_update_object(name)
+        for arg in args:
+            update = self._get_update_object(arg.name)
             if update is None:
                 ret = False
             else:
+                payload = arg.to_payload(old=False)
+                if payload is None:
+                    sys.stderr.write("Unable to convert %s to DNS payload\n" % (arg.raw))
+                    continue
+
                 try:
                     if payload is None:
-                        update.delete(name, self.rrtype if rrtype is None else rrtype)
+                        update.delete(arg.name, arg.rrtype)
                     else:
-                        update.delete(name, self.rrtype if rrtype is None else rrtype, payload)
+                        update.delete(arg.name, arg.rrtype, payload)
                 except dns.exception.SyntaxError as e:
-                    sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                    sys.stderr.write("Syntax error for delete %s record %s: %s\n" % (arg.rrtype, arg.name, payload))
                     ret = False
         return ret
 
@@ -294,25 +368,31 @@ Examples:
             if update is None:
                 ret = False
             else:
-                #print('arg: %s' % arg.raw)
-                payload = arg.to_payload()
-                #print('arg payload: %s' % payload)
-                if payload is not None and ':' in payload:
-                    old_payload, new_payload = payload, payload
+                payload = arg.to_payload(old=False)
+                if payload is None:
+                    sys.stderr.write("Unable to convert %s to DNS payload\n" % (arg.raw))
+                    continue
+
+                if arg.has_old_value:
+                    old_payload = arg.to_payload(old=True)
+                    delete_ok = False
                     try:
                         update.delete(arg.name, arg.rrtype, old_payload)
-                        update.add(arg.name, arg.ttl, arg.rrtype, new_payload)
+                        delete_ok = True
                     except dns.exception.SyntaxError as e:
-                        sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                        sys.stderr.write("Syntax error for delete %s record %s: %s\n" % (arg.rrtype, arg.name, old_payload))
                         ret = False
+                    if delete_ok:
+                        try:
+                            update.add(arg.name, arg.ttl, arg.rrtype, payload)
+                        except dns.exception.SyntaxError as e:
+                            sys.stderr.write("Syntax error for adding %s record %s: %s\n" % (arg.rrtype, arg.name, payload))
+                            ret = False
                 else:
                     try:
-                        if payload is None:
-                            update.replace(arg.name, arg.ttl, arg.rrtype)
-                        else:
-                            update.replace(arg.name, arg.ttl, arg.rrtype, payload)
+                        update.replace(arg.name, arg.ttl, arg.rrtype, payload)
                     except dns.exception.SyntaxError as e:
-                        sys.stderr.write("Syntax error for %s record %s: %s\n" % (self.rrtype if rrtype is None else rrtype, name, payload))
+                        sys.stderr.write("Syntax error for adding %s record %s: %s\n" % (arg.rrtype, arg.name, payload))
                         ret = False
         return ret
 
@@ -320,7 +400,7 @@ Examples:
         if args is None:
             return False
         ret = True
-        for (name, payload, rrtype) in args:
+        for arg in args:
             if isinstance(payload, list):
                 addr_list = payload
             else:
@@ -351,11 +431,11 @@ Examples:
         anotherserver = None
         hosts_to_import = []
 
-        for (name, payload, rrtype) in args:
-            if name[0] == '@':
-                anotherserver = name[1:]
+        for arg in args:
+            if arg.has_server:
+                anotherserver = arg.server
             else:
-                hosts_to_import.append( (name, rrtype) )
+                hosts_to_import.append( arg )
 
         if anotherserver is None:
             sys.stderr.write("No DNS server to query specified.\n")
@@ -363,7 +443,10 @@ Examples:
         else:
             ipv6 = True if self.rrtype == 'AAAA' else False
             ret = True
-            for (host,rrtype) in hosts_to_import:
+            for arg in hosts_to_import:
+                host = arg.name
+                rrtype = arg.rrtype
+
                 target_hostaddr = None
                 try:
                     target_hostaddr = arsoft.dnsutils.get_dns_host_record(host, ipv6=ipv6, dnsserver=self.server, timeout=self.timeout)
@@ -505,31 +588,38 @@ Examples:
         return ret
 
     def _lookup_hosts(self, args):
-        if args is None:
-            return False
+
+        ret = True
         dnsserver = self.server
         hosts_to_lookup = []
-
-        for (name, payload, rrtype) in args:
-            if name[0] == '@':
-                dnsserver = name[1:]
+        for arg in args:
+            if arg.has_server:
+                dnsserver = arg.server
             else:
-                hosts_to_lookup.append((name, payload, rrtype))
+                hosts_to_lookup.append( arg )
 
-        ipv6 = True if self.rrtype == 'AAAA' else False
-        ret = True
-        for (name, payload, rrtype) in hosts_to_lookup:
+        for arg in hosts_to_lookup:
+            host = arg.name
+            rrtype = arg.rrtype
+
             hostaddr = None
             try:
-                hostaddr = arsoft.dnsutils.get_dns_host_record(name, ipv6=ipv6, dnsserver=dnsserver, timeout=self.timeout)
+                resolver = arsoft.dnsutils._get_resolver(dnsserver, timeout=self.timeout)
+                if resolver:
+                    answers = resolver.query(arg.name, arg.rrtype)
+                    for rdata in answers:
+                        print(rdata)
+                else:
+                    ret = False
             except dns.resolver.NoAnswer as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - no answer.\n" % (name, dnsserver))
+                sys.stderr.write("Failed to retrieve %s record %s from DNS server %s - no answer.\n" % (arg.rrtype, arg.name, dnsserver))
+                ret = False
             except dns.resolver.NXDOMAIN as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - domain does not exist.\n" % (name, dnsserver))
+                sys.stderr.write("Failed to retrieve %s record %s from DNS server %s - domain does not exist.\n" % (arg.rrtype, arg.name, dnsserver))
+                ret = False
             except dns.exception.Timeout as e:
-                sys.stderr.write("Failed to retrieve host record %s from DNS server %s - timeout.\n" % (name, dnsserver))
-            if hostaddr is not None:
-                print('%s %s' % (name, hostaddr))
+                sys.stderr.write("Failed to retrieve %s record %s from DNS server %s - timeout.\n" % (arg.rrtype, arg.name, dnsserver))
+                ret = False
         return ret
 
     def main(self):
@@ -609,7 +699,7 @@ Examples:
             else:
                 ret = 0
                 for (host, update) in self._updates.items():
-                    if self.verbose:
+                    if self.verbose or self.noop:
                         print('update %s with:\n%s\n' % (host, update))
                     if not self.noop:
                         try:
