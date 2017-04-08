@@ -1,3 +1,9 @@
+arsoft-python (1.305) yakkety; urgency=medium
+
+  * dns: rewrite argument parsing and improve updates
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 08 Apr 2017 17:54:40 +0200
+
 arsoft-python (1.304) yakkety; urgency=medium
 
   * backup: various fixes and improvements
