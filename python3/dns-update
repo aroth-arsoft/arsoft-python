@@ -11,6 +11,7 @@ import dns.update
 import dns.reversename
 import dns.zone
 import socket
+import datetime
 
 def _is_hostaddr_equal(a, b):
     if a is None and b is None:
@@ -35,11 +36,14 @@ class RecordFieldError(Exception):
 
 class dns_update_app(object):
 
+    RDATA_ANY_FIELDS = [
+        ('ttl', [] ),
+        ]
     RDATA_FIELDS = {
         dns.rdatatype.AAAA:     [ ('addr', ['host', 'address'] ) ],
         dns.rdatatype.A:        [ ('addr', ['host', 'address'] ) ],
         dns.rdatatype.MX:       [ ('addr', ['host', 'address', 'exchange', 'ex'] ), ('priority', ['prio', 'preference'] ) ],
-        dns.rdatatype.CNAME:    [ ('addr', ['host', 'address'] ) ],
+        dns.rdatatype.CNAME:    [ ('target', ['addr', 'host', 'address'] ) ],
         dns.rdatatype.PTR:      [ ('addr', ['host', 'address'] ) ],
         dns.rdatatype.NS:       [ ('addr', ['host', 'address'] ) ],
         dns.rdatatype.SOA:      [
@@ -50,6 +54,12 @@ class dns_update_app(object):
                                   ('retry', ['ret'] ),
                                   ('expire', ['ex'] ),
                                   ('minimum', ['min'] ),
+                                  ],
+        dns.rdatatype.SRV:      [
+                                  ('priority', [] ),
+                                  ('weight', [] ),
+                                  ('port', [] ),
+                                  ('target', ['addr', 'host', 'address'] ),
                                   ],
         }
 
@@ -88,7 +98,7 @@ Examples:
             self._server = None
             self._valid = False
             self._rrtype = None
-            self._ttl = 0
+            self._ttl = None
             self._classtype = None
 
             arg_name = None
@@ -112,14 +122,22 @@ Examples:
             else:
                 arg_rrtype = dns.rdatatype.from_text('A')
 
-            arg_fields = dns_update_app.RDATA_FIELDS[arg_rrtype]
+            if arg_rrtype not in dns_update_app.RDATA_FIELDS:
+                raise NotImplementedError('DNS record type %s not implemented' % arg_rrtype)
+
             arg_field_map = {}
             arg_field_index_map = []
-            for main_name, alt_names in arg_fields:
+            for main_name, alt_names in dns_update_app.RDATA_FIELDS[arg_rrtype]:
                 arg_field_map[main_name] = main_name
                 arg_field_index_map.append(main_name)
                 for a in alt_names:
                     arg_field_map[a] = main_name
+            for main_name, alt_names in dns_update_app.RDATA_ANY_FIELDS:
+                if main_name not in arg_field_map:
+                    arg_field_map[main_name] = main_name
+                for a in alt_names:
+                    if a not in arg_field_map:
+                        arg_field_map[a] = main_name
             #print('arg_field_map=%s' % arg_field_map)
             #print('arg_field_index_map=%s' % arg_field_index_map)
 
@@ -205,11 +223,12 @@ Examples:
                     self._valid = True
                 except dns.exception.SyntaxError as e:
                     pass
-
             self._rrtype = arg_rrtype
             self._classtype = arg_classtype
             self._value = arg_value
             self._oldvalue = arg_oldvalue
+            if self._valid:
+                self._ttl = self._get_item('ttl', None, old=False)
 
         @property
         def valid(self):
@@ -223,7 +242,7 @@ Examples:
 
         @property
         def ttl(self):
-            return self._ttl
+            return self._ttl if self._ttl is not None else dns_update_app.DEFAULT_TTL
 
         @property
         def name(self):
@@ -291,8 +310,8 @@ Examples:
                 addr = self._get_item('addr', None, old=old)
                 return '%s' % (addr) if addr is not None else None
             elif self._rrtype == dns.rdatatype.CNAME:
-                addr = self._get_item('addr', None, old=old)
-                return '%s' % (addr) if addr is not None else None
+                target = self._get_item('target', None, old=old)
+                return '%s' % (target) if target is not None else None
             elif self._rrtype == dns.rdatatype.NS:
                 addr = self._get_item('addr', None, old=old)
                 return '%s' % (addr) if addr is not None else None
@@ -302,21 +321,34 @@ Examples:
             elif self._rrtype == dns.rdatatype.SOA:
                 mname = self._get_item('mname', 'master.%s' % self.name, old=old)
                 rname = self._get_item('rname', 'hostmaster.%s' % self.name, old=old)
-                serial = self._get_item('serial', 0, old=old)
-                refresh = self._get_item('refresh', 86400, old=old)
-                retry = self._get_item('retry', 900, old=old)
-                expire = self._get_item('expire', 86400, old=old)
-                minimum = self._get_item('minimum', 3600, old=old)
+
+                serial = self._get_item('serial', None, old=old)
+                if serial is None:
+                    now = datetime.datetime.now()
+                    serial = int('%04i%02i%02i%02i' % (now.year, now.month, now.day, now.hour))
+                refresh = self._get_item('refresh', self.ttl, old=old)
+                retry = self._get_item('retry', self.ttl / 24, old=old)
+                expire = self._get_item('expire', self.ttl, old=old)
+                minimum = self._get_item('minimum', self.ttl / 48, old=old)
                 return '%s %s (%i %i %i %i %i)' % (mname, rname, serial, refresh, retry, expire, minimum)
+            elif self._rrtype == dns.rdatatype.SRV:
+                priority = self._get_item('priority', 10, old=old)
+                weight = self._get_item('weight', 0, old=old)
+                port = self._get_item('port', None, old=old)
+                target = self._get_item('target', None, old=old)
+                return '%i %i %i %s' % (priority, weight, port, target) if port is not None and target is not None else None
             else:
                 raise NotImplementedError
 
         def _set_missing_item(self, key, value, index=None):
+            ret = False
             if self._value is None:
                 self._value = {}
             if not key in self._value:
                 #print('_set_missing_item %s=%s' % (key,value))
                 self._value[key] = value
+                ret = True
+            return ret
 
         def fetch_current(self, resolver):
             if self._rrtype is None:
@@ -332,15 +364,20 @@ Examples:
                     elif self._rrtype == dns.rdatatype.MX:
                         self._set_missing_item('addr', rdata.exchange)
                         self._set_missing_item('priority', rdata.preference)
+                    elif self._rrtype == dns.rdatatype.CNAME:
+                        self._set_missing_item('target', rdata.target)
                     elif self._rrtype == dns.rdatatype.SOA:
+                        #print('got %s' % rdata)
                         self._set_missing_item('mname', rdata.mname)
                         self._set_missing_item('rname', rdata.rname)
-                        self._set_missing_item('serial', rdata.serial)
+                        # increment serial number by one
+                        self._set_missing_item('serial', rdata.serial + 1)
                         self._set_missing_item('refresh', rdata.refresh)
                         self._set_missing_item('retry', rdata.retry)
                         self._set_missing_item('expire', rdata.expire)
                         self._set_missing_item('minimum', rdata.minimum)
             except dns.resolver.NoAnswer:
+                #print('No answer')
                 pass
 
     @staticmethod

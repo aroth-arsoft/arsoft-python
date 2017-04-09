@@ -1,3 +1,9 @@
+arsoft-python (1.306) yakkety; urgency=medium
+
+  * dns: improve ttl handling and increment soa serial
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 09 Apr 2017 08:23:01 +0200
+
 arsoft-python (1.305) yakkety; urgency=medium
 
   * dns: rewrite argument parsing and improve updates
