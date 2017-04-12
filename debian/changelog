@@ -1,3 +1,9 @@
+arsoft-python (1.307) yakkety; urgency=medium
+
+  * dns: fixed AAAA record
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 12 Apr 2017 09:03:47 +0200
+
 arsoft-python (1.306) yakkety; urgency=medium
 
   * dns: improve ttl handling and increment soa serial

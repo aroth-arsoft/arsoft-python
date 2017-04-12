@@ -151,7 +151,7 @@ Examples:
                     arg_dict = {}
                     arg_olddict = {}
 
-                    if ('=' in arg_value or ':' in arg_value) and arg_rrtype != dns.rdatatype.TXT:
+                    if ('=' in arg_value or ':' in arg_value) and (arg_rrtype != dns.rdatatype.TXT and arg_rrtype != dns.rdatatype.AAAA):
                         for v in arg_value.split(','):
                             v_name = None
                             v_val = None
@@ -173,7 +173,7 @@ Examples:
                                     arg_dict[key] = new
                             elif v_val:
                                 arg_dict[key] = v_val
-                    elif (',' in arg_value or ' ' in arg_value) and arg_rrtype != dns.rdatatype.TXT:
+                    elif (',' in arg_value or ' ' in arg_value) and (arg_rrtype != dns.rdatatype.TXT and arg_rrtype != dns.rdatatype.AAAA):
                         arg_value_split = arg_value.split(',') if ',' in arg_value else arg_value.split(' ')
                         arg_list = []
                         arg_oldlist = []
