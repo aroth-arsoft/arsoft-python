@@ -382,6 +382,7 @@ status_backend = sqlite
             logfile = account.logfile(base_dir)
             account_session = OfflineImap.Session(logfile)
         else:
+            logfile = None
             account_session = self._session
         #print('per_account_log %s, log %s, %s' % (per_account_log, log, account_session))
         ok = self._sync_account(account=account, base_dir=base_dir, log=log, session=account_session)

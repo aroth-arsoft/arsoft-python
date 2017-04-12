@@ -607,7 +607,8 @@ class BackupApp(object):
                                                        username=server_item.username,
                                                        password=server_item.password,
                                                        keyfile=server_item.keyfile,
-                                                       sudo_password=server_item.sudo_password)
+                                                       sudo_password=server_item.sudo_password,
+                                                       sudo_without_password=server_item.sudo_without_password)
             self._backup_app = backup_app
             self._cxn = None
             self._session_key = None
@@ -632,11 +633,11 @@ class BackupApp(object):
                 if self.keyfile is None and self.password:
                     self._session_key = SSHSessionKey(self._cxn)
 
-                if self.sudo_password:
+                if self.sudo_password is not None or self.sudo_without_password:
                     self._sudo = SSHSudoSession(self._cxn, sudo_password=self.sudo_password)
             elif self.scheme == 'local':
                 self._cxn = LocalConnection(verbose=self._backup_app.verbose)
-                if self.sudo_password:
+                if self.sudo_password is not None or self.sudo_without_password:
                     self._sudo = LocalSudoSession(self._cxn, sudo_password=self.sudo_password)
             return True if self._cxn else False
 
@@ -655,7 +656,7 @@ class BackupApp(object):
                 return BackupApp.RemoteServerConnection(self,item)
             if hostname is not None and item.hostname.lower() == hostname_for_comparison:
                 return BackupApp.RemoteServerConnection(self,item)
-        if hostname_for_comparison == 'localhost':
+        if self.is_localhost(hostname_for_comparison):
             item = BackupConfig.RemoteServerInstance(name='localhost', scheme='local', hostname='localhost')
             return BackupApp.RemoteServerConnection(self, item)
         return None

@@ -44,6 +44,15 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
 
     def __str__(self):
         ret = BackupPluginConfig.__str__(self)
+        ret = ret + 'mail_uid: ' + str(self.mail_uid) + '\n'
+        ret = ret + 'mail_gid: ' + str(self.mail_gid) + '\n'
+        ret = ret + 'backup_mail_location: ' + str(self.backup_mail_location) + '\n'
+        ret = ret + 'load_accounts_automatically: ' + str(self.load_accounts_automatically) + '\n'
+        ret = ret + 'use_sudo: ' + str(self.use_sudo) + '\n'
+        ret = ret + 'server: ' + str(self.server) + '\n'
+        ret = ret + 'port: ' + str(self.port) + '\n'
+        ret = ret + 'master_username: ' + str(self.master_username) + '\n'
+        ret = ret + 'master_password: ' + str(self.master_password) + '\n'
         ret = ret + 'accounts:\n'
         if self._plugin._offlineimap.account_list:
             for item in self._plugin._offlineimap.account_list:
@@ -103,8 +112,14 @@ class DovecotBackupPlugin(BackupPlugin):
         #print(dir_acl)
         #print(file_acl)
 
-        self._dir_acl.applyto(backup_dir)
-        if recursive:
+        try:
+            self._dir_acl.applyto(backup_dir)
+            ret = True
+        except PermissionError as e:
+            self.writelog('Unable to set ACL for dovecot to access the backup at %s, error %s.\n' % (backup_dir, e))
+            pass
+
+        if ret and recursive:
             walk_filetree(backup_dir, operation=_apply_acls(self._dir_acl, self._file_acl))
 
         return ret

@@ -40,7 +40,7 @@ class BackupConfigDefaults(object):
 class BackupConfig(object):
 
     class RemoteServerInstance(object):
-        def __init__(self, name, scheme=None, hostname=None, port=None, username=None, password=None, sudo_password=None, keyfile=None):
+        def __init__(self, name, scheme=None, hostname=None, port=None, username=None, password=None, sudo_password=None, sudo_without_password=False, keyfile=None):
             self.name = name
             self.scheme = scheme
             self.hostname = hostname
@@ -48,6 +48,7 @@ class BackupConfig(object):
             self.username = username
             self.password = password
             self.sudo_password = sudo_password
+            self.sudo_without_password = sudo_without_password
             self.keyfile = None
 
         def __str__(self):
@@ -58,7 +59,9 @@ class BackupConfig(object):
                 ret = '%s (%s://%s@%s:%i)' % (self.name, self.scheme, self.username if self.username else 'current-user', self.hostname, self.port)
             if self.keyfile:
                 ret = ret + ', keyfile %s' % self.keyfile
-            if self.sudo_password:
+            if self.sudo_without_password:
+                ret = ret + ', sudo *NOPASSWD*'
+            elif self.sudo_password:
                 ret = ret + ', sudo *secret*'
             return ret
 
@@ -87,6 +90,7 @@ class BackupConfig(object):
             self.username = inifile.get(section, 'username', None)
             self.password = inifile.get(section, 'password', None)
             self.sudo_password = inifile.get(section, 'sudo-password', None)
+            self.sudo_without_password = inifile.getAsBoolean(section, 'sudo-without-password', False)
             self.keyfile = inifile.get(section, 'keyfile', None)
             if self.keyfile:
                 self.keyfile = os.path.join(bak_config.private_dir, self.keyfile)
@@ -99,6 +103,7 @@ class BackupConfig(object):
             inifile.set(section, 'username', self.username)
             inifile.set(section, 'password', self.password)
             inifile.set(section, 'sudo-password', self.sudo_password)
+            inifile.setAsBoolean(section, 'sudo-without-password', self.sudo_without_password)
             s = os.path.relpath(self.keyfile, bak_config.private_dir) if self.keyfile else None
             inifile.set(section, 'keyfile', s)
             return True
