@@ -286,7 +286,11 @@ class DovecotBackupPlugin(BackupPlugin):
             mail_gid = get_gid(self.config.mail_gid)
 
             if (mail_uid != 0 or mail_gid != 0) and os.path.isdir(backup_dir):
-                apply_access_to_parent_directories(backup_dir, uid=mail_uid, gid=mail_gid)
+                try:
+                    apply_access_to_parent_directories(backup_dir, uid=mail_uid, gid=mail_gid)
+                except OSError as e:
+                    self.writelog('Unable to set ACL for dovecot to access the backup at %s, error %s.\n' % (backup_dir, e))
+                    pass
 
             for item in self._account_list:
                 if self.backup_app._verbose:
@@ -302,12 +306,24 @@ class DovecotBackupPlugin(BackupPlugin):
                 if account_dir is None:
                     self.writelog('Unable to get backup directory for dovecot account %s' % (item.name))
                 else:
-                    if not os.path.isdir(account_dir):
-                        os.makedirs(account_dir)
-                    account_dir = os.path.join(account_dir, backup_name)
-                    if os.path.isdir(src_dir):
-                        self.writelog('create link from %s -> %s' % (src_dir, account_dir))
-                        self.backup_app.create_link(src_dir, account_dir, symlink=True)
+                    try:
+                        if not os.path.isdir(account_dir):
+                            os.makedirs(account_dir)
+                    except OSError as e:
+                        self.writelog('Unable to create directory %s for dovecot account %s, error %s.\n' % (account_dir, item.name, e))
+                        account_dir = None
+                        pass
+                    if account_dir:
+                        account_dir = os.path.join(account_dir, backup_name)
+                        if os.path.isdir(src_dir):
+                            self.writelog('create symlink from %s -> %s' % (src_dir, account_dir))
+                            try:
+                                self.backup_app.create_link(src_dir, account_dir, symlink=True)
+                            except OSError as e:
+                                self.writelog('Unable to create symlink from %s -> %s, error %s.\n' % (src_dir, account_dir, e))
+                                pass
+                        else:
+                            self.writelog('source directory %s does not exist' % (src_dir))
 
         return ret
 
