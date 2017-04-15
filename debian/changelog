@@ -1,3 +1,9 @@
+arsoft-python (1.310) yakkety; urgency=medium
+
+  * dns: allow to update DKIM record
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 15 Apr 2017 18:47:48 +0200
+
 arsoft-python (1.309) yakkety; urgency=medium
 
   * backup: catch OS errors to continue with the backup logic
