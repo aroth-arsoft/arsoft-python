@@ -10,9 +10,14 @@ class PEMItem(object):
     def __init__(self, blockindex, blocktype, blockdata, encoding='utf8'):
         self.blockindex = blockindex
         self.blocktype = blocktype
-        self.blockdata = blockdata
+        self.rawblockdata = blockdata
         self.encoding = encoding
-        
+
+    @property
+    def blockdata(self):
+        #return ("-----BEGIN %s-----\n"% self.blocktype).encode('ascii') + self.rawblockdata + ("-----END %s-----\n"% self.blocktype).encode('ascii')
+        return ("-----BEGIN %s-----\n"% self.blocktype) + self.rawblockdata + ("-----END %s-----\n"% self.blocktype)
+
     def write(self, fobj):
         fobj.write(self.blockdata.encode(self.encoding))
         
@@ -67,11 +72,12 @@ class PEMFile(object):
                             # clear the cert buffer
                             #print('got blockstart ' + blocktype)
                             blockdata = ''
-                            blockdata += line
+                            #blockdata += line
                         elif cmd == "END":
                             #print('got blockend ' + blocktype)
                             if blocktype:
-                                blockdata += line
+                                #print('got blockdata=>>%s<< %s' % (blockdata, type(blockdata)))
+                                #blockdata += line
                                 blockindex = len(self.m_blocks)
                                 self.m_blocks.append( PEMItem(blockindex, blocktype, blockdata) )
                             # prepare for next cert
@@ -89,6 +95,8 @@ class PEMFile(object):
                 self.m_last_error = e
                 ret = False
                 pass
+            if ret:
+                self.m_filename = filename
         if close_file_required:
             f.close()
         return ret
@@ -126,6 +134,10 @@ class PEMFile(object):
     @property
     def valid(self):
         return True if self.m_filename is not None and self.m_last_error is None else False
+
+    @property
+    def blocks(self):
+        return self.m_blocks
 
     def getBlocks(self, blocktype):
         ret = []

@@ -6,23 +6,34 @@ import os
 from .pem import *
 from OpenSSL import crypto
 
-def _empty_passphrase_callback(*args):
-    return b''
-
 class PrivateKeyError(Exception):
     def __str__(self):
         return 'Error: Wrong private key'
 
+class PublicKeyError(Exception):
+    def __str__(self):
+        return 'Error: Invalid public key'
+
 class KeyItem(PEMItem):
+
+    @staticmethod
+    def _empty_passphrase_callback(*args):
+        return b''
     def __init__(self, pemitem, private=True, passphrase=None):
         PEMItem.__init__(self, pemitem.blockindex, pemitem.blocktype, pemitem.blockdata)
-        try:
-            if passphrase is None:
-                self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, self.blockdata, _empty_passphrase_callback)
-            else:
-                self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, self.blockdata, passphrase)
-        except crypto.Error as e:
-            raise PrivateKeyError
+        if private:
+            try:
+                if passphrase is None:
+                    self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, pemitem.blockdata, KeyItem._empty_passphrase_callback)
+                else:
+                    self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, pemitem.blockdata, passphrase)
+            except crypto.Error as e:
+                raise PrivateKeyError
+        else:
+            try:
+                self.key = crypto.load_publickey(crypto.FILETYPE_PEM, pemitem.blockdata)
+            except crypto.Error as e:
+                raise PublicKeyError
         self.private=private
         
     def get_bits(self):
