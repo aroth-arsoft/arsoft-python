@@ -1,3 +1,9 @@
+arsoft-python (1.311) yakkety; urgency=medium
+
+  * dns: add support for DMARC TXT record
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 17 Apr 2017 17:56:16 +0200
+
 arsoft-python (1.310) yakkety; urgency=medium
 
   * dns: allow to update DKIM record
