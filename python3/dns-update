@@ -148,6 +148,7 @@ Examples:
     dns-update --server 127.0.0.1 -a "example.com.=v=spf1 include:_spf.google.com ~all/TXT"
     Update an DKIM TXT-record:
     dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=key:MCQwDQYJKoZIhvcNAQEBBQADEwAwEAIJALkflXvQub5DAgMBAAE=/DKIM
+    dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=keyfile:~/dkim_publickey.pem/DKIM
     Update an DMARC TXT-record:
     dns-update --server 127.0.0.1 -u _dmarc.example.com.=p:reject/DMARC
 """
