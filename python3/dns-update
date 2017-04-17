@@ -118,6 +118,8 @@ class dns_update_app(object):
                                   ('pct', ['percent', 'percentage'] ),
                                   ('ruf', [] ),
                                   ('rua', [] ),
+                                  ('fo', ['forensic'] ), # Forensic options
+                                  ('ri', ['report', 'interval'] ), # The reporting interval
                                   ('adkim', ['dkim'] ),
                                   ('aspf', ['spf'] ),
                                   ],
@@ -227,9 +229,9 @@ Examples:
                             # DO NOT allow equal char in DKIM arguments because the key is base64 encoded
                             # and it might end with one or more padding '=' chars.
                             if '=' in v and arg_rrtype != app.rdatatype.DKIM:
-                                v_name, v_val = v.split('=')
+                                v_name, v_val = v.split('=', 1)
                             elif ':' in v:
-                                v_name, v_val = v.split(':')
+                                v_name, v_val = v.split(':', 1)
 
                             if v_name is None:
                                 key = arg_field_index_map[0]
@@ -473,6 +475,7 @@ Examples:
                 subpolicy = self._get_item('sp', 'none', old=old)
                 adkim = self._get_item('adkim', None, old=old)
                 aspf = self._get_item('aspf', None, old=old)
+                fo = self._get_item('fo', None, old=old)
                 props = ['v=%s' % version,
                          'p=%s' % policy,
                          'sp=%s' % subpolicy,
@@ -486,6 +489,8 @@ Examples:
                     props.append('adkim=%s' % adkim)
                 if aspf:
                     props.append('aspf=%s' % aspf)
+                if fo:
+                    props.append('fo=%s' % fo)
                 full_string = '; '.join(props).encode('ascii')
                 strings = [full_string[i:i+250] for i in range(0, len(full_string), 250)]
                 return dns.rdtypes.ANY.TXT.TXT(dns.rdataclass.IN, dns.rdatatype.TXT, strings)
