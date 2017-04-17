@@ -45,12 +45,23 @@ class RecordFieldError(Exception):
         self.key = key
         self.rrtype = rrtype
 
+class UnknownRRTypeError(Exception):
+    def __init__(self, rrtype):
+        self.rrtype = rrtype
+
+class InvalidRecordNameError(Exception):
+    def __init__(self, name, should_be):
+        self.name = name
+        self.should_be = should_be
+
 class dns_update_app(object):
     class rdatatype:
         DKIM = 600
+        DMARC = 601
 
     _APP_SPECIFIC_RRTYPES = {
-        rdatatype.DKIM : 'DKIM'
+        rdatatype.DKIM : 'DKIM',
+        rdatatype.DMARC : 'DMARC'
         }
     _APP_SPECIFIC_RRTYPES_REV = dict((v,k) for k,v in _APP_SPECIFIC_RRTYPES.items())
 
@@ -100,6 +111,16 @@ class dns_update_app(object):
                                   ('kf', ['keyfile', 'file'] ),
                                   ('k', ['type'] ),
                                   ],
+        rdatatype.DMARC:         [
+                                  ('p', ['policy'] ),
+                                  ('sp', ['subpolicy'] ),
+                                  ('v', ['version'] ),
+                                  ('pct', ['percent', 'percentage'] ),
+                                  ('ruf', [] ),
+                                  ('rua', [] ),
+                                  ('adkim', ['dkim'] ),
+                                  ('aspf', ['spf'] ),
+                                  ],
         }
 
     DEFAULT_RRTYPE = 'A'
@@ -127,6 +148,8 @@ Examples:
     dns-update --server 127.0.0.1 -a "example.com.=v=spf1 include:_spf.google.com ~all/TXT"
     Update an DKIM TXT-record:
     dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=key:MCQwDQYJKoZIhvcNAQEBBQADEwAwEAIJALkflXvQub5DAgMBAAE=/DKIM
+    Update an DMARC TXT-record:
+    dns-update --server 127.0.0.1 -u _dmarc.example.com.=p:reject/DMARC
 """
 
     def __init__(self):
@@ -160,6 +183,8 @@ Examples:
                     arg_rrtype = dns_update_app.rdatatype_from_text(arg_rrtype)
                 except dns.exception.SyntaxError as e:
                     arg_rrtype = None
+                except dns.rdatatype.UnknownRdatatype as e:
+                    raise UnknownRRTypeError(arg_rrtype)
             else:
                 arg_rrtype = dns_update_app.rdatatype_from_text('A')
 
@@ -198,6 +223,8 @@ Examples:
                         for v in arg_value.split(','):
                             v_name = None
                             v_val = None
+                            # DO NOT allow equal char in DKIM arguments because the key is base64 encoded
+                            # and it might end with one or more padding '=' chars.
                             if '=' in v and arg_rrtype != app.rdatatype.DKIM:
                                 v_name, v_val = v.split('=')
                             elif ':' in v:
@@ -277,6 +304,21 @@ Examples:
             self._oldvalue = arg_oldvalue
             if self._valid:
                 self._ttl = self._get_item('ttl', None, old=False)
+
+            self._check_record()
+
+        def _check_record(self):
+            ret = True
+            if self._rrtype == dns_update_app.rdatatype.DKIM:
+                elems = str(self._name).split('.')
+                if elems[1] != '_domainkey':
+                    elems[0] = '_domainkey'
+                    raise InvalidRecordNameError(self._name, should_be='.'.join(elems))
+            elif self._rrtype == dns_update_app.rdatatype.DMARC:
+                elems = str(self._name).split('.')
+                if elems[0] != '_dmarc':
+                    elems[0] = '_dmarc'
+                    raise InvalidRecordNameError(self._name, should_be='.'.join(elems))
 
         @property
         def valid(self):
@@ -421,6 +463,31 @@ Examples:
                 full_string = ('v=%s; k=%s; p=%s;' % (version, keytype, key)).encode('ascii')
                 strings = [full_string[i:i+250] for i in range(0, len(full_string), 250)]
                 return dns.rdtypes.ANY.TXT.TXT(dns.rdataclass.IN, dns.rdatatype.TXT, strings)
+            elif self._rrtype == app.rdatatype.DMARC:
+                version = self._get_item('v', 'DMARC1', old=old)
+                percentage = self._get_item('pct', '100', old=old)
+                ruf = self._get_item('ruf', None, old=old)
+                rua = self._get_item('rua', None, old=old)
+                policy = self._get_item('p', 'none', old=old)
+                subpolicy = self._get_item('sp', 'none', old=old)
+                adkim = self._get_item('adkim', None, old=old)
+                aspf = self._get_item('aspf', None, old=old)
+                props = ['v=%s' % version,
+                         'p=%s' % policy,
+                         'sp=%s' % subpolicy,
+                         'pct=%s' % percentage
+                         ]
+                if ruf:
+                    props.append('ruf=%s' % ruf)
+                if rua:
+                    props.append('rua=%s' % rua)
+                if adkim:
+                    props.append('adkim=%s' % adkim)
+                if aspf:
+                    props.append('aspf=%s' % aspf)
+                full_string = '; '.join(props).encode('ascii')
+                strings = [full_string[i:i+250] for i in range(0, len(full_string), 250)]
+                return dns.rdtypes.ANY.TXT.TXT(dns.rdataclass.IN, dns.rdatatype.TXT, strings)
             else:
                 raise NotImplementedError
 
@@ -465,6 +532,9 @@ Examples:
             except dns.resolver.NoAnswer:
                 #print('No answer')
                 pass
+            except dns.resolver.NXDOMAIN:
+                #print('do domain')
+                pass
 
     @staticmethod
     def _split_args(args):
@@ -477,6 +547,16 @@ Examples:
             except RecordFieldError as e:
                 sys.stderr.write("Parameter %s is not valid for DNS %s record \"%s\".\n" % (e.key, dns_update_app.rdatatype_to_text(e.rrtype), arg))
                 ok = False
+            except UnknownRRTypeError as e:
+                sys.stderr.write("DNS RR type \"%s\" not supported\n" % (e.rrtype))
+                ok = False
+            except NotImplementedError as e:
+                sys.stderr.write("Error processing parameter \"%s\": %s\n" % (arg, e))
+                ok = False
+            except InvalidRecordNameError as e:
+                sys.stderr.write("Invalid record name \"%s\", should be \"%s\"\n" % (e.name, e.should_be))
+                ok = False
+
             if item:
                 if not item.valid:
                     sys.stderr.write("Invalid syntax for DNS record \"%s\".\n" % (arg))
