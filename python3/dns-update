@@ -391,7 +391,7 @@ Examples:
 
         def to_payload(self, old=False):
             if self._rrtype is None:
-                return None, None
+                return None
             elif self._rrtype == dns.rdatatype.A:
                 addr = self._get_item('addr', None, old=old)
                 return dns.rdtypes.IN.A.A(dns.rdataclass.IN, dns.rdatatype.A, addr)
@@ -403,23 +403,34 @@ Examples:
             elif self._rrtype == dns.rdatatype.MX:
                 addr = self._get_item('addr', None, old=old)
                 priority = self._get_item('priority', 10, old=old)
-                return dns.rdtypes.ANY.MX.MX(dns.rdataclass.IN, dns.rdatatype.MX, priority, addr)
+                if addr is None:
+                    return None
+                return dns.rdtypes.ANY.MX.MX(dns.rdataclass.IN, dns.rdatatype.MX, priority, dns.name.from_text(addr))
 
             elif self._rrtype == dns.rdatatype.PTR:
                 target = self._get_item('target', None, old=old)
-                return dns.rdtypes.ANY.PTR.PTR(dns.rdataclass.IN, dns.rdatatype.PTR, target)
+                if target is None:
+                    return None
+                return dns.rdtypes.ANY.PTR.PTR(dns.rdataclass.IN, dns.rdatatype.PTR, dns.name.from_text(target))
 
             elif self._rrtype == dns.rdatatype.CNAME:
                 target = self._get_item('target', None, old=old)
-                return dns.rdtypes.ANY.CNAME.CNAME(dns.rdataclass.IN, dns.rdatatype.CNAME, target)
+                if target is None:
+                    return None
+                return dns.rdtypes.ANY.CNAME.CNAME(dns.rdataclass.IN, dns.rdatatype.CNAME, dns.name.from_text(target))
 
             elif self._rrtype == dns.rdatatype.NS:
                 target = self._get_item('target', None, old=old)
-                return dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, target)
+                if target is None:
+                    return None
+                return dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, dns.name.from_text(target))
 
             elif self._rrtype == dns.rdatatype.TXT:
                 text = self._get_item('text', None, old=old)
-                return dns.rdtypes.ANY.TXT.TXT(dns.rdataclass.IN, dns.rdatatype.TXT, text)
+                if text is None:
+                    return None
+                strings = [text[i:i+250] for i in range(0, len(text), 250)]
+                return dns.rdtypes.ANY.TXT.TXT(dns.rdataclass.IN, dns.rdatatype.TXT, strings)
 
             elif self._rrtype == dns.rdatatype.SOA:
                 mname = self._get_item('mname', 'master.%s' % self.name, old=old)
@@ -433,14 +444,16 @@ Examples:
                 retry = self._get_item('retry', self.ttl / 24, old=old)
                 expire = self._get_item('expire', self.ttl, old=old)
                 minimum = self._get_item('minimum', self.ttl / 48, old=old)
-                return dns.rdtypes.ANY.SOA.SOA(dns.rdataclass.IN, dns.rdatatype.SOA, mname, rname, serial, refresh, retry, expire, minimum)
+                return dns.rdtypes.ANY.SOA.SOA(dns.rdataclass.IN, dns.rdatatype.SOA,
+                                               dns.name.from_text(mname), dns.name.from_text(rname),
+                                               serial, refresh, retry, expire, minimum)
 
             elif self._rrtype == dns.rdatatype.SRV:
                 priority = self._get_item('priority', 10, old=old)
                 weight = self._get_item('weight', 0, old=old)
                 port = self._get_item('port', None, old=old)
                 target = self._get_item('target', None, old=old)
-                return dns.rdtypes.IN.SRV.SRV(dns.rdataclass.IN, dns.rdatatype.SRV, priority, weight, port, target) if port is not None and target is not None else None
+                return dns.rdtypes.IN.SRV.SRV(dns.rdataclass.IN, dns.rdatatype.SRV, priority, weight, port, dns.name.from_text(target)) if port is not None and target is not None else None
 
             elif self._rrtype == app.rdatatype.DKIM:
                 version = self._get_item('v', 'DKIM1', old=old)
@@ -1033,6 +1046,7 @@ Examples:
                 ret = 0
                 for (host, update) in self._updates.items():
                     if self.verbose or self.noop:
+                        print('update %s with:\n%s\n' % (type(host), type(update)))
                         print('update %s with:\n%s\n' % (host, update))
                     if not self.noop:
                         try:
