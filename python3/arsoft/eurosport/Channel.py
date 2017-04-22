@@ -47,6 +47,10 @@ class Schedule(object):
         return int(self.data["duration"])
 
     @property
+    def transmission_type(self):
+        return self.data["transmissiontypename"]
+
+    @property
     def duration_human(self):
         d = self.duration
         if d >= 60:
@@ -67,10 +71,25 @@ class Schedule(object):
             return self.name
 
     @property
-    def is_now(self):
+    def is_high_definition(self):
+        return True if "hd" in self.data else False
+
+    @property
+    def sport(self):
+        return self.data['sport']
+
+    @property
+    def is_currently_running(self):
         now = datetime.datetime.now()
         return True if now < self.endtime and now >= self.starttime else False
 
+    @property
+    def is_live_transmission(self):
+        return True if "Live" in self.transmission_type else False
+
+    @property
+    def is_highlights(self):
+        return True if "Highlight" in self.transmission_type else False
 
 class Channel:
 
@@ -89,7 +108,22 @@ class Channel:
 
     @property
     def name(self):
+        if 'channellivelabel' in self.data:
+            return self.data['channellivelabel']
+        elif 'channellabel' in self.data:
+            return self.data['channellabel']
+        else:
+            return None
+
+    @property
+    def label(self):
+        return self.data['channellabel']
+    @property
+    def livelabel(self):
         return self.data['channellivelabel']
+    @property
+    def livesublabel(self):
+        return self.data['channellivesublabel']
 
     @property
     def stream_url(self):
@@ -141,7 +175,7 @@ class Channel:
 
     def find_current_show(self):
         for sched in self.schedules:
-            if sched.is_now:
+            if sched.is_currently_running:
                 return sched
         return None
 

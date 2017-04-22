@@ -146,7 +146,7 @@ class eurosport_stream_app(object):
                     if args.show_schedule:
                         print('  Schedule:')
                         for schedule in ch.schedules:
-                            if schedule.is_now:
+                            if schedule.is_currently_running:
                                 print('  * %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
                             else:
                                 print('    %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
@@ -200,7 +200,7 @@ class eurosport_stream_app(object):
                     if args.show_schedule:
                         print('Schedule:')
                         for schedule in ch.schedules:
-                            if schedule.is_now:
+                            if schedule.is_currently_running:
                                 print('* %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
                             else:
                                 print('  %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))

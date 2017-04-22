@@ -3,10 +3,12 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 #
 # Original from https://github.com/glothriel/libeurosport
+# and https://github.com/Coi-l/EurosportPlayer.bundle/blob/master/Contents/Services/Shared%20Code/eurosportplayer.pys
 
 import json
 
 BASE_LOGIN_PATH = "https://playercrm.ssl.eurosport.com/JsonPlayerCrmApi.svc/Login?"
+BASE_UNLINK_PATH = "https://playercrm.ssl.eurosport.com/JsonPlayerCrmApi.svc/Unlink?"
 BASE_PROGRAMS_PATH = "http://videoshop.ext.eurosport.com/JsonProductService.svc/GetAllProductsByDeviceMobile?"
 
 DEFAULT_LOGIN_PARAMETERS = {

@@ -3,6 +3,7 @@
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 #
 # Original from https://github.com/glothriel/libeurosport
+# and https://github.com/stschake/eurosportCapper/blob/master/eurosportCapper/Eurosport.cs
 
 import urllib.request
 import urllib.parse
