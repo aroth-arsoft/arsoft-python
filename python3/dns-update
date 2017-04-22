@@ -381,9 +381,13 @@ Examples:
         def _get_item(self, key, default_value=None, old=False):
             target_type = None if default_value is None else type(default_value)
             if old:
+                if self._oldvalue is None:
+                    return default_value
                 if key in self._oldvalue:
                     return target_type(self._oldvalue[key]) if target_type is not None else self._oldvalue[key]
             else:
+                if self._value is None:
+                    return default_value
                 if key in self._value:
                     #print('_get_item %s->%s' % (key,self._value[key]))
                     return target_type(self._value[key]) if target_type is not None else self._value[key]
@@ -1046,7 +1050,6 @@ Examples:
                 ret = 0
                 for (host, update) in self._updates.items():
                     if self.verbose or self.noop:
-                        print('update %s with:\n%s\n' % (type(host), type(update)))
                         print('update %s with:\n%s\n' % (host, update))
                     if not self.noop:
                         try:
