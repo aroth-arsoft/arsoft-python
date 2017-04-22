@@ -11,16 +11,17 @@ from .Stream import Stream
 
 class Playlist:
 
-    def __init__(self, uri):
+    def __init__(self, uri, timeoffset=None):
         self.m3u_list = None
         self.cookie = None
         self.base_uri = None
         self.active_stream = None
         self.streams = []
-        self.m3u_list = m3u8.load(uri)
+        #self.m3u_list = m3u8.load(uri)
         self.download_list(uri)
 
     def download_list(self, uri):
+        #print('Playlist.download_list %s' % uri)
         contents = urllib.request.urlopen(uri)
         self.m3u_list = m3u8.loads(contents.read().decode('utf8'))
         self.cookie = contents.getheader('Set-Cookie')

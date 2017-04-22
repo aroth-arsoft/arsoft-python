@@ -52,13 +52,16 @@ class eurosport_stream_app(object):
         parser.add_argument('--geo', dest='geo', help='Geo-location code')
         parser.add_argument('--devtype', dest='devtype', help='Overwrite device type')
         parser.add_argument('--product', dest='productid', help='Overwrite product id')
-        parser.add_argument('channel', help='select channel for playback')
+        parser.add_argument('-s', '--schedule', dest='show_schedule', action='store_true', help='show the schedule of the selected channel.')
+        parser.add_argument('channel', default='list', nargs='?', help='select channel for playback; if not specified list of available streams is displayed')
 
         ret = 0
 
         args = parser.parse_args()
         self._verbose = args.verbose
         self._debug = args.debug
+        if self._debug:
+            import json
 
         save_config = False
         self._config = Config(filename=args.config_file)
@@ -123,12 +126,30 @@ class eurosport_stream_app(object):
 
         if channels:
             if args.channel == 'list' or args.channel == '*':
-                i = 0
-                for ch in channels:
-                    i += 1
-                    print('#%i: %s' % (i, ch.name))
+                for i, ch in enumerate(channels):
+                    print('#%i: %s' % (i+1, ch.name))
                     if self._verbose:
                         print('  Url: %s' % (ch.stream_url))
+                    if self._debug:
+                        f = open('/tmp/channel_%i' % i, 'w')
+                        f.write(json.dumps(ch.data, indent='  '))
+                        f.close()
+
+                    current_show = ch.find_current_show()
+                    if current_show:
+                        if self._debug:
+                            f = open('/tmp/channel_%i_show' % i, 'w')
+                            f.write(json.dumps(current_show.data, indent='  '))
+                            f.close()
+                        print('  Current show: %s from %s to %s' % (current_show.title, current_show.starttime, current_show.endtime))
+
+                    if args.show_schedule:
+                        print('  Schedule:')
+                        for schedule in ch.schedules:
+                            if schedule.is_now:
+                                print('  * %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
+                            else:
+                                print('    %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
 
                     streams = None
                     try:
@@ -136,22 +157,26 @@ class eurosport_stream_app(object):
                         streams = sorted(ch.streams, key=lambda stream: stream.bandwidth)
                     except Channel.InvalidData:
                         pass
+                    except Channel.NoLiveStream:
+                        pass
+                    except Channel.NoCatchupStream:
+                        pass
 
                     if streams:
                         print('  Streams:')
-
-                        stream_no = 0
-
-                        for stream in streams:
-                            stream_no += 1
-                            print('    %i: %i bits/sec' % (stream_no, stream.bandwidth))
+                        for stream_no, stream in enumerate(streams):
+                            print('    %i: %i bits/sec' % (stream_no + 1, stream.bandwidth))
             else:
-                if '/' in args.channel:
-                    (channel_no, quality) = args.channel.split('/', 1)
-                elif '@' in args.channel:
-                    (channel_no, quality) = args.channel.split('@', 1)
+                channel = args.channel
+                timeoffset = 0
+                if '-' in args.channel:
+                    (channel, timeoffset) = channel.split('-', 1)
+                if '/' in channel:
+                    (channel_no, quality) = channel.split('/', 1)
+                elif '@' in channel:
+                    (channel_no, quality) = channel.split('@', 1)
                 else:
-                    channel_no = args.channel
+                    channel_no = channel
                     quality = self._config.quality
                 try:
                     channel_no = int(channel_no)
@@ -171,61 +196,74 @@ class eurosport_stream_app(object):
                     pass
 
                 if ch:
-                    try:
-                        ch.download_playlist()
-                        if quality is not None:
-                            if isinstance(quality, int) and quality < 100:
-                                quality_options = ch.get_available_quality_options()
-                                if quality > len(quality_options):
-                                    sys.stderr.write('Invalid stream index %i (max %i)\n' %(quality, len(quality_options)))
-                                else:
-                                    quality = quality_options[quality]
-                            elif isinstance(quality, str):
-                                if quality == 'best':
-                                    quality = None
-                                else:
+
+                    if args.show_schedule:
+                        print('Schedule:')
+                        for schedule in ch.schedules:
+                            if schedule.is_now:
+                                print('* %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
+                            else:
+                                print('  %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
+                    else:
+                        try:
+                            ch.download_playlist(timeoffset=timeoffset)
+                            if quality is not None:
+                                if isinstance(quality, int) and quality < 100:
                                     quality_options = ch.get_available_quality_options()
-                                    num_streams = len(quality_options)
-                                    self.log('got %i streams' % num_streams)
-                                    if num_streams in self.QUALITY_NAMES:
-                                        found = False
-                                        self.log('possible qualtiy names %s, requested %s' % (self.QUALITY_NAMES[num_streams], quality))
-                                        for index, e in enumerate(self.QUALITY_NAMES[num_streams]):
-                                            self.log("got %i, %s" % (index, e))
-                                            if isinstance(e, str) and e == quality:
-                                                self.log('Found quality %s at index %i' % (quality, index))
-                                                quality = index
-                                                found = True
-                                                break
-                                            elif hasattr(e, '__iter__') and quality in e:
-                                                self.log('Found quality %s at index %i' % (quality, index))
-                                                quality = index
-                                                found = True
-                                                break
-                                        quality = quality_options[quality] if found else None
-                        ch.set_quality(quality)
-                    except Channel.InvalidData:
-                        ch = None
+                                    if quality > len(quality_options):
+                                        sys.stderr.write('Invalid stream index %i (max %i)\n' %(quality, len(quality_options)))
+                                    else:
+                                        quality = quality_options[quality]
+                                elif isinstance(quality, str):
+                                    if quality == 'best':
+                                        quality = None
+                                    else:
+                                        quality_options = ch.get_available_quality_options()
+                                        num_streams = len(quality_options)
+                                        self.log('got %i streams' % num_streams)
+                                        if num_streams in self.QUALITY_NAMES:
+                                            found = False
+                                            self.log('possible qualtiy names %s, requested %s' % (self.QUALITY_NAMES[num_streams], quality))
+                                            for index, e in enumerate(self.QUALITY_NAMES[num_streams]):
+                                                self.log("got %i, %s" % (index, e))
+                                                if isinstance(e, str) and e == quality:
+                                                    self.log('Found quality %s at index %i' % (quality, index))
+                                                    quality = index
+                                                    found = True
+                                                    break
+                                                elif hasattr(e, '__iter__') and quality in e:
+                                                    self.log('Found quality %s at index %i' % (quality, index))
+                                                    quality = index
+                                                    found = True
+                                                    break
+                                            quality = quality_options[quality] if found else None
+                            ch.set_quality(quality)
+                        except Channel.InvalidData:
+                            ch = None
+                        except Channel.NoLiveStream:
+                            ch = None
+                        except Channel.NoCatchupStream:
+                            ch = None
 
-                if ch:
-                    sd = StreamDownloader(ch.active_stream)
+                        if ch:
+                            sd = StreamDownloader(ch.active_stream)
 
-                    vlc_args = ['vlc', '-']
-                    p = subprocess.Popen(vlc_args, stdout=sys.stderr, stderr=sys.stderr, stdin=subprocess.PIPE, shell=False)
-                    if p:
-                        while 1:
-                            try:
-                                p.stdin.write(sd.get_next_part())
-                            except StreamDownloader.NoDataAvailable:
-                                time.sleep(1)
-                                continue
-                            except KeyboardInterrupt:
-                                sd.stop()
-                                break
-                            except BrokenPipeError:
-                                sd.stop()
-                                break
-                        p.terminate()
+                            vlc_args = ['vlc', '-']
+                            p = subprocess.Popen(vlc_args, stdout=sys.stderr, stderr=sys.stderr, stdin=subprocess.PIPE, shell=False)
+                            if p:
+                                while 1:
+                                    try:
+                                        p.stdin.write(sd.get_next_part())
+                                    except StreamDownloader.NoDataAvailable:
+                                        time.sleep(1)
+                                        continue
+                                    except KeyboardInterrupt:
+                                        sd.stop()
+                                        break
+                                    except BrokenPipeError:
+                                        sd.stop()
+                                        break
+                                p.terminate()
                 else:
                     sys.stderr.write('Unable to find channel %s\n' %channel_no)
                     ret = 2
