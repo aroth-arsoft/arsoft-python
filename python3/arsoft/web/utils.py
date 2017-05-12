@@ -83,7 +83,7 @@ def is_debug_info_disabled():
     else:
         return False
 
-def initialize_settings(settings_module, setttings_file, options={}):
+def initialize_settings(settings_module, setttings_file, options={}, use_local_tz=False):
     settings_obj = sys.modules[settings_module]
     settings_obj_type = type(settings_obj)
     appname = settings_module
@@ -138,12 +138,17 @@ def initialize_settings(settings_module, setttings_file, options={}):
 
     # If you set this to False, Django will not use timezone-aware datetimes.
     settings_obj.USE_TZ = True
-    
-    # Local time zone for this installation. Choices can be found here:
-    # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
-    # although not all choices may be available on all operating systems.
-    # In a Windows environment this must be set to your system time zone.
-    settings_obj.TIME_ZONE = _get_system_timezone()
+
+    if use_local_tz:
+        # Local time zone for this installation. Choices can be found here:
+        # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
+        # although not all choices may be available on all operating systems.
+        # In a Windows environment this must be set to your system time zone.
+        settings_obj.TIME_ZONE = _get_system_timezone()
+    else:
+        # By default use the UTC as timezone to avoid issues when the time zone on
+        # the server changed (e.g. daylight saving).
+        settings_obj.TIME_ZONE = 'UTC'
 
     # Absolute path to the directory static files should be collected to.
     # Don't put anything in this directory yourself; store your static files
@@ -242,6 +247,9 @@ def initialize_settings(settings_module, setttings_file, options={}):
         settings_obj.APP_DATA_DIR = os.path.join(appdir, 'data')
     else:
         settings_obj.APP_DATA_DIR = app_data_dir
+
+    # Fixture Dir
+    settings_obj.FIXTURE_DIRS = ( os.path.join(appdir, 'fixtures') )
 
     # and finally set up the list of installed applications
     settings_obj.INSTALLED_APPS = [
@@ -739,7 +747,7 @@ DEBUG_INFO_VIEW_TEMPLATE = """
       <tr>
         <th>Installed Middleware:</th>
         <td><ul>
-          {% for item in settings.MIDDLEWARE_CLASSES %}
+          {% for item in settings.MIDDLEWARE %}
             <li><code>{{ item }}</code></li>
           {% endfor %}
         </ul></td>
@@ -870,7 +878,7 @@ DEBUG_REQUEST_VIEW_TEMPLATE = """
       <tr>
         <th>Installed Middleware:</th>
         <td><ul>
-          {% for item in settings.MIDDLEWARE_CLASSES %}
+          {% for item in settings.MIDDLEWARE %}
             <li><code>{{ item }}</code></li>
           {% endfor %}
         </ul></td>
@@ -1136,7 +1144,7 @@ DEBUG_ENV_VIEW_TEMPLATE = """
       <tr>
         <th>Installed Middleware:</th>
         <td><ul>
-          {% for item in settings.MIDDLEWARE_CLASSES %}
+          {% for item in settings.MIDDLEWARE %}
             <li><code>{{ item }}</code></li>
           {% endfor %}
         </ul></td>
@@ -1263,7 +1271,7 @@ DEBUG_SETTINGS_VIEW_TEMPLATE = """
       <tr>
         <th>Installed Middleware:</th>
         <td><ul>
-          {% for item in settings.MIDDLEWARE_CLASSES %}
+          {% for item in settings.MIDDLEWARE %}
             <li><code>{{ item }}</code></li>
           {% endfor %}
         </ul></td>
@@ -1399,7 +1407,7 @@ DEBUG_URLS_VIEW_TEMPLATE = """
       <tr>
         <th>Installed Middleware:</th>
         <td><ul>
-          {% for item in settings.MIDDLEWARE_CLASSES %}
+          {% for item in settings.MIDDLEWARE %}
             <li><code>{{ item }}</code></li>
           {% endfor %}
         </ul></td>
