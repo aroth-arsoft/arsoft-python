@@ -25,7 +25,7 @@ class eurosport_stream_app(object):
         5: ['lowest', 'low', 'medium', 'high', ('highest', 'best') ],
         6: ['lowest', 'low', 'medium-low', 'medium', 'high', ('highest', 'best') ],
         7: ['lowest', 'low', 'medium-low', 'medium', 'medium-high', 'high', ('highest', 'best') ],
-        8: ['lowest', 'lower', 'low', 'medium-low', 'medium', 'medium', 'high', ('highest', 'best') ],
+        8: ['lowest', 'lower', 'low', 'medium-low', 'medium', 'medium-high', 'high', ('highest', 'best') ],
         }
 
     def log(self, msg):
