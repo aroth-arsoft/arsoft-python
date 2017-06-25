@@ -11,10 +11,14 @@ class CmdFile(object):
     CMDLINE_RE = re.compile(
         r'^'
         r'(?P<action>[a-z_]+)(\((?P<action_param>[^:])\))?:' # required action followed by colon
+        r'(' # begin choice
         r'(?P<section>[^/]+)?/?' # optional section
         r'(?P<key>[^=]*)' # required key
         r'=' # required equal sign
         r'(?P<value>.*)'
+        r'|' # next choice
+        r'(?P<req_section>[^/]+)' # required section
+        r')' # end choice
         r'$'
         )
     def __init__(self):
@@ -24,10 +28,11 @@ class CmdFile(object):
         if append == False:
             self._commands = []
         try:
+            ret = True
             f = open(filename, 'r')
             for line in f:
                 # comment or blank line?
-                if line.strip() == '' or line[0] == '#':
+                if line.strip() == '' or line[0] == '#' or line[0] == ';':
                     continue
                 # is it a section header?
                 mo = self.CMDLINE_RE.match(line)
@@ -35,13 +40,17 @@ class CmdFile(object):
                     action = mo.group('action')
                     action_param = mo.group('action_param')
                     section = mo.group('section')
+                    if section is None:
+                        section = mo.group('req_section')
+                        if section:
+                            section = section.strip()
                     key = mo.group('key')
                     value = mo.group('value')
                     self._commands.append( (action, action_param, section, key, value) )
                 else:
-                    sys.stderr.write('invalid command line: \'' + line + '\'\n')
+                    sys.stderr.write('invalid command line: \'%s\'\n' % line.strip())
+                    ret = False
             f.close()
-            ret = True
         except IOError:
             if append == False:
                 self._commands = []
@@ -250,7 +259,7 @@ class iniutil(object):
                     # remove all values from the given section
                     success = self.inifile.remove(section, '*')
                     if not success:
-                        sys.stderr.write('failed to clear ' + section + '\n')
+                        sys.stderr.write('failed to clear %s\n' % section)
                         ret = False
                     else:
                         modified = True

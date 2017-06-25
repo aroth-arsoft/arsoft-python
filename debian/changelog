@@ -1,3 +1,9 @@
+arsoft-python (1.312) zesty; urgency=medium
+
+  * ini-util: fixed parsing command file which contain clear command
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 25 Jun 2017 09:29:52 +0200
+
 arsoft-python (1.311) yakkety; urgency=medium
 
   * dns: add support for DMARC TXT record
