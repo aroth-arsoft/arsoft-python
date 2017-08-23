@@ -77,6 +77,8 @@ class Login:
         self.confirm(login_response.get_confirmation())
 
     def confirm(self, login_confirmation):
+        if self.__options.get('debug', False):
+            print('Login confirm: %s' % login_confirmation) 
         self.__logged_in_successfully = True
         self.__confirmation_data = login_confirmation
 

@@ -124,7 +124,13 @@ class eurosport_stream_app(object):
             sys.stderr.write('Incorrect login credentials.\n')
             ret = 5
 
-        if channels:
+        if channels is None:
+            sys.stderr.write('Unable to get channel information.\n')
+            ret = 6
+        elif not channels:
+            sys.stderr.write('No channel information available.\n')
+            ret = 7
+        else:
             if args.channel == 'list' or args.channel == '*':
                 for i, ch in enumerate(channels):
                     print('#%i: %s' % (i+1, ch.name))

@@ -32,8 +32,10 @@ class Program:
 
     @staticmethod
     def extract_channels_from_json(json_str):
-        data = json.loads(json_str)
         channels = []
-        for single_channel_data in data['PlayerObj']:
-            channels.append(Channel(single_channel_data))
+        data = json.loads(json_str)
+        print(data)
+        if data and data['PlayerObj']:
+            for single_channel_data in data['PlayerObj']:
+                channels.append(Channel(single_channel_data))
         return channels
