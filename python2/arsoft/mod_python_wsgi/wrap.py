@@ -40,6 +40,8 @@ class ModPythonWSGIApp(object):
                 #print('catch ex SERVER_RETURN %i' %ex.status_code)
                 request.response.status_code = ex.status_code
             else:
+                import traceback
+                traceback.print_exc()
                 raise ex
         finally:
             if request.cleanup is not None:
