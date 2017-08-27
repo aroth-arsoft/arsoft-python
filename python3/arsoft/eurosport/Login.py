@@ -38,16 +38,18 @@ class Login:
     def prepare_application_context(self):
 
         context    = {'g':Constants.get_geoloc_id(self.__options.get('geoloc',None)),
-                        'd':str(self.__options.get('devtype', 4)),
+                        'd':str(self.__options.get('devtype', 2)),
                         'l':str(Constants.get_locale_id(self.__options.get('language', None))),
-                        'p':str(self.__options.get('productid', 1)),
-                        'v':self.__options.get('version', ''),
+                        'p':str(self.__options.get('productid', 9)),
+                        'v':self.__options.get('version', '5.2.2'),
                         'c':self.__options.get('country', 'EUR'),
                         's':'1',
-                        'b':'Desktop',
+                        "li": 2,
+                        'b':'7',
+                        "mn":"iPad",
+                        "tt":"Pad",
                         }
         return context
-
 
     def _prepare_login_data(self):
         return json.dumps({
@@ -70,11 +72,16 @@ class Login:
     def do_login(self):
         login_url = BASE_LOGIN_PATH
         login_url += self._get_all_query_parameters()
-        raw_response = urllib.request.urlopen(login_url)
-        if not raw_response:
-            raise Login.NetworkError
-        login_response = LoginResponse(raw_response)
-        self.confirm(login_response.get_confirmation())
+        try:
+            print('do_login %s' % login_url)
+            raw_response = urllib.request.urlopen(login_url)
+            if not raw_response:
+                raise Login.NetworkError
+
+            login_response = LoginResponse(raw_response)
+            self.confirm(login_response.get_confirmation())
+        except urllib.error.HTTPError as e:
+            raise Login.HTTPError(e)
 
     def confirm(self, login_confirmation):
         if self.__options.get('debug', False):
@@ -85,13 +92,17 @@ class Login:
     def get_confirmation(self):
         if not self.__confirmation_data:
             self.do_login()
-        return json.dumps(self.__confirmation_data)
+        return self.__confirmation_data
 
     class IsNotConfigured(Exception):
         pass
 
     class NetworkError(Exception):
         pass
+
+    class HTTPError(NetworkError):
+        def __init__(self, http_ex):
+            self._http_ex = http_ex
 
     class LoginIncorrect(Exception):
         pass
@@ -134,8 +145,8 @@ class LoginResponse:
             "userid": self.__response_body["Id"],
             "hkey": self.__response_body["Hkey"],
             "languageid": 2,
-            "isfullaccess": 0,
-            "isbroadcasted": 0,
-            "epglight": False
+            #"isfullaccess": 0,
+            #"isbroadcasted": 0,
+            #"epglight": False
         }
 

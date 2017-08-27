@@ -6,9 +6,14 @@ from arsoft.inifile import IniFile
 
 class Config(object):
 
+
+    class Credentials:
+        def __init__(self, email, password):
+            self.email = email
+            self.password = password
+
     def __init__(self, filename=None, email=None, password=None, quality=None, geo=None, language=None, country=None, devtype=None, productid=None):
-        self.email = email
-        self.password = password
+        self.credentials = Config.Credentials(email, password)
         self.quality = quality
         self.geo = geo
         self.language = language
@@ -22,8 +27,8 @@ class Config(object):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         inifile.open(filename)
 
-        self.email = inifile.get(None, 'EMail', '')
-        self.password = inifile.get(None, 'Password', '')
+        self.credentials.email = inifile.get(None, 'EMail', '')
+        self.credentials.password = inifile.get(None, 'Password', '')
         self.quality = inifile.get(None, 'VideoQuality', None)
         self.geo = inifile.get(None, 'Geo', None)
         self.language = inifile.get(None, 'Language', None)
@@ -36,8 +41,8 @@ class Config(object):
         inifile = IniFile(commentPrefix='#', keyValueSeperator='=', disabled_values=False)
         inifile.open(filename)
 
-        inifile.set(None, 'EMail', self.email)
-        inifile.set(None, 'Password', self.password)
+        inifile.set(None, 'EMail', self.credentials.email)
+        inifile.set(None, 'Password', self.credentials.password)
         if self.quality is not None:
             inifile.set(None, 'VideoQuality', self.quality)
         else:

@@ -11,9 +11,11 @@ from .Stream import Stream
 
 class Playlist:
 
-    def __init__(self, uri, timeoffset=None):
+    def __init__(self, uri, timeoffset=None, client=None, token=None):
         self.m3u_list = None
+        self.token = token
         self.cookie = None
+        self.client = client
         self.base_uri = None
         self.active_stream = None
         self.streams = []
@@ -21,23 +23,25 @@ class Playlist:
         self.download_list(uri)
 
     def download_list(self, uri):
-        #print('Playlist.download_list %s' % uri)
-        contents = urllib.request.urlopen(uri)
-        self.m3u_list = m3u8.loads(contents.read().decode('utf8'))
-        self.cookie = contents.getheader('Set-Cookie')
+        print('Playlist.download_list %s' % uri)
+        req = urllib.request.Request(uri, headers={'Cookie': 'authorization=%s'%self.token})
+        contents = urllib.request.urlopen(req)
         self.set_base_uri(uri)
+        self.m3u_list = m3u8.M3U8(contents.read().decode('utf8'), base_uri=self.base_uri)
+        self.cookie = contents.getheader('Set-Cookie')
         self.create_streams()
 
     def set_base_uri(self, uri):
+
         self.base_uri = uri[:uri.rfind('/')]
+        print('set_base_uri %s -> %s' % (uri, self.base_uri))
 
     def create_streams(self):
         for s in self.m3u_list.playlists:
-            s.base_uri = self.base_uri
             if Stream.is_url_audio_only(s.absolute_uri):
                 continue
             try:
-                self.streams.append(Stream(s, self.cookie))
+                self.streams.append(Stream(s, self.token))
             except Stream.NoStreamPartsFound:
                 continue
         if len(self.streams) > 0:

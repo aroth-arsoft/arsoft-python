@@ -91,43 +91,92 @@ class Schedule(object):
     def is_highlights(self):
         return True if "Highlight" in self.transmission_type else False
 
-class Channel:
+class Channel(object):
+
+    class Url(object):
+        def __init__(self, data):
+            self.href = data['href']
+
+        def __str__(self):
+            return self.href
+        @property
+        def url(self):
+            return self.href
+
+    class Streams(object):
+        def __init__(self, data):
+            self._data = data
+
+        def playlist(self, complete=False, slide=False):
+            s = self._data.get('stream')
+            if complete:
+                return s.get('complete')
+            elif slide:
+                return s.get('slide')
+            else:
+                if 'slide' in s:
+                    return s['slide']
+                elif 'complete' in s:
+                    return s['complete']
+                else:
+                    return None
+
+        @property
+        def token(self):
+            return self._data.get('token')
+
 
     data = {}
 
     playlist = None
 
-    def __init__(self, data_array):
-        if 'channellivelabel' not in data_array or 'livestreams' not in data_array:
-            raise Channel.InvalidData("Could not get stream information")
+    def __init__(self, data_array, client):
+        if 'titles' not in data_array or 'playbackUrls' not in data_array:
+            raise Channel.InvalidData("Could not get stream information %s" % data_array.keys())
         self.data = data_array
         self._schedules = None
+        self._client = client
+        self._language = client.LANGUAGE
+        self._title = None
+        self.callsign = None
+        self._urls = []
+        self._streams = None
+        for u in self.data['playbackUrls']:
+            rel = u.get('rel')
+            if rel == 'event' or rel == 'video':
+                self._urls.append(Channel.Url(u))
+            else:
+                print('skip URL %s' % u)
+        if 'channel' in self.data:
+            self.callsign = self.data['channel'].get('callsign')
+        for t in data_array['titles']:
+            if t['language'] == self._language:
+                self._title = t
 
     def __str__(self):
         return self.name
 
     @property
     def name(self):
-        if 'channellivelabel' in self.data:
-            return self.data['channellivelabel']
-        elif 'channellabel' in self.data:
-            return self.data['channellabel']
-        else:
+        if self._title is None:
             return None
+        return self._title['title'].strip()
+    @property
+    def description(self):
+        if self._title is None:
+            return None
+        return self._title['description'].strip()
 
     @property
-    def label(self):
-        return self.data['channellabel']
-    @property
-    def livelabel(self):
-        return self.data['channellivelabel']
-    @property
-    def livesublabel(self):
-        return self.data['channellivesublabel']
+    def streams(self):
+        if self._streams is None:
+            data = self._client.streams(self._urls[0].url)
+            self._streams = Channel.Streams(data)
+        return self._streams
 
     @property
-    def stream_url(self):
-        return self.data['livestreams'][0]['securedurl']
+    def urls(self):
+        return self._urls
 
     @property
     def catchup_stream_url(self):
@@ -140,10 +189,6 @@ class Channel:
     def active_stream(self):
         return self.playlist.active_stream
 
-    @property
-    def streams(self):
-        return self.playlist.streams
-
     def get_active_stream_url(self):
         return self.playlist.get_active_stream_url()
 
@@ -151,12 +196,15 @@ class Channel:
         return self.playlist.get_available_bandwidths()
 
     def set_quality(self, desired):
+        print('set_quality %s' % desired)
         return self.playlist.set_bandwidth(desired)
 
     def download_playlist(self, timeoffset=None):
-        if self.stream_url is None:
+        streams = self.streams
+        if streams is None:
             raise Channel.NoLiveStream
-        self.playlist = Playlist(self.stream_url, timeoffset=timeoffset)
+
+        self.playlist = Playlist(streams.playlist(), timeoffset=timeoffset, client=self._client, token=streams.token)
 
     @property
     def schedules(self):
@@ -183,4 +231,7 @@ class Channel:
         pass
 
     class NoLiveStream(Exception):
+        pass
+
+    class NoCatchupStream(Exception):
         pass

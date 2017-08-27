@@ -18,8 +18,11 @@ class Program:
 
     @staticmethod
     def _get_all_query_parameters():
+        data = Login.get_instance().get_confirmation()
+        data['withouttvscheduleliveevents'] = 'true'
+        data['guest'] = 'false'
         return urllib.parse.urlencode({
-            "data": Login.get_instance().get_confirmation(),
+            "data": json.dumps(data),
             "context": Login.get_instance().prepare_application_context()
         })
 
@@ -27,7 +30,10 @@ class Program:
     def get_channel_list():
         base_url = BASE_PROGRAMS_PATH
         base_url += Program._get_all_query_parameters()
-        raw_response = urllib.request.urlopen(base_url)
+        print('get_channel_list %s' % base_url)
+
+        req = urllib.request.Request(base_url, headers={'accept': 'application/json', 'content-type': 'application/json' })
+        raw_response = urllib.request.urlopen(req)
         return Program.extract_channels_from_json(raw_response.read().decode('utf8'))
 
     @staticmethod

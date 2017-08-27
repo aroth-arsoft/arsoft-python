@@ -9,7 +9,16 @@ import json
 
 BASE_LOGIN_PATH = "https://playercrm.ssl.eurosport.com/JsonPlayerCrmApi.svc/Login?"
 BASE_UNLINK_PATH = "https://playercrm.ssl.eurosport.com/JsonPlayerCrmApi.svc/Unlink?"
-BASE_PROGRAMS_PATH = "http://videoshop.ext.eurosport.com/JsonProductService.svc/GetAllProductsByDeviceMobile?"
+#BASE_PROGRAMS_PATH = "http://videoshop.ext.eurosport.com/JsonProductService.svc/GetAllProductsByDeviceMobile?"
+BASE_PROGRAMS_PATH = "https://videoshop-partners.eurosportplayer.com/JsonProductService.svc/GetAllChannelsCache?"
+
+BASE_URL = 'http://www.eurosportplayer.com'
+BASE_GLOBAL_API = 'https://global-api.svcs.eurosportplayer.com/'
+BASE_SEARCH_API = 'https://search-api.svcs.eurosportplayer.com/'
+
+time_format = '%Y-%m-%dT%H:%M:%SZ'
+date_format = '%Y-%m-%d'
+
 
 DEFAULT_LOGIN_PARAMETERS = {
     "c": "EUR",
@@ -31,6 +40,9 @@ DEFAULT_LOGIN_PARAMETERS = {
     "l": "gb",
     "st": "2"
 }
+
+def log(msg):
+    print(msg)
 
 class Constants(object):
 

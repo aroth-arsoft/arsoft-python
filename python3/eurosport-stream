@@ -6,7 +6,9 @@ import os, sys
 import argparse
 import datetime
 import subprocess
+import json
 
+from arsoft.eurosport.client import Client
 from arsoft.eurosport.Config import Config
 from arsoft.eurosport.Login import Login
 from arsoft.eurosport.Program import Program
@@ -37,6 +39,136 @@ class eurosport_stream_app(object):
         self._script_name = os.path.basename(__file__)
         self._config = None
 
+    def cmd_list_streams(self):
+        for no, stream in enumerate(self._client.streams()):
+            print('#%i: %s' % (no, stream))
+
+    def cmd_list_categories(self):
+        categories = self._client.categories()
+        #print(json.dumps(categories, indent=4, sort_keys=True))
+
+        for no, category in enumerate(categories):
+            tags = category['tags']
+            sport_id = int(category['sport'])
+            displayName = []
+            for t in tags:
+                displayName.append(t['displayName'])
+            print('#%i: %s (%i)' % (no, ','.join(displayName), sport_id))
+
+    def cmd_list_videos(self):
+        videos = self._client.videos()
+        print(json.dumps(videos, indent=4, sort_keys=True))
+
+        for no, category in enumerate(videos):
+            tags = category['tags']
+            sport_id = int(category['sport'])
+            displayName = []
+            for t in tags:
+                displayName.append(t['displayName'])
+            print('#%i: %s (%i)' % (no, ','.join(displayName), sport_id))
+
+    def cmd_list_channels(self):
+        channels = self._client.channels()
+        #print(json.dumps(channels, indent=4, sort_keys=True))
+        for no, channel in enumerate(channels):
+            print('#%i: %s' % (no+1, channel.name))
+            if channel.urls:
+                print('  Url:')
+                for url_no, url in enumerate(channel.urls):
+                    print('    %i: %s' % (url_no + 1, url))
+
+    def cmd_stream_channel(self, channel):
+        timeoffset = 0
+        if '-' in channel:
+            (channel, timeoffset) = channel.split('-', 1)
+        if '/' in channel:
+            (channel_no, quality) = channel.split('/', 1)
+        elif '@' in channel:
+            (channel_no, quality) = channel.split('@', 1)
+        else:
+            channel_no = channel
+            quality = self._config.quality
+        try:
+            channel_no = int(channel_no)
+        except:
+            channel_no = -1
+
+        channels = self._client.channels()
+        ch = None
+        try:
+            if channel_no >= 0:
+                ch = channels[channel_no]
+        except IndexError:
+            pass
+
+        ret = 0
+        if ch:
+            try:
+                ch.download_playlist(timeoffset=timeoffset)
+                if quality is not None:
+                    if isinstance(quality, int) and quality < 100:
+                        quality_options = ch.get_available_quality_options()
+                        if quality > len(quality_options):
+                            sys.stderr.write('Invalid stream index %i (max %i)\n' %(quality, len(quality_options)))
+                        else:
+                            quality = quality_options[quality]
+                    elif isinstance(quality, str):
+                        if quality == 'best':
+                            quality = None
+                        else:
+                            quality_options = ch.get_available_quality_options()
+                            num_streams = len(quality_options)
+                            self.log('got %i streams' % num_streams)
+                            if num_streams in self.QUALITY_NAMES:
+                                found = False
+                                self.log('possible qualtiy names %s, requested %s' % (self.QUALITY_NAMES[num_streams], quality))
+                                for index, e in enumerate(self.QUALITY_NAMES[num_streams]):
+                                    self.log("got %i, %s" % (index, e))
+                                    if isinstance(e, str) and e == quality:
+                                        self.log('Found quality %s at index %i' % (quality, index))
+                                        quality = index
+                                        found = True
+                                        break
+                                    elif hasattr(e, '__iter__') and quality in e:
+                                        self.log('Found quality %s at index %i' % (quality, index))
+                                        quality = index
+                                        found = True
+                                        break
+                                quality = quality_options[quality] if found else None
+                ch.set_quality(quality)
+            except Channel.InvalidData:
+                ch = None
+            except Channel.NoLiveStream:
+                ch = None
+            except Channel.NoCatchupStream:
+                ch = None
+
+            if ch:
+                print(ch.active_stream)
+                sd = StreamDownloader(ch.active_stream)
+
+
+                #vlc_args = ['vlc', '-']
+                #p = subprocess.Popen(vlc_args, stdout=sys.stderr, stderr=sys.stderr, stdin=subprocess.PIPE, shell=False)
+                #if p:
+                    #while 1:
+                        #try:
+                            #p.stdin.write(sd.get_next_part())
+                        #except StreamDownloader.NoDataAvailable:
+                            #time.sleep(1)
+                            #continue
+                        #except KeyboardInterrupt:
+                            #sd.stop()
+                            #break
+                        #except BrokenPipeError:
+                            #sd.stop()
+                            #break
+                    #p.terminate()
+        else:
+            sys.stderr.write('Unable to find channel %s\n' %channel_no)
+            ret = 2
+        return ret
+
     def main(self, argv=None):
         #=============================================================================================
         # process command line
@@ -64,12 +196,15 @@ class eurosport_stream_app(object):
             import json
 
         save_config = False
+        if self._debug:
+            print('Config file: %s' % args.config_file)
         self._config = Config(filename=args.config_file)
-        if not self._config.email and args.email is not None:
-            self._config.email = args.email
+
+        if not self._config.credentials.email and args.email is not None:
+            self._config.credentials.email = args.email
             save_config = True
-        if not self._config.password and args.password is not None:
-            self._config.password = args.password
+        if not self._config.credentials.password and args.password is not None:
+            self._config.credentials.password = args.password
             save_config = True
 
         if args.geo is not None:
@@ -102,19 +237,19 @@ class eurosport_stream_app(object):
         if self._config.productid is not None:
             options['productid'] = self._config.productid
 
-        Login.configure(self._config.email, self._config.password, options)
-        ret = 0
-
-        channels = None
+        self._client = Client(self._config)
         try:
-            channels = Program.get_channel_list()
+            self._client.login()
         except Login.IsNotConfigured:
             sys.stderr.write('Missing login credentials.\n')
             ret = 1
         except Login.InvalidLoginData as e:
             sys.stderr.write('Invalid login credentials: %s.\n' % e)
             ret = 1
-        except Login.NetworkError:
+        except Login.HTTPError as e:
+            sys.stderr.write('%s. Unable to login to Eurosport.\n' % e)
+            ret = 3
+        except Login.NetworkError as e:
             sys.stderr.write('Network error. Unable to login to Eurosport.\n')
             ret = 2
         except Login.InvalidContext:
@@ -124,6 +259,17 @@ class eurosport_stream_app(object):
             sys.stderr.write('Incorrect login credentials.\n')
             ret = 5
 
+        if args.channel == 'list' or args.channel == '*':
+            self.cmd_list_channels()
+        else:
+            if args.show_schedule:
+                self.cmd_channel_schedule(args.channel)
+            else:
+                self.cmd_stream_channel(args.channel)
+        #self.cmd_list_categories()
+        #self.cmd_list_videos()
+        return 0
+
         if channels is None:
             sys.stderr.write('Unable to get channel information.\n')
             ret = 6
@@ -131,148 +277,27 @@ class eurosport_stream_app(object):
             sys.stderr.write('No channel information available.\n')
             ret = 7
         else:
-            if args.channel == 'list' or args.channel == '*':
-                for i, ch in enumerate(channels):
-                    print('#%i: %s' % (i+1, ch.name))
-                    if self._verbose:
-                        print('  Url: %s' % (ch.stream_url))
-                    if self._debug:
-                        f = open('/tmp/channel_%i' % i, 'w')
-                        f.write(json.dumps(ch.data, indent='  '))
-                        f.close()
-
-                    current_show = ch.find_current_show()
-                    if current_show:
-                        if self._debug:
-                            f = open('/tmp/channel_%i_show' % i, 'w')
-                            f.write(json.dumps(current_show.data, indent='  '))
-                            f.close()
-                        print('  Current show: %s from %s to %s' % (current_show.title, current_show.starttime, current_show.endtime))
-
-                    if args.show_schedule:
-                        print('  Schedule:')
-                        for schedule in ch.schedules:
-                            if schedule.is_currently_running:
-                                print('  * %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
-                            else:
-                                print('    %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
-
-                    streams = None
-                    try:
-                        ch.download_playlist()
-                        streams = sorted(ch.streams, key=lambda stream: stream.bandwidth)
-                    except Channel.InvalidData:
-                        pass
-                    except Channel.NoLiveStream:
-                        pass
-                    except Channel.NoCatchupStream:
-                        pass
-
-                    if streams:
-                        print('  Streams:')
-                        for stream_no, stream in enumerate(streams):
-                            print('    %i: %i bits/sec' % (stream_no + 1, stream.bandwidth))
+            channel = args.channel
+            timeoffset = 0
+            if '-' in args.channel:
+                (channel, timeoffset) = channel.split('-', 1)
+            if '/' in channel:
+                (channel_no, quality) = channel.split('/', 1)
+            elif '@' in channel:
+                (channel_no, quality) = channel.split('@', 1)
             else:
-                channel = args.channel
-                timeoffset = 0
-                if '-' in args.channel:
-                    (channel, timeoffset) = channel.split('-', 1)
-                if '/' in channel:
-                    (channel_no, quality) = channel.split('/', 1)
-                elif '@' in channel:
-                    (channel_no, quality) = channel.split('@', 1)
-                else:
-                    channel_no = channel
-                    quality = self._config.quality
-                try:
-                    channel_no = int(channel_no)
-                except ValueError:
-                    channel_no = -1
-                try:
-                    if quality is not None:
-                        quality = int(quality)
-                except ValueError:
-                    pass
+                channel_no = channel
+                quality = self._config.quality
+            try:
+                channel_no = int(channel_no)
+            except ValueError:
+                channel_no = -1
+            try:
+                if quality is not None:
+                    quality = int(quality)
+            except ValueError:
+                pass
 
-                ch = None
-                try:
-                    if channel_no >= 0:
-                        ch = channels[channel_no]
-                except IndexError:
-                    pass
-
-                if ch:
-
-                    if args.show_schedule:
-                        print('Schedule:')
-                        for schedule in ch.schedules:
-                            if schedule.is_currently_running:
-                                print('* %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
-                            else:
-                                print('  %s %s: %s' % (schedule.starttime, schedule.duration_human, schedule.title))
-                    else:
-                        try:
-                            ch.download_playlist(timeoffset=timeoffset)
-                            if quality is not None:
-                                if isinstance(quality, int) and quality < 100:
-                                    quality_options = ch.get_available_quality_options()
-                                    if quality > len(quality_options):
-                                        sys.stderr.write('Invalid stream index %i (max %i)\n' %(quality, len(quality_options)))
-                                    else:
-                                        quality = quality_options[quality]
-                                elif isinstance(quality, str):
-                                    if quality == 'best':
-                                        quality = None
-                                    else:
-                                        quality_options = ch.get_available_quality_options()
-                                        num_streams = len(quality_options)
-                                        self.log('got %i streams' % num_streams)
-                                        if num_streams in self.QUALITY_NAMES:
-                                            found = False
-                                            self.log('possible qualtiy names %s, requested %s' % (self.QUALITY_NAMES[num_streams], quality))
-                                            for index, e in enumerate(self.QUALITY_NAMES[num_streams]):
-                                                self.log("got %i, %s" % (index, e))
-                                                if isinstance(e, str) and e == quality:
-                                                    self.log('Found quality %s at index %i' % (quality, index))
-                                                    quality = index
-                                                    found = True
-                                                    break
-                                                elif hasattr(e, '__iter__') and quality in e:
-                                                    self.log('Found quality %s at index %i' % (quality, index))
-                                                    quality = index
-                                                    found = True
-                                                    break
-                                            quality = quality_options[quality] if found else None
-                            ch.set_quality(quality)
-                        except Channel.InvalidData:
-                            ch = None
-                        except Channel.NoLiveStream:
-                            ch = None
-                        except Channel.NoCatchupStream:
-                            ch = None
-
-                        if ch:
-                            sd = StreamDownloader(ch.active_stream)
-
-                            vlc_args = ['vlc', '-']
-                            p = subprocess.Popen(vlc_args, stdout=sys.stderr, stderr=sys.stderr, stdin=subprocess.PIPE, shell=False)
-                            if p:
-                                while 1:
-                                    try:
-                                        p.stdin.write(sd.get_next_part())
-                                    except StreamDownloader.NoDataAvailable:
-                                        time.sleep(1)
-                                        continue
-                                    except KeyboardInterrupt:
-                                        sd.stop()
-                                        break
-                                    except BrokenPipeError:
-                                        sd.stop()
-                                        break
-                                p.terminate()
-                else:
-                    sys.stderr.write('Unable to find channel %s\n' %channel_no)
-                    ret = 2
 
         return ret
 
