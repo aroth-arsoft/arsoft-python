@@ -11,6 +11,10 @@ import threading
 from collections import deque
 from Crypto.Cipher import AES
 
+BS = 16
+pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
+unpad = lambda s : s[0:-ord(s[-1])]
+
 class AESCipher:
 
     def __init__( self, key, iv ):
