@@ -1,0 +1,83 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import argparse
+import json
+
+from arsoft.utils import *
+
+class video_rename_app:
+    def __init__(self):
+        self._verbose = False
+        self._files = []
+        self._video_file_exts = ['.mp4', '.avi', '.wmv', '.mkv']
+
+    def _add_file(self, f):
+        fabs = os.path.abspath(f)
+        (name, ext) = os.path.splitext(fabs)
+        if ext in self._video_file_exts:
+            self._files.append(fabs)
+        else:
+            print('Skip non-video file %s' % fabs)
+
+
+
+    def _process_file(self, f, force=False):
+        path, name = os.path.split(f)
+        (basename, ext) = os.path.splitext(name)
+
+        hash_only = True
+        for b in basename:
+            if b not in '0123456789abcdefABCDEF':
+                hash_only = False
+                break;
+        if not hash_only and not force:
+            print('Skip already %s' % f)
+            return
+
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f])
+        if sts == 0:
+            file_format = json.loads(stdoutdata.decode('utf8'))
+            #print(file_format['format'])
+            if 'tags' in file_format['format']:
+                tags = file_format['format']['tags']
+                if 'title' in tags:
+                    title = tags['title']
+                    suggested_filename = path + '/' + title + ext
+                    print('Rename %s to %s' % (f, suggested_filename))
+                    os.rename(f, suggested_filename)
+
+
+
+    def main(self):
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='renames video files by extract the video title from the meta data')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-f', '--force', dest='force', action='store_true', help='force processing of given files.')
+        parser.add_argument('files', metavar='FILE', type=str, nargs='+', help='video files or directories')
+
+        args = parser.parse_args()
+        self._verbose = args.verbose
+
+        for f in args.files:
+            if os.path.isfile(f):
+                self._add_file(f)
+            elif os.path.isdir(f):
+                for e in os.listdir(path=f):
+                    full = os.path.join(f, e)
+                    self._add_file(full)
+
+        for f in self._files:
+            #print('%s' % f)
+            self._process_file(f, force=args.force)
+
+        ret = 0
+        return ret
+
+if __name__ == "__main__":
+    app =  video_rename_app()
+    sys.exit(app.main())
