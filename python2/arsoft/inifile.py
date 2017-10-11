@@ -6,6 +6,7 @@ import re
 import datetime
 import os
 from .timestamp import timestamp_from_datetime
+from .utils import unquote_string
 
 class IniSection(object):
 
@@ -240,10 +241,10 @@ class IniSection(object):
         return self.asString(only_data=False)
 
 class IniFile(object):
-    def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True, keyIsWord=True, autoQuoteStrings=False):
+    def __init__(self, filename=None, commentPrefix=None, keyValueSeperator=None, disabled_values=True, keyIsWord=True, autoQuoteStrings=False, qt=False):
         self.m_commentPrefix = commentPrefix
         self.m_keyValueSeperator = keyValueSeperator
-        self.m_autoQuoteStrings = autoQuoteStrings
+        self.m_autoQuoteStrings = True if autoQuoteStrings or qt else False
         self.m_sections = []
         self.m_filename = filename
         self.m_last_error = None
@@ -262,7 +263,9 @@ class IniFile(object):
                 disabled_re = r'\s*(?P<disabled>[#;]*)'
         else:
             disabled_re = r''
-        if keyIsWord:
+        if qt:
+            key_re = r'[\w\\]+'
+        elif keyIsWord:
             key_re = r'[\w]+'
         else:
             comment_chars = commentPrefix if commentPrefix else '#;'
@@ -468,9 +471,12 @@ class IniFile(object):
                         #print('commentPrefix=' + str(commentPrefix) + ' optcomment=' + str(optcomment))
 
                         optval = optval.strip()
-                        # allow empty values
-                        if optval == '""':
-                            optval = ''
+                        if self.m_autoQuoteStrings:
+                            optval = unquote_string(optval)
+                        else:
+                            # allow empty values
+                            if optval == '""':
+                                optval = ''
                         optname = optname.rstrip()
 
                         cursect.appendRaw(lineno, line, optname, optval, optcomment, disabled)
