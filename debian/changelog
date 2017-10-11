@@ -1,3 +1,9 @@
+arsoft-python (1.313) artful; urgency=medium
+
+  * add initial qt inifile support
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 11 Oct 2017 07:10:39 +0200
+
 arsoft-python (1.312) zesty; urgency=medium
 
   * ini-util: fixed parsing command file which contain clear command
