@@ -12,6 +12,10 @@ ISO8601_REGEX = re.compile(r"(?P<year>[0-9]{4})((?P<month>[0-9]{2})((?P<day>[0-9
     r"((?P<hour>[0-9]{2})(?P<minute>[0-9]{2})((?P<second>[0-9]{2})(\.(?P<fraction>[0-9]+))?)?"
     r"(?P<timezone>Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?"
 )
+ISO8601_REGEX_WITH_SEP = re.compile(r"(?P<year>[0-9]{4})-((?P<month>[0-9]{2})-((?P<day>[0-9]{2})"
+    r"T((?P<hour>[0-9]{2}):(?P<minute>[0-9]{2}):((?P<second>[0-9]{2})(\.(?P<fraction>[0-9]+))?)?"
+    r"(?P<timezone>Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?"
+)
 TIMEZONE_REGEX = re.compile("(?P<prefix>[+-])(?P<hours>[0-9]{2}).(?P<minutes>[0-9]{2})")
 TIMEDELTA_REGEX = re.compile(r'((?P<days>\d+?)d)?((?P<hours>\d+?)hr)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?')
 
@@ -135,7 +139,10 @@ def parse_date(datestring, default_timezone=UTC, encoding='utf8'):
         datestring = datestring.decode(encoding)
     elif not isinstance(datestring, str):
         raise ParseError("Expecting a string %r (%s)" % (datestring, type(datestring)))
-    m = ISO8601_REGEX.match(datestring)
+    if '-' in datestring:
+        m = ISO8601_REGEX_WITH_SEP.match(datestring)
+    else:
+        m = ISO8601_REGEX.match(datestring)
     if not m:
         raise ParseError("Unable to parse date string %r" % datestring)
     groups = m.groupdict()
