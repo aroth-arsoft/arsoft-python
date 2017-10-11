@@ -1,3 +1,9 @@
+arsoft-python (1.314) artful; urgency=medium
+
+  * build fixes for artful
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 11 Oct 2017 18:39:13 +0200
+
 arsoft-python (1.313) artful; urgency=medium
 
   * add initial qt inifile support
