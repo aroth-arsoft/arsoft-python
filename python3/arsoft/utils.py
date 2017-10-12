@@ -436,6 +436,41 @@ def unquote_string(str):
 def quote_string(str, quote_char='\''):
     return quote_char + str + quote_char
 
+def escape_string_for_c(str):
+    tmap = {"'":  r"\'",
+            "\"":  r"\"",
+            "\\": r"\\",
+            "\r": r"\r",
+            "\n": r"\n",
+            "\t": r"\t",
+            }
+    ret = ''
+    for c in str:
+        ret += tmap.get(c, c)
+    return ret
+
+def unescape_string_from_c(str):
+    tmap = {"'":  "'",
+            "\"":  "\"",
+            "\\": "\\",
+            "r": "\r",
+            "n": "\n",
+            "t": "\t",
+            }
+    ret = ''
+    i = 0
+    l = len(str)
+    while i < l:
+        if str[i] == '\\':
+            ret += tmap.get(str[i+1], str[i+1])
+            i = i + 2
+        else:
+            ret += str[i]
+            i = i + 1
+    return ret
+
+
+
 def getlogin():
     """:return: string identifying the currently active system user as name@node
     :note: user can be set with the 'USER' environment variable, usually set on windows

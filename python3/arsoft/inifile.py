@@ -6,7 +6,7 @@ import re
 import datetime
 import os
 from .timestamp import timestamp_from_datetime
-from .utils import unquote_string
+from .utils import unquote_string, escape_string_for_c, unescape_string_from_c
 
 class IniSection(object):
 
@@ -94,6 +94,12 @@ class IniSection(object):
         ret = []
         for v in self.values:
             ret.append( (v.key, v.value) )
+        return ret
+
+    def get_all_as_dict(self):
+        ret = {}
+        for v in self.values:
+            ret[v.key] = v.value
         return ret
 
     def set(self, key, value, comment='', disabled=False):
@@ -245,6 +251,7 @@ class IniFile(object):
         self.m_commentPrefix = commentPrefix
         self.m_keyValueSeperator = keyValueSeperator
         self.m_autoQuoteStrings = True if autoQuoteStrings or qt else False
+        self.m_autoEscapeStrings = True if qt else False
         self.m_sections = []
         self.m_filename = filename
         self.m_last_error = None
@@ -477,6 +484,8 @@ class IniFile(object):
                             # allow empty values
                             if optval == '""':
                                 optval = ''
+                        if self.m_autoEscapeStrings:
+                            optval = unescape_string_from_c(optval)
                         optname = optname.rstrip()
 
                         cursect.appendRaw(lineno, line, optname, optval, optcomment, disabled)
