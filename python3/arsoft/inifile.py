@@ -81,6 +81,64 @@ class IniSection(object):
                 return v.value
         return default
 
+    def getAsBoolean(self, key, default=None):
+        value = self.get(key, default)
+        if value is not None:
+            try:
+                num = int(value)
+                ret = True if num != 0 else False
+            except ValueError:
+                str = value.lower()
+                if str == 'true' or str == 'yes' or str == 'on':
+                    ret = True
+                elif str == 'false' or str == 'no' or str == 'off':
+                    ret = False
+                else:
+                    ret = default
+        else:
+            ret = default
+        return ret
+
+    def getAsInteger(self, key, default=None):
+        value = self.get(key, default)
+        if value is not None:
+            try:
+                ret = int(value)
+            except ValueError:
+                ret = default
+        else:
+            ret = default
+        return ret
+
+    def getAsDateTime(self, key, default=None, date_format='%a, %d %b %Y %H:%M:%S %z'):
+        value = self.get(key, default)
+        if value is not None:
+            if isinstance(value, datetime.datetime):
+                ret = value
+            else:
+                try:
+                    ret = datetime.datetime.strptime(value)
+                except ValueError:
+                    ret = default
+        else:
+            ret = default
+        return ret
+
+    def getAsTimestamp(self, key, default=None):
+        value = self.get(key, default)
+        if value is not None:
+            if isinstance(value, datetime.datetime):
+                ret = value
+            else:
+                try:
+                    num = float(value)
+                    ret = datetime.datetime.fromtimestamp(num)
+                except ValueError:
+                    ret = default
+        else:
+            ret = default
+        return ret
+
     def getAsArray(self, key, default=[]):
         ret = []
         found = False

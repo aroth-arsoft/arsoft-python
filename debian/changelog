@@ -1,3 +1,9 @@
+arsoft-python (1.315) artful; urgency=medium
+
+  * inifile: add missing functions
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Wed, 18 Oct 2017 19:10:59 +0200
+
 arsoft-python (1.314) artful; urgency=medium
 
   * build fixes for artful
