@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# openldap daemon certificates
 # -*- coding: utf-8 -*-
 # kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
 

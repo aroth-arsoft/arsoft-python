@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Check_MK Dovecot Plugin - Check Dovecot daemon.
+
 from arsoft.timestamp import format_timedelta
 
 # default times in hours
@@ -122,5 +124,6 @@ check_info['dovecot'] = {
     'check_function':            check_dovecot,
     'inventory_function':        inventory_dovecot,
     'service_description':       'Dovecot',
+    'group':                     'Dovecot',
     'has_perfdata':              True,
 }

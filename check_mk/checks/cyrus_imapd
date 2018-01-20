@@ -70,4 +70,5 @@ check_info['cyrus_imapd'] = {
     'inventory_function':        inventory_cyrus_imapd,
     'service_description':       'Cyrus-IMAP',
     'has_perfdata':              True,
+    'group':                     'cyrus',
 }

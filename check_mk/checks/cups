@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 #
+# Check_MK CUPS Plugin - Check for status of CUPS daemon.
+#
 from arsoft.crypto.utils import check_mk_cert_check, check_mk_cert_inventory
 from arsoft.check_mk import check_state
 
@@ -54,5 +56,6 @@ check_info['cups'] = {
     'inventory_function':        inventory_cups,
     'service_description':       'cups',
     'has_perfdata':              True,
+    'group':                     'cups',
 }
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Check_MK DMI baseboard Plugin - Get DMI baseboard information.
+#
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 #
 
@@ -29,4 +31,5 @@ check_info["dmi_baseboard"] = {
     'check_function':          check_dmi_baseboard,
     'inventory_function':      inventory_dmi_baseboard,
     'service_description':     'DMI base board info',
+    'group':                   'DMI',
 }

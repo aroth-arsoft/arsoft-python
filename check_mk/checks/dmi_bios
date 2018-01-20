@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Check_MK DMI bios Plugin - Get DMI BIOS information.
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 #
 
@@ -54,4 +55,5 @@ check_info["dmi_bios"] = {
     'check_function':          check_dmi_bios,
     'inventory_function':      inventory_dmi_bios,
     'service_description':     'DMI BIOS info',
+    'group':                   'DMI',
 }

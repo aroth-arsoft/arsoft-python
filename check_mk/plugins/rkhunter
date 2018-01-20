@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# rkhunter system check
 import os,sys
 import re
 import datetime
