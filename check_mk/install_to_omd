@@ -1,0 +1,9 @@
+#!/bin/bash -x
+
+cp -a checks/* /opt/omd/versions/default/share/check_mk/checks
+cp -a checkman/* /opt/omd/versions/default/share/check_mk/checkman
+cp -a special_agent/* /opt/omd/versions/default/share/check_mk/agents/special/
+cp -a plugins/* /opt/omd/versions/default/share/check_mk/agents/plugins/
+cp -a web/* /opt/omd/versions/default/share/check_mk/web/
+#cp -a /root/arpy-dist/usr/lib/python2.7/site-packages/arsoft /opt/omd/versions/default/lib/python
+

@@ -1,0 +1,13 @@
+title: Puppet Agent Status
+agents: linux
+catalog: app/apache
+license: GPL
+distribution: heinlein
+description:
+ This checks the status of the puppet agent.
+
+perfdata:
+ Number of successful and failed services.
+
+inventory:
+ Automatically.

@@ -6,6 +6,11 @@ from arsoft.check_mk import check_state
 default_warn_time = 24
 default_crit_time = 48
 
+factory_settings['puppet_agent_default_levels'] = {
+    'daemon': (True, True),
+    'config': (default_warn_time, default_crit_time)
+}
+
 def parse_puppet_agent(info):
     data = {}
     for line in info:
@@ -106,4 +111,6 @@ check_info['puppet_agent'] = {
     'inventory_function':        inventory_puppet_agent,
     'service_description':       'Puppet agent',
     'has_perfdata':              True,
+    'group':                     'puppet',
+    'default_levels_variable':   'puppet_agent_default_levels',
 }
