@@ -398,7 +398,6 @@ Examples:
                 return None
             elif self._rrtype == dns.rdatatype.A:
                 addr = self._get_item('addr', None, old=old)
-                print('addr=%s' % addr)
                 return dns.rdtypes.IN.A.A(dns.rdataclass.IN, dns.rdatatype.A, addr)
 
             elif self._rrtype == dns.rdatatype.AAAA:
