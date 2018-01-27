@@ -1,3 +1,9 @@
+arsoft-python (1.317) artful; urgency=medium
+
+  * fix dns-update script
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 27 Jan 2018 15:27:29 +0100
+
 arsoft-python (1.315) artful; urgency=medium
 
   * inifile: add missing functions

@@ -398,6 +398,7 @@ Examples:
                 return None
             elif self._rrtype == dns.rdatatype.A:
                 addr = self._get_item('addr', None, old=old)
+                print('addr=%s' % addr)
                 return dns.rdtypes.IN.A.A(dns.rdataclass.IN, dns.rdatatype.A, addr)
 
             elif self._rrtype == dns.rdatatype.AAAA:
@@ -739,35 +740,6 @@ Examples:
                         ret = False
         return ret
 
-    def _update_host(self, args):
-        if args is None:
-            return False
-        ret = True
-        for arg in args:
-            if isinstance(payload, list):
-                addr_list = payload
-            else:
-                addr_list = payload.split(',')
-
-            name = dns.name.from_text(name)
-            update = self._get_update_object(host)
-            if update is None:
-                ret = False
-            else:
-                update.delete(name, self.rrtype)
-                for addr in addr_list:
-                    update.add(name, self.ttl, self.rrtype, addr)
-                    if (self.rrtype == 'A' or self.rrtype == 'AAAA') and not self.no_reverse:
-                        # delete reverse addr and re-add it afterwards
-                        revaddrname = dns.reversename.from_address(addr)
-                        Origin, dummy = arsoft.dnsutils.get_dns_zone_for_name(revaddrname)
-                        #print(Origin, dummy)
-                        rev_update = self._get_update_object(revaddrname)
-                        if rev_update:
-                            rev_update.delete(revaddrname, 'PTR')
-                            rev_update.add(revaddrname, self.ttl, 'PTR', addr)
-        return ret
-
     def _import_host(self, args):
         if args is None:
             return False
@@ -823,9 +795,9 @@ Examples:
                 if not _is_hostaddr_equal(target_hostaddr, anotherserver_hostaddr):
                     if self.verbose:
                         print("Update host record %s from %s to %s." % (host, target_hostaddr, anotherserver_hostaddr))
-                    update_tuple = (host, anotherserver_hostaddr)
-                    if not self._update_host( [ update_tuple ] ):
-                        sys.stderr.write("Failed to update host record %s on target DNS server\n" % (host, self.server))
+                    update_tuple = dns_update_app.arg_data('%s=%s' % (host, '|'.join(anotherserver_hostaddr)))
+                    if not self._update_record( [ update_tuple ] ):
+                        sys.stderr.write("Failed to update host record %s on target DNS server %s\n" % (host, self.server))
                         ret = False
                 else:
                     if self.verbose:
@@ -995,7 +967,6 @@ Examples:
         parser.add_argument('-d', '--delete', dest='delete', nargs='+', help='deletes the specified DNS record')
         parser.add_argument('-u', '--update', dest='update', nargs='+', help='updates the specified DNS record')
         parser.add_argument('--update-file', dest='update_file', nargs='+', help='load DNS records from the given files and update them.')
-        parser.add_argument('--update-host', dest='update_host', nargs='+', help='updates the given host for the specified address.')
         parser.add_argument('--import-host', dest='import_host', nargs='+', help='import the result from the specified DNS server and update the local DNS server.')
 
         args = parser.parse_args()
@@ -1023,10 +994,6 @@ Examples:
                 perform_update = False
         if args.update:
             if not self._update_record(dns_update_app._split_args(args.update)):
-                perform_update = False
-
-        if args.update_host:
-            if not self._update_host(dns_update_app._split_args(args.update_host)):
                 perform_update = False
 
         if args.update_file:

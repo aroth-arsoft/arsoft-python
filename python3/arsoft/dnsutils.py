@@ -105,7 +105,7 @@ def _read_key_file_zone(filename):
         ret = None
     return ret
 
-def _read_key_file_tsig(filename):
+def _read_key_file_tsig(filename, encoding='utf8'):
     """Accept a TSIG keyfile and a key name to retrieve.
     Return a keyring object with the key name and TSIG secret."""
 
@@ -126,7 +126,7 @@ def _read_key_file_tsig(filename):
             key_data = m.group(2)
             keyalgorithm = re.search(r"algorithm ([a-zA-Z0-9_-]+?)\;", key_data, re.DOTALL).group(1)
             secret = re.search(r"secret \"(.*?)\"", key_data, re.DOTALL).group(1)
-            secret = base64.decodestring(secret)
+            secret = base64.decodebytes(bytearray(secret, encoding=encoding))
         except AttributeError:
             keyname = None
             raise
@@ -141,7 +141,7 @@ def _read_key_file_tsig(filename):
         ret = None
     return ret
 
-def _read_key_data_zone(data):
+def _read_key_data_zone(data, encoding='utf8'):
     ret = {}
     for line in data.splitlines():
         keyline = line.strip()
@@ -153,7 +153,7 @@ def _read_key_data_zone(data):
                 keyprotocol = int(keyline_elems[4])
                 keyalgorithm = get_algorithm_for_number(int(keyline_elems[5]))
                 keyname = dns.name.from_text(keyline_elems[0])
-                secret = base64.decodestring(''.join(keyline_elems[6:]))
+                secret = base64.decodebytes(bytearray(''.join(keyline_elems[6:]), encoding=encoding))
                 ret[keyname] = {'secret': secret, 'protocol':keyprotocol, 'algorithm':keyalgorithm, 'flags':keyflags }
         except IndexError:
             ret = None
