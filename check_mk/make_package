@@ -1,0 +1,153 @@
+#!/usr/bin/python
+
+import sys
+import os
+import shutil
+
+OMD_ROOT = '/local/work/cmk/omd/versions/1.4.0p23.cre'
+
+CMK_PACKAGE_DIR = os.path.join(OMD_ROOT, 'var/check_mk/packages')
+os.environ["OMD_ROOT"] = OMD_ROOT
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+sys.path.append(os.path.join(OMD_ROOT, 'lib/python'))
+
+
+PACKAGE_INFO = {
+    'author': 'Andreas Roth',
+    'description': 'check_mk plugins ',
+    'download_url': 'https://github.com/aroth-arsoft/arsoft-python',
+    'name': 'arsoft',
+    'title': 'Various plugins by AR Soft',
+    'version': '1.0',
+    'version_min_required': '1.4.0p1',
+    }
+
+setup_py = os.path.join(SCRIPT_DIR, '../setup.py')
+setup_py_version = None
+f = open(setup_py, 'r')
+for line in f:
+    l = line.strip()
+    if l.startswith('version='):
+        setup_py_version = l[8:].translate(None, "',")
+
+PACKAGE_INFO['version'] = setup_py_version
+print('Package version %s' % setup_py_version)
+
+import cmk
+CMK_VERSION = {
+    'version_packaged': cmk.__version__,
+    }
+
+CMK_DIR_MAP = {
+    'agents': cmk.paths.agents_dir,
+    'bin': cmk.paths.bin_dir,
+    'checkman': cmk.paths.check_manpages_dir,
+    'checks': cmk.paths.local_checks_dir,
+    'doc': cmk.paths.doc_dir,
+    'inventory': cmk.paths.inventory_dir,
+    'lib': cmk.paths.lib_dir,
+    'mibs': cmk.paths.mibs_dir,
+    'notifications': cmk.paths.notifications_dir,
+    'pnp-templates': cmk.paths.local_pnp_templates_dir,
+    'web': cmk.paths.local_web_dir,
+    }
+
+def merge_two_dicts(x, y):
+    z = x.copy()   # start with x's keys and values
+    z.update(y)    # modifies z with y's keys and values & returns None
+    return z
+
+def _recursive_filelist(dir, base):
+    ret = []
+    for f in os.listdir(dir):
+        full = os.path.join(dir,f)
+        rel = os.path.relpath(full, base)
+        if os.path.isfile(full):
+            ret.append(rel)
+        elif os.path.isdir(full):
+            sub_files = _recursive_filelist(full, base)
+            ret += sub_files
+    return ret
+
+def find_files(filetype):
+    ret = []
+    d = os.path.join(SCRIPT_DIR, filetype)
+    if os.path.isdir(d):
+        ret = _recursive_filelist(d, SCRIPT_DIR)
+    return ret
+
+def _cmk_pack(pkg_name):
+    print('Generating package %s' % pkg_name)
+    import cmk_base.packaging
+    args = ['pack', pkg_name]
+    cmk_base.packaging.do_packaging(args)
+
+def _write_package_info(pkg_name):
+    pkg_info_file = os.path.join(CMK_PACKAGE_DIR, pkg_name)
+    print('Write %s' % pkg_info_file)
+
+    pkg_info = merge_two_dicts(PACKAGE_INFO,CMK_VERSION)
+
+    files = {}
+    for k in CMK_DIR_MAP:
+        files[k] = find_files(k)
+        if files[k]:
+            for f in files[k]:
+                print('Found %s' % (f))
+
+    #print(files)
+    for (k,filelist) in files.items():
+
+        cmk_dir = CMK_DIR_MAP[k]
+        base_dir = os.path.join(SCRIPT_DIR, k)
+        #print('dir for %s: %s' % (k, cmk_dir))
+        filelist_abs = []
+        for f in filelist:
+            f_base = os.path.basename(f)
+            src_file = os.path.join(SCRIPT_DIR, f)
+            f_rel = os.path.relpath(src_file, base_dir)
+
+            dest_file = os.path.join(cmk_dir,f_rel)
+            dest_dir = os.path.dirname(dest_file)
+            if not os.path.isdir(dest_dir):
+                os.makedirs(dest_dir)
+
+            shutil.copyfile(src_file, dest_file)
+            filelist_abs.append(f_rel)
+        filelist_abs_str = ("'" + "','".join(filelist_abs) + "'") if filelist_abs else ''
+        pkg_info['files_%s' % k ] = filelist_abs_str
+
+    try:
+        f = open(pkg_info_file, 'w')
+        f.write("""
+{'author': '%(author)s',
+ 'description': '%(description)s',
+ 'download_url': '%(download_url)s',
+ 'files': {'agents': [%(files_agents)s],
+           'bin': [%(files_bin)s],
+           'checkman': [%(files_checkman)s],
+           'checks': [%(files_checks)s],
+           'doc': [%(files_doc)s],
+           'inventory': [%(files_inventory)s],
+           'lib': [%(files_lib)s],
+           'mibs': [%(files_mibs)s],
+           'notifications': [%(files_notifications)s],
+           'pnp-templates': [%(files_pnp-templates)s],
+           'web': [%(files_web)s]},
+ 'name': '%(name)s',
+ 'title': '%(title)s',
+ 'version': '%(version)s',
+ 'version.min_required': '%(version_min_required)s',
+ 'version.packaged': '%(version_packaged)s'}
+""" % pkg_info )
+
+        f.close()
+    except IOError:
+        pass
+
+pkg_name = PACKAGE_INFO['name']
+_write_package_info(pkg_name)
+_cmk_pack(pkg_name)
+
