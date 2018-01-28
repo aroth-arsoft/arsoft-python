@@ -1,0 +1,11 @@
+title: FritzBox dynamic DNS
+agents: fritzbox
+catalog: hw/network/avm
+license: GPL
+distribution: arsoft
+description:
+ The check is OK when the current WAN address matches the configured DNS
+ name loopup.
+
+inventory:
+ Automatically.

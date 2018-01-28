@@ -1,11 +1,13 @@
 checkgroups = []
-subgroup_oracle =           _("Oracle Resources")
+subgroup_puppet =           _("Puppet")
 
 register_check_parameters(
     subgroup_applications,
-    "puppet_agent",
+    "puppet_agent.daemon",
     _("Puppet Agent"),
     Dictionary(
+        title = _('Puppet Agent'),
+        help = _('Configure the state of the Puppet Agent'),
         elements = [
             ('daemon',
               Tuple(
@@ -18,18 +20,33 @@ register_check_parameters(
                   ]
               )
              ),
+        ],
+        optional_keys=None,
+    ),
+    None,
+    match_type = "dict",
+)
+
+
+register_check_parameters(
+    subgroup_applications,
+    "puppet_agent.config",
+    _("Puppet Agent"),
+    Dictionary(
+        title = _('Puppet Agent'),
+        help = _('Configure the state of the Puppet Agent'),
+        elements = [
             ('config',
              Tuple(
                 title = _('Threshold config time'),
-                default_value = (24, 48),
                 elements = [
-                    Integer( title = _("Warning")),
-                    Integer( title = _("Critical"))
+                    Integer( title = _("Warning"), unit='h', default_value = 24),
+                    Integer( title = _("Critical"), unit='h', default_value = 48)
             ])),
         ],
-        optional_keys=[]
+        optional_keys=None,
     ),
-    TextAscii( title = _("Puppet agent")),
+    None,
     match_type = "dict",
 )
 

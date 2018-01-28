@@ -1,0 +1,15 @@
+title: Dovecot mail server status
+agents: linux
+catalog: app/dovecot
+license: GPL
+distribution: arsoft
+description:
+ The check determinate the current state of the Dovecot mail server.
+
+item:
+  The item {daemon} shows the daemon status.
+
+  The item {statistics} collect statistics information of the mail server.
+
+inventory:
+  Returns two checks for each machine: {daemon} and {statistics}

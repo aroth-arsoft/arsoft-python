@@ -1,0 +1,10 @@
+title: Jenkins information
+agents: linux
+catalog: app/jenkins
+license: GPL
+distribution: arsoft
+description:
+ Shows information about Jenkins CI service.
+
+inventory:
+ Automatically.

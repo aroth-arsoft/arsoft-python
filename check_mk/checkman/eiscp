@@ -1,0 +1,10 @@
+title: Onkyo device information
+agents: linux
+catalog: hw/network/onkyo
+license: GPL
+distribution: arsoft
+description:
+ Shows information about the Onkyo receiver using eISCP.
+
+inventory:
+ Automatically.

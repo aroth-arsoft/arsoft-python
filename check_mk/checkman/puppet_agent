@@ -1,13 +1,18 @@
 title: Puppet Agent Status
 agents: linux
-catalog: app/apache
+catalog: app/puppet
 license: GPL
-distribution: heinlein
+distribution: arsoft
 description:
  This checks the status of the puppet agent.
 
 perfdata:
  Number of successful and failed services.
 
+item:
+  The item {daemon} shows the daemon status.
+
+  The item {config} shows the status of the last config run.
+
 inventory:
- Automatically.
+  Returns two checks for each machine: {daemon} and {config}

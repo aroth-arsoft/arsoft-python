@@ -1,0 +1,10 @@
+title: networkd status information
+agents: linux
+catalog: os/networking
+license: GPL
+distribution: arsoft
+description:
+ Shows information from networkctl output.
+
+inventory:
+ Automatically.

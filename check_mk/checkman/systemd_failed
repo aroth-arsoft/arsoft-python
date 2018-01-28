@@ -1,0 +1,10 @@
+title: systemd failed services
+agents: linux
+catalog: os/misc
+license: GPL
+distribution: arsoft
+description:
+ Check for failed services on systemd.
+
+inventory:
+ Automatically.

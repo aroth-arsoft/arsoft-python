@@ -43,7 +43,7 @@ CMK_VERSION = {
 CMK_DIR_MAP = {
     'agents': cmk.paths.local_agents_dir,
     'bin': cmk.paths.bin_dir,
-    'checkman': cmk.paths.check_manpages_dir,
+    'checkman': cmk.paths.local_check_manpages_dir,
     'checks': cmk.paths.local_checks_dir,
     'doc': cmk.paths.doc_dir,
     'inventory': cmk.paths.inventory_dir,

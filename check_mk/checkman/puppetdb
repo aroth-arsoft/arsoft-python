@@ -1,0 +1,25 @@
+title: Puppet DB Status
+agents: linux
+catalog: app/puppet
+license: GPL
+distribution: arsoft
+description:
+ This checks the status of the puppet DB.
+
+perfdata:
+ Number of successful and failed services.
+
+item:
+  The item {daemon} shows the daemon status.
+
+  The item {memory} shows the memory status.
+
+  The item {threads} shows the thread status.
+
+  The item {queue} shows the queue status.
+
+  The item {database} shows the queue status.
+
+inventory:
+  Returns five checks for each machine: {daemon}, {memory}, {threads},
+  {queue} and {database}.

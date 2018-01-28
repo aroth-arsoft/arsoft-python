@@ -1,0 +1,18 @@
+title: Certificates
+agents: linux
+catalog: app/nginx
+license: GPL
+distribution: arsoft
+description:
+ Checks certificates used by the nginx server for expiring certificates.
+
+ Returns {WARN} if the certificate will expire within the next 60 days.
+
+ Returns {CRIT} if the certificate will expire within the next 30 days or
+ already is expired.
+
+item:
+ Name of the certificate.
+
+inventory:
+ Creates one Check for every certificate in the agent's output.

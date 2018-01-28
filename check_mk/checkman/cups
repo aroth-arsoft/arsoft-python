@@ -1,0 +1,10 @@
+title: CUPS daemon information
+agents: linux, freebsd
+catalog: os/services
+license: GPL
+distribution: arsoft
+description:
+ Shows CUPS status information.
+
+inventory:
+ Automatically.

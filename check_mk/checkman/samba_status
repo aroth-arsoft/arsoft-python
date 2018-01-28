@@ -1,0 +1,11 @@
+title: Samba information
+agents: linux
+catalog: app/samba
+license: GPL
+distribution: arsoft
+description:
+ Shows status of the samba service.
+
+inventory:
+ Automatically.
+

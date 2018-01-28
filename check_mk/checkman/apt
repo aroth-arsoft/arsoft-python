@@ -1,0 +1,10 @@
+title: APT cache status
+agents: linux
+catalog: os/misc
+license: GPL
+distribution: arsoft
+description:
+ Check status of APT cache and available updates.
+
+inventory:
+ Automatically.

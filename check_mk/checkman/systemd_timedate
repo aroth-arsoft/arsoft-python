@@ -1,0 +1,10 @@
+title: systemd time and date
+agents: linux
+catalog: os/misc
+license: GPL
+distribution: arsoft
+description:
+ Shows systemd time and date information.
+
+inventory:
+ Automatically.

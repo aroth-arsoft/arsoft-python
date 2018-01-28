@@ -1,0 +1,10 @@
+title: DMI baseboard information
+agents: linux
+catalog: os/misc
+license: GPL
+distribution: arsoft
+description:
+ Shows information about the baseboard/mainboard using DMI.
+
+inventory:
+ Automatically.

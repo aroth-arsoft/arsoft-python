@@ -1,0 +1,10 @@
+title: DMI bios information
+agents: linux
+catalog: os/misc
+license: GPL
+distribution: arsoft
+description:
+ Shows information about the BIOS using DMI.
+
+inventory:
+ Automatically.
