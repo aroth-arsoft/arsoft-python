@@ -169,7 +169,7 @@ setup(name='arsoft-python',
                         ['check_mk/check_mk_agent_detect_plugins'] +
                          distribution_dep_scripts([
                              ('check_mk/cron/python2/check_mk_agent_apt', ['precise', 'trusty']),
-                             ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'artful', 'bionic']),
+                             ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'artful', 'bionic', 'cosmic']),
                              ] )  ),
             ('/usr/share/check_mk/agents/plugins', [
                     'check_mk/agents/plugins/cups',
