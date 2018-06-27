@@ -131,8 +131,12 @@ class DirectoryBackupPlugin(BackupPlugin):
                             print('backup %s to %s' % (source_dir, backup_dest_dir))
                         if Rsync.sync_file(source_dir, backup_dest_dir, exclude=item_exclude_list, stdout=my_stdout, stderr_to_stdout=True, verbose=self.backup_app.verbose):
                             dir_backup_filelist.append(backup_dest_dir)
+                    elif os.path.exists(source_dir):
+                        self.writelog('Refuse to back up %s because it is not a file or directory.\n' % source_dir)
+                        ret = False
                     else:
-                        sys.stderr.write('Refuse to back up %s because it is not a file or directory.\n' % source_dir)
+                        self.writelog('Refuse to back up %s because it is not exist.\n' % source_dir)
+                        ret = False
             self.backup_app.append_to_filelist(dir_backup_filelist)
 
         return ret
