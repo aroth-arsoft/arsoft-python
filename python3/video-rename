@@ -1,18 +1,63 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python; syntax Python;
 
 import sys
 import argparse
 import json
+import re
+import urllib.request
 
 from arsoft.utils import *
+
+def extract_html_title(data):
+    from html.parser import HTMLParser
+    class MyHTMLParser(HTMLParser):
+        _path = []
+        _title = None
+        def handle_starttag(self, tag, attrs):
+            self._path.append(tag)
+
+        def handle_endtag(self, tag):
+            self._path.pop()
+
+        def handle_data(self, data):
+            if self._path == ['html', 'head', 'title']:
+                self._title = data
+
+    parser = MyHTMLParser()
+    parser.feed(data)
+    return parser._title
+
+class video_rule(object):
+    def __init__(self, re_pattern, url_template):
+        self.re_pattern = re_pattern
+        self.re = re.compile(re_pattern)
+        self.url_template = url_template
+
+    def match(self, basename):
+        return self.re.match(basename)
 
 class video_rename_app:
     def __init__(self):
         self._verbose = False
         self._files = []
         self._video_file_exts = ['.mp4', '.avi', '.wmv', '.mkv']
+        self._rules = []
+
+    def _load_rules(self, rules_file='~/.config/video-rename.rules'):
+        filename = os.path.expanduser(rules_file)
+        try:
+            f = open(filename, 'r')
+            for line in f:
+                line = line.strip()
+                (re, url) = line.split('=', 2)
+                r = video_rule(re, url)
+                self._rules.append(r)
+        except IOError as e:
+            if self._verbose:
+                print('Failed to load %s: %s' % (filename, e))
+
 
     def _add_file(self, f):
         fabs = os.path.abspath(f)
@@ -23,20 +68,49 @@ class video_rename_app:
             print('Skip non-video file %s' % fabs)
 
 
+    def _get_html_title(self, url):
+
+        hdr = {'User-Agent':'Mozilla/5.0', 'Accept': '*/*'}
+        req = urllib.request.Request(url, headers=hdr)
+        try:
+            response = urllib.request.urlopen(req)
+            if response.status == 200:
+                data = response.read()      # a `bytes` object
+                text = data.decode('utf-8') # a `str`; this step can't be used if data is binary
+                return extract_html_title(text)
+        except urllib.error.HTTPError as e:
+            if self._verbose:
+                print('HTTP Error %s: %s' % (url, e))
+            pass
+        return None
+
+    def _clean_title(self, s):
+        hash_idx = s.rfind('#')
+        if hash_idx > 0:
+            s = s[0:hash_idx - 1]
+        s = s.replace('/', '_')
+        return s.strip()
 
     def _process_file(self, f, force=False):
         path, name = os.path.split(f)
         (basename, ext) = os.path.splitext(name)
 
-        hash_only = True
-        for b in basename:
-            if b not in '0123456789abcdefABCDEF':
-                hash_only = False
-                break;
-        if not hash_only and not force:
-            print('Skip already %s' % f)
+        found_rule = False
+        found_url = None
+        for rule in self._rules:
+            m = rule.match(basename)
+            if m is not None:
+                found_rule = True
+                found_url = m.expand(rule.url_template)
+                if self._verbose:
+                    print('%s: Match rule %s/%s -> %s' % (basename, rule.re_pattern, rule.url_template, found_url))
+                break
+        if not found_rule:
+            print('Skip %s' % f)
             return
 
+        got_title = False
+        suggested_filename = None
         (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f])
         if sts == 0:
             file_format = json.loads(stdoutdata.decode('utf8'))
@@ -44,11 +118,17 @@ class video_rename_app:
             if 'tags' in file_format['format']:
                 tags = file_format['format']['tags']
                 if 'title' in tags:
-                    title = tags['title']
+                    got_title = True
+                    title = self._clean_title(tags['title'])
                     suggested_filename = path + '/' + title + ext
-                    print('Rename %s to %s' % (f, suggested_filename))
-                    os.rename(f, suggested_filename)
-
+        if not got_title and found_url:
+            title = self._get_html_title(found_url)
+            if title:
+                title = self._clean_title(title)
+                suggested_filename = path + '/' + title + ('.%s' % basename) + ext
+        if suggested_filename is not None:
+            print('Rename %s to %s' % (f, suggested_filename))
+            os.rename(f, suggested_filename)
 
 
     def main(self):
@@ -62,6 +142,8 @@ class video_rename_app:
 
         args = parser.parse_args()
         self._verbose = args.verbose
+
+        self._load_rules()
 
         for f in args.files:
             if os.path.isfile(f):
