@@ -1,3 +1,9 @@
+arsoft-python (1.320) cosmic; urgency=medium
+
+  * handle user/group not found in to_uid/to_gid function
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 10 Nov 2018 10:04:50 +0100
+
 arsoft-python (1.319) bionic; urgency=medium
 
   * backup: fixed stderr access

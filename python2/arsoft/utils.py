@@ -322,18 +322,24 @@ def get_main_script_filename():
     import __main__
     return os.path.realpath(os.path.abspath(__main__.__file__))
 
-def to_uid(user):
+def to_uid(user, default_uid=0):
     try:
         uid = int(user)
     except ValueError:
-        uid = getpwnam(user).pw_uid
+        try:
+            uid = getpwnam(user).pw_uid
+        except KeyError:
+            uid = default_uid
     return uid
 
-def to_gid(group):
+def to_gid(group, default_gid=0):
     try:
         gid = int(group)
     except ValueError:
-        gid = getgrnam(group).gr_gid
+        try:
+            gid = getgrnam(group).gr_gid
+        except KeyError:
+            gid = default_gid
     return gid
 
 # Copyright (c) 2001-2004 Twisted Matrix Laboratories.
