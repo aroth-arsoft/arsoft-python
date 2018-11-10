@@ -1,3 +1,10 @@
+arsoft-python (1.321) cosmic; urgency=medium
+
+  * fix cosmic build
+  * remove obsolete releases
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 10 Nov 2018 11:12:31 +0100
+
 arsoft-python (1.320) cosmic; urgency=medium
 
   * handle user/group not found in to_uid/to_gid function

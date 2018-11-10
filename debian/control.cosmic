@@ -3,9 +3,9 @@ Section: admin
 Priority: optional
 Maintainer: Andreas Roth <aroth@arsoft-online.com>
 Standards-Version: 3.9.8
-Build-Depends: debhelper (>= 9), dh-python, python (>= 2.7), python3 (>= 3.5)
+Build-Depends: debhelper (>= 9), dh-python, python (>= 2.7), python3.6, python3.7
 X-Python-Version: >=2.7
-X-Python3-Version: >=3.5
+X-Python3-Version: >=3.6
 
 Package: python-arsoft
 Section: python
@@ -88,7 +88,7 @@ Description: suid helpers for the accessing Trac from a web server
 
 Package: arsoft-check-mk-plugins
 Architecture: all
-Depends: python (>= 2.7), python3 (>= 3.2), python-arsoft, check-mk-agent, lm-sensors, hddtemp, dnsutils
+Depends: python (>= 2.7), python3 (>= 3.6), python-arsoft, check-mk-agent, lm-sensors, hddtemp, dnsutils
  , python-yaml, ${python:Depends}, ${misc:Depends}
 Description: additional check_mk plugins for AR Soft specific services
  Installs all files and packages required to use the AR Soft check_mk
@@ -116,7 +116,7 @@ Description: additional check_mk plugins for AR Soft specific services
 
 Package: arsoft-check-mk-checks
 Architecture: all
-Depends: python (>= 2.7), python3 (>= 3.2), python-arsoft, python3-arsoft, ${python:Depends}, ${misc:Depends}
+Depends: python (>= 2.7), python3 (>= 3.6), python-arsoft, python3-arsoft, ${python:Depends}, ${misc:Depends}
 Description: additional checks for check_mk
  Checks include the following:
   - APT status
