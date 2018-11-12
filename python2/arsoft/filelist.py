@@ -181,7 +181,10 @@ class FileListItemWithDestination(FileListItemBase):
         self._append(source, dest)
 
     def _append(self, source, dest):
-        source_fullname = os.path.join(self._base_directory, source)
+        if self._base_directory is None:
+            source_fullname = source
+        else:
+            source_fullname = os.path.join(self._base_directory, source)
         if self._use_glob:
             newitems = glob.glob(source_fullname)
             if newitems:

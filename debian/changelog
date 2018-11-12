@@ -1,3 +1,9 @@
+arsoft-python (1.322) cosmic; urgency=medium
+
+  * fixed filelist from string value
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 12 Nov 2018 07:02:11 +0100
+
 arsoft-python (1.321) cosmic; urgency=medium
 
   * fix cosmic build

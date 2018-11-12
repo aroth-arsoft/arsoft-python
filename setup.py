@@ -34,7 +34,7 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.319',
+		version='1.322',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -105,6 +105,7 @@ setup(name='arsoft-python',
             ('eurosport-stream', 3),
             ('ad-rfc2307', 3),
             ('ad-password-expire', 3),
+            ('video-rename', 3),
             ]),
 		data_files=[ 
 			('/etc/ldap/schema', ['schema/netconfig.schema']),
