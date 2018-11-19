@@ -54,3 +54,4 @@ usr/bin/slapd-config
 usr/bin/ssdp-discover
 usr/bin/svnbackup
 usr/bin/system-info
+usr/bin/video-rename
