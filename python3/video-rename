@@ -22,7 +22,7 @@ def extract_html_title(data):
             self._path.pop()
 
         def handle_data(self, data):
-            if self._path[-1] == 'title':
+            if len(self._path) > 1 and self._path[-1] == 'title':
                 self._title = data
 
     parser = MyHTMLParser()
