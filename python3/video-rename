@@ -93,7 +93,12 @@ class video_rename_app:
         if hash_idx > 0:
             s = s[0:hash_idx - 1]
         s = s.replace('/', '_')
-        return s.strip()
+        s = s.strip()
+        while len(s) > 200:
+            elems = s.split()
+            elems.pop()
+            s = ' '.join(elems)
+        return s
 
     def _process_file(self, f, force=False):
         path, name = os.path.split(f)
