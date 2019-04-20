@@ -521,28 +521,25 @@ class GitRepository(object):
         uid = to_uid(owner) if owner else None
         gid = to_gid(group) if group else None
         
-        ret = True
+        ret = self._fix_permissions_impl(self.magic_directory, uid, gid, dir_perms, file_perms)
         # fix perms for selected directories
         for d in ['branches', 'info', 'logs', 'objects', 'refs' ]:
             dir_path = os.path.join(self.magic_directory, d)
             if os.path.isdir(dir_path):
-                ret = self._fix_permissions_impl(dir_path, uid, gid, dir_perms, file_perms)
-                if not ret:
-                    break
+                if not self._fix_permissions_impl(dir_path, uid, gid, dir_perms, file_perms):
+                    ret = False
         for hook in GIT_HOOKS:
             file_path = os.path.join(self.hook_directory, d)
             if os.path.isfile(file_path):
-                ret = self._fix_permissions_impl(file_path, uid, gid, dir_perms, 0o775)
-                if not ret:
-                    break
+                if not self._fix_permissions_impl(file_path, uid, gid, dir_perms, 0o775):
+                    ret = False
 
         # fix perms for selected files
         for f in ['config', 'description', 'packed-refs', 'git-daemon-export-ok', 'HEAD', 'revlist', 'commitlist' ]:
             file_path = os.path.join(self.magic_directory, f)
             if os.path.isfile(file_path):
-                ret = self._fix_permissions_impl(file_path, uid, gid, dir_perms, file_perms)
-                if not ret:
-                    break
+                if not self._fix_permissions_impl(file_path, uid, gid, dir_perms, file_perms):
+                    ret = False
         return ret
 
     @property
