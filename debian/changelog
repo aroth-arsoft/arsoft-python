@@ -1,3 +1,10 @@
+arsoft-python (1.323) disco; urgency=medium
+
+  * git: set permission of magic dir
+  * video-rename: add hashing
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 22 Apr 2019 16:32:00 +0200
+
 arsoft-python (1.322) cosmic; urgency=medium
 
   * fixed filelist from string value
