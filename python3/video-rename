@@ -52,6 +52,62 @@ def extract_html_title(data):
     parser.feed(data)
     return parser._title
 
+def copyfile(src, dst, *, follow_symlinks=True, callback=None):
+    """Copy data from src to dst.
+
+    If follow_symlinks is not set and src is a symbolic link, a new
+    symlink will be created instead of copying the file it points to.
+
+    """
+    if shutil._samefile(src, dst):
+        raise shutil.SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+    for fn in [src, dst]:
+        try:
+            st = os.stat(fn)
+        except OSError:
+            # File most likely does not exist
+            pass
+        else:
+            # XXX What about other special files? (sockets, devices...)
+            if shutil.stat.S_ISFIFO(st.st_mode):
+                raise shutil.SpecialFileError("`%s` is a named pipe" % fn)
+
+    if not follow_symlinks and os.path.islink(src):
+        os.symlink(os.readlink(src), dst)
+    else:
+        size = os.stat(src).st_size
+        with open(src, 'rb') as fsrc:
+            with open(dst, 'wb') as fdst:
+                copyfileobj(fsrc, fdst, callback=callback, total=size)
+    return dst
+
+
+def copyfileobj(fsrc, fdst, callback, total, length=256*1024, flush_blocks=256):
+    copied = 0
+    num_blocks = 0
+    while True:
+        buf = fsrc.read(length)
+        if not buf:
+            break
+        fdst.write(buf)
+        copied += len(buf)
+        num_blocks += 1
+        if num_blocks >= flush_blocks:
+            fdst.flush()
+            os.fsync(fdst.fileno())
+            num_blocks = 0
+        if callback is not None:
+            callback(copied, total=total)
+
+
+def copy_with_progress(src, dst, *, follow_symlinks=True, callback=None):
+    if os.path.isdir(dst):
+        dst = os.path.join(dst, os.path.basename(src))
+    copyfile(src, dst, follow_symlinks=follow_symlinks, callback=callback)
+    shutil.copymode(src, dst)
+    return dst
+
 class video_rule(object):
     def __init__(self, re_pattern, url_template):
         self.re_pattern = re_pattern
@@ -155,6 +211,7 @@ class video_rename_app:
             self._input_dirs = f.getAsArray(None, 'input')
         if self._hash_dirs is None or not self._hash_dirs:
             self._hash_dirs = f.getAsArray(None, 'hash_dir')
+        self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv'])
 
     def _add_file(self, f):
         fabs = os.path.abspath(f)
@@ -173,6 +230,7 @@ class video_rename_app:
                 ret = False
         return ret
 
+
     def _rename_file(self, src, dst):
         dst_dir = os.path.dirname(dst)
         self._mkdir(dst_dir)
@@ -185,9 +243,15 @@ class video_rename_app:
             else:
                 print('Failed to rename %s to %s: %s' % (src, dst, e))
         if need_copy:
+            def _copy_progress(copied, total):
+                precent = 100*copied/total
+                print('\r  Copying %i %% ...' % (precent), end='')
             try:
-                shutil.copy2(src, dst)
-                os.unlink(src)
+                print("  Copying", end='')
+                copy_with_progress(src, dst, callback=_copy_progress)
+                #shutil.copy2(src, dst)
+                #os.unlink(src)
+                print("\r  Copy complete")
             except OSError as e:
                 print('Failed to copy %s to %s: %s' % (src, dst, e))
 
@@ -233,13 +297,14 @@ class video_rename_app:
             s = ' '.join(elems)
         return s
 
-    def _process_file(self, f, force=False):
+    def _process_file(self, num_tuple, f, force=False):
+        num, total = num_tuple
+        print('[%i/%i] %s' % (num + 1, total, f))
+        new_filename = f
         if not self._no_rename:
-            new_filename = self._auto_rename_file(f, force=force)
-            if new_filename is None:
-                return None
-        else:
-            new_filename = f
+            f_new = self._auto_rename_file(f, force=force)
+            if not f_new is None:
+                new_filename = f_new
 
         if not self._no_hash:
             return self._auto_hash_file(new_filename, force=force)
@@ -259,11 +324,10 @@ class video_rename_app:
                 found_rule = True
                 found_url = m.expand(rule.url_template)
                 if self._verbose:
-                    print('    %s: Match rule %s/%s -> %s' % (basename, rule.re_pattern, rule.url_template, found_url))
+                    print('  %s: Match rule %s/%s -> %s' % (basename, rule.re_pattern, rule.url_template, found_url))
                 break
         if not found_rule:
-            print('  Skip %s' % f)
-            return f
+            return None
 
         got_title = False
         suggested_filename = None
@@ -283,7 +347,7 @@ class video_rename_app:
                 title = self._clean_title(title)
                 suggested_filename = path + '/' + title + ('.%s' % basename) + ext
         if suggested_filename is not None:
-            print('    Rename to %s' % (suggested_filename))
+            print('  Rename to %s' % (suggested_filename))
             if not self._noop:
                 self._rename_file(f, suggested_filename)
         return suggested_filename
@@ -312,8 +376,6 @@ class video_rename_app:
 
         suggested_filename = None
         symlink_filenames = []
-        if self._verbose:
-            print('hash file %s:' % f)
         entries = self._find_hash_entry(basename)
         if entries:
             entries = filter(lambda x: x[0] >= self._hash_threshold, entries)
@@ -344,12 +406,12 @@ class video_rename_app:
             suggested_filename = os.path.join(hd, self._hash_unknown_dir, name)
 
         if suggested_filename is not None:
-            print('    Hash to %s' % (suggested_filename))
+            print('  Hash to %s' % (suggested_filename))
             if not self._noop:
                 self._rename_file(f, suggested_filename)
 
             for f in symlink_filenames:
-                print('    Hash symlink to %s' % (f))
+                print('  Hash symlink to %s' % (f))
                 if not self._noop:
                     self._mklink(suggested_filename, f)
 
@@ -410,8 +472,9 @@ class video_rename_app:
             for f in self._files:
                 print('  %s' % f)
 
-        for f in self._files:
-            self._process_file(f, force=args.force)
+        total = len(self._files)
+        for i, f in enumerate(self._files):
+            self._process_file( (i, total), f, force=args.force)
 
         ret = 0
         return ret
