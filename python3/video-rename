@@ -297,21 +297,6 @@ class video_rename_app:
             s = ' '.join(elems)
         return s
 
-    def _process_file(self, num_tuple, f, force=False):
-        num, total = num_tuple
-        print('[%i/%i] %s' % (num + 1, total, f))
-        new_filename = f
-        if not self._no_rename:
-            f_new = self._auto_rename_file(f, force=force)
-            if not f_new is None:
-                new_filename = f_new
-
-        if not self._no_hash:
-            return self._auto_hash_file(new_filename, force=force)
-        else:
-            return True
-
-
     def _auto_rename_file(self, f, force=False):
         path, name = os.path.split(f)
         (basename, ext) = os.path.splitext(name)
@@ -473,8 +458,27 @@ class video_rename_app:
                 print('  %s' % f)
 
         total = len(self._files)
-        for i, f in enumerate(self._files):
-            self._process_file( (i, total), f, force=args.force)
+        total_progress = 0
+        current_progress = 0
+        if not self._no_rename:
+            total_progress += total
+        if not self._no_hash:
+            total_progress += total
+
+        if not self._no_rename:
+            for i in range(total):
+                print('[%i/%i] Rename %s' % (current_progress + 1, total_progress, self._files[i]))
+                current_progress += 1
+                f_new = self._auto_rename_file(self._files[i], force=args.force)
+                if f_new is not None:
+                    self._files[i] = f_new
+
+        if not self._no_hash:
+            for i in range(total):
+                f = self._files[i]
+                print('[%i/%i] Hash %s' % (current_progress + 1, total_progress, self._files[i]))
+                current_progress += 1
+                self._auto_hash_file(self._files[i], force=args.force)
 
         ret = 0
         return ret
