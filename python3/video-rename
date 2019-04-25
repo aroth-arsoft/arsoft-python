@@ -130,7 +130,8 @@ def copy_with_progress(src, dst, *, follow_symlinks=True, callback=None):
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
     copyfile(src, dst, follow_symlinks=follow_symlinks, callback=callback)
-    shutil.copymode(src, dst)
+    shutil.copymode(src, dst, follow_symlinks=follow_symlinks)
+    shutil.copystat(src, dst, follow_symlinks=follow_symlinks)
     return dst
 
 class video_rule(object):
@@ -155,6 +156,14 @@ class hash_entry(object):
                 if k == 'alias':
                     self._aliases.append(split_into_words(v))
         self._words = split_into_words(base)
+
+    def equal(self, words):
+        if len(words) != len(self._words):
+            return False
+        for i, w in enumerate(self._words):
+            if w != words[i]:
+                return False
+        return True
 
     def match(self, words):
 
@@ -506,14 +515,31 @@ class video_rename_app:
                         else:
                             word_dict[cw] = set( [ f ] )
 
-            print('Possible words:')
+            existing_hashes = []
             possible_words = []
             for (word, files) in word_dict.items():
-                if len(files) >= self._hash_threshold:
+                found_existing_hash = False
+                words = split_into_words(word)
+                for h in self._hashes:
+                    if h.equal(words):
+                        #print('found matching hash for %s: %s' % (words, h))
+                        found_existing_hash = True
+                        break
+                if found_existing_hash:
+                    existing_hashes.append( (word, files) )
+                elif len(files) >= self._hash_threshold:
                     possible_words.append( ( word, files ) )
 
             possible_words = sorted(possible_words, key=lambda e: len(e[1]), reverse=False)
 
+            if existing_hashes:
+                print('Find files for existing hashes:')
+                for (word, files) in existing_hashes:
+                    print('  %s: %i matches' % (word, len(files)))
+                    for f in files:
+                        print('    %s' % f)
+
+            print('Possible words:')
             for (word, files) in possible_words:
                 print('  %s: %i matches' % (word, len(files)))
                 for f in files:
