@@ -6,6 +6,7 @@ import sys
 import argparse
 import json
 import re
+import string
 import urllib.request
 
 from arsoft.utils import *
@@ -13,7 +14,13 @@ from arsoft.inifile import IniFile
 
 re_words = re.compile('[ \\.\\-&_,]+')
 
-def split_into_words(s, ignored=None):
+def isxdigit(value):
+    for c in value:
+        if c not in string.hexdigits:
+            return False
+    return True
+
+def split_into_words(s, ignored=None, allow_digit_only=False):
     ret = []
     in_brackets = 0
     brackets_list = []
@@ -40,6 +47,8 @@ def split_into_words(s, ignored=None):
         else:
             w = w.lower()
         if ignored is not None and w in ignored:
+            continue
+        if not allow_digit_only and (w.isdigit() or isxdigit(w)):
             continue
         ret.append(w)
     return ret
@@ -147,15 +156,19 @@ class video_rule(object):
         return '\"%s\" -> %s' % (self.re_pattern, self.url_template)
 
 class hash_entry(object):
-    def __init__(self, base, opts):
-        self.directory = base
+    def __init__(self, base=None, opts=None, words=None):
         self._aliases = []
-        for o in opts.split(','):
-            if ':' in o:
-                k,v = o.split(':')
-                if k == 'alias':
-                    self._aliases.append(split_into_words(v))
-        self._words = split_into_words(base)
+        if words is None:
+            self._words = split_into_words(base)
+        else:
+            self._words = words
+        self.directory = base
+        if opts is not None:
+            for o in opts.split(','):
+                if ':' in o:
+                    k,v = o.split(':')
+                    if k == 'alias':
+                        self._aliases.append(split_into_words(v))
 
     def equal(self, words):
         if len(words) != len(self._words):
@@ -192,6 +205,15 @@ class hash_entry(object):
                 pass
             i += 1
         #print('%s ret=%i' % (self,ret))
+        return ret
+
+    def __eq__(self, rhs):
+        return self._words == rhs._words
+
+    def __hash__(self):
+        ret = 0
+        for w in self._words:
+            ret += hash(w)
         return ret
 
     def __str__(self):
@@ -235,7 +257,7 @@ class video_rename_app:
 
     def _load_config(self, filename):
         filename = os.path.expanduser(filename)
-        f = IniFile(filename, commentPrefix='#', keyValueSeperator='=')
+        f = IniFile(filename, keyValueSeperator='=')
         if f.has_section('rules'):
             self._load_rules(f.section('rules'))
         if f.has_section('hashes'):
@@ -414,6 +436,9 @@ class video_rename_app:
                 for hd in self._hash_dirs:
                     suggested_dir = os.path.join(hd, e.directory)
                     new_filename = os.path.join(suggested_dir, name)
+                    if new_filename == f:
+                        # avoid rename and symlink to same name
+                        continue
                     if suggested_filename is None:
                         suggested_filename = new_filename
                     else:
@@ -443,6 +468,7 @@ class video_rename_app:
         #=============================================================================================
         parser = argparse.ArgumentParser(description='renames video files by extract the video title from the meta data')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debug output of this script.')
         parser.add_argument('-f', '--force', dest='force', action='store_true', help='force processing of given files.')
         parser.add_argument('-n', '--noop', dest='noop', action='store_true', help='only show what would be done.')
         parser.add_argument('--no-hash', dest='no_hash', action='store_true', help='do not perform hashing')
@@ -454,6 +480,7 @@ class video_rename_app:
 
         args = parser.parse_args()
         self._verbose = args.verbose
+        self._debug = args.debug
         self._noop = args.noop
         self._no_hash = args.no_hash
         self._no_rename = args.no_rename
@@ -464,7 +491,7 @@ class video_rename_app:
 
         self._load_config(filename=args.config_file)
 
-        if self._verbose:
+        if self._debug:
             print('Rules:')
             for r in self._rules:
                 print('  %s' % r)
@@ -499,6 +526,8 @@ class video_rename_app:
             for f in self._files:
                 print('  %s' % f)
 
+        possible_words = []
+
         if self._process_unknown:
             word_dict = {}
 
@@ -509,43 +538,40 @@ class video_rename_app:
                 num_words = len(words)
                 for i in range(num_words):
                     if i + 1 < num_words:
-                        cw = '.'.join([ words[i], words[i+1] ])
-                        if cw in word_dict:
-                            word_dict[cw].add(f)
+                        word_combo = [ words[i], words[i+1] ]
+                        h = hash_entry( words=word_combo )
+                        if h in word_dict:
+                            word_dict[h].add(f)
                         else:
-                            word_dict[cw] = set( [ f ] )
+                            word_dict[h] = set( [ f ] )
 
             existing_hashes = []
-            possible_words = []
-            for (word, files) in word_dict.items():
-                found_existing_hash = False
-                words = split_into_words(word)
-                for h in self._hashes:
-                    if h.equal(words):
-                        #print('found matching hash for %s: %s' % (words, h))
-                        found_existing_hash = True
-                        break
+            for (h, files) in word_dict.items():
+                found_existing_hash = True if h in self._hashes else False
+
                 if found_existing_hash:
-                    existing_hashes.append( (word, files) )
-                elif len(files) >= self._hash_threshold:
-                    possible_words.append( ( word, files ) )
+                    existing_hashes.append( (h, files) )
+                elif len(files) > 1: #self._hash_threshold:
+                    possible_words.append( (h, files ) )
 
-            possible_words = sorted(possible_words, key=lambda e: len(e[1]), reverse=False)
-
+            # reset the list of files
+            self._files = []
             if existing_hashes:
-                print('Find files for existing hashes:')
-                for (word, files) in existing_hashes:
-                    print('  %s: %i matches' % (word, len(files)))
+                if self._verbose:
+                    print('Find files for existing hashes:')
+                for (h, files) in existing_hashes:
+                    if self._verbose:
+                        print('  %s: %i matches' % (h, len(files)))
                     for f in files:
-                        print('    %s' % f)
+                        if self._verbose:
+                            print('    %s' % f)
+                        self._files.append(f)
 
-            print('Possible words:')
-            for (word, files) in possible_words:
-                print('  %s: %i matches' % (word, len(files)))
-                for f in files:
-                    print('    %s' % f)
-
-            return 0
+            if self._verbose:
+                if self._files:
+                    print('Files for rehashing:')
+                    for f in files:
+                        print('  %s' % f)
 
         total = len(self._files)
         total_progress = 0
@@ -570,6 +596,14 @@ class video_rename_app:
                 current_progress += 1
                 self._auto_hash_file(self._files[i], force=args.force)
 
+        if possible_words:
+            possible_words = sorted(possible_words, key=lambda e: len(e[1]), reverse=False)
+            print('Possible words:')
+            for (h, files) in possible_words:
+                print('  %s: %i matches' % (h, len(files)))
+                if self._debug:
+                    for f in files:
+                        print('    %s' % f)
         ret = 0
         return ret
 
