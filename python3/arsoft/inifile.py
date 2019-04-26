@@ -143,7 +143,7 @@ class IniSection(object):
         ret = []
         found = False
         for v in self.values:
-            if v.key == key:
+            if v.key == key and not v.disabled:
                 ret.append( v.value )
                 found = True
         return ret if found else default
@@ -151,13 +151,15 @@ class IniSection(object):
     def get_all(self):
         ret = []
         for v in self.values:
-            ret.append( (v.key, v.value) )
+            if not v.disabled:
+                ret.append( (v.key, v.value) )
         return ret
 
     def get_all_as_dict(self):
         ret = {}
         for v in self.values:
-            ret[v.key] = v.value
+            if not v.disabled:
+                ret[v.key] = v.value
         return ret
 
     def set(self, key, value, comment='', disabled=False):
