@@ -8,6 +8,7 @@ import json
 import re
 import string
 import urllib.request
+import datetime
 
 from arsoft.utils import *
 from arsoft.inifile import IniFile
@@ -20,18 +21,121 @@ def isxdigit(value):
             return False
     return True
 
-def split_into_words(s, ignored=None, allow_digit_only=False):
+def iscamelcase(s):
+    ret = False
+    got_upper = False
+    for c in s:
+        if c in string.ascii_uppercase:
+            if got_upper:
+                # already upper, so at least two uppercase letters
+                return False
+            else:
+                got_upper = True
+        else:
+            if not c in string.ascii_lowercase:
+                return False
+            got_upper = False
+    return True
+
+def split_camelcase(s):
     ret = []
+    got_upper = False
+    start = 0
+    i = 0
+    for i in range(len(s)):
+        if s[i] in string.ascii_uppercase:
+            if i > start:
+                ret.append(s[start:i])
+            got_upper = True
+            start = i
+    if i >= start:
+        ret.append(s[start:])
+    return ret
+
+def convert_date(words):
+    ret = []
+    int_values = []
+    month_names = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+    for w in words:
+        w_int = None
+        w_int_month = False
+        w_int_year = False
+        try:
+            w_int = month_names.index(w.lower()) + 1
+            w_int_month = True
+        except ValueError:
+            pass
+        if w_int is None:
+            try:
+                w_int = int(w)
+                if w_int > 2000:
+                    w_int_year = True
+            except ValueError:
+                pass
+        ret.append(w)
+
+        #print(w, w_int)
+        if w_int is None:
+            int_values = []
+        else:
+            int_values.append( (w_int, w_int_month, w_int_year) )
+            if len(int_values) == 3:
+                year = 0
+                month = 0
+                day = 0
+                #print(int_values)
+                for (w_int, w_int_month, w_int_year) in int_values:
+                    if w_int_month:
+                        month = w_int
+                    elif w_int_year:
+                        year = w_int
+
+                for (w_int, w_int_month, w_int_year) in int_values:
+                    if w_int_month or w_int_year:
+                        continue
+                    else:
+                        if year == 0:
+                            year = w_int + 2000 if w_int < 100 else w_int
+                        elif month == 0 and w_int >= 1 and w_int <= 12:
+                            month = w_int
+                        elif day == 0 and w_int >= 1 and w_int <= 31:
+                            day = w_int
+                #print(year, month , day)
+                if year and month and day:
+                    # remove string values
+                    ret = ret[0:-3]
+                    ret.append(datetime.date(year=year, month=month, day=day))
+                #print(int_values)
+    return ret
+
+def replace_in_list(list, needle, replacement):
+    start = 0
+    #print(list)
+    for n in needle:
+        try:
+            i = list.index(n)
+            #print('find %s -> %i' % (n, i))
+        except ValueError:
+            return list
+    list = list[0:start] + replacement + list[start+len(needle):]
+    return list
+
+def split_into_words(s, ignored=None, combined=None):
+    #print(s)
+    ret = []
+    ex = []
     in_brackets = 0
     brackets_list = []
     for w in re_words.split(s):
-        if len(w) < 2:
+        if not w:
             continue
-        if w[0] == '(':
+        if (w[0] == '(' and w[-1] == ')') or (w[0] == '[' and w[-1] == ']') or (w[0] == '{' and w[-1] == '}'):
+            w = w[1:-1]
+        elif w[0] == '(' or w[0] == '[':
             in_brackets+=1
             brackets_list.append(w[1:])
             continue
-        elif w[-1] == ')':
+        elif w[-1] == ')' or w[0] == ']':
             in_brackets-=1
             brackets_list.append(w[0:-1])
             if in_brackets == 0:
@@ -42,15 +146,27 @@ def split_into_words(s, ignored=None, allow_digit_only=False):
             brackets_list.append(w)
             continue
 
+        if iscamelcase(w):
+            ex.extend(split_camelcase(w))
+        else:
+            ex.append(w)
+    for w in ex:
+        #if len(w) < 2:
+            #continue
+
         if w[0] == '#':
             w = w[1:].lower()
         else:
             w = w.lower()
         if ignored is not None and w in ignored:
             continue
-        if not allow_digit_only and (w.isdigit() or isxdigit(w)):
-            continue
+        #if not allow_digit_only and (w.isdigit() or isxdigit(w)):
+            #continue
         ret.append(w)
+    if combined:
+        for (needle, replacement) in combined:
+            ret = replace_in_list(ret, needle, replacement)
+    ret = convert_date(ret)
     return ret
 
 def expanduser_dirs(*args):
@@ -143,6 +259,19 @@ def copy_with_progress(src, dst, *, follow_symlinks=True, callback=None):
     shutil.copystat(src, dst, follow_symlinks=follow_symlinks)
     return dst
 
+def is_within_directory(f, d):
+    relpath = os.path.relpath(f, d)
+    if os.path.isabs(relpath):
+        # if we got an abspath then f cannot be within d, otherwise we
+        # would have gotten a relpath
+        return False
+    else:
+        # if relpath starts with .. the file is outside the directory
+        if relpath[0] == '.' and relpath[1] == '.':
+            return False
+        else:
+            return True
+
 class video_rule(object):
     def __init__(self, re_pattern, url_template):
         self.re_pattern = re_pattern
@@ -217,10 +346,16 @@ class hash_entry(object):
         return ret
 
     def __str__(self):
-        return '%s' % '.'.join(self._words)
+        s = []
+        for w in self._words:
+            if isinstance(w, datetime.date):
+                s.append(str(w))
+            else:
+                s.append(w)
+        return '%s' % '.'.join(s)
 
     def __repr__(self):
-        return '%s' % '.'.join(self._words)
+        return self.__str__()
 
 class video_rename_app:
     def __init__(self):
@@ -233,6 +368,9 @@ class video_rename_app:
         self._hashes = []
         self._input_dirs = []
         self._hash_dirs = []
+        self._ignored_words = []
+        self._combined_words = []
+        self._channels = []
 
     def _load_rules(self, section=None):
         self._rules = []
@@ -254,6 +392,7 @@ class video_rename_app:
                 continue
             self._hashes.append(hash_entry(k, v))
         self._hash_unknown_dir = section.get('unknown', '_unknown')
+        self._hash_channels_dir = section.get('channels', '_channels')
 
     def _load_config(self, filename):
         filename = os.path.expanduser(filename)
@@ -269,6 +408,13 @@ class video_rename_app:
             self._hash_dirs = f.getAsArray(None, 'hash_dir')
         self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv'])
         self._ignored_words = f.getAsArray(None, 'ignored_words', ['360p', '480p', '720p', '1080p', 'and', 'the', 'a', 'is', 'in', 'of'])
+        self._channels = f.getAsArray(None, 'channels', [])
+        for s in self._channels:
+            channel_names = s.split(',')
+            main_channel_name = channel_names[0]
+            for ch in channel_names:
+                chw = split_into_words(ch)
+                self._combined_words.append( (chw, [main_channel_name] ) )
 
     def _add_file(self, f):
         fabs = os.path.abspath(f)
@@ -277,6 +423,17 @@ class video_rename_app:
             self._files.append(fabs)
         elif self._verbose:
             print('Skip non-video file %s' % fabs)
+
+    def _add(self, f):
+        if os.path.isfile(f):
+            self._add_file(f)
+        elif os.path.isdir(f):
+            for e in os.listdir(path=f):
+                full = os.path.join(f, e)
+                if os.path.isdir(full):
+                    self._add(full)
+                elif os.path.isfile(full):
+                    self._add_file(full)
 
     def _mkdir(self, d):
         ret = True
@@ -389,8 +546,10 @@ class video_rename_app:
                 title = self._clean_title(title)
                 suggested_filename = path + '/' + title + ('.%s' % basename) + ext
         if suggested_filename is not None:
-            print('  Rename to %s' % (suggested_filename))
-            if not self._noop:
+            if self._noop:
+                print('  Rename to %s (noop)' % (suggested_filename))
+            else:
+                print('  Rename to %s' % (suggested_filename))
                 self._rename_file(f, suggested_filename)
         return suggested_filename
 
@@ -399,11 +558,13 @@ class video_rename_app:
         for e in os.listdir(path=self._hash_dir):
             if e == self._hash_unknown_dir:
                 continue
+            #if e == self._hash_channels_dir:
+                #continue
             full = os.path.join(self._hash_dir, e)
             self._hashes.append(hash_entry(full, e))
 
     def _find_hash_entry(self, basename):
-        words = split_into_words(basename, ignored=self._ignored_words)
+        words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
 
         ret = []
         for e in self._hashes:
@@ -447,20 +608,29 @@ class video_rename_app:
             #for (score, e) in entries:
                 #print('  found %i - %s' %(score,e))
         if suggested_filename is None:
-            hd = self._hash_dirs[0]
-            suggested_filename = os.path.join(hd, self._hash_unknown_dir, name)
+            # DO not move files if the file is within a hash_dir
+            is_within_hash_dir = False
+            for hd in self._hash_dirs:
+                if is_within_directory(f, hd):
+                    is_within_hash_dir = True
+                    break
+            if not is_within_hash_dir:
+                hd = self._hash_dirs[0]
+                suggested_filename = os.path.join(hd, self._hash_unknown_dir, name)
 
         if suggested_filename is not None:
-            print('  Hash to %s' % (suggested_filename))
-            if not self._noop:
+            if self._noop:
+                print('  Hash to %s (noop)' % (suggested_filename))
+            else:
+                print('  Hash to %s' % (suggested_filename))
                 self._rename_file(f, suggested_filename)
 
             for f in symlink_filenames:
-                print('  Hash symlink to %s' % (f))
-                if not self._noop:
+                if self._noop:
+                    print('  Hash symlink to %s (noop)' % (f))
+                else:
+                    print('  Hash symlink to %s' % (f))
                     self._mklink(suggested_filename, f)
-
-
 
     def main(self):
         #=============================================================================================
@@ -475,6 +645,7 @@ class video_rename_app:
         parser.add_argument('--no-rename', dest='no_rename', action='store_true', help='do not rename files.')
         parser.add_argument('-H', '--hash', dest='hash_dirs', nargs='*', help='hash video files into given directory')
         parser.add_argument('--unknown', dest='process_unknown', action='store_true', help='re-process files in unknown directory')
+        parser.add_argument('--channels', dest='process_channels', action='store_true', help='re-process files in channels directory')
         parser.add_argument('-c', '--config', dest='config_file', default='~/.config/video-rename.conf', help='load configuration file')
         parser.add_argument('files', metavar='FILE', type=str, nargs='*', help='video files or directories')
 
@@ -488,6 +659,7 @@ class video_rename_app:
         self._input_dirs = args.files
         self._hash_dirs = args.hash_dirs
         self._process_unknown = args.process_unknown
+        self._process_channels = args.process_channels
 
         self._load_config(filename=args.config_file)
 
@@ -500,6 +672,7 @@ class video_rename_app:
                 for h in self._hashes:
                     print('  %s' % h)
                 print('Hash unknown dir: %s' % self._hash_unknown_dir)
+                print('Hash channels dir: %s' % self._hash_channels_dir)
 
         input_dirs = expanduser_dirs(self._input_dirs)
         hash_dirs = expanduser_dirs(self._hash_dirs)
@@ -508,18 +681,17 @@ class video_rename_app:
             if not self._no_hash:
                 print('Hash dirs: %s' % ','.join(hash_dirs))
 
-        if self._process_unknown:
+        if self._process_unknown or self._process_channels:
             input_dirs = []
+        if self._process_unknown:
             for h in self._hash_dirs:
                 input_dirs.append( os.path.join(h, self._hash_unknown_dir) )
+        if self._process_channels:
+            for h in self._hash_dirs:
+                input_dirs.append( os.path.join(h, self._hash_channels_dir) )
 
         for f in input_dirs:
-            if os.path.isfile(f):
-                self._add_file(f)
-            elif os.path.isdir(f):
-                for e in os.listdir(path=f):
-                    full = os.path.join(f, e)
-                    self._add_file(full)
+            self._add(f)
 
         if self._verbose:
             print('Files to process:')
@@ -528,13 +700,13 @@ class video_rename_app:
 
         possible_words = []
 
-        if self._process_unknown:
+        if self._process_unknown or self._process_channels:
             word_dict = {}
 
             for f in self._files:
                 (name, ext) = os.path.splitext(f)
                 basename = os.path.basename(name)
-                words = split_into_words(basename, ignored=self._ignored_words)
+                words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
                 num_words = len(words)
                 for i in range(num_words):
                     if i + 1 < num_words:
