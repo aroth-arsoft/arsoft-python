@@ -307,19 +307,20 @@ class hash_entry(object):
                 return False
         return True
 
-    def match(self, words):
+    def match(self, words, full_match=False):
 
         ret = -1
         first = True
-        in_series = False
         i = 0
         i_max = len(self._words)
         j_max = len(words)
+        num_matches = 0
         while i < i_max:
             try:
                 j = words.index(self._words[i])
                 if first:
                     ret = 1
+                    num_matches += 1
                     first = False
                 else:
                     ret += 1
@@ -327,12 +328,18 @@ class hash_entry(object):
                 while i + k < i_max and j + k < j_max and self._words[i + k] == words[j + k]:
                     #print('xx k=%i, %s, %s' % (k, self._words[i + k], words[j + k]))
                     ret += 10
+                    num_matches += 1
                     k += 1
                     #print('xx ret=%i' % (ret))
                 i = i + k
             except ValueError:
                 pass
             i += 1
+        if full_match:
+            if j_max == num_matches:
+                return ret
+            else:
+                return -1
         #print('%s ret=%i' % (self,ret))
         return ret
 
@@ -354,6 +361,15 @@ class hash_entry(object):
                 s.append(w)
         return '%s' % '.'.join(s)
 
+    def __repr__(self):
+        return self.__str__()
+
+class input_file(object):
+    def __init__(self, filename, hash_dir=None):
+        self.hash_dir = hash_dir
+        self.filename = filename
+    def __str__(self):
+        return self.filename
     def __repr__(self):
         return self.__str__()
 
@@ -417,23 +433,23 @@ class video_rename_app:
                 self._combined_words.append( (chw, [main_channel_name] ) )
 
     def _add_file(self, f):
-        fabs = os.path.abspath(f)
+        fabs = os.path.abspath(f.filename)
         (name, ext) = os.path.splitext(fabs)
         if ext in self._video_file_exts:
-            self._files.append(fabs)
+            self._files.append(input_file(fabs, hash_dir=f.hash_dir))
         elif self._verbose:
             print('Skip non-video file %s' % fabs)
 
     def _add(self, f):
-        if os.path.isfile(f):
+        if os.path.isfile(f.filename):
             self._add_file(f)
-        elif os.path.isdir(f):
-            for e in os.listdir(path=f):
-                full = os.path.join(f, e)
+        elif os.path.isdir(f.filename):
+            for e in os.listdir(path=f.filename):
+                full = os.path.join(f.filename, e)
                 if os.path.isdir(full):
-                    self._add(full)
+                    self._add( input_file(full, hash_dir=f.hash_dir) )
                 elif os.path.isfile(full):
-                    self._add_file(full)
+                    self._add_file(input_file(full, hash_dir=f.hash_dir))
 
     def _mkdir(self, d):
         ret = True
@@ -472,9 +488,12 @@ class video_rename_app:
     def _mklink(self, src, dst):
         dst_dir = os.path.dirname(dst)
         self._mkdir(dst_dir)
-        r = os.path.relpath(dst, src)
+        r = os.path.relpath(src, dst_dir)
         need_copy = False
         try:
+            if os.path.islink(dst):
+                # remove old link first
+                os.remove(dst)
             os.symlink(r, dst, target_is_directory=False)
         except OSError as e:
             print('Failed to create symlink %s to %s: %s' % (src, dst, e))
@@ -512,7 +531,7 @@ class video_rename_app:
         return s
 
     def _auto_rename_file(self, f, force=False):
-        path, name = os.path.split(f)
+        path, name = os.path.split(f.filename)
         (basename, ext) = os.path.splitext(name)
 
         found_rule = False
@@ -530,7 +549,7 @@ class video_rename_app:
 
         got_title = False
         suggested_filename = None
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f])
+        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f.filename])
         if sts == 0:
             file_format = json.loads(stdoutdata.decode('utf8'))
             #print(file_format['format'])
@@ -563,21 +582,23 @@ class video_rename_app:
             full = os.path.join(self._hash_dir, e)
             self._hashes.append(hash_entry(full, e))
 
-    def _find_hash_entry(self, basename):
+    def _find_hash_entry(self, basename, full_match=False):
         words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
 
         ret = []
         for e in self._hashes:
-            score = e.match(words)
+            score = e.match(words, full_match=full_match)
             if score >= 0:
                 ret.append((score, e))
         return sorted(ret, key=lambda e: e[0], reverse=True)
 
     def _auto_hash_file(self, f, force=False):
-        path, name = os.path.split(f)
+        path, name = os.path.split(f.filename)
         (basename, ext) = os.path.splitext(name)
 
         suggested_filename = None
+        if f.hash_dir is not None:
+            suggested_filename = f.filename
         symlink_filenames = []
         entries = self._find_hash_entry(basename)
         if entries:
@@ -594,36 +615,48 @@ class video_rename_app:
                     equal_score_entries.append(e)
 
             for e in equal_score_entries:
-                for hd in self._hash_dirs:
-                    suggested_dir = os.path.join(hd, e.directory)
+                #print('equal_score_entries %s' % e)
+                if f.hash_dir is None:
+                    for hd in self._hash_dirs:
+                        suggested_dir = os.path.join(hd, e.directory)
+                        new_filename = os.path.join(suggested_dir, name)
+                        if new_filename == f.filename:
+                            # avoid rename and symlink to same name
+                            continue
+                        if suggested_filename is None:
+                            suggested_filename = new_filename
+                        else:
+                            symlink_filenames.append(new_filename)
+                else:
+                    suggested_dir = os.path.join(f.hash_dir, e.directory)
                     new_filename = os.path.join(suggested_dir, name)
-                    if new_filename == f:
+                    if new_filename == f.filename:
                         # avoid rename and symlink to same name
                         continue
-                    if suggested_filename is None:
-                        suggested_filename = new_filename
-                    else:
-                        symlink_filenames.append(new_filename)
+                    symlink_filenames.append(new_filename)
 
-            #for (score, e) in entries:
-                #print('  found %i - %s' %(score,e))
+
         if suggested_filename is None:
             # DO not move files if the file is within a hash_dir
             is_within_hash_dir = False
-            for hd in self._hash_dirs:
-                if is_within_directory(f, hd):
-                    is_within_hash_dir = True
-                    break
+            if f.hash_dir is None:
+                for hd in self._hash_dirs:
+                    if is_within_directory(f.filename, hd):
+                        is_within_hash_dir = True
+                        break
+            else:
+                is_within_hash_dir = True
             if not is_within_hash_dir:
                 hd = self._hash_dirs[0]
                 suggested_filename = os.path.join(hd, self._hash_unknown_dir, name)
 
         if suggested_filename is not None:
-            if self._noop:
-                print('  Hash to %s (noop)' % (suggested_filename))
-            else:
-                print('  Hash to %s' % (suggested_filename))
-                self._rename_file(f, suggested_filename)
+            if f.filename != suggested_filename:
+                if self._noop:
+                    print('  Hash to %s (noop)' % (suggested_filename))
+                else:
+                    print('  Hash to %s' % (suggested_filename))
+                    self._rename_file(f.filename, suggested_filename)
 
             for f in symlink_filenames:
                 if self._noop:
@@ -644,6 +677,8 @@ class video_rename_app:
         parser.add_argument('--no-hash', dest='no_hash', action='store_true', help='do not perform hashing')
         parser.add_argument('--no-rename', dest='no_rename', action='store_true', help='do not rename files.')
         parser.add_argument('-H', '--hash', dest='hash_dirs', nargs='*', help='hash video files into given directory')
+        parser.add_argument('-q', '--query', dest='queries', nargs='*', help='query for specific files')
+        parser.add_argument('-r', '--rehash', dest='rehashs', nargs='*', help='rehash specific words')
         parser.add_argument('--unknown', dest='process_unknown', action='store_true', help='re-process files in unknown directory')
         parser.add_argument('--channels', dest='process_channels', action='store_true', help='re-process files in channels directory')
         parser.add_argument('-c', '--config', dest='config_file', default='~/.config/video-rename.conf', help='load configuration file')
@@ -658,6 +693,8 @@ class video_rename_app:
         #self._noop = True
         self._input_dirs = args.files
         self._hash_dirs = args.hash_dirs
+        self._queries = args.queries
+        self._rehashs = args.rehashs
         self._process_unknown = args.process_unknown
         self._process_channels = args.process_channels
 
@@ -674,7 +711,9 @@ class video_rename_app:
                 print('Hash unknown dir: %s' % self._hash_unknown_dir)
                 print('Hash channels dir: %s' % self._hash_channels_dir)
 
-        input_dirs = expanduser_dirs(self._input_dirs)
+        input_dirs = []
+        for f in expanduser_dirs(self._input_dirs):
+            input_dirs.append( input_file(f) )
         hash_dirs = expanduser_dirs(self._hash_dirs)
         if self._verbose:
             print('Input dirs: %s' % ','.join(input_dirs))
@@ -683,6 +722,16 @@ class video_rename_app:
 
         if self._process_unknown or self._process_channels:
             input_dirs = []
+        elif self._queries:
+            input_dirs = []
+            # query is a read-only operation
+            self._no_hash = True
+            self._no_rename = True
+        elif self._rehashs:
+            input_dirs = []
+            # rehash, so required to do some hashing, but no rename
+            self._no_hash = False
+            self._no_rename = True
         if self._process_unknown:
             for h in self._hash_dirs:
                 input_dirs.append( os.path.join(h, self._hash_unknown_dir) )
@@ -744,6 +793,29 @@ class video_rename_app:
                     print('Files for rehashing:')
                     for f in files:
                         print('  %s' % f)
+        elif self._queries:
+            for q in self._queries:
+                entries = self._find_hash_entry(q, full_match=True)
+                if entries:
+                    for (score, e) in entries:
+                        print('Found hash entry: %s:' % (e))
+
+                        for hd in self._hash_dirs:
+                            d = os.path.join(hd, str(e))
+                            if os.path.isdir(d):
+                                for f in os.listdir(d):
+                                    print('  %s' % f)
+        elif self._rehashs:
+            for q in self._rehashs:
+                entries = self._find_hash_entry(q, full_match=True)
+                if entries:
+                    for (score, e) in entries:
+                        print('Found hash entry: %s:' % (e))
+                        for hd in self._hash_dirs:
+                            d = os.path.join(hd, str(e))
+                            if os.path.isdir(d):
+                                self._add(input_file(d, hash_dir=hd))
+
 
         total = len(self._files)
         total_progress = 0
