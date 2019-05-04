@@ -149,7 +149,10 @@ def split_into_words(s, ignored=None, combined=None):
         if iscamelcase(w):
             ex.extend(split_camelcase(w))
         else:
-            ex.append(w)
+            if w[0].isalpha() and w[-1].isdigit():
+                ex.append(w[0:-1])
+            else:
+                ex.append(w)
     for w in ex:
         #if len(w) < 2:
             #continue
@@ -284,6 +287,24 @@ class video_rule(object):
     def __repr__(self):
         return '\"%s\" -> %s' % (self.re_pattern, self.url_template)
 
+class hash_directory(object):
+    def __init__(self, path=None, opts=None):
+        self.path = path
+        self.readonly = False
+        if opts is not None:
+            for o in opts.split(','):
+                if o == 'read-only' or o == 'ro':
+                    self.readonly = True
+
+    def __str__(self):
+        if self.readonly:
+            return 'read-only:%s' % self.path
+        else:
+            return self.path
+
+    def __repr__(self):
+        return self.__str__()
+
 class hash_entry(object):
     def __init__(self, base=None, opts=None, words=None):
         self._aliases = []
@@ -307,17 +328,22 @@ class hash_entry(object):
                 return False
         return True
 
-    def match(self, words, full_match=False):
+    @property
+    def aliases(self):
+        return self._aliases
+
+    @staticmethod
+    def _match_words(lhs_words, rhs_words, full_match=False):
 
         ret = -1
         first = True
         i = 0
-        i_max = len(self._words)
-        j_max = len(words)
+        i_max = len(lhs_words)
+        j_max = len(rhs_words)
         num_matches = 0
         while i < i_max:
             try:
-                j = words.index(self._words[i])
+                j = rhs_words.index(lhs_words[i])
                 if first:
                     ret = 1
                     num_matches += 1
@@ -325,8 +351,8 @@ class hash_entry(object):
                 else:
                     ret += 1
                 k = 1
-                while i + k < i_max and j + k < j_max and self._words[i + k] == words[j + k]:
-                    #print('xx k=%i, %s, %s' % (k, self._words[i + k], words[j + k]))
+                while i + k < i_max and j + k < j_max and lhs_words[i + k] == rhs_words[j + k]:
+                    #print('xx k=%i, %s, %s' % (k, lhs_words[i + k], rhs_words[j + k]))
                     ret += 10
                     num_matches += 1
                     k += 1
@@ -343,6 +369,14 @@ class hash_entry(object):
         #print('%s ret=%i' % (self,ret))
         return ret
 
+    def match(self, words, full_match=False):
+        ret = self._match_words(self._words, words, full_match=full_match)
+        for alias in self._aliases:
+            alias_score = self._match_words(alias, words, full_match=full_match)
+            if alias_score > ret:
+                ret = alias_score
+        return ret
+
     def __eq__(self, rhs):
         return self._words == rhs._words
 
@@ -352,22 +386,30 @@ class hash_entry(object):
             ret += hash(w)
         return ret
 
-    def __str__(self):
+    @staticmethod
+    def directory_name(words, delim='.'):
         s = []
-        for w in self._words:
+        for w in words:
             if isinstance(w, datetime.date):
                 s.append(str(w))
             else:
                 s.append(w)
-        return '%s' % '.'.join(s)
+        return delim.join(s)
+
+    def __str__(self):
+        return self.directory_name(self._words)
 
     def __repr__(self):
         return self.__str__()
 
 class input_file(object):
-    def __init__(self, filename, hash_dir=None):
+    def __init__(self, filename, hash_dir=None, unknown=False, channels=False):
         self.hash_dir = hash_dir
         self.filename = filename
+        self.unknown = unknown
+        self.channels = channels
+        if not isinstance(self.filename, str):
+            raise RuntimeError("self.filename is not a string: %s" % type(self.filename))
     def __str__(self):
         return self.filename
     def __repr__(self):
@@ -421,7 +463,15 @@ class video_rename_app:
         if self._input_dirs is None or not self._input_dirs:
             self._input_dirs = f.getAsArray(None, 'input')
         if self._hash_dirs is None or not self._hash_dirs:
-            self._hash_dirs = f.getAsArray(None, 'hash_dir')
+            self._hash_dirs = []
+            for hd in f.getAsArray(None, 'hash_dir'):
+                if ',' in hd:
+                    path,opts = hd.split(',',1)
+                else:
+                    path = hd
+                    opts = None
+                self._hash_dirs.append(hash_directory(path, opts))
+
         self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv'])
         self._ignored_words = f.getAsArray(None, 'ignored_words', ['360p', '480p', '720p', '1080p', 'and', 'the', 'a', 'is', 'in', 'of'])
         self._channels = f.getAsArray(None, 'channels', [])
@@ -436,20 +486,22 @@ class video_rename_app:
         fabs = os.path.abspath(f.filename)
         (name, ext) = os.path.splitext(fabs)
         if ext in self._video_file_exts:
-            self._files.append(input_file(fabs, hash_dir=f.hash_dir))
+            self._files.append(input_file(fabs, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels))
         elif self._verbose:
             print('Skip non-video file %s' % fabs)
 
     def _add(self, f):
+        if not isinstance(f, input_file):
+            raise RuntimeError('require input_file not %s' % type(f))
         if os.path.isfile(f.filename):
             self._add_file(f)
         elif os.path.isdir(f.filename):
             for e in os.listdir(path=f.filename):
                 full = os.path.join(f.filename, e)
                 if os.path.isdir(full):
-                    self._add( input_file(full, hash_dir=f.hash_dir) )
+                    self._add( input_file(full, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels) )
                 elif os.path.isfile(full):
-                    self._add_file(input_file(full, hash_dir=f.hash_dir))
+                    self._add_file(input_file(full, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels))
 
     def _mkdir(self, d):
         ret = True
@@ -462,16 +514,31 @@ class video_rename_app:
 
 
     def _rename_file(self, src, dst):
+        ret = False
         dst_dir = os.path.dirname(dst)
         self._mkdir(dst_dir)
         need_copy = False
         try:
+            if os.path.exists(dst):
+                if os.path.islink(dst):
+                    target = os.readlink(dst)
+                    if not os.path.isabs(target):
+                        # convert into absolute path
+                        target = os.path.join(os.path.dirname(dst), target)
+                    if os.path.samefile(src,target):
+                        os.remove(dst)
+                        #print('Found link from src to dst -> %s' % dst)
+                else:
+                    #print('dest %s file exists' % dst)
+                    pass
             os.rename(src, dst)
+            ret = True
         except OSError as e:
+            # Invalid cross-device link
             if e.errno == 18:
                 need_copy = True
             else:
-                print('Failed to rename %s to %s: %s' % (src, dst, e))
+                print('Failed to rename %s to %s: %s' % (src, dst, e), file=sys.stderr)
         if need_copy:
             def _copy_progress(copied, total):
                 precent = 100*copied/total
@@ -480,23 +547,27 @@ class video_rename_app:
                 print("  Copying", end='')
                 copy_with_progress(src, dst, callback=_copy_progress)
                 #shutil.copy2(src, dst)
-                #os.unlink(src)
+                os.unlink(src)
+                ret = True
                 print("\r  Copy complete")
             except OSError as e:
-                print('Failed to copy %s to %s: %s' % (src, dst, e))
+                print('Failed to copy %s to %s: %s' % (src, dst, e), file=sys.stderr)
+        return ret
 
     def _mklink(self, src, dst):
+        ret = False
         dst_dir = os.path.dirname(dst)
         self._mkdir(dst_dir)
         r = os.path.relpath(src, dst_dir)
-        need_copy = False
         try:
             if os.path.islink(dst):
                 # remove old link first
                 os.remove(dst)
             os.symlink(r, dst, target_is_directory=False)
+            ret = True
         except OSError as e:
-            print('Failed to create symlink %s to %s: %s' % (src, dst, e))
+            print('Failed to create symlink %s to %s: %s' % (src, dst, e), file=sys.stderr)
+        return ret
 
     def _get_html_title(self, url):
 
@@ -523,6 +594,9 @@ class video_rename_app:
         if hash_idx > 0:
             s = s[0:hash_idx - 1]
         s = s.replace('/', '_')
+        s = s.replace('\r', '_')
+        s = s.replace('\n', '_')
+        s = s.replace('__', '_')
         s = s.strip()
         while len(s) > 200:
             elems = s.split()
@@ -531,6 +605,8 @@ class video_rename_app:
         return s
 
     def _auto_rename_file(self, f, force=False):
+        if not isinstance(f, input_file):
+            raise RuntimeError('require input_file not %s' % type(f))
         path, name = os.path.split(f.filename)
         (basename, ext) = os.path.splitext(name)
 
@@ -569,18 +645,8 @@ class video_rename_app:
                 print('  Rename to %s (noop)' % (suggested_filename))
             else:
                 print('  Rename to %s' % (suggested_filename))
-                self._rename_file(f, suggested_filename)
+                self._rename_file(f.filename, suggested_filename)
         return suggested_filename
-
-    def _load_hash_dir(self):
-        self._hashes = []
-        for e in os.listdir(path=self._hash_dir):
-            if e == self._hash_unknown_dir:
-                continue
-            #if e == self._hash_channels_dir:
-                #continue
-            full = os.path.join(self._hash_dir, e)
-            self._hashes.append(hash_entry(full, e))
 
     def _find_hash_entry(self, basename, full_match=False):
         words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
@@ -593,12 +659,12 @@ class video_rename_app:
         return sorted(ret, key=lambda e: e[0], reverse=True)
 
     def _auto_hash_file(self, f, force=False):
+        if not isinstance(f, input_file):
+            raise RuntimeError('require input_file not %s' % type(f))
         path, name = os.path.split(f.filename)
         (basename, ext) = os.path.splitext(name)
 
         suggested_filename = None
-        if f.hash_dir is not None:
-            suggested_filename = f.filename
         symlink_filenames = []
         entries = self._find_hash_entry(basename)
         if entries:
@@ -618,7 +684,9 @@ class video_rename_app:
                 #print('equal_score_entries %s' % e)
                 if f.hash_dir is None:
                     for hd in self._hash_dirs:
-                        suggested_dir = os.path.join(hd, e.directory)
+                        if hd.readonly:
+                            continue
+                        suggested_dir = os.path.join(hd.path, e.directory)
                         new_filename = os.path.join(suggested_dir, name)
                         if new_filename == f.filename:
                             # avoid rename and symlink to same name
@@ -628,12 +696,15 @@ class video_rename_app:
                         else:
                             symlink_filenames.append(new_filename)
                 else:
-                    suggested_dir = os.path.join(f.hash_dir, e.directory)
+                    suggested_dir = os.path.join(f.hash_dir.path, e.directory)
                     new_filename = os.path.join(suggested_dir, name)
                     if new_filename == f.filename:
                         # avoid rename and symlink to same name
                         continue
-                    symlink_filenames.append(new_filename)
+                    if suggested_filename is None:
+                        suggested_filename = new_filename
+                    else:
+                        symlink_filenames.append(new_filename)
 
 
         if suggested_filename is None:
@@ -641,21 +712,27 @@ class video_rename_app:
             is_within_hash_dir = False
             if f.hash_dir is None:
                 for hd in self._hash_dirs:
-                    if is_within_directory(f.filename, hd):
+                    if is_within_directory(f.filename, hd.path):
                         is_within_hash_dir = True
                         break
             else:
                 is_within_hash_dir = True
             if not is_within_hash_dir:
-                hd = self._hash_dirs[0]
-                suggested_filename = os.path.join(hd, self._hash_unknown_dir, name)
+                target_hd = None
+                for hd in self._hash_dirs:
+                    if hd.readonly:
+                        continue
+                    target_hd = hd
+                    break
+                if target_hd is not None:
+                    suggested_filename = os.path.join(target_hd.path, self._hash_unknown_dir, name)
 
         if suggested_filename is not None:
             if f.filename != suggested_filename:
                 if self._noop:
-                    print('  Hash to %s (noop)' % (suggested_filename))
+                    print('  Hash move to %s (noop)' % (suggested_filename))
                 else:
-                    print('  Hash to %s' % (suggested_filename))
+                    print('  Hash move to %s' % (suggested_filename))
                     self._rename_file(f.filename, suggested_filename)
 
             for f in symlink_filenames:
@@ -682,6 +759,9 @@ class video_rename_app:
         parser.add_argument('--unknown', dest='process_unknown', action='store_true', help='re-process files in unknown directory')
         parser.add_argument('--channels', dest='process_channels', action='store_true', help='re-process files in channels directory')
         parser.add_argument('-c', '--config', dest='config_file', default='~/.config/video-rename.conf', help='load configuration file')
+        parser.add_argument('--test-words', dest='test_words', nargs='*', help='testing word processing')
+        parser.add_argument('--test-match', dest='test_match', nargs='*', help='test match processing')
+        parser.add_argument('--show-hashes', dest='show_hashes', action='store_true', help='show all configured hashes')
         parser.add_argument('files', metavar='FILE', type=str, nargs='*', help='video files or directories')
 
         args = parser.parse_args()
@@ -692,7 +772,9 @@ class video_rename_app:
         self._no_rename = args.no_rename
         #self._noop = True
         self._input_dirs = args.files
-        self._hash_dirs = args.hash_dirs
+        self._hash_dirs = []
+        for h in expanduser_dirs(args.hash_dirs):
+            hash_dirs.append(hash_directory(h))
         self._queries = args.queries
         self._rehashs = args.rehashs
         self._process_unknown = args.process_unknown
@@ -704,21 +786,43 @@ class video_rename_app:
             print('Rules:')
             for r in self._rules:
                 print('  %s' % r)
-            if not self._no_hash:
-                print('Hashes:')
-                for h in self._hashes:
-                    print('  %s' % h)
-                print('Hash unknown dir: %s' % self._hash_unknown_dir)
-                print('Hash channels dir: %s' % self._hash_channels_dir)
+        if args.show_hashes:
+            print('Hashes:')
+            for h in self._hashes:
+                print('  %s' % h)
+                if h.aliases:
+                    for a in h.aliases:
+                        print('    %s' % hash_entry.directory_name(a))
+
+            print('Hash unknown dir: %s' % self._hash_unknown_dir)
+            print('Hash channels dir: %s' % self._hash_channels_dir)
+            return 0
+
+        if args.test_words:
+            for w in args.test_words:
+                words = split_into_words(w, ignored=self._ignored_words, combined=self._combined_words)
+                print(words)
+            return 0
+
+        if args.test_match:
+            for m in args.test_match:
+                entries = self._find_hash_entry(m, full_match=False)
+                if entries:
+                    entries = filter(lambda x: x[0] >= self._hash_threshold, entries)
+                if entries:
+                    for (score, e) in entries:
+                        print('%03i %s' % (score, e))
+            return 0
 
         input_dirs = []
         for f in expanduser_dirs(self._input_dirs):
             input_dirs.append( input_file(f) )
-        hash_dirs = expanduser_dirs(self._hash_dirs)
         if self._verbose:
             print('Input dirs: %s' % ','.join(input_dirs))
             if not self._no_hash:
-                print('Hash dirs: %s' % ','.join(hash_dirs))
+                print('Hash dirs:')
+                for hd in hash_dirs:
+                    print('  %s' % hd)
 
         if self._process_unknown or self._process_channels:
             input_dirs = []
@@ -734,10 +838,10 @@ class video_rename_app:
             self._no_rename = True
         if self._process_unknown:
             for h in self._hash_dirs:
-                input_dirs.append( os.path.join(h, self._hash_unknown_dir) )
+                input_dirs.append( input_file(os.path.join(h.path, self._hash_unknown_dir), hash_dir=h, unknown=True) )
         if self._process_channels:
             for h in self._hash_dirs:
-                input_dirs.append( os.path.join(h, self._hash_channels_dir) )
+                input_dirs.append( input_file(os.path.join(h.path, self._hash_channels_dir), hash_dir=h, channels=True) )
 
         for f in input_dirs:
             self._add(f)
@@ -753,7 +857,7 @@ class video_rename_app:
             word_dict = {}
 
             for f in self._files:
-                (name, ext) = os.path.splitext(f)
+                (name, ext) = os.path.splitext(f.filename)
                 basename = os.path.basename(name)
                 words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
                 num_words = len(words)
@@ -831,7 +935,7 @@ class video_rename_app:
                 current_progress += 1
                 f_new = self._auto_rename_file(self._files[i], force=args.force)
                 if f_new is not None:
-                    self._files[i] = f_new
+                    self._files[i] = input_file(f_new, hash_dir=f.hash_dir)
 
         if not self._no_hash:
             for i in range(total):
@@ -840,7 +944,7 @@ class video_rename_app:
                 current_progress += 1
                 self._auto_hash_file(self._files[i], force=args.force)
 
-        if possible_words:
+        if possible_words and 0:
             possible_words = sorted(possible_words, key=lambda e: len(e[1]), reverse=False)
             print('Possible words:')
             for (h, files) in possible_words:
