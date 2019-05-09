@@ -276,10 +276,11 @@ def is_within_directory(f, d):
             return True
 
 class video_rule(object):
-    def __init__(self, re_pattern, url_template):
+    def __init__(self, re_pattern, url_template, options={}):
         self.re_pattern = re_pattern
         self.re = re.compile(re_pattern)
         self.url_template = url_template
+        self.options = options
 
     def match(self, basename):
         return self.re.match(basename)
@@ -439,8 +440,11 @@ class video_rename_app:
             if k_ext == 're':
                 re_pattern = v
                 url = section.get(k_name + '.url')
-                if url:
-                    r = video_rule(re_pattern, url)
+                webpage = section.getAsBoolean(k_name + '.webpage', False)
+                enable = section.getAsBoolean(k_name + '.enable', True)
+                if url and enable:
+                    options = { 'webpage': webpage }
+                    r = video_rule(re_pattern, url, options)
                     self._rules.append(r)
 
     def _load_hashes(self, section):
@@ -818,7 +822,10 @@ class video_rename_app:
         for f in expanduser_dirs(self._input_dirs):
             input_dirs.append( input_file(f) )
         if self._verbose:
-            print('Input dirs: %s' % ','.join(input_dirs))
+            if input_dirs:
+                print('Input:')
+                for i in input_dirs:
+                    print('  %s' % i)
             if not self._no_hash:
                 print('Hash dirs:')
                 for hd in hash_dirs:
@@ -905,7 +912,7 @@ class video_rename_app:
                         print('Found hash entry: %s:' % (e))
 
                         for hd in self._hash_dirs:
-                            d = os.path.join(hd, str(e))
+                            d = os.path.join(hd.path, str(e))
                             if os.path.isdir(d):
                                 for f in os.listdir(d):
                                     print('  %s' % f)
@@ -916,7 +923,7 @@ class video_rename_app:
                     for (score, e) in entries:
                         print('Found hash entry: %s:' % (e))
                         for hd in self._hash_dirs:
-                            d = os.path.join(hd, str(e))
+                            d = os.path.join(hd.path, str(e))
                             if os.path.isdir(d):
                                 self._add(input_file(d, hash_dir=hd))
 
