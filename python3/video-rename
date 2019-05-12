@@ -267,13 +267,13 @@ def is_within_directory(f, d):
     if os.path.isabs(relpath):
         # if we got an abspath then f cannot be within d, otherwise we
         # would have gotten a relpath
-        return False
+        return False, None
     else:
         # if relpath starts with .. the file is outside the directory
         if relpath[0] == '.' and relpath[1] == '.':
-            return False
+            return False, None
         else:
-            return True
+            return True, relpath
 
 class video_rule(object):
     def __init__(self, re_pattern, url_template, options={}):
@@ -421,8 +421,9 @@ class hash_entry(object):
         return self.__str__()
 
 class input_file(object):
-    def __init__(self, filename, hash_dir=None, unknown=False, channels=False):
+    def __init__(self, filename, hash_dir=None, entry=None, unknown=False, channels=False):
         self.hash_dir = hash_dir
+        self.entry = entry
         self.filename = filename
         self.unknown = unknown
         self.channels = channels
@@ -507,7 +508,7 @@ class video_rename_app:
         fabs = os.path.abspath(f.filename)
         (name, ext) = os.path.splitext(fabs)
         if ext in self._video_file_exts:
-            self._files.append(input_file(fabs, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels))
+            self._files.append(input_file(fabs, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels, entry=f.entry))
         elif self._verbose:
             print('Skip non-video file %s' % fabs)
 
@@ -520,9 +521,9 @@ class video_rename_app:
             for e in os.listdir(path=f.filename):
                 full = os.path.join(f.filename, e)
                 if os.path.isdir(full):
-                    self._add( input_file(full, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels) )
+                    self._add( input_file(full, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels, entry=f.entry) )
                 elif os.path.isfile(full):
-                    self._add_file(input_file(full, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels))
+                    self._add_file(input_file(full, hash_dir=f.hash_dir, unknown=f.unknown, channels=f.channels, entry=f.entry))
 
     def _mkdir(self, d):
         ret = True
@@ -681,7 +682,7 @@ class video_rename_app:
                 self._rename_file(f.filename, suggested_filename)
         return suggested_filename
 
-    def _find_hash_entry(self, basename, full_match=False, debug=False):
+    def _find_hash_entry(self, basename, existing_entry=None, full_match=False, debug=False):
         words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
 
         ret = []
@@ -689,7 +690,11 @@ class video_rename_app:
             score = e.match(words, full_match=full_match, debug=debug)
             if score >= 0:
                 ret.append((score, e))
-        return sorted(ret, key=lambda e: e[0], reverse=True)
+        ret = sorted(ret, key=lambda e: e[0], reverse=True)
+        if ret and existing_entry is not None:
+            (top_score, top_entry) = ret[0]
+            ret.insert(0, (top_score, existing_entry) )
+        return ret
 
     def _auto_hash_file(self, f, force=False):
         if not isinstance(f, input_file):
@@ -699,7 +704,7 @@ class video_rename_app:
 
         suggested_filename = None
         symlink_filenames = []
-        entries = self._find_hash_entry(basename)
+        entries = self._find_hash_entry(basename, existing_entry=f.entry)
         if entries:
             entries = filter(lambda x: x[0] >= self._hash_threshold, entries)
         if entries:
@@ -715,7 +720,6 @@ class video_rename_app:
 
             dest_filenames = []
             for e in equal_score_entries:
-                #print('equal_score_entries %s' % e)
                 if f.hash_dir is None:
                     for hd in self._hash_dirs:
                         if hd.readonly:
@@ -729,6 +733,8 @@ class video_rename_app:
                     dest_filenames.append( (new_filename, f.hash_dir) )
 
             if dest_filenames:
+                #if self._verbose:
+                    #print('  dest filenames: %s' % (dest_filenames))
                 for (new_filename, hd) in dest_filenames:
                     is_same = False
                     try:
@@ -751,8 +757,8 @@ class video_rename_app:
             is_within_hash_dir = False
             if f.hash_dir is None:
                 for hd in self._hash_dirs:
-                    if is_within_directory(f.filename, hd.path):
-                        is_within_hash_dir = True
+                    is_within_hash_dir, relpath = is_within_directory(f.filename, hd.path)
+                    if is_within_hash_dir:
                         break
             else:
                 is_within_hash_dir = True
@@ -855,7 +861,23 @@ class video_rename_app:
 
         input_dirs = []
         for f in expanduser_dirs(self._input_dirs):
-            input_dirs.append( input_file(f) )
+            f_hd = None
+            f_entry = None
+            for hd in self._hash_dirs:
+                within, relpath = is_within_directory(f, hd.path)
+                if within:
+                    if os.path.isfile(f):
+                        f_dir = os.path.dirname(relpath)
+                    else:
+                        f_dir = relpath
+                    #print('%i, %s' % (within, f_dir))
+                    f_hd = hd
+                    entries = self._find_hash_entry(f_dir, full_match=True)
+                    if entries:
+                        f_score, f_entry = entries[0]
+                    break
+            #print(f, f_hd, f_entry)
+            input_dirs.append( input_file(f, hash_dir=f_hd, entry=f_entry) )
         if self._verbose:
             if input_dirs:
                 print('Input:')
@@ -974,7 +996,7 @@ class video_rename_app:
                         for hd in self._hash_dirs:
                             d = os.path.join(hd.path, str(e))
                             if os.path.isdir(d):
-                                self._add(input_file(d, hash_dir=hd))
+                                self._add(input_file(d, hash_dir=hd, entry=e))
 
 
         total = len(self._files)
