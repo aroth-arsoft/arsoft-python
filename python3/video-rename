@@ -334,7 +334,7 @@ class hash_entry(object):
         return self._aliases
 
     @staticmethod
-    def _match_words(lhs_words, rhs_words, full_match=False):
+    def _match_words(lhs_words, rhs_words, full_match=False, debug=False):
 
         ret = -1
         first = True
@@ -353,27 +353,36 @@ class hash_entry(object):
                     ret += 1
                 k = 1
                 while i + k < i_max and j + k < j_max and lhs_words[i + k] == rhs_words[j + k]:
-                    #print('xx k=%i, %s, %s' % (k, lhs_words[i + k], rhs_words[j + k]))
+                    if debug:
+                        print('xx k=%i, %s, %s' % (k, lhs_words[i + k], rhs_words[j + k]))
                     ret += 10
                     num_matches += 1
                     k += 1
-                    #print('xx ret=%i' % (ret))
+                    if debug:
+                        print('xx ret=%i' % (ret))
                 i = i + k
             except ValueError:
                 pass
             i += 1
         if full_match:
+
             if j_max == num_matches:
+                if debug:
+                    print('%s<>%s ret=%i (full match)' % (lhs_words,rhs_words,ret))
                 return ret
             else:
+                if debug:
+                    print('%s<>%s ret=-1 (no full match %i!=%i)' % (lhs_words,rhs_words,j_max,num_matches))
                 return -1
-        #print('%s ret=%i' % (self,ret))
-        return ret
+        else:
+            if debug:
+                print('%s<>%s ret=%i' % (lhs_words,rhs_words,ret))
+            return ret
 
-    def match(self, words, full_match=False):
-        ret = self._match_words(self._words, words, full_match=full_match)
+    def match(self, words, full_match=False, debug=False):
+        ret = self._match_words(self._words, words, full_match=full_match, debug=debug)
         for alias in self._aliases:
-            alias_score = self._match_words(alias, words, full_match=full_match)
+            alias_score = self._match_words(alias, words, full_match=full_match, debug=debug)
             if alias_score > ret:
                 ret = alias_score
         return ret
@@ -834,7 +843,6 @@ class video_rename_app:
         if self._process_unknown or self._process_channels:
             input_dirs = []
         elif self._queries:
-            input_dirs = []
             # query is a read-only operation
             self._no_hash = True
             self._no_rename = True
@@ -909,13 +917,28 @@ class video_rename_app:
                 entries = self._find_hash_entry(q, full_match=True)
                 if entries:
                     for (score, e) in entries:
-                        print('Found hash entry: %s:' % (e))
+                        print('Found hash entry \'%s\':' % (e))
 
+                        results = []
                         for hd in self._hash_dirs:
                             d = os.path.join(hd.path, str(e))
                             if os.path.isdir(d):
                                 for f in os.listdir(d):
-                                    print('  %s' % f)
+                                    results.append( (f, os.path.join(d, f), hd ) )
+                        for f in self._files:
+                            (name, ext) = os.path.splitext(f.filename)
+                            basename = os.path.basename(name)
+                            words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
+                            score = e.match(words, full_match=False)
+                            if score >= 0:
+                                results.append( (basename, f.filename, None ) )
+
+                        for (basename, full, hd) in sorted(results, key=lambda x: x[0]):
+                            if hd is None:
+                                print('  %s in %s' % (basename, os.path.dirname(full)))
+                            else:
+                                print('  %s' % basename)
+
         elif self._rehashs:
             for q in self._rehashs:
                 entries = self._find_hash_entry(q, full_match=True)
