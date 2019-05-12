@@ -236,7 +236,7 @@ def copyfile(src, dst, *, follow_symlinks=True, callback=None):
     return dst
 
 
-def copyfileobj(fsrc, fdst, callback, total, length=256*1024, flush_blocks=256):
+def copyfileobj(fsrc, fdst, callback, total, length=1024*1024, flush_blocks=128):
     copied = 0
     num_blocks = 0
     while True:
@@ -360,6 +360,11 @@ class hash_entry(object):
                     k += 1
                     if debug:
                         print('xx ret=%i' % (ret))
+                # add extra point for full match for single words
+                if i_max == 1:
+                    ret += 1
+                    if debug:
+                        print('full i=%i/%i, ret=%i' % (i,i_max, ret))
                 i = i + k
             except ValueError:
                 pass
@@ -376,7 +381,7 @@ class hash_entry(object):
                 return -1
         else:
             if debug:
-                print('%s<>%s ret=%i' % (lhs_words,rhs_words,ret))
+                print('%s<>%s %i/%i ret=%i' % (lhs_words,rhs_words,j_max,num_matches, ret))
             return ret
 
     def match(self, words, full_match=False, debug=False):
@@ -395,6 +400,9 @@ class hash_entry(object):
         for w in self._words:
             ret += hash(w)
         return ret
+
+    def __iter__(self):
+        return iter(self._words)
 
     @staticmethod
     def directory_name(words, delim='.'):
@@ -429,7 +437,7 @@ class video_rename_app:
     def __init__(self):
         self._verbose = False
         self._files = []
-        self._video_file_exts = ['.mp4', '.avi', '.wmv', '.mkv']
+        self._video_file_exts = ['.mp4', '.avi', '.wmv', '.mkv', '.mov']
         self._rules = []
         self._hash_threshold = 2
         self._hash_unknown_dir = '_unknown'
@@ -526,12 +534,13 @@ class video_rename_app:
         return ret
 
 
-    def _rename_file(self, src, dst):
+    def _rename_file(self, src, dst, overwrite=False):
         ret = False
         dst_dir = os.path.dirname(dst)
         self._mkdir(dst_dir)
         need_copy = False
         try:
+            do_rename = True
             if os.path.exists(dst):
                 if os.path.islink(dst):
                     target = os.readlink(dst)
@@ -541,10 +550,21 @@ class video_rename_app:
                     if os.path.samefile(src,target):
                         os.remove(dst)
                         #print('Found link from src to dst -> %s' % dst)
+                elif os.path.isdir(dst):
+                    print('Destination %s exists as directory' % (dst), file=sys.stderr)
+                    do_rename = False
+                elif os.path.isfile(dst):
+                    if overwrite:
+                        print('Destination file %s already exists. Overwrite' % (dst), file=sys.stderr)
+                        os.remove(dst)
+                    else:
+                        do_rename = False
+                        print('Destination file %s already exists' % (dst), file=sys.stderr)
                 else:
-                    #print('dest %s file exists' % dst)
-                    pass
-            os.rename(src, dst)
+                    print('Destination %s already exists' % (dst), file=sys.stderr)
+                    do_rename = False
+            if do_rename:
+                os.rename(src, dst)
             ret = True
         except OSError as e:
             # Invalid cross-device link
@@ -661,12 +681,12 @@ class video_rename_app:
                 self._rename_file(f.filename, suggested_filename)
         return suggested_filename
 
-    def _find_hash_entry(self, basename, full_match=False):
+    def _find_hash_entry(self, basename, full_match=False, debug=False):
         words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
 
         ret = []
         for e in self._hashes:
-            score = e.match(words, full_match=full_match)
+            score = e.match(words, full_match=full_match, debug=debug)
             if score >= 0:
                 ret.append((score, e))
         return sorted(ret, key=lambda e: e[0], reverse=True)
@@ -693,6 +713,7 @@ class video_rename_app:
                 elif equal_score == score:
                     equal_score_entries.append(e)
 
+            dest_filenames = []
             for e in equal_score_entries:
                 #print('equal_score_entries %s' % e)
                 if f.hash_dir is None:
@@ -701,24 +722,29 @@ class video_rename_app:
                             continue
                         suggested_dir = os.path.join(hd.path, e.directory)
                         new_filename = os.path.join(suggested_dir, name)
-                        if new_filename == f.filename:
-                            # avoid rename and symlink to same name
-                            continue
-                        if suggested_filename is None:
-                            suggested_filename = new_filename
-                        else:
-                            symlink_filenames.append(new_filename)
+                        dest_filenames.append( (new_filename, hd) )
                 else:
                     suggested_dir = os.path.join(f.hash_dir.path, e.directory)
                     new_filename = os.path.join(suggested_dir, name)
-                    if new_filename == f.filename:
-                        # avoid rename and symlink to same name
-                        continue
-                    if suggested_filename is None:
+                    dest_filenames.append( (new_filename, f.hash_dir) )
+
+            if dest_filenames:
+                for (new_filename, hd) in dest_filenames:
+                    is_same = False
+                    try:
+                        is_same = os.path.samefile(new_filename, f.filename)
+                    except OSError:
+                        pass
+                    if is_same:
                         suggested_filename = new_filename
                     else:
                         symlink_filenames.append(new_filename)
-
+                if suggested_filename is None:
+                    suggested_filename = symlink_filenames[0]
+                    if len(symlink_filenames) > 1:
+                        symlink_filenames = symlink_filenames[1:]
+                    else:
+                        symlink_filenames = []
 
         if suggested_filename is None:
             # DO not move files if the file is within a hash_dir
@@ -787,7 +813,7 @@ class video_rename_app:
         self._input_dirs = args.files
         self._hash_dirs = []
         for h in expanduser_dirs(args.hash_dirs):
-            hash_dirs.append(hash_directory(h))
+            self._hash_dirs.append(hash_directory(h))
         self._queries = args.queries
         self._rehashs = args.rehashs
         self._process_unknown = args.process_unknown
@@ -819,7 +845,7 @@ class video_rename_app:
 
         if args.test_match:
             for m in args.test_match:
-                entries = self._find_hash_entry(m, full_match=False)
+                entries = self._find_hash_entry(m, full_match=False, debug=self._debug)
                 if entries:
                     entries = filter(lambda x: x[0] >= self._hash_threshold, entries)
                 if entries:
@@ -837,7 +863,7 @@ class video_rename_app:
                     print('  %s' % i)
             if not self._no_hash:
                 print('Hash dirs:')
-                for hd in hash_dirs:
+                for hd in self._hash_dirs:
                     print('  %s' % hd)
 
         if self._process_unknown or self._process_channels:
