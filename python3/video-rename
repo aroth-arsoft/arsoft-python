@@ -109,14 +109,19 @@ def convert_date(words):
     return ret
 
 def replace_in_list(list, needle, replacement):
-    start = 0
+    start = -1
+    end = 0
     #print(list)
     for n in needle:
         try:
-            i = list.index(n)
+            i = list.index(n, end)
+            if start < 0:
+                start = i
+            end = i
             #print('find %s -> %i' % (n, i))
         except ValueError:
             return list
+    #print('build %i, %s -> %s -> %s' % (start, list[0:start], replacement, list[start+len(needle):]))
     list = list[0:start] + replacement + list[start+len(needle):]
     return list
 
@@ -151,6 +156,8 @@ def split_into_words(s, ignored=None, combined=None):
         else:
             if w[0].isalpha() and w[-1].isdigit():
                 ex.append(w[0:-1])
+            elif w[0].isalpha() and w[-1] == '+':
+                ex.append(w[0:-1])
             else:
                 ex.append(w)
     for w in ex:
@@ -169,6 +176,7 @@ def split_into_words(s, ignored=None, combined=None):
     if combined:
         for (needle, replacement) in combined:
             ret = replace_in_list(ret, needle, replacement)
+            #print('%s -> %s, %s' % (needle, replacement, ret))
     ret = convert_date(ret)
     return ret
 
@@ -314,12 +322,15 @@ class hash_entry(object):
         else:
             self._words = words
         self.directory = base
+        self.debug = False
         if opts is not None:
             for o in opts.split(','):
                 if ':' in o:
                     k,v = o.split(':')
                     if k == 'alias':
                         self._aliases.append(split_into_words(v))
+                elif o == 'debug':
+                    self.debug = True
 
     def equal(self, words):
         if len(words) != len(self._words):
@@ -334,7 +345,7 @@ class hash_entry(object):
         return self._aliases
 
     @staticmethod
-    def _match_words(lhs_words, rhs_words, full_match=False, debug=False):
+    def _match_words(lhs_words, rhs_words, full_match=False, partial_match=False, debug=False):
 
         ret = -1
         first = True
@@ -343,31 +354,36 @@ class hash_entry(object):
         j_max = len(rhs_words)
         num_matches = 0
         while i < i_max:
-            try:
-                j = rhs_words.index(lhs_words[i])
-                if first:
-                    ret = 1
-                    num_matches += 1
-                    first = False
-                else:
-                    ret += 1
-                k = 1
-                while i + k < i_max and j + k < j_max and lhs_words[i + k] == rhs_words[j + k]:
-                    if debug:
-                        print('xx k=%i, %s, %s' % (k, lhs_words[i + k], rhs_words[j + k]))
-                    ret += 10
-                    num_matches += 1
-                    k += 1
-                    if debug:
-                        print('xx ret=%i' % (ret))
-                # add extra point for full match for single words
-                if i_max == 1:
-                    ret += 1
-                    if debug:
-                        print('full i=%i/%i, ret=%i' % (i,i_max, ret))
-                i = i + k
-            except ValueError:
-                pass
+            rhs_words_start = 0
+            while rhs_words_start < j_max and i < i_max:
+                try:
+                    #print('rhs_words.index(%s i=%i, %i)' % (lhs_words, i, rhs_words_start))
+                    j = rhs_words.index(lhs_words[i], rhs_words_start)
+                    if first:
+                        ret = 1
+                        num_matches += 1
+                        first = False
+                    else:
+                        ret += 1
+                    rhs_words_start = j + 1
+                    #print(j)
+                    k = 1
+                    while i + k < i_max and j + k < j_max and lhs_words[i + k] == rhs_words[j + k]:
+                        if debug:
+                            print('xx k=%i, %s, %s' % (k, lhs_words[i + k], rhs_words[j + k]))
+                        ret += 10
+                        num_matches += 1
+                        k += 1
+                        if debug:
+                            print('xx ret=%i' % (ret))
+                    # add extra point for full match for single words
+                    if i_max == 1:
+                        ret += 1
+                        if debug:
+                            print('full i=%i/%i, ret=%i' % (i,i_max, ret))
+                    i = i + k
+                except ValueError:
+                    break
             i += 1
         if full_match:
 
@@ -379,15 +395,26 @@ class hash_entry(object):
                 if debug:
                     print('%s<>%s ret=-1 (no full match %i!=%i)' % (lhs_words,rhs_words,j_max,num_matches))
                 return -1
+        elif partial_match:
+            if num_matches >= i_max:
+                if debug:
+                    print('%s<>%s ret=%i (partial match)' % (lhs_words,rhs_words,ret))
+                return ret
+            else:
+                if debug:
+                    print('%s<>%s ret=-1 (no partial match %i!=%i)' % (lhs_words,rhs_words,i_max,num_matches))
+                return -1
         else:
             if debug:
                 print('%s<>%s %i/%i ret=%i' % (lhs_words,rhs_words,j_max,num_matches, ret))
             return ret
 
-    def match(self, words, full_match=False, debug=False):
-        ret = self._match_words(self._words, words, full_match=full_match, debug=debug)
+    def match(self, words, full_match=False, partial_match=False, debug=False):
+        if self.debug:
+            debug = True
+        ret = self._match_words(self._words, words, full_match=full_match, partial_match=partial_match, debug=debug)
         for alias in self._aliases:
-            alias_score = self._match_words(alias, words, full_match=full_match, debug=debug)
+            alias_score = self._match_words(alias, words, full_match=full_match, partial_match=partial_match, debug=debug)
             if alias_score > ret:
                 ret = alias_score
         return ret
@@ -438,7 +465,7 @@ class video_rename_app:
     def __init__(self):
         self._verbose = False
         self._files = []
-        self._video_file_exts = ['.mp4', '.avi', '.wmv', '.mkv', '.mov']
+        self._video_file_exts = []
         self._rules = []
         self._hash_threshold = 2
         self._hash_unknown_dir = '_unknown'
@@ -494,7 +521,7 @@ class video_rename_app:
                     opts = None
                 self._hash_dirs.append(hash_directory(path, opts))
 
-        self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv'])
+        self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv', '.mov'])
         self._ignored_words = f.getAsArray(None, 'ignored_words', ['360p', '480p', '720p', '1080p', 'and', 'the', 'a', 'is', 'in', 'of'])
         self._channels = f.getAsArray(None, 'channels', [])
         for s in self._channels:
@@ -515,6 +542,9 @@ class video_rename_app:
     def _add(self, f):
         if not isinstance(f, input_file):
             raise RuntimeError('require input_file not %s' % type(f))
+        if self._verbose:
+            print('Process %s' % f)
+
         if os.path.isfile(f.filename):
             self._add_file(f)
         elif os.path.isdir(f.filename):
@@ -627,15 +657,19 @@ class video_rename_app:
         hash_idx = s.rfind('#')
         if hash_idx > 0:
             s = s[0:hash_idx - 1]
+        s = self._clean_filename(s)
+        while len(s) > 200:
+            elems = s.split()
+            elems.pop()
+            s = ' '.join(elems)
+        return s
+
+    def _clean_filename(self, s):
         s = s.replace('/', '_')
         s = s.replace('\r', '_')
         s = s.replace('\n', '_')
         s = s.replace('__', '_')
         s = s.strip()
-        while len(s) > 200:
-            elems = s.split()
-            elems.pop()
-            s = ' '.join(elems)
         return s
 
     def _auto_rename_file(self, f, force=False):
@@ -654,26 +688,30 @@ class video_rename_app:
                 if self._verbose:
                     print('  %s: Match rule %s/%s -> %s' % (basename, rule.re_pattern, rule.url_template, found_url))
                 break
-        if not found_rule:
-            return None
-
         got_title = False
         suggested_filename = None
-        (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f.filename])
-        if sts == 0:
-            file_format = json.loads(stdoutdata.decode('utf8'))
-            #print(file_format['format'])
-            if 'tags' in file_format['format']:
-                tags = file_format['format']['tags']
-                if 'title' in tags:
-                    got_title = True
-                    title = self._clean_title(tags['title'])
-                    suggested_filename = path + '/' + title + ext
-        if not got_title and found_url:
-            title = self._get_html_title(found_url)
-            if title:
-                title = self._clean_title(title)
-                suggested_filename = path + '/' + title + ('.%s' % basename) + ext
+
+        if found_rule:
+            (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f.filename])
+            if sts == 0:
+                file_format = json.loads(stdoutdata.decode('utf8'))
+                #print(file_format['format'])
+                if 'tags' in file_format['format']:
+                    tags = file_format['format']['tags']
+                    if 'title' in tags:
+                        got_title = True
+                        title = self._clean_title(tags['title'])
+                        suggested_filename = path + '/' + title + ext
+            if not got_title and found_url:
+                title = self._get_html_title(found_url)
+                if title:
+                    title = self._clean_title(title)
+                    suggested_filename = path + '/' + title + ('.%s' % basename) + ext
+        else:
+            new_basename = self._clean_filename(basename)
+            if new_basename != basename:
+                suggested_filename = path + '/' + new_basename + ext
+
         if suggested_filename is not None:
             if self._noop:
                 print('  Rename to %s (noop)' % (suggested_filename))
@@ -704,7 +742,8 @@ class video_rename_app:
 
         suggested_filename = None
         symlink_filenames = []
-        entries = self._find_hash_entry(basename, existing_entry=f.entry)
+        equal_score_entries = []
+        entries = self._find_hash_entry(basename, existing_entry=f.entry, debug=False)
         if entries:
             entries = filter(lambda x: x[0] >= self._hash_threshold, entries)
         if entries:
@@ -718,6 +757,7 @@ class video_rename_app:
                 elif equal_score == score:
                     equal_score_entries.append(e)
 
+        if equal_score_entries:
             dest_filenames = []
             for e in equal_score_entries:
                 if f.hash_dir is None:
@@ -733,8 +773,8 @@ class video_rename_app:
                     dest_filenames.append( (new_filename, f.hash_dir) )
 
             if dest_filenames:
-                #if self._verbose:
-                    #print('  dest filenames: %s' % (dest_filenames))
+                if self._verbose:
+                    print('  dest filenames: %s' % (dest_filenames))
                 for (new_filename, hd) in dest_filenames:
                     is_same = False
                     try:
@@ -786,6 +826,14 @@ class video_rename_app:
                 else:
                     print('  Hash symlink to %s' % (f))
                     self._mklink(suggested_filename, f)
+
+    def _is_combined_word(self,w):
+        ret = False
+        for (chw, main_channel_name) in self._combined_words:
+            if w in chw:
+                ret = True
+                break
+        return ret
 
     def main(self):
         #=============================================================================================
@@ -844,14 +892,32 @@ class video_rename_app:
             return 0
 
         if args.test_words:
+            if self._debug:
+                print('Ignored words:')
+                for w in self._ignored_words:
+                    print('  %s' %w)
+                print('Combined words:')
+                for (chw, main_channel_name) in self._combined_words:
+                    print('  %s -> %s' % ('.'.join(chw), '.'.join(main_channel_name)) )
+            print('Results:')
             for w in args.test_words:
+                if w.startswith('file://'):
+                    w = w[7:]
+                if os.path.exists(w):
+                    (name, ext) = os.path.splitext(w)
+                    w = os.path.basename(name)
                 words = split_into_words(w, ignored=self._ignored_words, combined=self._combined_words)
-                print(words)
+                print('  %s' % words)
             return 0
 
         if args.test_match:
-            for m in args.test_match:
-                entries = self._find_hash_entry(m, full_match=False, debug=self._debug)
+            for w in args.test_match:
+                if w.startswith('file://'):
+                    w = w[7:]
+                if os.path.exists(w):
+                    (name, ext) = os.path.splitext(w)
+                    w = os.path.basename(name)
+                entries = self._find_hash_entry(w, full_match=False, debug=self._debug)
                 if entries:
                     entries = filter(lambda x: x[0] >= self._hash_threshold, entries)
                 if entries:
@@ -911,12 +977,14 @@ class video_rename_app:
 
         if self._verbose:
             print('Files to process:')
-            for f in self._files:
-                print('  %s' % f)
+            for i, f in enumerate(self._files):
+                print('  [%03i]: %s' % (i,f))
 
         possible_words = []
+        show_possible_words = False
 
         if self._process_unknown or self._process_channels:
+            show_possible_words = True
             word_dict = {}
 
             for f in self._files:
@@ -926,6 +994,8 @@ class video_rename_app:
                 num_words = len(words)
                 for i in range(num_words):
                     if i + 1 < num_words:
+                        if self._is_combined_word(words[i]) or self._is_combined_word(words[i+1]):
+                            continue
                         word_combo = [ words[i], words[i+1] ]
                         h = hash_entry( words=word_combo )
                         if h in word_dict:
@@ -942,27 +1012,29 @@ class video_rename_app:
                 elif len(files) > 1: #self._hash_threshold:
                     possible_words.append( (h, files ) )
 
-            # reset the list of files
-            self._files = []
-            if existing_hashes:
-                if self._verbose:
-                    print('Find files for existing hashes:')
-                for (h, files) in existing_hashes:
+            if 0:
+                # reset the list of files
+                self._files = []
+                if existing_hashes:
                     if self._verbose:
-                        print('  %s: %i matches' % (h, len(files)))
-                    for f in files:
+                        print('Find files for existing hashes:')
+                    for (h, files) in existing_hashes:
                         if self._verbose:
-                            print('    %s' % f)
-                        self._files.append(f)
+                            print('  %s: %i matches' % (h, len(files)))
+                        for f in files:
+                            if self._verbose:
+                                print('    %s' % f)
+                            self._files.append(f)
 
-            if self._verbose:
-                if self._files:
-                    print('Files for rehashing:')
-                    for f in files:
-                        print('  %s' % f)
+                if self._verbose:
+                    if self._files:
+                        print('Files for rehashing:')
+                        for f in files:
+                            print('  %s' % f)
         elif self._queries:
+
             for q in self._queries:
-                entries = self._find_hash_entry(q, full_match=True)
+                entries = self._find_hash_entry(q, full_match=True, debug=self._debug)
                 if entries:
                     for (score, e) in entries:
                         print('Found hash entry \'%s\':' % (e))
@@ -986,6 +1058,22 @@ class video_rename_app:
                                 print('  %s in %s' % (basename, os.path.dirname(full)))
                             else:
                                 print('  %s' % basename)
+                if 1:
+                    tmp_hash_entry = hash_entry(q)
+                    results = []
+                    for hd in self._hash_dirs:
+                        d = os.path.join(hd.path, self._hash_unknown_dir)
+                        if os.path.isdir(d):
+                            for f in os.listdir(d):
+                                (basename, ext) = os.path.splitext(f)
+                                words = split_into_words(basename, ignored=self._ignored_words, combined=self._combined_words)
+                                score = tmp_hash_entry.match(words, partial_match=True)
+                                if score >= 0:
+                                    results.append( (f, os.path.join(d, f), hd ) )
+
+                    for (basename, full, hd) in sorted(results, key=lambda x: x[0]):
+                        print('  %s in %s' % (basename, os.path.dirname(full)))
+
 
         elif self._rehashs:
             for q in self._rehashs:
@@ -1009,7 +1097,7 @@ class video_rename_app:
 
         if not self._no_rename:
             for i in range(total):
-                print('[%i/%i] Rename %s' % (current_progress + 1, total_progress, self._files[i]))
+                print('[%03i/%03i] Rename %s' % (current_progress + 1, total_progress, self._files[i]))
                 current_progress += 1
                 f_new = self._auto_rename_file(self._files[i], force=args.force)
                 if f_new is not None:
@@ -1018,11 +1106,11 @@ class video_rename_app:
         if not self._no_hash:
             for i in range(total):
                 f = self._files[i]
-                print('[%i/%i] Hash %s' % (current_progress + 1, total_progress, self._files[i]))
+                print('[%03i/%03i] Hash %s' % (current_progress + 1, total_progress, self._files[i]))
                 current_progress += 1
                 self._auto_hash_file(self._files[i], force=args.force)
 
-        if possible_words and 0:
+        if possible_words and show_possible_words:
             possible_words = sorted(possible_words, key=lambda e: len(e[1]), reverse=False)
             print('Possible words:')
             for (h, files) in possible_words:
@@ -1030,6 +1118,9 @@ class video_rename_app:
                 if self._debug:
                     for f in files:
                         print('    %s' % f)
+            for (h, files) in possible_words:
+                if len(files) > 2:
+                    print('%s=' % (h))
         ret = 0
         return ret
 
