@@ -45,6 +45,12 @@ class RecordFieldError(Exception):
         self.key = key
         self.rrtype = rrtype
 
+class RecordValueError(Exception):
+    def __init__(self, rrtype, name, value):
+        self.rrtype = rrtype
+        self.name = name
+        self.value = value
+
 class UnknownRRTypeError(Exception):
     def __init__(self, rrtype):
         self.rrtype = rrtype
@@ -153,6 +159,8 @@ Examples:
     dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=keyfile:~/dkim_publickey.pem/DKIM
     Update an DMARC TXT-record:
     dns-update --server 127.0.0.1 -u _dmarc.example.com.=p:reject/DMARC
+    Update an DMARC PTR-record:
+    dns-update --server 127.0.0.1 -u 3.2.168.192.in-addr.arpa.=host.example.com./PTR
 """
 
     def __init__(self):
@@ -322,6 +330,22 @@ Examples:
                 if elems[0] != '_dmarc':
                     elems[0] = '_dmarc'
                     raise InvalidRecordNameError(self._name, should_be='.'.join(elems))
+            elif self._rrtype == dns.rdatatype.A:
+                addr = self._get_item('addr', None)
+                if addr is None:
+                    raise RecordValueError(self._rrtype, self._name, 'addr is %s' % addr)
+                try:
+                    dns.rdtypes.IN.A.A(dns.rdataclass.IN, dns.rdatatype.A, addr)
+                except dns.exception.SyntaxError:
+                    raise RecordValueError(self._rrtype, self._name, str(addr))
+            elif self._rrtype == dns.rdatatype.AAAA:
+                addr = self._get_item('addr', None)
+                if addr is None:
+                    raise RecordValueError(self._rrtype, self._name, 'addr is %s' % addr)
+                try:
+                    dns.rdtypes.IN.AAAA.AAAA(dns.rdataclass.IN, dns.rdatatype.AAAA, addr)
+                except dns.exception.SyntaxError:
+                    raise RecordValueError(self._rrtype, self._name, str(addr))
 
         @property
         def valid(self):
@@ -569,6 +593,9 @@ Examples:
                 item = dns_update_app.arg_data(arg)
             except RecordFieldError as e:
                 sys.stderr.write("Parameter %s is not valid for DNS %s record \"%s\".\n" % (e.key, dns_update_app.rdatatype_to_text(e.rrtype), arg))
+                ok = False
+            except RecordValueError as e:
+                sys.stderr.write("Value \"%s\" is not valid for the DNS %s record \"%s\".\n" % (e.value, dns_update_app.rdatatype_to_text(e.rrtype), e.name))
                 ok = False
             except UnknownRRTypeError as e:
                 sys.stderr.write("DNS RR type \"%s\" not supported\n" % (e.rrtype))
