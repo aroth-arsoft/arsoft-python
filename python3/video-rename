@@ -125,6 +125,40 @@ def replace_in_list(list, needle, replacement):
     list = list[0:start] + replacement + list[start+len(needle):]
     return list
 
+def remove_ignored(words, ignored):
+    if not words:
+        return []
+    ret = []
+    index = 0
+    words_len = len(words)
+    #print('remove_ignored %s' % words)
+    while index < words_len:
+        found = False
+        for iw in ignored:
+            if isinstance(iw, list):
+                offset = 0
+                found = True
+                #print('ff %s' % iw)
+                for iwe in iw:
+                    #print('ff qq %s<>%s' % (iwe, words[index+offset]))
+                    if iwe != words[index+offset]:
+                        found = False
+                        break
+                    offset = offset + 1
+                #print('ff match %s' % found)
+                if found:
+                    index = index + len(iw)
+            elif iw == words[index]:
+                #print('ff match single %s' % iw)
+                found = True
+                index = index + 1
+                break
+        if not found:
+            ret.append(words[index])
+            index = index + 1
+    #print('remove_ignored ret=%s' % ret)
+    return ret
+
 def split_into_words(s, ignored=None, combined=None):
     #print(s)
     ret = []
@@ -152,27 +186,28 @@ def split_into_words(s, ignored=None, combined=None):
             continue
 
         if iscamelcase(w):
-            ex.extend(split_camelcase(w))
+            for wx in split_camelcase(w):
+                if wx[0].isalpha() and wx[-1].isdigit():
+                    ex.append(wx[0:-1])
+                elif wx[0].isalpha() and wx[-1] == '+':
+                    ex.append(wx[0:-1])
+                elif wx[0] == '#':
+                    ex.append(wx[1:].lower())
+                else:
+                    ex.append(wx.lower())
         else:
             if w[0].isalpha() and w[-1].isdigit():
                 ex.append(w[0:-1])
             elif w[0].isalpha() and w[-1] == '+':
                 ex.append(w[0:-1])
+            elif w[0] == '#':
+                ex.append(w[1:].lower())
             else:
-                ex.append(w)
-    for w in ex:
-        #if len(w) < 2:
-            #continue
-
-        if w[0] == '#':
-            w = w[1:].lower()
-        else:
-            w = w.lower()
-        if ignored is not None and w in ignored:
-            continue
-        #if not allow_digit_only and (w.isdigit() or isxdigit(w)):
-            #continue
-        ret.append(w)
+                ex.append(w.lower())
+    if ignored is not None:
+        ret = remove_ignored(ex, ignored)
+    else:
+        ret = ex
     if combined:
         for (needle, replacement) in combined:
             ret = replace_in_list(ret, needle, replacement)
@@ -522,7 +557,18 @@ class video_rename_app:
                 self._hash_dirs.append(hash_directory(path, opts))
 
         self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv', '.mov'])
-        self._ignored_words = f.getAsArray(None, 'ignored_words', ['360p', '480p', '720p', '1080p', 'and', 'the', 'a', 'is', 'in', 'of'])
+        self._ignored_words = []
+        ignored_words_multi = []
+        for w in f.getAsArray(None, 'ignored_words', ['360p', '480p', '720p', '1080p', 'and', 'the', 'a', 'is', 'in', 'of']):
+            ww = split_into_words(w)
+            if len(ww) > 1:
+                #print('ignore %s' % (ww))
+                ignored_words_multi.append(ww)
+            else:
+                self._ignored_words.append(w)
+        # put all multi words ignores to the beginning of the list
+        for ww in ignored_words_multi:
+            self._ignored_words.insert(0, ww)
         self._channels = f.getAsArray(None, 'channels', [])
         for s in self._channels:
             channel_names = s.split(',')
@@ -658,6 +704,12 @@ class video_rename_app:
         if hash_idx > 0:
             s = s[0:hash_idx - 1]
         s = self._clean_filename(s)
+        words = split_into_words(s, ignored=self._ignored_words, combined=self._combined_words)
+        if self._verbose:
+            print('clean filename %s: %s' % (s, words))
+        if not words:
+            return None
+
         while len(s) > 200:
             elems = s.split()
             elems.pop()
@@ -699,14 +751,16 @@ class video_rename_app:
                 if 'tags' in file_format['format']:
                     tags = file_format['format']['tags']
                     if 'title' in tags:
-                        got_title = True
                         title = self._clean_title(tags['title'])
-                        suggested_filename = path + '/' + title + ext
+                        if title:
+                            got_title = True
+                            suggested_filename = path + '/' + title + ext
             if not got_title and found_url:
                 title = self._get_html_title(found_url)
                 if title:
                     title = self._clean_title(title)
-                    suggested_filename = path + '/' + title + ('.%s' % basename) + ext
+                    if title:
+                        suggested_filename = path + '/' + title + ('.%s' % basename) + ext
         else:
             new_basename = self._clean_filename(basename)
             if new_basename != basename:
