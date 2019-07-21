@@ -1,3 +1,9 @@
+arsoft-python (1.325) disco; urgency=medium
+
+  * update and fix build issues
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sun, 21 Jul 2019 13:51:35 +0200
+
 arsoft-python (1.324) disco; urgency=medium
 
   * fix build issues

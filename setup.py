@@ -34,7 +34,7 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.324',
+		version='1.325',
 		description='AR Soft Python modules',
 		author='Andreas Roth',
 		author_email='aroth@arsoft-online.com',
@@ -170,7 +170,7 @@ setup(name='arsoft-python',
                         ['check_mk/check_mk_agent_detect_plugins'] +
                          distribution_dep_scripts([
                              ('check_mk/cron/python2/check_mk_agent_apt', ['precise', 'trusty']),
-                             ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'artful', 'bionic', 'cosmic', 'disco']),
+                             ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'bionic', 'disco', 'eoan']),
                              ] )  ),
             ('/usr/share/check_mk/agents/plugins', [
                     'check_mk/agents/plugins/cups',

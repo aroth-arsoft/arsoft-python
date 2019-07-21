@@ -47,7 +47,7 @@ Package: arsoft-python-trac
 Architecture: all
 Depends: python-arsoft, trac, arsoft-trac-suid, ${python:Depends}, ${misc:Depends}
 Description: utilities for trac administration
- Several adminstration helper scripts for trac:
+ Several administration helper scripts for trac:
   - convert repository from SVN to GIT
   - convert trac database from SQLite to MySQL
   - manage the trac environment by using command line

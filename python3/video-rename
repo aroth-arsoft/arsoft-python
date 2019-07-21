@@ -141,7 +141,7 @@ def remove_ignored(words, ignored):
                 #print('ff %s' % iw)
                 for iwe in iw:
                     #print('ff qq %s<>%s' % (iwe, words[index+offset]))
-                    if iwe != words[index+offset]:
+                    if index+offset >= words_len or iwe != words[index+offset]:
                         found = False
                         break
                     offset = offset + 1
