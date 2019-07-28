@@ -744,7 +744,11 @@ class video_rename_app:
         suggested_filename = None
 
         if found_rule:
-            (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f.filename])
+            try:
+                (sts, stdoutdata, stderrdata) = runcmdAndGetData(args=['ffprobe', '-hide_banner', '-v', 'error', '-of', 'json', '-show_format', f.filename])
+            except FileNotFoundError as ex:
+                print('Cannot execute ffprobe.', file=sys.stderr)
+                sts = -1
             if sts == 0:
                 file_format = json.loads(stdoutdata.decode('utf8'))
                 #print(file_format['format'])
