@@ -1,3 +1,9 @@
+arsoft-python (1.326) disco; urgency=medium
+
+  * fix dns-update with import-hosts
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Fri, 02 Aug 2019 17:41:33 +0200
+
 arsoft-python (1.325) disco; urgency=medium
 
   * update and fix build issues
