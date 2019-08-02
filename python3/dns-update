@@ -175,6 +175,7 @@ Examples:
             self._rrtype = None
             self._ttl = None
             self._classtype = None
+            self._has_value = False
 
             arg_name = None
             arg_server = None
@@ -221,10 +222,13 @@ Examples:
             #print('arg_field_index_map=%s' % arg_field_index_map)
 
             if arg[0] == '@':
+                # got a DNS server, so just use the name and no other options. And no record type
                 arg_server = arg[1:]
+                arg_rrtype = None
             else:
                 i = arg.find('=')
                 if i >= 0:
+                    self._has_value = True
                     arg_name = arg[0:i]
                     arg_value = arg[i+1:]
                     arg_dict = {}
@@ -293,6 +297,7 @@ Examples:
                     arg_value = arg_dict if arg_dict else None
                     arg_oldvalue = arg_olddict if arg_olddict else None
                 else:
+                    #print('got name %s' % arg)
                     arg_name = arg
 
             #print('>> got arg %s, %s, \'%s\'' % (arg_name, arg_rrtype, arg_value))
@@ -303,7 +308,7 @@ Examples:
                 except dns.exception.SyntaxError as e:
                     pass
 
-            if arg_server is not None and arg_rrtype is not None:
+            if arg_server is not None and arg_rrtype is None:
                 try:
                     self._server = dns.name.from_text(arg_server)
                     self._valid = True
@@ -319,7 +324,8 @@ Examples:
             self._check_record()
 
         def _check_record(self):
-            ret = True
+            if not self._has_value:
+                return
             if self._rrtype == dns_update_app.rdatatype.DKIM:
                 elems = str(self._name).split('.')
                 if elems[1] != '_domainkey':
