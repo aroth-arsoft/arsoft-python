@@ -556,7 +556,7 @@ class video_rename_app:
                     opts = None
                 self._hash_dirs.append(hash_directory(path, opts))
 
-        self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv', '.mov'])
+        self._video_file_exts = f.getAsArray(None, 'video_file_exts', ['.mp4', '.avi', '.wmv', '.mkv', '.mov', '.vid'])
         self._ignored_words = []
         ignored_words_multi = []
         for w in f.getAsArray(None, 'ignored_words', ['360p', '480p', '720p', '1080p', 'and', 'the', 'a', 'is', 'in', 'of']):
