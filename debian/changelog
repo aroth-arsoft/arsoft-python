@@ -1,3 +1,9 @@
+arsoft-python (1.327) disco; urgency=medium
+
+  * inifile: fix with empty comment prefix
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Sat, 14 Sep 2019 18:25:22 +0200
+
 arsoft-python (1.326) disco; urgency=medium
 
   * fix dns-update with import-hosts
