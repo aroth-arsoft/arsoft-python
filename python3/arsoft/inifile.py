@@ -51,8 +51,10 @@ class IniSection(object):
             else:
                 if self.disabled == False:
                     ret = ''
-                else:
+                elif self.inifile.m_commentPrefix is not None:
                     ret = self.inifile.m_commentPrefix
+                else:
+                    ret = ''
                 if self.key is not None:
                     ret += self.key + self.inifile.m_keyValueSeperator
                     if self.value is not None:
