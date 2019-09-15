@@ -56,7 +56,11 @@ class IniSection(object):
                 else:
                     ret = ''
                 if self.key is not None:
-                    ret += self.key + self.inifile.m_keyValueSeperator
+                    ret += self.key
+                    if self.inifile.m_keyValueSeperator is None:
+                        ret += '='
+                    else:
+                        ret += self.inifile.m_keyValueSeperator
                     if self.value is not None:
                         ret += str(self.value)
                 if self.comment is not None and not only_data:
