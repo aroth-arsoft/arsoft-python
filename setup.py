@@ -5,12 +5,23 @@
 import sys
 import platform
 import os.path
-from distutils.core import setup
+from setuptools import find_packages, setup
 
 source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
 is_python2 = True if sys.version_info[0] == 2 else False
 is_python3 = True if sys.version_info[0] == 3 else False
-target_distribution = os.environ.get('TARGET_DISTRIBUTION', 'unknown')
+target_distribution = os.environ.get('TARGET_DISTRIBUTION', None)
+if target_distribution is None:
+    if os.path.isfile('/etc/lsb-release'):
+        for l in open('/etc/lsb-release', 'r').readlines():
+            l = l.strip()
+            (k,v) = l.split('=', 1)
+            if k == 'DISTRIB_CODENAME':
+                target_distribution = v
+
+long_description = None
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 def version_dep_scripts(scripts, prefix=None):
     ret = []
@@ -24,7 +35,7 @@ def version_dep_scripts(scripts, prefix=None):
 
 def distribution_dep_scripts(scripts, prefix=None):
     ret = []
-    sys.stderr.write('distribution_dep_scripts dd=%s\n' % target_distribution)
+    #sys.stderr.write('distribution_dep_scripts dd=%s\n' % target_distribution)
     for (s, d) in scripts:
         if target_distribution in d or d is None:
             if prefix is None:
@@ -34,15 +45,17 @@ def distribution_dep_scripts(scripts, prefix=None):
     return ret
 
 setup(name='arsoft-python',
-		version='1.328',
-		description='AR Soft Python modules',
-		author='Andreas Roth',
-		author_email='aroth@arsoft-online.com',
-		url='http://www.arsoft-online.com/',
-		license='GPLv3',
-		platforms=['linux'],
+        version='1.328',
+        description='AR Soft Python modules',
+        long_description=long_description,
+        long_description_content_type="text/markdown",
+        author='Andreas Roth',
+        author_email='aroth@arsoft-online.com',
+        url='http://www.arsoft-online.com/',
+        license='GPLv3',
+        platforms=['linux'],
         package_dir={'': source_dir},
-		packages=['arsoft',
+        packages=['arsoft',
                     'arsoft.backup',
                     'arsoft.backup.plugins',
                     'arsoft.config',
@@ -52,7 +65,7 @@ setup(name='arsoft-python',
                     'arsoft.efi',
                     'arsoft.eiscp',
                     'arsoft.eurosport',
-                    'arsoft.fritzbox', 
+                    'arsoft.fritzbox',
                     'arsoft.kerberos',
                     'arsoft.git',
                     'arsoft.ldap',
@@ -63,8 +76,8 @@ setup(name='arsoft-python',
                     'arsoft.mod_python_wsgi.mod_python',
                     'arsoft.mount',
                     'arsoft.nagios',
-                    'arsoft.netconfig', 
-                    'arsoft.nfs', 
+                    'arsoft.netconfig',
+                    'arsoft.nfs',
                     'arsoft.openvpn',
                     'arsoft.trac',
                     'arsoft.trac.plugins',
@@ -73,7 +86,7 @@ setup(name='arsoft-python',
                     'arsoft.xdg',
                     'arsoft.xmpp'
                     ],
-		scripts=version_dep_scripts([
+        scripts=version_dep_scripts([
             ('certinfo', 3),
             ('dns-query', 3),
             ('fritzbox-status', 3),
@@ -107,21 +120,21 @@ setup(name='arsoft-python',
             ('ad-password-expire', 3),
             ('video-rename', 3),
             ]),
-		data_files=[ 
-			('/etc/ldap/schema', ['schema/netconfig.schema']),
-			('/etc/cron.d', ['cron/arsoft-check-mk-plugins'] ),
-			('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf', 
-                           'config/default_pattern.conf', 'config/default_shortcuts.conf']),
+        data_files=[
+            ('/etc/ldap/schema', ['schema/netconfig.schema']),
+            ('/etc/cron.d', ['cron/arsoft-check-mk-plugins'] ),
+            ('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf',
+                            'config/default_pattern.conf', 'config/default_shortcuts.conf']),
             ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),
-			('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg', 
-                                   'nagios/openvpn.cfg', 
-                                   'nagios/kernel_modules.cfg', 
-                                   'nagios/xmpp_notify.cfg', 
-                                   'nagios/puppet_agent.cfg', 
-                                   'nagios/weather.cfg', 
-                                   'nagios/ipp.cfg',
-                                   'nagios/rkhunter.cfg',
-                                   ]),
+            ('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg',
+                                    'nagios/openvpn.cfg',
+                                    'nagios/kernel_modules.cfg',
+                                    'nagios/xmpp_notify.cfg',
+                                    'nagios/puppet_agent.cfg',
+                                    'nagios/weather.cfg',
+                                    'nagios/ipp.cfg',
+                                    'nagios/rkhunter.cfg',
+                                    ]),
             ('/usr/bin', [
                     os.path.join(source_dir, 'onkyo-remote'),
                     os.path.join(source_dir, 'nsswitch-ldap'),
@@ -129,8 +142,8 @@ setup(name='arsoft-python',
                     os.path.join(source_dir, 'nsswitch-sss'),
                     os.path.join(source_dir, 'openvpn-status'),
                     ]),
-			('/usr/lib/nagios', [os.path.join(source_dir, 'send_xmpp_notification')]),
-			('/usr/lib/nagios/plugins', [
+            ('/usr/lib/nagios', [os.path.join(source_dir, 'send_xmpp_notification')]),
+            ('/usr/lib/nagios/plugins', [
                     os.path.join(source_dir, 'check_fritzbox'),
                     os.path.join(source_dir, 'check_openvpn'),
                     os.path.join(source_dir, 'check_kernel_modules'),
@@ -138,10 +151,10 @@ setup(name='arsoft-python',
                     os.path.join(source_dir, 'check_weather'),
                     os.path.join(source_dir, 'check_ipp'),
                     os.path.join(source_dir, 'check_rkhunter'),
-             ]),
-			('/usr/lib/nagios/plugins/test_data', ['test_data/check_ipp.test', 'test_data/check_ipp_jobs.test', 'test_data/check_ipp_completed_jobs.test']),
-			('/lib/udev', [ 'edskmgr-support/external-disk' ]),
-			('/lib/udev/rules.d', [ 'edskmgr-support/88-external-disk.rules' ]),
+                ]),
+            ('/usr/lib/nagios/plugins/test_data', ['test_data/check_ipp.test', 'test_data/check_ipp_jobs.test', 'test_data/check_ipp_completed_jobs.test']),
+            ('/lib/udev', [ 'edskmgr-support/external-disk' ]),
+            ('/lib/udev/rules.d', [ 'edskmgr-support/88-external-disk.rules' ]),
             ('/usr/share/check_mk/checks', [
                 'check_mk/checks/apt',
                 'check_mk/checks/cups',
@@ -168,10 +181,10 @@ setup(name='arsoft-python',
                     ] ),
             ('/usr/lib/check_mk_agent',
                         ['check_mk/check_mk_agent_detect_plugins'] +
-                         distribution_dep_scripts([
-                             ('check_mk/cron/python2/check_mk_agent_apt', ['precise', 'trusty']),
-                             ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'bionic', 'disco', 'eoan']),
-                             ] )  ),
+                            distribution_dep_scripts([
+                                ('check_mk/cron/python2/check_mk_agent_apt', ['precise', 'trusty']),
+                                ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'bionic', 'disco', 'eoan', 'focal']),
+                                ] )  ),
             ('/usr/share/check_mk/agents/plugins', [
                     'check_mk/agents/plugins/cups',
                     'check_mk/agents/plugins/cyrus_imapd',
@@ -196,4 +209,4 @@ setup(name='arsoft-python',
                     'check_mk/agents/special/agent_eiscp'
                 ] )
             ]
-		)
+        )
