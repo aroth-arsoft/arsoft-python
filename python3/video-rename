@@ -279,7 +279,7 @@ def copyfile(src, dst, *, follow_symlinks=True, callback=None):
     return dst
 
 
-def copyfileobj(fsrc, fdst, callback, total, length=1024*1024, flush_blocks=128):
+def copyfileobj(fsrc, fdst, callback, total, length=4096*1024, flush_blocks=64):
     copied = 0
     num_blocks = 0
     while True:

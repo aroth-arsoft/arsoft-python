@@ -1,3 +1,9 @@
+arsoft-python (1.329) eoan; urgency=medium
+
+  * rebuild
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 13 Apr 2020 14:44:49 +0200
+
 arsoft-python (1.328) disco; urgency=medium
 
   * inifile: fix without key-value separator set
