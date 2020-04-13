@@ -1,0 +1,24 @@
+Source: arsoft-python
+Section: admin
+Priority: optional
+Maintainer: Andreas Roth <aroth@arsoft-online.com>
+Standards-Version: 3.9.8
+Build-Depends: debhelper (>= 9), dh-python, python3.7
+X-Python3-Version: >=3.7
+
+Package: python3-arsoft
+Section: python
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp,
+ python3-openssl, python3-magic, python3-pylibacl
+Replaces: arsoft-python-openvpn, arsoft-openvpn, arsoft-python-fritzbox, arsoft-crypto,
+ arsoft-python-git, arsoft-onkyo
+Description: common files for the AR Soft python scripts
+ This package includes all common files for the AR Soft python scripts.
+
+Package: python3-arsoft-web
+Section: python
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-arsoft, python3-django (>= 1.8), python3-webob
+Description: module for django web applications
+ This package includes all common files for the django web applications.
