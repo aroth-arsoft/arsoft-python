@@ -27,3 +27,5 @@ python3-arsoft: binary-without-manpage usr/bin/slapd-config
 python3-arsoft: binary-without-manpage usr/bin/ssdp-discover
 python3-arsoft: binary-without-manpage usr/bin/svnbackup
 python3-arsoft: binary-without-manpage usr/bin/system-info
+python3-arsoft: binary-without-manpage usr/bin/arsoft-imapsync
+python3-arsoft: binary-without-manpage usr/bin/video-rename

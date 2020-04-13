@@ -1,3 +1,9 @@
+arsoft-python (1.331) focal; urgency=medium
+
+  * fix build issues on focal
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Mon, 13 Apr 2020 15:42:24 +0200
+
 arsoft-python (1.330) focal; urgency=medium
 
   * use python 3.8 for focal
