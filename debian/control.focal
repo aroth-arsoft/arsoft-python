@@ -3,8 +3,8 @@ Section: admin
 Priority: optional
 Maintainer: Andreas Roth <aroth@arsoft-online.com>
 Standards-Version: 3.9.8
-Build-Depends: debhelper (>= 9), dh-python, python3.7
-X-Python3-Version: >=3.7
+Build-Depends: debhelper (>= 9), dh-python, python3.8
+X-Python3-Version: >=3.8
 
 Package: python3-arsoft
 Section: python
