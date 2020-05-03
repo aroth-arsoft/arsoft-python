@@ -248,7 +248,7 @@ def extract_html_title(data):
     parser.feed(data)
     return parser._title
 
-def copyfile(src, dst, *, follow_symlinks=True, callback=None):
+def copyfile(src, dst, *, follow_symlinks=True, callback=None, use_sendfile=False):
     """Copy data from src to dst.
 
     If follow_symlinks is not set and src is a symbolic link, a new
@@ -275,32 +275,44 @@ def copyfile(src, dst, *, follow_symlinks=True, callback=None):
         size = os.stat(src).st_size
         with open(src, 'rb') as fsrc:
             with open(dst, 'wb') as fdst:
-                copyfileobj(fsrc, fdst, callback=callback, total=size)
+                copyfileobj(fsrc, fdst, callback=callback, total=size, use_sendfile=use_sendfile)
     return dst
 
 
-def copyfileobj(fsrc, fdst, callback, total, length=4096*1024, flush_blocks=64):
+def copyfileobj(fsrc, fdst, callback, total, length=4096*1024, flush_blocks=64, use_sendfile=False):
     copied = 0
     num_blocks = 0
-    while True:
-        buf = fsrc.read(length)
-        if not buf:
-            break
-        fdst.write(buf)
-        copied += len(buf)
-        num_blocks += 1
-        if num_blocks >= flush_blocks:
-            fdst.flush()
-            os.fsync(fdst.fileno())
-            num_blocks = 0
-        if callback is not None:
-            callback(copied, total=total)
+    if use_sendfile:
+        dest_fd = fdst.fileno()
+        src_fd = fsrc.fileno()
+        block_size = length * flush_blocks
+        while True:
+            bytesSent = os.sendfile(dest_fd, src_fd, copied, block_size)
+            if bytesSent == 0:
+                break
+            copied += bytesSent
+            if callback is not None:
+                callback(copied, total=total)
+    else:
+        while True:
+            buf = fsrc.read(length)
+            if not buf:
+                break
+            fdst.write(buf)
+            copied += len(buf)
+            num_blocks += 1
+            if num_blocks >= flush_blocks:
+                fdst.flush()
+                os.fsync(fdst.fileno())
+                num_blocks = 0
+            if callback is not None:
+                callback(copied, total=total)
 
 
-def copy_with_progress(src, dst, *, follow_symlinks=True, callback=None):
+def copy_with_progress(src, dst, *, follow_symlinks=True, callback=None, use_sendfile=False):
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
-    copyfile(src, dst, follow_symlinks=follow_symlinks, callback=callback)
+    copyfile(src, dst, follow_symlinks=follow_symlinks, callback=callback, use_sendfile=use_sendfile)
     shutil.copymode(src, dst, follow_symlinks=follow_symlinks)
     shutil.copystat(src, dst, follow_symlinks=follow_symlinks)
     return dst
@@ -655,7 +667,7 @@ class video_rename_app:
                 print('\r  Copying %i %% ...' % (precent), end='')
             try:
                 print("  Copying", end='')
-                copy_with_progress(src, dst, callback=_copy_progress)
+                copy_with_progress(src, dst, callback=_copy_progress, use_sendfile=False if self._disable_sendfile else True)
                 #shutil.copy2(src, dst)
                 os.unlink(src)
                 ret = True
@@ -913,6 +925,7 @@ class video_rename_app:
         parser.add_argument('--test-words', dest='test_words', nargs='*', help='testing word processing')
         parser.add_argument('--test-match', dest='test_match', nargs='*', help='test match processing')
         parser.add_argument('--show-hashes', dest='show_hashes', action='store_true', help='show all configured hashes')
+        parser.add_argument('--disable-sendfile', dest='disable_sendfile', action='store_true', help='disable usage of sendfile on Unix machines')
         parser.add_argument('files', metavar='FILE', type=str, nargs='*', help='video files or directories')
 
         args = parser.parse_args()
@@ -930,6 +943,7 @@ class video_rename_app:
         self._rehashs = args.rehashs
         self._process_unknown = args.process_unknown
         self._process_channels = args.process_channels
+        self._disable_sendfile = args.disable_sendfile
 
         self._load_config(filename=args.config_file)
 
