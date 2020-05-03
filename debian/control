@@ -16,6 +16,6 @@ Replaces: python-arsoft, python3-arsoft-web, arsoft-python-nagios,
  arsoft-check-mk-plugins, arsoft-check-mk-checks,
  arsoft-python-openvpn, arsoft-openvpn, arsoft-python-fritzbox, arsoft-crypto,
  arsoft-python-git, arsoft-onkyo
-Conflicts: arsoft-edskmgr, arsoft-edskmgr-suid, arsoft-trac-suid
+Conflicts: arsoft-edskmgr, arsoft-edskmgr-suid
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
