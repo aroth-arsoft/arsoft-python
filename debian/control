@@ -3,7 +3,7 @@ Section: admin
 Priority: optional
 Maintainer: Andreas Roth <aroth@arsoft-online.com>
 Standards-Version: 4.5.0
-Build-Depends: debhelper (>= 11), dh-python, python3
+Build-Depends: debhelper (>= 11), dh-python, python3, python3-setuptools
 X-Python3-Version: >=3.8
 
 Package: python3-arsoft
@@ -11,7 +11,11 @@ Section: python
 Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends}, python3-sleekxmpp,
  python3-openssl, python3-magic, python3-pylibacl
-Replaces: arsoft-python-openvpn, arsoft-openvpn, arsoft-python-fritzbox, arsoft-crypto,
+Replaces: python-arsoft, python3-arsoft-web, arsoft-python-nagios,
+ arsoft-python-trac, arsoft-python-kerberos, arsoft-python-web,
+ arsoft-check-mk-plugins, arsoft-check-mk-checks,
+ arsoft-python-openvpn, arsoft-openvpn, arsoft-python-fritzbox, arsoft-crypto,
  arsoft-python-git, arsoft-onkyo
+Conflicts: arsoft-edskmgr, arsoft-edskmgr-suid, arsoft-trac-suid
 Description: common files for the AR Soft python scripts
  This package includes all common files for the AR Soft python scripts.
