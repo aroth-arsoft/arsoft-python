@@ -1,9 +1,0 @@
-#!/usr/bin/make -f
-TARGET_DISTRIBUTION := $(shell dpkg-parsechangelog  | awk '/Distribution/ { print $$2}')
-
-#export DH_VERBOSE=1
-export PYBUILD_NAME=arsoft
-export PYBUILD_DISABLE=test
-
-%:
-	TARGET_DISTRIBUTION=${TARGET_DISTRIBUTION} dh $@ --with python3 --buildsystem=pybuild

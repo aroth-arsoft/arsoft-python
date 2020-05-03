@@ -7,9 +7,6 @@ import platform
 import os.path
 from setuptools import find_packages, setup
 
-source_dir = {2: 'python2', 3: 'python3'}[sys.version_info[0]]
-is_python2 = True if sys.version_info[0] == 2 else False
-is_python3 = True if sys.version_info[0] == 3 else False
 target_distribution = os.environ.get('TARGET_DISTRIBUTION', None)
 if target_distribution is None:
     if os.path.isfile('/etc/lsb-release'):
@@ -23,27 +20,6 @@ long_description = None
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-def version_dep_scripts(scripts, prefix=None):
-    ret = []
-    for (s, v) in scripts:
-        if sys.version_info[0] == v or v is None:
-            if prefix is None:
-                ret.append(os.path.join(source_dir, s))
-            else:
-                ret.append(os.path.join(prefix, source_dir, s))
-    return ret
-
-def distribution_dep_scripts(scripts, prefix=None):
-    ret = []
-    #sys.stderr.write('distribution_dep_scripts dd=%s\n' % target_distribution)
-    for (s, d) in scripts:
-        if target_distribution in d or d is None:
-            if prefix is None:
-                ret.append(s)
-            else:
-                ret.append(os.path.join(prefix, s))
-    return ret
-
 setup(name='arsoft-python',
         version='1.328',
         description='AR Soft Python modules',
@@ -54,7 +30,7 @@ setup(name='arsoft-python',
         url='http://www.arsoft-online.com/',
         license='GPLv3',
         platforms=['linux'],
-        package_dir={'': source_dir},
+        package_dir={'': 'python3'},
         packages=['arsoft',
                     'arsoft.backup',
                     'arsoft.backup.plugins',
@@ -86,46 +62,44 @@ setup(name='arsoft-python',
                     'arsoft.xdg',
                     'arsoft.xmpp'
                     ],
-        scripts=version_dep_scripts([
-            ('certinfo', 3),
-            ('dns-query', 3),
-            ('fritzbox-status', 3),
-            ('ini-util', 3),
-            ('trac-sqlite2mysql', 2),
-            ('trac-svn2git', 2),
-            ('trac-manage', 2),
-            ('trac-git-post-receive-hook', 2),
-            ('arsoft-backup', 3),
-            ('arsoft-imapsync', 3),
-            ('arsoft-mailer', 3),
-            ('edskmgr', 3),
-            ('alog', 3),
-            ('onkyo-rs232', 3),
-            ('system-info', 3),
-            ('nsswitch-config', 3),
-            ('efiinfo', 3),
-            ('ssdp-discover', 3),
-            ('managehosts', 3),
-            ('openvpn-admin', 3),
-            ('svnbackup', 3),
-            ('cups-admin', 3),
-            ('slapd-config', 3),
-            ('autofs-ldap-auth', 3),
-            ('puppet-setup', 3),
-            ('puppet-template-check', 3),
-            ('heimdal-password-expire', 2),
-            ('dns-update', 3),
-            ('eurosport-stream', 3),
-            ('ad-rfc2307', 3),
-            ('ad-password-expire', 3),
-            ('video-rename', 3),
-            ]),
+        scripts=[
+            'python3/certinfo',
+            'python3/dns-query',
+            'python3/fritzbox-status',
+            'python3/ini-util',
+            'python3/trac-sqlite2mysql',
+            'python3/trac-svn2git',
+            'python3/trac-manage',
+            'python3/trac-git-post-receive-hook',
+            'python3/arsoft-backup',
+            'python3/arsoft-imapsync',
+            'python3/arsoft-mailer',
+            'python3/alog',
+            'python3/onkyo-rs232',
+            'python3/system-info',
+            'python3/nsswitch-config',
+            'python3/efiinfo',
+            'python3/ssdp-discover',
+            'python3/managehosts',
+            'python3/openvpn-admin',
+            'python3/svnbackup',
+            'python3/cups-admin',
+            'python3/slapd-config',
+            'python3/autofs-ldap-auth',
+            'python3/puppet-setup',
+            'python3/puppet-template-check',
+            'python3/heimdal-password-expire',
+            'python3/dns-update',
+            'python3/eurosport-stream',
+            'python3/ad-rfc2307',
+            'python3/ad-password-expire',
+            'python3/video-rename',
+            ],
         data_files=[
             ('/etc/ldap/schema', ['schema/netconfig.schema']),
             ('/etc/cron.d', ['cron/arsoft-check-mk-plugins'] ),
             ('/etc/arsoft/alog.d', ['config/default_field_alias.conf', 'config/default_log_levels.conf',
                             'config/default_pattern.conf', 'config/default_shortcuts.conf']),
-            ('/etc/edskmgr/hook.d', [ 'edskmgr-support/hooks/arsoft-backup' ]),
             ('/etc/nagios-plugins/config', ['nagios/fritzbox.cfg',
                                     'nagios/openvpn.cfg',
                                     'nagios/kernel_modules.cfg',
@@ -136,25 +110,23 @@ setup(name='arsoft-python',
                                     'nagios/rkhunter.cfg',
                                     ]),
             ('/usr/bin', [
-                    os.path.join(source_dir, 'onkyo-remote'),
-                    os.path.join(source_dir, 'nsswitch-ldap'),
-                    os.path.join(source_dir, 'nsswitch-winbind'),
-                    os.path.join(source_dir, 'nsswitch-sss'),
-                    os.path.join(source_dir, 'openvpn-status'),
+                    'python3/onkyo-remote',
+                    'python3/nsswitch-ldap',
+                    'python3/nsswitch-winbind',
+                    'python3/nsswitch-sss',
+                    'python3/openvpn-status',
                     ]),
-            ('/usr/lib/nagios', [os.path.join(source_dir, 'send_xmpp_notification')]),
+            ('/usr/lib/nagios', ['python3/send_xmpp_notification']),
             ('/usr/lib/nagios/plugins', [
-                    os.path.join(source_dir, 'check_fritzbox'),
-                    os.path.join(source_dir, 'check_openvpn'),
-                    os.path.join(source_dir, 'check_kernel_modules'),
-                    os.path.join(source_dir, 'check_puppet_agent'),
-                    os.path.join(source_dir, 'check_weather'),
-                    os.path.join(source_dir, 'check_ipp'),
-                    os.path.join(source_dir, 'check_rkhunter'),
+                    'python3/check_fritzbox',
+                    'python3/check_openvpn',
+                    'python3/check_kernel_modules',
+                    'python3/check_puppet_agent',
+                    'python3/check_weather',
+                    'python3/check_ipp',
+                    'python3/check_rkhunter',
                 ]),
             ('/usr/lib/nagios/plugins/test_data', ['test_data/check_ipp.test', 'test_data/check_ipp_jobs.test', 'test_data/check_ipp_completed_jobs.test']),
-            ('/lib/udev', [ 'edskmgr-support/external-disk' ]),
-            ('/lib/udev/rules.d', [ 'edskmgr-support/88-external-disk.rules' ]),
             ('/usr/share/check_mk/checks', [
                 'check_mk/checks/apt',
                 'check_mk/checks/cups',
@@ -180,11 +152,9 @@ setup(name='arsoft-python',
                 'check_mk/checks/systemd_timedate',
                     ] ),
             ('/usr/lib/check_mk_agent',
-                        ['check_mk/check_mk_agent_detect_plugins'] +
-                            distribution_dep_scripts([
-                                ('check_mk/cron/python2/check_mk_agent_apt', ['precise', 'trusty']),
-                                ('check_mk/cron/python3/check_mk_agent_apt', ['xenial', 'bionic', 'disco', 'eoan', 'focal']),
-                                ] )  ),
+                        ['check_mk/check_mk_agent_detect_plugins',
+                         'check_mk/cron/python3/check_mk_agent_apt',
+                                ]  ),
             ('/usr/share/check_mk/agents/plugins', [
                     'check_mk/agents/plugins/cups',
                     'check_mk/agents/plugins/cyrus_imapd',

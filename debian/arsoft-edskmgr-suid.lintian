@@ -1,2 +1,0 @@
-arsoft-edskmgr-suid: setuid-binary usr/bin/edskload 4755 root/root
-arsoft-edskmgr-suid: setuid-binary usr/bin/edskeject 4755 root/root
