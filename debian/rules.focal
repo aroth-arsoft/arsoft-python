@@ -1,45 +1,9 @@
 #!/usr/bin/make -f
-
-build3vers := $(shell py3versions -sv)
-
-# Don't compress .py files
-DEB_COMPRESS_EXCLUDE := .py
-EDSKMGR_SUID_SOURCES = edskmgr-support/edskmgr-suid.c
-TRAC_ADMIN_SUID_SOURCES = trac/trac-admin-suid.c
-
 TARGET_DISTRIBUTION := $(shell dpkg-parsechangelog  | awk '/Distribution/ { print $$2}')
-SUBSTVARS=
 
-CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
-CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
-CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
-LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+#export DH_VERBOSE=1
+export PYBUILD_NAME=arsoft
+export PYBUILD_DISABLE=test
 
 %:
-	dh $@ --with python3
-
-override_dh_clean:
-	dh_clean
-	-rm -rf $(CURDIR)/debian/python3
-	-rm *.zip
-	
-override_dh_auto_build:
-	
-override_dh_auto_install:
-	install -d $(CURDIR)/debian/tmp/usr/bin
-	install -d $(CURDIR)/debian/tmp/usr/lib/arsoft-python
-
-	set -ex && for i in $(build3vers); do \
-	  TARGET_DISTRIBUTION=$(TARGET_DISTRIBUTION) python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/tmp; \
-	done
-
-	#install -d $(CURDIR)/debian/tmp/usr/lib/python3
-	#cp -a $(CURDIR)/debian/python3/usr/lib/python3/* $(CURDIR)/debian/tmp/usr/lib/python3
-
-	dh_auto_install
-
-override_dh_fixperms:
-	dh_fixperms -O--buildsystem=python_distutils
-
-override_dh_gencontrol:
-	dh_gencontrol -O--buildsystem=python_distutils -- $(SUBSTVARS)
+	TARGET_DISTRIBUTION=${TARGET_DISTRIBUTION} dh $@ --with python3 --buildsystem=pybuild

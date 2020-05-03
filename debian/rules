@@ -1,70 +1,9 @@
 #!/usr/bin/make -f
-
-buildvers := $(shell pyversions -sv)
-build3vers := $(shell py3versions -sv)
-
-# Don't compress .py files
-DEB_COMPRESS_EXCLUDE := .py
-EDSKMGR_SUID_SOURCES = edskmgr-support/edskmgr-suid.c
-TRAC_ADMIN_SUID_SOURCES = trac/trac-admin-suid.c
-
 TARGET_DISTRIBUTION := $(shell dpkg-parsechangelog  | awk '/Distribution/ { print $$2}')
-SUBSTVARS=
 
-CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
-CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
-CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
-LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+#export DH_VERBOSE=1
+export PYBUILD_NAME=arsoft
+export PYBUILD_DISABLE=test
 
 %:
-	dh $@ --with python2, --with python3
-
-edskload: $(EDSKMGR_SUID_SOURCES)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DEDSKMGR_LOAD -o $@ $(EDSKMGR_SUID_SOURCES)
-
-edskeject: $(EDSKMGR_SUID_SOURCES)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DEDSKMGR_EJECT -o $@ $(EDSKMGR_SUID_SOURCES)
-	
-trac-admin-suid: $(TRAC_ADMIN_SUID_SOURCES)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(TRAC_ADMIN_SUID_SOURCES)
-
-override_dh_clean:
-	dh_clean
-	-rm -rf $(CURDIR)/debian/python2
-	-rm -rf $(CURDIR)/debian/python3
-	-rm *.zip
-	-rm edskload edskeject
-	-rm trac-admin-suid
-	
-override_dh_auto_build: edskeject edskload trac-admin-suid
-	
-override_dh_auto_install:
-	install -d $(CURDIR)/debian/tmp/usr/bin
-	install -o root -g root -m 0755 -s edskload $(CURDIR)/debian/tmp/usr/bin/edskload
-	install -o root -g root -m 0755 -s edskeject $(CURDIR)/debian/tmp/usr/bin/edskeject
-	install -d $(CURDIR)/debian/tmp/usr/lib/arsoft-python
-	install -o root -g root -m 0755 -s trac-admin-suid $(CURDIR)/debian/tmp/usr/lib/arsoft-python/trac-admin-suid
-	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr
-	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr/conf.d
-	install -d root -g root -m 0755 $(CURDIR)/debian/tmp/etc/edskmgr/hook.d
-
-	set -ex && for i in $(buildvers); do \
-	  TARGET_DISTRIBUTION=$(TARGET_DISTRIBUTION) python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/tmp; \
-	done
-
-	set -ex && for i in $(build3vers); do \
-	  TARGET_DISTRIBUTION=$(TARGET_DISTRIBUTION) python$$i ./setup.py install --install-layout=deb --root $(CURDIR)/debian/tmp; \
-	done
-
-	#install -d $(CURDIR)/debian/tmp/usr/lib/python3
-	#cp -a $(CURDIR)/debian/python3/usr/lib/python3/* $(CURDIR)/debian/tmp/usr/lib/python3
-
-	dh_auto_install
-
-override_dh_fixperms:
-	dh_fixperms -O--buildsystem=python_distutils
-	chown root.root $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
-	chmod 4755 $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskload $(CURDIR)/debian/arsoft-edskmgr-suid/usr/bin/edskeject
-
-override_dh_gencontrol:
-	dh_gencontrol -O--buildsystem=python_distutils -- $(SUBSTVARS)
+	TARGET_DISTRIBUTION=${TARGET_DISTRIBUTION} dh $@ --with python3 --buildsystem=pybuild
