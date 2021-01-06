@@ -13,7 +13,7 @@ class ARSoftImapSync(object):
         self._script_name = os.path.basename(__file__)
         self._offline_imap = None
         self._root_dir = None
-        self._cache_dir = '/var/cache/arsoft-imapsync'
+        self._cache_dir = None
 
 
     def main(self, argv=None):
@@ -27,6 +27,7 @@ class ARSoftImapSync(object):
         parser.add_argument('--write-config', dest='write_config', action='store_true', help='only write the configuration for offlineimap and exit.')
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
         parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft/imapsync', help='name of the directory containing the imap sync configuration.')
+        parser.add_argument('--cache-directory', dest='cache_dir', default='/var/tmp/arsoft-imapsync', help='name of the directory containing the imap sync configuration.')
 
         args = parser.parse_args()
 
@@ -34,6 +35,7 @@ class ARSoftImapSync(object):
         self._verbose = args.verbose
         self._debug = args.debug
         self._root_dir = args.root_dir
+        self._cache_dir = args.cache_dir
 
         if self._root_dir is not None and self._root_dir != '/':
             config_dir = os.path.normpath(self._root_dir + args.config_dir)
@@ -50,9 +52,20 @@ class ARSoftImapSync(object):
             print('Accounts data directory: %s' % private_dir)
 
         if not os.path.isdir(cache_dir):
-            os.mkdir(cache_dir)
+            try:
+                os.mkdir(cache_dir)
+            except OSError:
+                sys.stderr.write('Unable to create cache directory %s.\n' % (cache_dir))
+                ret = 1
+
         if not os.path.isdir(private_dir):
-            os.mkdir(private_dir)
+            try:
+                os.mkdir(private_dir)
+            except OSError:
+                sys.stderr.write('Unable to create private directory %s.\n' % (private_dir))
+                ret = 1
+        if ret != 0:
+            return ret
 
         self._offline_imap = OfflineImap(private_dir=private_dir, verbose=self._verbose)
         if not self._offline_imap.is_installed:
