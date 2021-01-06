@@ -46,7 +46,8 @@ class trac_manage(object):
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
         parser.add_argument('--list-repos', dest='action_list_repos', action='store_true', help='list all configured repositories.')
         parser.add_argument('--config-repos', nargs=1, dest='action_config_repos', help='configures the repositories from the given file.')
-        parser.add_argument('--sync-repos', nargs='*', dest='action_sync_repos', help='synchronize all configured repositories or the specified ones.')
+        parser.add_argument('--sync-repos', nargs='*', dest='action_sync_repos', help='synchronize the specified repositories.')
+        parser.add_argument('--sync-all-repos', dest='action_sync_all_repos', help='synchronize all configured repositories.')
         parser.add_argument('--resync-repos', nargs='*', dest='action_resync_repos', help='re-synchronize all configured repositories or the specified ones.')
 
         args = parser.parse_args()
@@ -164,9 +165,12 @@ class trac_manage(object):
                             result = False
                             break
                 ret = True if result else False
-        elif args.action_sync_repos is not None or args.action_resync_repos is not None:
+        elif args.action_sync_repos is not None or args.action_resync_repos is not None or args.action_sync_all_repos:
             resync = True if args.action_resync_repos is not None else False
-            action_args = args.action_resync_repos if resync else args.action_sync_repos
+            if args.action_sync_all_repos:
+                action_args = []
+            else:
+                action_args = args.action_resync_repos if resync else args.action_sync_repos
 
             selected_repos = set()
             if len(action_args) == 0:
