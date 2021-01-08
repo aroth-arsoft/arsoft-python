@@ -119,7 +119,7 @@ EOF
 function venv_build_wheels() {
     docker_build_wheel 'six' || return 1
     docker_build_wheel 'rfc6555' || return 1
-    docker_build_wheel 'offlineimap' 'wheel:six wheel:rfc6555' || return 1
+    docker_build_wheel 'offlineimap' 'wheel:six wheel:rfc6555' 'https://github.com/OfflineIMAP/offlineimap3/archive/master.zip' || return 1
     return 0
 }
 

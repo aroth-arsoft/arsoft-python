@@ -72,3 +72,4 @@ Thumbs.db
 /.kdev4/
 /*.kdev4
 /.pybuild/
+/venv/

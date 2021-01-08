@@ -1,0 +1,54 @@
+#!/bin/bash
+SCRIPTFILE=`readlink -f "$0"`
+SCRIPTNAME=`basename "$SCRIPTFILE"`
+SCRIPTDIR=`dirname "$SCRIPTFILE"`
+
+VENV_DIR="$SCRIPTDIR/venv"
+
+function do_initialize_venv() {
+    msg=`python3 -m venv "$VENV_DIR" 2>&1`
+    if [ -f "$VENV_DIR/bin/activate" ]; then
+        source "$VENV_DIR/bin/activate"
+        pip install -r "$SCRIPTDIR/requirements.txt"
+        deactivate
+    else
+        echo "Unable to create virtual environment $VENV_DIR. Please run 'sudo apt install python3-venv'." >&2
+        false
+    fi
+}
+verbose=0
+venv_initialize=0
+
+
+# parse command line arguments
+while [ $# -ne 0 ]; do
+	case "$1" in
+	'-?'|'-h'|'--help') usage;;
+	'-v'|'--verbose') verbose=1; set -x; ;;
+	'--init') venv_initialize=1; ;;
+	-*)
+		echo "Unrecognized option $1" >&2
+		exit 1
+		;;
+	*)
+        echo "Unrecognized argument $1" >&2
+        exit 1
+		;;
+	esac
+	shift
+done
+
+if [ $venv_initialize -ne 0 ]; then
+    do_initialize_venv
+    RES=$?
+    exit $RES
+elif [ ! -d "$VENV_DIR" ]; then
+    echo "No virtualenv directory $VENV_DIR found. Run '$SCRIPTFILE --init'" >&2
+    exit 2
+elif [ ! -f "$VENV_DIR/bin/activate" ]; then
+    echo "No virtualenv directory $VENV_DIR not initialized. Run '$SCRIPTFILE --init'" >&2
+    exit 2
+else
+    echo "Virtualenv directory $VENV_DIR ready."
+    echo "Use \"source $VENV_DIR/bin/activate\" to activate it"
+fi

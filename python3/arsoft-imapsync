@@ -27,7 +27,7 @@ class ARSoftImapSync(object):
         parser.add_argument('--write-config', dest='write_config', action='store_true', help='only write the configuration for offlineimap and exit.')
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
         parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft/imapsync', help='name of the directory containing the imap sync configuration.')
-        parser.add_argument('--cache-directory', dest='cache_dir', default='/var/tmp/arsoft-imapsync', help='name of the directory containing the imap sync configuration.')
+        parser.add_argument('--cache-directory', dest='cache_dir', default='/var/tmp/arsoft-imapsync', help='name of the directory containing the imap sync cache data.')
 
         args = parser.parse_args()
 
@@ -76,8 +76,10 @@ class ARSoftImapSync(object):
                 print('Logfile: %s' % self._offline_imap.logfile)
             self._offline_imap.readConfig(account_file)
             if self._verbose:
-                for acc in self._offline_imap.account_list:
-                    print(acc)
+                if self._offline_imap.account_list is not None:
+                    print('Accounts:')
+                    for acc in self._offline_imap.account_list:
+                        print('  %s' % acc)
             if args.write_config:
                 files = self._offline_imap.write_config()
                 if files is None:
@@ -89,7 +91,7 @@ class ARSoftImapSync(object):
                 results = self._offline_imap.run(per_account_log=True)
                 for (account, ok, logfile) in results:
                     if not ok:
-                        sys.stderr.write('Failed to sync account %s; logfile %s.\n' % (account.name, logfile) )
+                        sys.stderr.write('Failed to sync account %s; logfile %s\n' % (account.name, logfile) )
                         ret = 1
         return ret
 

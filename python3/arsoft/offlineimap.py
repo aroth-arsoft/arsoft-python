@@ -109,7 +109,7 @@ class OfflineImap(object):
                 if self.ssl:
                     items['sslcacertfile'] = '/etc/ssl/certs/ca-certificates.crt'
                     items['tls_level'] = 'tls_no_ssl'
-                    items['ssl_version'] = 'tls1_1'
+                    items['ssl_version'] = 'tls1_2'
                 if port == 143:
                     items['starttls'] = 'yes' if self.ssl else 'no'
                 else:
@@ -179,7 +179,6 @@ metadata = %(metadata_dir)s
 [Account %(accountname)s]
 localrepository = %(accountname)s-local
 remoterepository = %(accountname)s-remote
-status_backend = sqlite
 
 [Repository %(accountname)s-local]
 %(local_config)s
