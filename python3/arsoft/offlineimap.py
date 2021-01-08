@@ -396,9 +396,10 @@ status_backend = sqlite
             base_dir = self._private_dir
         if account is None:
             ret = []
-            for account in self._account_list:
-                (ok, logfile) = self._run_account(account=account, base_dir=base_dir, log=log, per_account_log=per_account_log)
-                ret.append( (account, ok, logfile) )
+            if self._account_list is not None:
+                for account in self._account_list:
+                    (ok, logfile) = self._run_account(account=account, base_dir=base_dir, log=log, per_account_log=per_account_log)
+                    ret.append( (account, ok, logfile) )
         else:
             ret = self._run_account(account=account, base_dir=base_dir, log=log, per_account_log=per_account_log)
         return ret
