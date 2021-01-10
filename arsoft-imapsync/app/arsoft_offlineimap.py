@@ -5,10 +5,210 @@
 import os.path
 import collections
 
-from arsoft.utils import which, runcmdAndGetData
-from arsoft.utils import logfile_writer_proxy
-from arsoft.inifile import IniFile
-from arsoft.socket_utils import gethostname_tuple
+from inifile import IniFile
+import socket
+import subprocess
+import platform
+import datetime
+
+# Copyright (c) 2001-2004 Twisted Matrix Laboratories.
+# See LICENSE for details.
+
+"""
+Utilities for dealing with processes.
+"""
+
+def which(name, flags=os.X_OK, only_first=False):
+    """Search PATH for executable files with the given name.
+
+    On newer versions of MS-Windows, the PATHEXT environment variable will be
+    set to the list of file extensions for files considered executable. This
+    will normally include things like ".EXE". This fuction will also find files
+    with the given name ending with any of these extensions.
+
+    On MS-Windows the only flag that has any meaning is os.F_OK. Any other
+    flags will be ignored.
+
+    @type name: C{str}
+    @param name: The name for which to search.
+
+    @type flags: C{int}
+    @param flags: Arguments to L{os.access}.
+
+    @rtype: C{list}
+    @param: A list of the full paths to files found, in the
+    order in which they were found.
+    """
+    result = []
+    exts = [_f for _f in os.environ.get('PATHEXT', '').split(os.pathsep) if _f]
+    path = os.environ.get('PATH', None)
+    if path is None:
+        if only_first:
+            return None
+        else:
+            return []
+    for p in os.environ.get('PATH', '').split(os.pathsep):
+        p = os.path.join(p, name)
+        if os.access(p, flags):
+            result.append(p)
+        for e in exts:
+            pext = p + e
+            if os.access(pext, flags):
+                result.append(pext)
+    if only_first:
+        return result[0] if result else None
+    else:
+        return result
+
+def runcmdAndGetData(args=[], script=None, verbose=False, outputStdErr=False, outputStdOut=False,
+                     executable=None, shell='/bin/sh',
+                     stdin=None, stdout=None, stderr=None, stderr_to_stdout=False, input=None, cwd=None, env=None,
+                     runAsUser=None, su='/bin/su'):
+
+    script_tmpfile = None
+    if script is None:
+        if args:
+            if runAsUser is None:
+                all_args = args
+            else:
+                all_args = [su, '-s', shell, '-', str(runAsUser), '-c', ' '.join(args)]
+        else:
+            raise ValueError('neither commandline nor script specified.')
+    else:
+        try:
+            script_tmpfile = tempfile.NamedTemporaryFile()
+            script_tmpfile.write(script.encode())
+        except IOError:
+            script_tmpfile = None
+
+        all_args = [str(shell)]
+        all_args.append(script_tmpfile.name)
+
+    if input is not None:
+        stdin_param = subprocess.PIPE
+    else:
+        stdin_param = stdin if stdin is not None else subprocess.PIPE
+    if stdout is not None and hasattr(stdout, '__call__'):
+        stdout_param = subprocess.PIPE
+    else:
+        stdout_param = stdout if stdout is not None else subprocess.PIPE
+    if stderr_to_stdout:
+        stderr_param = subprocess.STDOUT
+    else:
+        if stdout is not None and hasattr(stdout, '__call__'):
+            stderr_param = subprocess.PIPE
+        else:
+            stderr_param = stdout if stdout is not None else subprocess.PIPE
+    if verbose:
+        print("runcmd " + ' '.join(all_args) +
+                ' 0<%s 1>%s 2>%s' % (stdin_param, stdout_param, stderr_param)
+                    )
+
+    p = subprocess.Popen(all_args, executable=executable, stdout=stdout_param, stderr=stderr_param, stdin=stdin_param, shell=False, cwd=cwd, env=env)
+    if p:
+        if stdout is not None and hasattr(stdout, '__call__'):
+            encoding = 'CP1252' if platform.system() == 'Windows' else 'utf-8'
+            while True:
+                line = ""
+                try:
+                    line = p.stdout.readline()
+                except Exception:
+                    pass
+                try:
+                    line = line.decode(encoding)
+                except:
+                    continue
+                if not line:
+                    break
+                line = line.rstrip('\n\r')
+                stdout(line)
+            sts = p.wait()
+            stdoutdata = None
+            stderrdata = None
+        else:
+            if input:
+                (stdoutdata, stderrdata) = p.communicate(input.encode())
+            else:
+                (stdoutdata, stderrdata) = p.communicate()
+            if stdoutdata is not None and outputStdOut:
+                if int(python_major) < 3: # check for version < 3
+                    sys.stdout.write(stdoutdata)
+                    sys.stdout.flush()
+                else:
+                    sys.stdout.buffer.write(stdoutdata)
+                    sys.stdout.buffer.flush()
+            if stderrdata is not None and outputStdErr:
+                if int(python_major) < 3: # check for version < 3
+                    sys.stderr.write(stderrdata)
+                    sys.stderr.flush()
+                else:
+                    sys.stderr.buffer.write(stderrdata)
+                    sys.stderr.buffer.flush()
+            sts = p.returncode
+    else:
+        sts = -1
+        stdoutdata = None
+        stderrdata = None
+    return (sts, stdoutdata, stderrdata)
+
+def gethostname_tuple(fqdn=None):
+    if fqdn is None:
+        fqdn = socket.getfqdn().lower()
+    else:
+        fqdn = fqdn.lower()
+    if '.' in fqdn:
+        (hostname, domain) = fqdn.split('.', 1)
+    else:
+        hostname = fqdn
+        domain = 'localdomain'
+    return (fqdn, hostname, domain)
+
+class logfile_writer_proxy(object):
+    def __init__(self, writer, prefix=None, add_timestamp=True):
+        self._writer = writer
+        self._prefix = prefix
+        self._add_timestamp = True
+        self._notifiers = []
+
+    def current_timestamp(self, timestamp=None):
+        if timestamp is None:
+            now = datetime.datetime.utcnow()
+        else:
+            now = datetime.datetime.fromtimestamp(timestamp)
+        return now.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    def add_notify(self, fun):
+        self._notifiers.append(fun)
+
+    def remove_notify(self, fun):
+        try:
+            self._notifiers.remove(fun)
+        except ValueError:
+            pass
+        except AttributeError:
+            pass
+
+    def __call__(self, line):
+        self._write_line(line)
+
+    def write(self, *args):
+        self._write_line('\t'.join(args))
+
+    def _write_line(self, line):
+        add_newline = True if line and line[-1] != '\n' else False
+        if self._prefix:
+            full = self._prefix + line
+        else:
+            full = line
+        if add_newline:
+            full = full + '\n'
+        if self._add_timestamp:
+            msg = self.current_timestamp() + '\t' + full
+        else:
+            msg = full
+        self._writer.write(msg)
+        for n in self._notifiers:
+            n(msg)
 
 class OfflineImap(object):
 

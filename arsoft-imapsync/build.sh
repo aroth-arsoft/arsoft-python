@@ -31,8 +31,12 @@ function docker_build_wheel() {
     local tmpdir=`mktemp -d`
     local dockerfile="$tmpdir/Dockerfile"
     local build_sh="$tmpdir/build.sh"
-    local from_tag='3.8-slim'
-    local build_image_name="python-build-wheel:$from_tag"
+    #local from_tag='3-slim'
+    local from_tag='2-slim'
+    #local python_dev_pkg='python3-dev'
+    local python_dev_pkg='python-dev'
+    #local from_tag='2-alpine'
+    local build_image_name="python2-build-wheel:$from_tag"
     local wheel_dir="$script_dir/wheel"
     local existing=''
 
@@ -49,7 +53,7 @@ ARG TAG=$from_tag
 FROM python:\$TAG
 RUN apt update -y && \
     DEBIAN_FRONTEND=noninteractive apt install -y \
-        build-essential python3-dev \
+        build-essential $python_dev_pkg \
         && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
@@ -119,7 +123,8 @@ EOF
 function venv_build_wheels() {
     docker_build_wheel 'six' || return 1
     docker_build_wheel 'rfc6555' || return 1
-    docker_build_wheel 'offlineimap' 'wheel:six wheel:rfc6555' 'https://github.com/OfflineIMAP/offlineimap3/archive/master.zip' || return 1
+    #docker_build_wheel 'offlineimap' 'wheel:six wheel:rfc6555' 'https://github.com/OfflineIMAP/offlineimap3/archive/master.zip' || return 1
+    docker_build_wheel 'offlineimap' 'wheel:six wheel:rfc6555' || return 1
     return 0
 }
 
@@ -130,7 +135,8 @@ function venv_build_docker() {
     local app_use_mssql="$3"
     local app_use_mysql="$4"
     #local from_tag='3-alpine'
-    local from_tag='3.8-slim'
+    #local from_tag='3-slim'
+    local from_tag='2-slim'
     local tag='latest'
     local tar_compress_fmt='xz'
     local tar_compress_cmd='xz --threads=2 -z'
@@ -146,7 +152,7 @@ function venv_build_docker() {
 
     venv_build_wheels || return 1
 
-    venv_export_archive "$tmpdir" || return 1
+    #venv_export_archive "$tmpdir" || return 1
 
     [ ! -d "$script_dir/wheel" ] && mkdir "$script_dir/wheel"
     [ ! -d "$script_dir/dpkg" ] && mkdir "$script_dir/dpkg"
@@ -164,17 +170,19 @@ function venv_build_docker() {
         no_debian_pkgs=''
     fi
 
+    cp -a "$script_dir/app" "$tmpdir/app"
+
     cat > "$dockerfile" <<EOF
 ARG TAG=$from_tag
 FROM python:\$TAG
-ADD *.tar.gz /app/
+COPY app/*.py /app/
 ${no_wheels}ADD *.whl /tmp/wheel/
 ${no_debian_pkgs}ADD *.deb /tmp/dpkg/
 RUN test ! -d /tmp/wheel && mkdir -p /tmp/wheel ; \
     find /tmp/wheel -type f -print -exec pip install {} \; && \
     rm -rf /tmp/wheel && \
     rm -rf /usr/share/doc/* /usr/share/man/* /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/log/apt* /var/log/dpkg.log /var/cache/debconf/* && \
-    echo "#!/bin/sh\npython /app/arsoft-python/python3/arsoft-imapsync \\\$@\n" > /usr/local/bin/arsoft-imapsync && \
+    echo "#!/bin/sh\npython /app/arsoft-imapsync.py \\\$@\n" > /usr/local/bin/arsoft-imapsync && \
     chmod +x /usr/local/bin/arsoft-imapsync && \
     useradd -ms /bin/bash app && \
     install -d -g app -o app -m 0755 /etc/arsoft/imapsync && \
@@ -185,7 +193,7 @@ EOF
 
     docker build --tag arsoft-imapsync:latest "$tmpdir" || return 1
     docker tag arsoft-imapsync:latest rothan/arsoft-imapsync:latest
-    docker push rothan/arsoft-imapsync:latest
+    #docker push rothan/arsoft-imapsync:latest
 
     # Remove temp dir
     rm -rf "$tmpdir"

@@ -4,7 +4,7 @@
 
 import os, sys
 import argparse
-from arsoft.offlineimap import OfflineImap
+from arsoft_offlineimap import OfflineImap
 
 class ARSoftImapSync(object):
 
@@ -23,7 +23,6 @@ class ARSoftImapSync(object):
         #=============================================================================================
         parser = argparse.ArgumentParser(description='sync mail between imap servers')
         parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
-        parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='enable debugging of this script.')
         parser.add_argument('--write-config', dest='write_config', action='store_true', help='only write the configuration for offlineimap and exit.')
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
         parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft/imapsync', help='name of the directory containing the imap sync configuration.')
@@ -33,7 +32,6 @@ class ARSoftImapSync(object):
 
         ret = 0
         self._verbose = args.verbose
-        self._debug = args.debug
         self._root_dir = args.root_dir
         self._cache_dir = args.cache_dir
 
@@ -74,7 +72,8 @@ class ARSoftImapSync(object):
         else:
             if self._verbose:
                 print('Logfile: %s' % self._offline_imap.logfile)
-            self._offline_imap.readConfig(account_file)
+            if not self._offline_imap.readConfig(account_file):
+                sys.stderr.write('Failed to read account configuration from %s\n' % account_file)
             if self._verbose:
                 if self._offline_imap.account_list is not None:
                     print('Accounts:')
