@@ -6,7 +6,13 @@ import os
 import platform
 import arsoft.utils
 
-(linux_distname,linux_distversion,linux_distcodename) = platform.linux_distribution()
+try:
+    import distro
+    (linux_distname,linux_distversion,linux_distcodename) = distro.linux_distribution()
+except ImportError:
+    linux_distname = None
+    linux_distversion = None
+    linux_distcodename = None
 
 class OpenVPNDefaults(object):
     config_directory = '/etc/openvpn'
