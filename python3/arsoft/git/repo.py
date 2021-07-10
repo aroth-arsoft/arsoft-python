@@ -250,7 +250,7 @@ class GitRepository(object):
                                 stdin=stdin, stdout=stdout, stderr=stderr)
 
     def init(self):
-        args = ['init']
+        args = ['init', '--initial-branch=master']
         if self.bare:
             args.append('--bare')
         args.append(self.root_directory)
