@@ -4,7 +4,6 @@
 
 import os.path
 import sys
-import yaml
 from arsoft.utils import runcmdAndGetData
 from .repo import *
 

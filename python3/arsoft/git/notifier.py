@@ -4,7 +4,6 @@
 
 import os.path
 import sys
-import yaml
 from arsoft.utils import which
 from .repo import *
 
@@ -41,6 +40,7 @@ class GitCommitNotifierConfig(object):
         if filename is None:
             filename = self._configfile
 
+        import yaml
         try:
             f = open(filename, 'r')
             object.__setattr__(self, '_data', yaml.load(f))
@@ -53,6 +53,7 @@ class GitCommitNotifierConfig(object):
         return ret
 
     def save(self, filename=None):
+        import yaml
         if filename is None:
             filename = self._configfile
 

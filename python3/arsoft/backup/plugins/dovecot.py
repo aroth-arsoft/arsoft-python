@@ -7,7 +7,6 @@ from arsoft.filelist import *
 from arsoft.utils import which, runcmdAndGetData, get_gid, get_uid, walk_filetree, create_posix_acl, apply_access_to_parent_directories
 from arsoft.sshutils import SudoSessionException
 from arsoft.rsync import Rsync
-from arsoft.offlineimap import OfflineImap
 
 import tempfile
 import sys
@@ -37,7 +36,10 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         self.port = inifile.get(None, 'port', 143)
         self.master_username = inifile.get(None, 'master_username', 'doveadm')
         self.master_password = inifile.get(None, 'master_password', None)
-        return self._plugin._offlineimap.readConfig(inifile)
+        if self._plugin._offlineimap is None:
+            return False
+        else:
+            return self._plugin._offlineimap.readConfig(inifile)
     
     def _write_conf(self, inifile):
         return True
@@ -54,14 +56,19 @@ class DovecotBackupPluginConfig(BackupPluginConfig):
         ret = ret + 'master_username: ' + str(self.master_username) + '\n'
         ret = ret + 'master_password: ' + str(self.master_password) + '\n'
         ret = ret + 'accounts:\n'
-        if self._plugin._offlineimap.account_list:
-            for item in self._plugin._offlineimap.account_list:
-                ret = ret + '  %s\n' % (item)
+        if self._plugin._offlineimap is not None:
+            if self._plugin._offlineimap.account_list:
+                for item in self._plugin._offlineimap.account_list:
+                    ret = ret + '  %s\n' % (item)
         return ret
 
 class DovecotBackupPlugin(BackupPlugin):
     def __init__(self, backup_app):
-        self._offlineimap = OfflineImap()
+        try:
+            from arsoft.offlineimap import OfflineImap
+            self._offlineimap = OfflineImap()
+        except ImportError:
+            self._offlineimap = None
         self.config = DovecotBackupPluginConfig(self, backup_app)
         BackupPlugin.__init__(self, backup_app, 'dovecot')
         self.doveadm_exe = which('doveadm', only_first=True)
@@ -200,7 +207,7 @@ class DovecotBackupPlugin(BackupPlugin):
         if not self._mkdir(backup_dir):
             ret = False
         if ret:
-            if not self._offlineimap.is_installed:
+            if not self._offlineimap or not self._offlineimap.is_installed:
                 self.writelog('offlineimap not installed')
                 ret = False
             else:
