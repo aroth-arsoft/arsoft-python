@@ -268,9 +268,12 @@ def get_uid(user_name_or_id):
     try:
         ret = int(user_name_or_id)
     except ValueError:
-        u = pwd.getpwnam(user_name_or_id)
-        if u:
-            ret = u.pw_uid
+        try:
+            u = pwd.getpwnam(user_name_or_id)
+            if u:
+                ret = u.pw_uid
+        except KeyError:
+            pass
     return ret
 
 def get_gid(group_name_or_id):
@@ -278,9 +281,12 @@ def get_gid(group_name_or_id):
     try:
         ret = int(group_name_or_id)
     except ValueError:
-        g = grp.getgrnam(group_name_or_id)
-        if g:
-            ret = g.gr_gid
+        try:
+            g = grp.getgrnam(group_name_or_id)
+            if g:
+                ret = g.gr_gid
+        except KeyError:
+            pass
     return ret
 
 def isMountDirectory(path):
