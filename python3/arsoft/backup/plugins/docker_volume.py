@@ -12,11 +12,15 @@ class DockerVolumeBackupPluginConfig(BackupPluginConfig):
     class DockerVolumeConfigItem(object):
         def __init__(self, inifile=None, section=None):
             self._volume_list = None
+            self.compress = False
+            self.compress_format = 'bzip2'
             self.inifile = inifile
             self.section = section
 
         def read_conf(self):
             self._volume_list = self.inifile.getAsArray(self.section, 'Volume', [])
+            self.compress = self.inifile.getAsBoolean(None, 'compress', False)
+            self.compress_format = self.inifile.get(None, 'compress_format', 'bzip2')
             return True
 
         def write_conf(self, inifile):
@@ -24,6 +28,8 @@ class DockerVolumeBackupPluginConfig(BackupPluginConfig):
                 inifile.set(self.section, 'Volume', self._volume_list.items)
             else:
                 inifile.set(self.section, 'Volume', [])
+            inifile.set(self.section, 'compress', self.compress)
+            inifile.set(self.section, 'compress_format', self.compress_format)
             return True
 
         @property
@@ -90,18 +96,41 @@ class DockerVolumeBackupPlugin(BackupPlugin):
             dir_backup_filelist = FileListItem(base_directory=self.config.base_directory)
             for item in self.config.items:
                 for volume in item.volume_list:
-                    volume_bak_file = volume + '.tar.bzip2'
-                    backup_dest_file = os.path.join(backup_dir, volume_bak_file)
-                    print('volume %s -> %s' % (volume, backup_dest_file))
 
-                    args = ['/usr/bin/docker', 'run', '--rm', '-v', '%s:/data' % volume, '-v', '%s:/dest' % backup_dir, 
-                        'busybox', 
-                        'tar', 'c', '-j', '-f', '/dest/%s' % volume_bak_file, '-C', '/data', './' ]
+                    if item.compress:
+                        tar_compress = ''
+                        if item.compress_format == 'bzip2':
+                            volume_bak_file = volume + '.tar.bz2'
+                            tar_compress = '-j'
+                        elif item.compress_format == 'gzip':
+                            volume_bak_file = volume + '.tar.gz'
+                            tar_compress = '-z'
+                        elif item.compress_format == 'xz':
+                            volume_bak_file = volume + '.tar.xz'
+                            tar_compress = '-J'
+                        backup_dest_file = os.path.join(backup_dir, volume_bak_file)
+                        self.writelog('volume %s compress to %s' % (volume, backup_dest_file))
+                        args = ['/usr/bin/docker', 'run', '--rm', '-v', '%s:/data' % volume, '-v', '%s:/dest' % backup_dir, 
+                            'busybox', 
+                            'tar', 'c', tar_compress, '-f', '/dest/%s' % volume_bak_file, '-C', '/data', './' ]
+                    else:
+                        backup_dest_file = os.path.join(backup_dir, volume)
+                        try:
+                            if not os.path.isdir(backup_dest_file):
+                                os.makedirs(backup_dest_file)
+                        except OSError as e:
+                            self.writelog('Unable to create directory %s for docker volume %s, error %s.\n' % (backup_dest_file, volume, e))
+                            backup_dest_file = None
 
-                    (sts, stdout_data, stderr_data) = runcmdAndGetData(executable='/usr/bin/docker', args=args, shell=False, 
-                        verbose=True, outputStdErr=True, outputStdOut=True)
-                    if sts == 0:
-                        dir_backup_filelist.append(backup_dest_file)
+                        self.writelog('volume %s copy to %s' % (volume, backup_dest_file))
+                        args = ['/usr/bin/docker', 'run', '--rm', '-v', '%s:/data' % volume, '-v', '%s:/dest/data' % backup_dest_file, 
+                            'busybox', 
+                            'cp', '-a', '/data', '/dest/' ]
+                    if backup_dest_file:
+                        (sts, stdout_data, stderr_data) = runcmdAndGetData(executable='/usr/bin/docker', args=args, shell=False, 
+                            verbose=True, outputStdErr=True, outputStdOut=True)
+                        if sts == 0:
+                            dir_backup_filelist.append(backup_dest_file)
             self.backup_app.append_to_filelist(dir_backup_filelist)
 
         return ret
