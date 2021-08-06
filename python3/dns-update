@@ -142,25 +142,27 @@ NOTE:
     HELP_EXAMPLES = """
 Examples:
     Add an A-record:
-    dns-update --server 127.0.0.1 -a mail.example.com.=127.0.0.2
-    Add an CNAME-record:
-    dns-update --server 127.0.0.1 -a smtp.example.com.=mail.example.com./CNAME
+      dns-update --server 127.0.0.1 -a mail.example.com.=127.0.0.2
+    Add a CNAME-record:
+      dns-update --server 127.0.0.1 -a smtp.example.com.=mail.example.com./CNAME
     Update an internet (IN) class A-record:
-    dns-update --server 127.0.0.1 -u mail.example.com.=127.0.0.3/A:IN
-    Update an NS-record:
-    dns-update --server 127.0.0.1 -u 'example.com.=first.example.com.|second.example.com./NS'
-    Update an SOA-record:
-    dns-update --server 127.0.0.1 -u example.com.=admin=admin.example.com.,ttl=86400/SOA
-    dns-update --server 127.0.0.1 -u example.com.=master:ns1.example.com.,ttl:86400/SOA
+      dns-update --server 127.0.0.1 -u mail.example.com.=127.0.0.3/A:IN
+    Update a NS-record:
+      dns-update --server 127.0.0.1 -u 'example.com.=first.example.com.|second.example.com./NS'
+    Update a SOA-record:
+      dns-update --server 127.0.0.1 -u example.com.=admin=admin.example.com.,ttl=86400/SOA
+      dns-update --server 127.0.0.1 -u example.com.=master:ns1.example.com.,ttl:86400/SOA
     Add SPF TXT record:
-    dns-update --server 127.0.0.1 -a "example.com.=v=spf1 include:_spf.google.com ~all/TXT"
-    Update an DKIM TXT-record:
-    dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=key:MCQwDQYJKoZIhvcNAQEBBQADEwAwEAIJALkflXvQub5DAgMBAAE=/DKIM
-    dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=keyfile:~/dkim_publickey.pem/DKIM
-    Update an DMARC TXT-record:
-    dns-update --server 127.0.0.1 -u _dmarc.example.com.=p:reject/DMARC
-    Update an DMARC PTR-record:
-    dns-update --server 127.0.0.1 -u 3.2.168.192.in-addr.arpa.=host.example.com./PTR
+      dns-update --server 127.0.0.1 -a "example.com.=v=spf1 include:_spf.google.com ~all/TXT"
+    Update a DKIM TXT-record:
+      dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=key:MCQwDQYJKoZIhvcNAQEBBQADEwAwEAIJALkflXvQub5DAgMBAAE=/DKIM
+      dns-update --server 127.0.0.1 -u mail._domainkey.example.com.=keyfile:~/dkim_publickey.pem/DKIM
+    Update a DMARC TXT-record:
+      dns-update --server 127.0.0.1 -u _dmarc.example.com.=p:reject/DMARC
+    Update a DMARC PTR-record:
+      dns-update --server 127.0.0.1 -u 3.2.168.192.in-addr.arpa.=host.example.com./PTR
+    Delete a TXT-record:
+      dns-update --server 127.0.0.1 -d host.example.com.=mydhcpid/TXT
 """
 
     def __init__(self):
@@ -261,7 +263,7 @@ Examples:
                                         arg_olddict[key] = old
                                     if new:
                                         arg_dict[key] = new
-                                elif v_val:
+                                elif v_val is not None:
                                     arg_dict[key] = v_val
                     elif (',' in arg_value or ' ' in arg_value) and (arg_rrtype != dns.rdatatype.TXT and arg_rrtype != dns.rdatatype.AAAA):
                         arg_value_split = arg_value.split(',') if ',' in arg_value else arg_value.split(' ')
@@ -291,7 +293,7 @@ Examples:
                             arg_dict[key] = new
                     else:
                         key = arg_field_index_map[0]
-                        if arg_value:
+                        if arg_value is not None:
                             arg_dict[key] = arg_value
 
                     arg_value = arg_dict if arg_dict else None
@@ -300,7 +302,7 @@ Examples:
                     #print('got name %s' % arg)
                     arg_name = arg
 
-            #print('>> got arg %s, %s, \'%s\'' % (arg_name, arg_rrtype, arg_value))
+            print('>> got arg %s, %s, \'%s\'' % (arg_name, arg_rrtype, arg_value))
             if arg_name is not None and arg_rrtype is not None:
                 try:
                     self._name = dns.name.from_text(arg_name)
@@ -352,6 +354,10 @@ Examples:
                     dns.rdtypes.IN.AAAA.AAAA(dns.rdataclass.IN, dns.rdatatype.AAAA, addr)
                 except dns.exception.SyntaxError:
                     raise RecordValueError(self._rrtype, self._name, str(addr))
+            elif self._rrtype == dns.rdatatype.TXT:
+                text = self._get_item('txt', None)
+                if text is None:
+                    raise RecordValueError(self._rrtype, self._name, 'text is missing')
 
         @property
         def valid(self):
@@ -460,10 +466,13 @@ Examples:
                 return dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, dns.name.from_text(target))
 
             elif self._rrtype == dns.rdatatype.TXT:
-                text = self._get_item('text', None, old=old)
+                text = self._get_item('txt', None, old=old)
                 if text is None:
                     return None
+                #print(text)
+                text = text.encode('ascii')
                 strings = [text[i:i+250] for i in range(0, len(text), 250)]
+                #print(strings)
                 return dns.rdtypes.ANY.TXT.TXT(dns.rdataclass.IN, dns.rdatatype.TXT, strings)
 
             elif self._rrtype == dns.rdatatype.SOA:
