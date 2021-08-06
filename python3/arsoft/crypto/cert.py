@@ -180,9 +180,10 @@ class Certificate(PEMItem):
         for (key, value) in name.get_components():
             if len(text) != 0:
                 text += ', '
-            text += key + '=' + value
+            text += key.decode('utf8') + '=' + value.decode('utf8')
+        text += ' Hash(%s)' % name.hash()
         fobj.write(prefix + text + '\n')
-        
+
     def _writeNamePretty(self, fobj, label, name, indent=0):
         prefix = ' ' * indent
         
@@ -221,7 +222,7 @@ class Certificate(PEMItem):
         issuer = self.cert.get_issuer()
         serial = self.get_serial_number() 
         try:
-            signature_algorithm = cert.get_signature_algorithm()
+            signature_algorithm = self.cert.get_signature_algorithm().decode('utf8')
         except:
             signature_algorithm = 'Unknown'
         subject = self.get_subject()
@@ -254,12 +255,16 @@ class Certificate(PEMItem):
             fobj.write(prefix + "  Digest SHA1: %s\n" % self.digest('sha1'))
             fobj.write(prefix + ("  Serial Number: %i (0x%X)\n" %(serial, serial)))
             fobj.write(prefix + "  Signature Algorithm: %s\n" % signature_algorithm)
-            self._writeNamePretty(fobj, '  Issuer:  ', issuer)
             fobj.write(prefix + "  Validity\n")
             fobj.write(prefix + "    Not Before: %s\n" % not_before.ctime())
             fobj.write(prefix + "    Not After : %s\n" % not_after.ctime())
-            self._writeNamePretty(fobj, '  Subject: ', subject)
- 
+            if 0:
+                self._writeNamePretty(fobj, '  Issuer:  ', issuer)
+                self._writeNamePretty(fobj, '  Subject: ', subject)
+            else:
+                self._writeName(fobj, '  Issuer:  ', issuer)
+                self._writeName(fobj, '  Subject: ', subject)
+
 
 class CertificateList:
     def __init__(self):
