@@ -256,10 +256,14 @@ class GitRepository(object):
         args.append(self.root_directory)
         return self.git(args, stdout=sys.stdout, stderr=sys.stderr, use_root_for_cwd=False)
 
-    def clone(self, url, dest_dir=None, recursive=True, branch=None, origin=None, outputStdErr=True, outputStdOut=True):
+    def clone(self, url, dest_dir=None, recursive=True, mirror=False, bare=False, branch=None, origin=None, outputStdErr=True, outputStdOut=True):
         args = ['clone']
         if recursive:
             args.append('--recursive')
+        if mirror:
+            args.append('--mirror')
+        if bare:
+            args.append('--bare')
         if branch:
             args.append('--branch')
             args.append(branch)
@@ -307,6 +311,19 @@ class GitRepository(object):
             args.append('--all')
         elif isinstance(remote, list):
             args.append('--multiple')
+            for e in remote:
+                args.append(e)
+        elif remote is not None:
+            args.append(remote)
+        return self.git(args, stdout=sys.stdout, stderr=sys.stderr)
+
+    def push(self, remote=None, all=False, mirror=False):
+        args = ['push']
+        if all:
+            args.append('--all')
+        if mirror:
+            args.append('--mirror')
+        if isinstance(remote, list):
             for e in remote:
                 args.append(e)
         elif remote is not None:
@@ -459,6 +476,39 @@ class GitRepository(object):
         (sts, stdout, stderr) = self.git(args)
         if sts == 0:
             return GitBundle(filename, repository=self)
+        else:
+            raise GitRepositoryError(self, sts, stdout, stderr)
+
+    @property
+    def remotes(self):
+        args = ['remote']
+        (sts, stdoutdata, stderrdata) = self.git(args)
+        if sts == 0:
+            ret = []
+            stdoutdata = stdoutdata.decode("utf-8")
+            for line in stdoutdata.splitlines():
+                ret.append(line.strip())
+        else:
+            raise GitRepositoryError(self, sts, stdoutdata, stderrdata)
+        return ret
+
+    def add_remote(self, name, url, fail_if_exists=True):
+        if not fail_if_exists:
+            if name in self.remotes:
+                return self.set_remote(name, url)
+
+        args = ['remote', 'add', name, url]
+        (sts, stdout, stderr) = self.git(args)
+        if sts == 0:
+            return True
+        else:
+            raise GitRepositoryError(self, sts, stdout, stderr)
+
+    def set_remote(self, name, url):
+        args = ['remote', 'set-url', name, url]
+        (sts, stdout, stderr) = self.git(args)
+        if sts == 0:
+            return True
         else:
             raise GitRepositoryError(self, sts, stdout, stderr)
 

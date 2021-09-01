@@ -1,0 +1,51 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python;
+
+import sys
+import os
+import argparse
+import re
+from urlparse import urlparse
+from arsoft.git import GitRepository
+
+class git_sync_app(object):
+
+    def __init__(self):
+        pass
+
+
+    def main(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+            
+        #=============================================================================================
+        # process command line
+        #=============================================================================================
+        parser = argparse.ArgumentParser(description='converts SVN reference with trac to GIT commits')
+        parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='enable verbose output of this script.')
+        parser.add_argument('source', help='source git repository', metavar='repo')
+        parser.add_argument('dest', help='destination git repository', metavar='repo')
+
+        args = parser.parse_args()
+        self._verbose = args.verbose
+        source_name = os.path.basename(args.source)
+        #self._gitdir = os.path.join(os.getcwd(), source_name + '.git')
+        self._gitdir = os.path.join('/tmp', source_name + '.git')
+        #self._gitdir = os.path.realpath(os.getcwd() if args.gitdir is None else args.gitdir)
+        #self._remote = args.remote
+        ret = True
+
+        #print(self._gitdir)
+
+        self._repo = GitRepository(self._gitdir)
+        if not self._repo.valid:
+            self._repo.clone(url=args.source, dest_dir=self._gitdir, mirror=True, bare=True)
+        self._repo.fetch(remote='origin', recursive=False)
+        self._repo.push(remote=args.dest, mirror=True)
+
+        return 0 if ret else 1
+        
+if __name__ == "__main__":
+    app =  git_sync_app()
+    sys.exit(app.main())
