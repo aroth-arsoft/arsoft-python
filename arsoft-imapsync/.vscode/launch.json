@@ -1,0 +1,38 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "justMyCode": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: arsoft-imapsync.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/app/arsoft-imapsync.py",
+            "args": ["-C", "/mnt/work/arsoft/imapsynctest/", 
+                "-v", "--cache-directory", "/mnt/work/arsoft/imapsynctest/cache",
+            "--offlineimap", "/mnt/work/arsoft/arsoft-python/arsoft-imapsync/venv/bin/offlineimap"],
+            "justMyCode": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "offlineimap",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/offlineimap/offlineimap.py",
+            "args": ["-c", "/mnt/work/arsoft/imapsynctest/cache/account-data/mroth@arsoft-online.com.conf"],
+            "justMyCode": false,
+            "env": {"PYTHONPATH": "${workspaceFolder}/rfc6555:${workspaceFolder}/selectors2:${env:PYTHONPATH}"},
+            "console": "integratedTerminal"
+        },
+
+    ]
+}

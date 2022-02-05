@@ -193,7 +193,7 @@ EOF
 
     docker build --tag arsoft-imapsync:latest "$tmpdir" || return 1
     docker tag arsoft-imapsync:latest rothan/arsoft-imapsync:latest
-    #docker push rothan/arsoft-imapsync:latest
+    docker push rothan/arsoft-imapsync:latest
 
     # Remove temp dir
     rm -rf "$tmpdir"

@@ -437,10 +437,15 @@ remoterepository = %(accountname)s-remote
                 self.openlog()
             return self._logfile_proxy
 
-    def __init__(self, private_dir=None, verbose=False, dryrun=False):
+    def __init__(self, offlineimap_exe=None, private_dir=None, verbose=False, dryrun=False):
         self._account_list = None
         self._private_dir = private_dir
-        self.offlineimap_exe = which('offlineimap', only_first=True)
+        if offlineimap_exe is None:
+            self.offlineimap_exe = which('offlineimap', only_first=True)
+        else:
+            p = os.path.abspath(offlineimap_exe)
+            if os.path.isfile(p):
+                self.offlineimap_exe = p
         self._verbose = verbose
         self._dryrun = dryrun
         (fqdn, hostname, domain) = gethostname_tuple()

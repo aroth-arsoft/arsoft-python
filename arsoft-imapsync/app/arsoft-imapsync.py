@@ -27,6 +27,7 @@ class ARSoftImapSync(object):
         parser.add_argument('-R', '--root-directory', dest='root_dir', default='/', help='specifies the root directory for operations.')
         parser.add_argument('-C', '--config-directory', dest='config_dir', default='/etc/arsoft/imapsync', help='name of the directory containing the imap sync configuration.')
         parser.add_argument('--cache-directory', dest='cache_dir', default='/var/tmp/arsoft-imapsync', help='name of the directory containing the imap sync cache data.')
+        parser.add_argument('--offlineimap', dest='offlineimap_exe', help='use specified offlineimap tool')
 
         args = parser.parse_args()
 
@@ -65,12 +66,13 @@ class ARSoftImapSync(object):
         if ret != 0:
             return ret
 
-        self._offline_imap = OfflineImap(private_dir=private_dir, verbose=self._verbose)
+        self._offline_imap = OfflineImap(private_dir=private_dir, offlineimap_exe=args.offlineimap_exe, verbose=self._verbose)
         if not self._offline_imap.is_installed:
             sys.stderr.write('Unable to find offlineimap executable. Please install offlineimap.\n')
             ret = 1
         else:
             if self._verbose:
+                print('Offlineimap: %s' % self._offline_imap.offlineimap_exe)
                 print('Logfile: %s' % self._offline_imap.logfile)
             if not self._offline_imap.readConfig(account_file):
                 sys.stderr.write('Failed to read account configuration from %s\n' % account_file)
