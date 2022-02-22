@@ -1,3 +1,9 @@
+arsoft-python (1.335) focal; urgency=medium
+
+  * sort out missing check_mk
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 22 Feb 2022 19:16:15 +0100
+
 arsoft-python (1.334) focal; urgency=medium
 
   * allow to use arsoft-trac-suid from arsoft-base
