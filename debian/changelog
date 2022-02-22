@@ -1,3 +1,9 @@
+arsoft-python (1.336) focal; urgency=medium
+
+  * fix build
+
+ -- Andreas Roth <aroth@arsoft-online.com>  Tue, 22 Feb 2022 19:23:55 +0100
+
 arsoft-python (1.335) focal; urgency=medium
 
   * sort out missing check_mk
